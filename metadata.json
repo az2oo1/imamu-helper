@@ -1,0 +1,6 @@
+{
+  "name": "IMAMU Helper",
+  "description": "A comprehensive student platform for Imam Mohammad Ibn Saud Islamic University (IMAMU) featuring tools, resources, events, news, and an intelligent academic counselor.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
