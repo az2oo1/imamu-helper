@@ -12,7 +12,30 @@
   --color-imamu-gold-light: #e5cd96;
 }
 
+html {
+  overflow-y: scroll;
+}
+
 body {
   background-color: #f8fafc;
   color: #0f172a;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f8fafc; 
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1; 
+  border-radius: 10px;
+  border: 2px solid #f8fafc;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8; 
 }

@@ -3,7 +3,7 @@ import { useAuth } from '../lib/AuthContext';
 import { ShieldAlert, Plus, ShieldCheck, Twitter, Calendar, BookOpen, FileText, Trash2, Link as LinkIcon, Download, Sparkles, Upload } from 'lucide-react';
 import { format } from 'date-fns';
 
-type Tab = 'news_sources' | 'majors' | 'events' | 'subjects' | 'smtp_settings';
+type Tab = 'news_sources' | 'majors' | 'events' | 'subjects' | 'settings';
 
 function AiImporter({ 
   prompt, 
@@ -187,7 +187,7 @@ export function AdminPage() {
   const [majors, setMajors] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
-  const [globalSettings, setGlobalSettings] = useState<{fetchRangeDays: number, autoDeleteDays: number, smtpHost?: string, smtpPort?: number, smtpUser?: string, smtpPass?: string}>({ fetchRangeDays: 30, autoDeleteDays: 30 });
+  const [globalSettings, setGlobalSettings] = useState<{fetchRangeDays: number, autoDeleteDays: number, smtpHost?: string, smtpPort?: number, smtpUser?: string, smtpPass?: string, semesterStartDate?: string, semesterEndDate?: string, apiToken?: string}>({ fetchRangeDays: 30, autoDeleteDays: 30 });
 
   // Forms
   const [sourceForm, setSourceForm] = useState<{id?:number, handle:string}>({ handle: ''});
@@ -197,6 +197,15 @@ export function AdminPage() {
   const [subjectForm, setSubjectForm] = useState<{id?:number, code:string, name:string, driveLink:string, whatsappLink:string, creditHours:string, level:string}>({ code: '', name: '', driveLink: '', whatsappLink: '', creditHours: '3', level: '' });
   const [unassignedSearch, setUnassignedSearch] = useState('');
   const [includedCoursesSearch, setIncludedCoursesSearch] = useState('');
+
+  const [subjectSearch, setSubjectSearch] = useState('');
+  const [subjectLimit, setSubjectLimit] = useState(20);
+
+  const [majorSearch, setMajorSearch] = useState('');
+  const [majorLimit, setMajorLimit] = useState(10);
+
+  const [eventSearch, setEventSearch] = useState('');
+  const [eventLimit, setEventLimit] = useState(20);
 
   // Native Delete Modal
   const [deleteModal, setDeleteModal] = useState<{url: string, message: string} | null>(null);
@@ -617,10 +626,34 @@ export function AdminPage() {
               </div>
             </div>
 
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Current Majors</h3>
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Current Majors ({majors.length})</h3>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <input
+                    type="text"
+                    placeholder="Search majors..."
+                    value={majorSearch}
+                    onChange={(e) => setMajorSearch(e.target.value)}
+                    className="flex-1 sm:w-64 bg-white border border-gray-200 py-2 px-3 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)]"
+                  />
+                  <select
+                    value={majorLimit}
+                    onChange={(e) => setMajorLimit(Number(e.target.value))}
+                    className="bg-white border border-gray-200 py-2 px-3 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)]"
+                  >
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+              </div>
               <div className="divide-y divide-gray-100 border-t border-gray-100">
-                {majors.map(m => (
+                {majors
+                  .filter(m => m.name?.toLowerCase().includes(majorSearch.toLowerCase()))
+                  .slice(0, majorLimit)
+                  .map(m => (
                   <div key={m.id} className="py-4 flex items-center justify-between group">
                     <div>
                       <div className="font-medium text-gray-900">{m.name}</div>
@@ -666,6 +699,24 @@ export function AdminPage() {
                 <Download className="w-4 h-4" /> Download .ics
               </a>
             </div>
+            
+            <div className="flex items-center justify-between gap-4 bg-emerald-50 p-4 rounded-xl border border-emerald-100 mb-6">
+              <div>
+                <h4 className="font-semibold text-emerald-900">Mokafaa (Student Allowance)</h4>
+                <p className="text-sm text-emerald-700">Automatically generate Mokafaa events on the 25th of every month for the next 12 months.</p>
+              </div>
+              <button
+                onClick={() => {
+                  handlePost('/api/admin/events/generate-mokafaa', {}, () => {
+                    alert('Generated 12 Mokafaa events successfully!');
+                    fetchData();
+                  });
+                }}
+                className="flex items-center gap-2 bg-emerald-600 text-white font-medium px-4 py-2 rounded-lg hover:bg-emerald-700 transition shadow-sm text-sm whitespace-nowrap"
+              >
+                <Sparkles className="w-4 h-4" /> Generate Mokafaa Dates
+              </button>
+            </div>
 
             <div>
               <h3 className="text-xl font-display font-semibold text-gray-900 mb-4">{eventForm.id ? "Edit Calendar Event" : "Add Calendar Event"}</h3>
@@ -705,10 +756,35 @@ export function AdminPage() {
               </div>
             </div>
 
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Upcoming Events</h3>
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Upcoming Events ({events.length})</h3>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <input
+                    type="text"
+                    placeholder="Search events..."
+                    value={eventSearch}
+                    onChange={(e) => setEventSearch(e.target.value)}
+                    className="flex-1 sm:w-64 bg-white border border-gray-200 py-2 px-3 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)]"
+                  />
+                  <select
+                    value={eventLimit}
+                    onChange={(e) => setEventLimit(Number(e.target.value))}
+                    className="bg-white border border-gray-200 py-2 px-3 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)]"
+                  >
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+              </div>
               <div className="divide-y divide-gray-100 border-t border-gray-100">
-                {events.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map(e => (
+                {events
+                  .filter(e => e.title?.toLowerCase().includes(eventSearch.toLowerCase()) || e.description?.toLowerCase().includes(eventSearch.toLowerCase()))
+                  .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                  .slice(0, eventLimit)
+                  .map(e => (
                   <div key={e.id} className="py-4 flex items-center justify-between group">
                     <div>
                       <div className="font-medium text-gray-900">{e.title}</div>
@@ -757,23 +833,46 @@ export function AdminPage() {
                 </div>
               </div>
             </div>
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-900">Current Subjects</h3>
-                <button
-                  onClick={() => {
-                    if(confirm("Are you sure you want to deduplicate subjects? This will keep only the best one per course code.")) {
-                      handlePost('/api/admin/subjects/deduplicate', {}, () => alert('Duplicates removed!'));
-                    }
-                  }}
-                  className="px-4 py-2 text-sm bg-orange-50 text-orange-600 hover:bg-orange-100 rounded-lg font-medium transition flex items-center gap-2"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  Clean Duplicates
-                </button>
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Current Subjects ({subjects.length})</h3>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <input
+                    type="text"
+                    placeholder="Search subjects..."
+                    value={subjectSearch}
+                    onChange={(e) => setSubjectSearch(e.target.value)}
+                    className="flex-1 sm:w-64 bg-white border border-gray-200 py-2 px-3 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)]"
+                  />
+                  <select
+                    value={subjectLimit}
+                    onChange={(e) => setSubjectLimit(Number(e.target.value))}
+                    className="bg-white border border-gray-200 py-2 px-3 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)]"
+                  >
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                    <option value={1000}>All</option>
+                  </select>
+                  <button
+                    onClick={() => {
+                      if(confirm("Are you sure you want to deduplicate subjects? This will keep only the best one per course code.")) {
+                        handlePost('/api/admin/subjects/deduplicate', {}, () => alert('Duplicates removed!'));
+                      }
+                    }}
+                    className="px-3 py-2 text-sm bg-orange-50 text-orange-600 hover:bg-orange-100 rounded-lg font-medium transition flex items-center gap-1 whitespace-nowrap"
+                    title="Clean Duplicates"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
               <div className="divide-y divide-gray-100 border-t border-gray-100">
-                {subjects.map(s => (
+                {subjects
+                  .filter(s => s.code?.toLowerCase().includes(subjectSearch.toLowerCase()) || s.name?.toLowerCase().includes(subjectSearch.toLowerCase()))
+                  .slice(0, subjectLimit)
+                  .map(s => (
                   <div key={s.id} className="py-4 flex items-center justify-between group">
                     <div className="flex gap-4">
                       <div className="font-mono text-sm bg-gray-100 px-2.5 py-1 rounded-md text-gray-700 self-start">{s.code}</div>
@@ -805,17 +904,58 @@ export function AdminPage() {
             </div>
           </div>
         );
-      case 'smtp_settings':
+      case 'settings':
         return (
           <div className="space-y-8">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h3 className="text-xl font-display font-semibold text-gray-900 mb-1">SMTP Settings</h3>
-                <p className="text-sm text-gray-500">Configure email settings for sending verification codes</p>
+                <h3 className="text-xl font-display font-semibold text-gray-900 mb-1">Global Settings</h3>
+                <p className="text-sm text-gray-500">Configure global application settings</p>
               </div>
             </div>
 
-            <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+            <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 mb-8">
+               <h4 className="text-lg font-medium text-gray-900 mb-4">Semester Countdowns</h4>
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                 <div className="flex flex-col">
+                   <label className="text-sm text-gray-600 mb-1">Semester Start Date</label>
+                   <input 
+                     type="date"
+                     value={globalSettings.semesterStartDate || ''}
+                     onChange={e => setGlobalSettings(s => ({...s, semesterStartDate: e.target.value}))}
+                     className="bg-white border border-gray-300 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)]"
+                   />
+                 </div>
+                 <div className="flex flex-col">
+                   <label className="text-sm text-gray-600 mb-1">Semester End Date</label>
+                   <input 
+                     type="date"
+                     value={globalSettings.semesterEndDate || ''}
+                     onChange={e => setGlobalSettings(s => ({...s, semesterEndDate: e.target.value}))}
+                     className="bg-white border border-gray-300 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)]"
+                   />
+                 </div>
+               </div>
+            </div>
+
+            <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 mb-8">
+               <h4 className="text-lg font-medium text-gray-900 mb-4">External API Settings</h4>
+               <div className="grid grid-cols-1 gap-5">
+                 <div className="flex flex-col">
+                   <label className="text-sm text-gray-600 mb-1">API Token (Used for /api/external endpoints)</label>
+                   <input 
+                     type="text"
+                     value={globalSettings.apiToken || ''}
+                     onChange={e => setGlobalSettings(s => ({...s, apiToken: e.target.value}))}
+                     placeholder="super_secret_token_123"
+                     className="bg-white border border-gray-300 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)]"
+                   />
+                 </div>
+               </div>
+            </div>
+
+            <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 mb-8">
+               <h4 className="text-lg font-medium text-gray-900 mb-4">SMTP Settings (Verification Codes)</h4>
                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                  <div className="flex flex-col">
                    <label className="text-sm text-gray-600 mb-1">SMTP Host</label>
@@ -862,9 +1002,9 @@ export function AdminPage() {
                <div className="mt-6 flex justify-end">
                  <button 
                    className="bg-[var(--color-imamu-blue)] text-white px-5 py-2.5 rounded-lg font-medium hover:bg-[var(--color-imamu-blue-light)] transition"
-                   onClick={() => handlePostWithMethod('/api/admin/global_settings', 'PUT', globalSettings, () => alert('SMTP Settings saved!'))}
+                   onClick={() => handlePostWithMethod('/api/admin/global_settings', 'PUT', globalSettings, () => alert('Settings saved!'))}
                  >
-                   Save SMTP Settings
+                   Save All Settings
                  </button>
                </div>
             </div>
@@ -915,10 +1055,10 @@ export function AdminPage() {
               <BookOpen className="w-5 h-5 shrink-0" /> Course Resources
             </button>
             <button 
-              onClick={() => setActiveTab('smtp_settings')} 
-              className={`flex items-center gap-3 w-full px-4 py-3 text-left rounded-xl font-medium transition ${activeTab === 'smtp_settings' ? 'bg-[var(--color-imamu-blue)] text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100/80 hover:text-gray-900'}`}
+              onClick={() => setActiveTab('settings')} 
+              className={`flex items-center gap-3 w-full px-4 py-3 text-left rounded-xl font-medium transition ${activeTab === 'settings' ? 'bg-[var(--color-imamu-blue)] text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100/80 hover:text-gray-900'}`}
             >
-              <ShieldCheck className="w-5 h-5 shrink-0" /> SMTP Config
+              <ShieldCheck className="w-5 h-5 shrink-0" /> Global Settings
             </button>
           </nav>
         </div>

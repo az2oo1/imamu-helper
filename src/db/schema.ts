@@ -73,6 +73,9 @@ export const global_settings = pgTable('global_settings', {
   smtpPort: integer('smtp_port'),
   smtpUser: text('smtp_user'),
   smtpPass: text('smtp_pass'),
+  semesterStartDate: text('semester_start_date'),
+  semesterEndDate: text('semester_end_date'),
+  apiToken: text('api_token'),
 });
 
 export const newsLikes = pgTable('news_likes', {

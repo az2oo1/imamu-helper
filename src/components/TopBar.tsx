@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/AuthContext';
-import { LogIn, LogOut, Settings, GraduationCap, Menu, X, UserCircle2 } from 'lucide-react';
+import { LogIn, LogOut, Settings, GraduationCap, Menu, X, UserCircle2, Home, Calculator, BookOpen, Calendar, Newspaper, HelpCircle } from 'lucide-react';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -12,27 +12,28 @@ export function TopBar() {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   const navLinks = [
-    { name: 'Home', path: '/' },
-    { name: 'Tools', path: '/tools' },
-    { name: 'Resources', path: '/resources' },
-    { name: 'Calendar', path: '/calendar' },
-    { name: 'News', path: '/news' },
+    { name: 'الرئيسية', path: '/', icon: Home },
+    { name: 'الأدوات', path: '/tools', icon: Calculator },
+    { name: 'المصادر', path: '/resources', icon: BookOpen },
+    { name: 'التقويم', path: '/calendar', icon: Calendar },
+    { name: 'الأخبار', path: '/news', icon: Newspaper },
+    { name: 'الشروحات', path: '/how-to', icon: HelpCircle },
   ];
 
   return (
     <>
-      <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/80 backdrop-blur-md">
+      <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/80 backdrop-blur-md" dir="rtl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-x-4 md:gap-x-8">
             <button 
-              className="md:hidden p-2 -ml-2 text-gray-500 hover:text-gray-900 rounded-md"
+              className="md:hidden p-2 -mr-2 text-gray-500 hover:text-gray-900 rounded-md"
               onClick={() => setMobileMenuOpen(true)}
             >
               <Menu className="w-6 h-6" />
             </button>
             <Link to="/" className="flex items-center gap-2 text-[var(--color-imamu-blue)] font-display font-bold text-xl tracking-tight">
               <GraduationCap className="h-6 w-6 text-[var(--color-imamu-gold)]" />
-              <span className="hidden sm:inline">IMAMU Helper</span>
+              <span className="hidden sm:inline">مساعد الإمام</span>
             </Link>
             
             <nav className="hidden md:flex gap-x-6 h-full items-center text-sm font-medium">
@@ -43,14 +44,16 @@ export function TopBar() {
                     key={link.path}
                     to={link.path}
                     className={clsx(
-                      "relative h-16 flex items-center px-1 transition-colors hover:text-[var(--color-imamu-blue)]",
+                      "relative h-16 flex items-center gap-2 px-1 transition-colors hover:text-[var(--color-imamu-blue)]",
                       isActive ? "text-[var(--color-imamu-blue)]" : "text-gray-500"
                     )}
                   >
+                    <link.icon className="w-4 h-4" />
                     {link.name}
                     {isActive && (
                       <motion.div
-                        layoutId="activeTab"
+                        initial={{ opacity: 0, y: 2 }}
+                        animate={{ opacity: 1, y: 0 }}
                         className="absolute bottom-0 left-0 right-0 h-[3px] bg-[var(--color-imamu-blue)] rounded-t-full"
                       />
                     )}
@@ -104,9 +107,10 @@ export function TopBar() {
                           to="/profile" 
                           onClick={() => setProfileMenuOpen(false)}
                           className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-[var(--color-imamu-blue)] transition"
+                          dir="rtl"
                         >
                           <Settings className="w-4 h-4" />
-                          Profile Settings
+                          إعدادات الملف الشخصي
                         </Link>
                         <hr className="my-1 border-gray-100" />
                         <button
@@ -115,9 +119,10 @@ export function TopBar() {
                             setProfileMenuOpen(false);
                           }}
                           className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition"
+                          dir="rtl"
                         >
                           <LogOut className="w-4 h-4" />
-                          Sign Out
+                          تسجيل الخروج
                         </button>
                       </motion.div>
                     </>
@@ -130,7 +135,7 @@ export function TopBar() {
                 className="flex items-center gap-2 rounded-full bg-[var(--color-imamu-blue)] px-4 sm:px-5 py-2 text-sm font-medium text-white transition hover:bg-[var(--color-imamu-blue-light)] shadow-sm"
               >
                 <LogIn className="w-4 h-4" />
-                <span className="hidden sm:inline">Sign In</span>
+                <span className="hidden sm:inline">تسجيل الدخول</span>
               </Link>
             )}
           </div>
@@ -149,16 +154,17 @@ export function TopBar() {
               onClick={() => setMobileMenuOpen(false)}
             />
             <motion.div 
-              initial={{ x: '-100%' }}
+              initial={{ x: '100%' }}
               animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
+              exit={{ x: '100%' }}
               transition={{ type: 'spring', bounce: 0, duration: 0.3 }}
-              className="fixed inset-y-0 left-0 w-64 z-[70] bg-white shadow-2xl flex flex-col md:hidden"
+              className="fixed inset-y-0 right-0 w-64 z-[70] bg-white shadow-2xl flex flex-col md:hidden"
+              dir="rtl"
             >
               <div className="flex items-center justify-between p-4 border-b border-gray-100">
                 <Link to="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 text-[var(--color-imamu-blue)] font-display font-bold text-lg">
                   <GraduationCap className="h-6 w-6 text-[var(--color-imamu-gold)]" />
-                  <span>IMAMU Helper</span>
+                  <span>مساعد الإمام</span>
                 </Link>
                 <button 
                   className="p-2 text-gray-400 hover:text-gray-900 rounded-md"
@@ -176,10 +182,11 @@ export function TopBar() {
                       to={link.path}
                       onClick={() => setMobileMenuOpen(false)}
                       className={clsx(
-                        "px-4 py-3 rounded-xl text-base font-medium transition-colors",
+                        "px-4 py-3 rounded-xl flex items-center gap-3 text-base font-medium transition-colors",
                         isActive ? "bg-sky-50 text-[var(--color-imamu-blue)]" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                       )}
                     >
+                      <link.icon className={clsx("w-5 h-5", isActive ? "text-[var(--color-imamu-blue)]" : "text-gray-400")} />
                       {link.name}
                     </Link>
                   );

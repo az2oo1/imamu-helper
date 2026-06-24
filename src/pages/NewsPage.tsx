@@ -1,7 +1,66 @@
 import React, { useEffect, useState } from "react";
-import { Newspaper, Twitter, MessageCircle, Heart, Link as LinkIcon, Send, X, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Newspaper, Twitter, MessageCircle, Heart, Link as LinkIcon, Send, X, Trash2, ChevronLeft, ChevronRight, Play } from "lucide-react";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { useAuth } from "../lib/AuthContext";
+import Masonry from 'react-masonry-css';
+
+const breakpointColumnsObj = {
+  default: 4,
+  1536: 4,
+  1024: 3,
+  640: 2,
+  0: 1
+};
+
+const VideoPlayer = ({ videoUrl, posterUrl }: { videoUrl: string, posterUrl?: string }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+
+  const handlePlay = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (videoRef.current) {
+      videoRef.current.play();
+      setIsPlaying(true);
+    }
+  };
+
+  return (
+    <div className="w-full aspect-video rounded-2xl overflow-hidden border border-gray-100 bg-gray-900 mb-4 flex items-center justify-center relative group" dir="ltr" onClick={(e) => e.stopPropagation()}>
+      <video 
+        ref={videoRef}
+        src={videoUrl.includes('#') ? videoUrl : `${videoUrl}#t=0.1`} 
+        poster={posterUrl}
+        controls={isPlaying}
+        preload="metadata"
+        playsInline
+        className="w-full h-full object-contain mx-auto" 
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+      />
+      {!isPlaying && posterUrl && (
+        <img 
+          src={posterUrl} 
+          alt="Video preview" 
+          className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+          referrerPolicy="no-referrer"
+          onError={(e) => {
+            (e.target as HTMLImageElement).style.display = 'none';
+          }}
+        />
+      )}
+      {!isPlaying && (
+        <button 
+          onClick={handlePlay}
+          className="absolute inset-0 flex items-center justify-center hover:bg-black/20 transition-colors z-10"
+        >
+          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white/90 rounded-full flex items-center justify-center shadow-lg backdrop-blur-sm group-hover:scale-105 transition-transform">
+            <Play className="w-8 h-8 sm:w-10 sm:h-10 text-[var(--color-imamu-blue,currentColor)] ml-1" fill="currentColor" />
+          </div>
+        </button>
+      )}
+    </div>
+  );
+};
 
 export function NewsPage() {
   const [news, setNews] = useState<any[]>([]);
@@ -193,7 +252,7 @@ export function NewsPage() {
     return (
       <div 
         key={item.id} 
-        className={`border-b border-gray-200 last:border-b-0 py-5 sm:py-6 transition flex flex-col group w-full text-right relative hover:bg-gray-50/50 duration-200`}
+        className={`break-inside-avoid border-b border-gray-200 last:border-b-0 py-5 sm:py-6 transition flex flex-col group w-full text-right relative hover:bg-gray-50/50 duration-200`}
       >
         {isFeatured && (
           <div className="flex justify-between items-center mb-4">
@@ -233,28 +292,22 @@ export function NewsPage() {
           </p>
           
           {item.videoUrl && (
-            <div className="w-full rounded-2xl overflow-hidden border border-gray-100 bg-black mb-4" dir="ltr">
-              <video 
-                src={item.videoUrl} 
-                controls
-                preload="none"
-                playsInline
-                className="w-full h-auto max-h-[450px] object-contain mx-auto" 
-              />
-            </div>
+            <VideoPlayer videoUrl={item.videoUrl} posterUrl={item.videoThumbnailUrl || (item.parsedImages?.length > 0 ? item.parsedImages[0] : undefined)} />
           )}
 
-          {item.parsedImages && item.parsedImages.length > 0 && (
-            <div className="w-full rounded-2xl overflow-hidden border border-gray-100 mb-4" dir="ltr">
+          {!item.videoUrl && item.parsedImages && item.parsedImages.length > 0 && (
+            <div className="w-full rounded-2xl overflow-hidden border border-gray-100 mb-4 bg-gray-100" dir="ltr">
                 {item.parsedImages.length === 1 ? (
-                    <img 
-                      src={item.parsedImages[0]} 
-                      alt="Post media" 
-                      onClick={(e) => { e.stopPropagation(); setImageModal({ images: item.parsedImages, currentIndex: 0 }); }}
-                      className="w-full h-auto max-h-[550px] object-cover cursor-pointer hover:opacity-95 transition" 
-                      loading="lazy" 
-                      referrerPolicy="no-referrer"
-                    />
+                    <div className="w-full min-h-[300px]">
+                      <img 
+                        src={item.parsedImages[0]} 
+                        alt="Post media" 
+                        onClick={(e) => { e.stopPropagation(); setImageModal({ images: item.parsedImages, currentIndex: 0 }); }}
+                        className="w-full h-auto max-h-[550px] object-cover cursor-pointer hover:opacity-95 transition" 
+                        loading="lazy" 
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
                 ) : (
                     <div className={`grid gap-0.5 bg-gray-100 ${item.parsedImages.length === 2 ? 'grid-cols-2' : item.parsedImages.length === 3 ? 'grid-cols-2' : 'grid-cols-2'}`}>
                         {item.parsedImages.map((src: string, imgIdx: number) => (
@@ -375,9 +428,13 @@ export function NewsPage() {
        </div>
 
        {loading ? (
-         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 relative z-10">
+         <Masonry
+           breakpointCols={breakpointColumnsObj}
+           className="flex w-auto gap-6 relative z-10"
+           columnClassName="bg-clip-padding flex flex-col gap-6"
+         >
            {Array.from({ length: 4 }).map((_, i) => (
-             <div key={i} className="w-full bg-white border border-gray-100 rounded-[2rem] p-5 shadow-sm animate-pulse flex flex-col gap-4">
+             <div key={i} className="w-full break-inside-avoid bg-white border border-gray-100 rounded-[2rem] p-5 shadow-sm animate-pulse flex flex-col gap-4">
                <div className="flex gap-3 items-center">
                  <div className="w-12 h-12 rounded-full bg-gray-100 animate-pulse" />
                  <div className="flex flex-col gap-2 flex-1">
@@ -389,7 +446,7 @@ export function NewsPage() {
                <div className="h-4 w-full bg-gray-50 rounded" />
              </div>
            ))}
-         </div>
+         </Masonry>
        ) : (
          <div className="w-full relative z-10 flex flex-col">
              {featuredPost && (
@@ -406,9 +463,13 @@ export function NewsPage() {
             )}
 
             {remainingNews.length > 0 && (
-              <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
+              <Masonry
+                breakpointCols={breakpointColumnsObj}
+                className="flex w-auto gap-6"
+                columnClassName="bg-clip-padding flex flex-col gap-6"
+              >
                   {remainingNews.map((item) => renderNewsCard(item, false))}
-              </div>
+              </Masonry>
             )}
 
             {!featuredPost && remainingNews.length === 0 && (

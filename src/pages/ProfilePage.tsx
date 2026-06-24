@@ -4,6 +4,38 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ChevronDown, UserCircle2, Mail, Phone, BookOpen, Calculator, Clock, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+function AnimatedNumber({ value }: { value: number }) {
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    let start = 0;
+    const end = value;
+    if (start === end) {
+      setDisplayValue(end);
+      return;
+    }
+    
+    let totalDuration = 1000;
+    let startTime: number | null = null;
+    
+    const animate = (currentTime: number) => {
+      if (!startTime) startTime = currentTime;
+      const progress = Math.min((currentTime - startTime) / totalDuration, 1);
+      // Easing function: easeOutExpo (or just linear, let's use a simple linear/easeOut)
+      const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+      setDisplayValue(Math.floor(easeOutQuart * (end - start) + start));
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        setDisplayValue(end);
+      }
+    };
+    requestAnimationFrame(animate);
+  }, [value]);
+
+  return <>{displayValue}</>;
+}
+
 export function ProfilePage() {
   const { user, dbUser, refreshToken, signOut } = useAuth();
   const navigate = useNavigate();
@@ -148,12 +180,12 @@ export function ProfilePage() {
       }
 
       await refreshToken();
-      setFeedback({ type: 'success', message: 'Profile updated successfully!' });
+      setFeedback({ type: 'success', message: 'تم تحديث الملف الشخصي بنجاح!' });
       setPhoneEditable(false);
       setTimeout(() => setFeedback(null), 3000);
     } catch (err: any) {
       console.error(err);
-      setFeedback({ type: 'error', message: err.message || 'Error saving profile. Please try again.' });
+      setFeedback({ type: 'error', message: err.message || 'خطأ في حفظ الملف الشخصي. يرجى المحاولة مرة أخرى.' });
     } finally {
       setIsSaving(false);
     }
@@ -162,10 +194,10 @@ export function ProfilePage() {
   if (!user) return null;
 
   return (
-    <div className="flex flex-col flex-1 max-w-4xl w-full mx-auto pb-24">
-      <div className="mb-10 text-left">
-        <h1 className="text-4xl font-display font-bold text-gray-900 mb-2">My Profile</h1>
-        <p className="text-gray-500">Manage your personal and academic details.</p>
+    <div className="flex flex-col flex-1 max-w-4xl w-full mx-auto pb-24" dir="rtl">
+      <div className="mb-10 text-right">
+        <h1 className="text-4xl font-display font-bold text-gray-900 mb-2">الملف الشخصي</h1>
+        <p className="text-gray-500">إدارة التفاصيل الشخصية والأكاديمية الخاصة بك.</p>
       </div>
 
       <div className="flex flex-col md:flex-row gap-12 lg:gap-24">
@@ -180,7 +212,7 @@ export function ProfilePage() {
               )}
             </div>
             <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
-              <span className="text-white text-xs font-medium">Change</span>
+              <span className="text-white text-xs font-medium">تغيير</span>
             </div>
             <input 
               type="file" 
@@ -233,14 +265,14 @@ export function ProfilePage() {
           
           <button 
             onClick={async () => {
-              if (window.confirm('Are you sure you want to log out?')) {
+              if (window.confirm('هل أنت متأكد أنك تريد تسجيل الخروج؟')) {
                 await signOut();
                 navigate('/login');
               }
             }}
             className="w-full md:w-auto py-2.5 px-6 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition"
           >
-            Log Out
+            تسجيل الخروج
           </button>
         </div>
 
@@ -251,13 +283,13 @@ export function ProfilePage() {
               onClick={() => setActiveTab('profile')} 
               className={`pb-3 font-medium transition ${activeTab === 'profile' ? 'text-[var(--color-imamu-blue)] border-b-2 border-[var(--color-imamu-blue)]' : 'text-gray-500 hover:text-gray-700'}`}
             >
-              Profile Settings
+              إعدادات الحساب
             </button>
             <button 
               onClick={() => setActiveTab('progress')} 
               className={`pb-3 font-medium transition ${activeTab === 'progress' ? 'text-[var(--color-imamu-blue)] border-b-2 border-[var(--color-imamu-blue)]' : 'text-gray-500 hover:text-gray-700'}`}
             >
-              Progress & Courses
+              التقدم والمقررات
             </button>
           </div>
 
@@ -284,47 +316,49 @@ export function ProfilePage() {
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                 {/* Personal Details */}
                 <div>
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-4">Personal Details</h3>
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-4">التفاصيل الشخصية</h3>
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">اسم المستخدم</label>
                       <div className="relative">
-                        <div className="absolute left-3 top-3 w-5 h-5 text-gray-400 font-medium select-none">@</div>
+                        <div className="absolute right-3 top-3 w-5 h-5 text-gray-400 font-medium select-none" dir="ltr">@</div>
                         <input 
                           type="text"
                           placeholder="username"
                           value={profileForm.userName}
                           onChange={e => setProfileForm(p => ({...p, userName: e.target.value.replace(/[^a-zA-Z0-9_]/g, '')}))}
                           className="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] focus:bg-white transition text-sm text-gray-900"
+                          dir="ltr"
                         />
-                        <div className="absolute right-3 top-3 flex items-center">
+                        <div className="absolute left-3 top-3 flex items-center">
                           {usernameStatus === 'checking' && <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />}
                           {usernameStatus === 'available' && <CheckCircle2 className="w-5 h-5 text-green-500" />}
-                          {usernameStatus === 'taken' && <AlertCircle className="w-5 h-5 text-red-500" title="Username taken" />}
+                          {usernameStatus === 'taken' && <AlertCircle className="w-5 h-5 text-red-500" title="اسم المستخدم مستخدم مسبقاً" />}
                         </div>
                       </div>
-                      {usernameStatus === 'taken' && <p className="text-xs text-red-500 mt-1">This username is already taken.</p>}
-                      {usernameStatus === 'available' && <p className="text-xs text-green-600 mt-1">Username available!</p>}
+                      {usernameStatus === 'taken' && <p className="text-xs text-red-500 mt-1">اسم المستخدم هذا مستخدم بالفعل.</p>}
+                      {usernameStatus === 'available' && <p className="text-xs text-green-600 mt-1">اسم المستخدم متاح!</p>}
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1 flex justify-between items-center">
-                        <span>Phone Number</span>
+                        <span>رقم الجوال</span>
                         {!phoneEditable && (
                           <button type="button" onClick={() => setPhoneEditable(true)} className="text-[var(--color-imamu-blue)] hover:underline text-xs">
-                            Edit
+                            تعديل
                           </button>
                         )}
                       </label>
                       <div className="relative">
-                        <Phone className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                        <Phone className="absolute right-3 top-3 w-5 h-5 text-gray-400" />
                         <input 
                           type="tel"
                           placeholder="05XXXXXXXX"
                           value={profileForm.phone}
                           disabled={!phoneEditable}
                           onChange={e => setProfileForm(p => ({...p, phone: e.target.value}))}
-                          className={`w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] focus:bg-white transition text-sm text-gray-900 ${!phoneEditable ? 'opacity-70 cursor-not-allowed' : ''}`}
+                          className={`w-full pr-10 pl-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] focus:bg-white transition text-sm text-gray-900 ${!phoneEditable ? 'opacity-70 cursor-not-allowed' : ''}`}
+                          dir="ltr"
                         />
                       </div>
                     </div>
@@ -335,55 +369,54 @@ export function ProfilePage() {
 
                 {/* Academic Status */}
                 <div>
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-4">Academic Status</h3>
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-4">الحالة الأكاديمية</h3>
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Major</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">التخصص</label>
                         <div className="relative">
-                          <BookOpen className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                          <BookOpen className="absolute right-3 top-3 w-5 h-5 text-gray-400" />
                           <select 
                             value={profileForm.major} 
                             onChange={e => setProfileForm(p => ({...p, major: e.target.value}))}
-                            className="w-full pl-10 pr-10 py-2.5 appearance-none bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] focus:bg-white transition text-sm text-gray-900"
+                            className="w-full pr-10 pl-10 py-2.5 appearance-none bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] focus:bg-white transition text-sm text-gray-900"
                           >
-                            <option value="">Select a Major...</option>
+                            <option value="">اختر التخصص...</option>
                             {majors.map(m => (
                               <option key={m.id} value={m.name}>{m.name}</option>
                             ))}
-                            {!majors.length && <option value="Computer Science">Computer Science</option>}
-                            {!majors.length && <option value="Information Systems">Information Systems</option>}
-                            {!majors.length && <option value="Information Technology">Information Technology</option>}
                           </select>
-                          <ChevronDown className="absolute right-3 top-3.5 w-5 h-5 text-gray-400 pointer-events-none" />
+                          <ChevronDown className="absolute left-3 top-3.5 w-5 h-5 text-gray-400 pointer-events-none" />
                         </div>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Current GPA</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">المعدل التراكمي</label>
                         <div className="relative">
-                          <Calculator className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                          <Calculator className="absolute right-3 top-3 w-5 h-5 text-gray-400" />
                           <input 
                             type="number" step="0.01" min="0" max="5.0"
-                            placeholder="e.g. 4.5"
+                            placeholder="مثال 4.5"
                             value={profileForm.currentGpa}
                             onChange={e => setProfileForm(p => ({...p, currentGpa: e.target.value}))}
-                            className="w-full pl-10 pr-4 py-2.5 font-mono bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] focus:bg-white transition text-sm text-gray-900"
+                            className="w-full pr-10 pl-4 py-2.5 font-mono bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] focus:bg-white transition text-sm text-gray-900"
+                            dir="ltr"
                           />
                         </div>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Completed Hours</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">الساعات المكتسبة</label>
                         <div className="relative">
-                          <Clock className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                          <Clock className="absolute right-3 top-3 w-5 h-5 text-gray-400" />
                           <input 
                             type="number" min="0"
                             placeholder="110"
                             value={profileForm.finishedHours}
                             onChange={e => setProfileForm(p => ({...p, finishedHours: e.target.value}))}
-                            className="w-full pl-10 pr-4 py-2.5 font-mono bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] focus:bg-white transition text-sm text-gray-900"
+                            className="w-full pr-10 pl-4 py-2.5 font-mono bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] focus:bg-white transition text-sm text-gray-900"
+                            dir="ltr"
                           />
                         </div>
                       </div>
@@ -395,19 +428,20 @@ export function ProfilePage() {
 
             {activeTab === 'progress' && (
               <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-4">Course Progress</h3>
+                <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-4">الخطة الدراسية</h3>
                 {!profileForm.major ? (
                   <div className="bg-gray-50 border border-gray-200 rounded-xl p-8 text-center">
-                    <p className="text-gray-500 font-medium">Please select a major in the Profile tab first.</p>
+                    <p className="text-gray-500 font-medium">يرجى اختيار التخصص في تبويب الإعدادات أولاً.</p>
                   </div>
                 ) : subjects.length > 0 ? (
                   <div className="space-y-6">
-                    {Object.entries(
-                      (() => {
-                        const userMajor = majors.find(m => m.name === profileForm.major);
-                        const displayedSubjects = userMajor ? subjects.filter(s => userMajor.courseIds?.includes(s.id)) : subjects;
-                        return displayedSubjects.reduce((acc, s) => {
-                          let g = 'General Requirements';
+                    {(() => {
+                      const userMajor = majors.find(m => m.name === profileForm.major);
+                      const displayedSubjects = userMajor ? subjects.filter(s => userMajor.courseIds?.includes(s.id)) : subjects;
+                      
+                      const groups = Object.entries(
+                        displayedSubjects.reduce((acc, s) => {
+                          let g = 'المتطلبات العامة';
                           let reqCount = 0;
                           if (userMajor && userMajor.courses) {
                             const c = userMajor.courses.find((mc:any) => mc.subjectId === s.id);
@@ -419,59 +453,106 @@ export function ProfilePage() {
                           if (!acc[g]) acc[g] = [];
                           acc[g].push({...s, reqCount});
                           return acc;
-                        }, {} as Record<string, any[]>);
-                      })()
-                    ).sort((a, b) => a[0] === 'General Requirements' ? -1 : b[0] === 'General Requirements' ? 1 : 0)
-                    .map(([groupName, groupSubjects]: [string, any[]]) => {
-                      const totalInGroup = groupSubjects.length;
-                      const declaredReqCount = groupSubjects[0]?.reqCount || 0;
-                      const reqCount = declaredReqCount > 0 ? declaredReqCount : totalInGroup;
-                      
-                      const selectedInGroup = groupSubjects.filter(s => profileForm.completedCourses.includes(s.code)).length;
-                      const isGroupFull = selectedInGroup >= reqCount;
+                        }, {} as Record<string, any[]>)
+                      ).sort((a, b) => {
+                        if (a[0] === 'المتطلبات العامة') return -1;
+                        if (b[0] === 'المتطلبات العامة') return 1;
+                        return a[0].localeCompare(b[0], 'ar');
+                      });
+
+                      let totalReq = 0;
+                      let totalFinishedInReq = 0;
+
+                      groups.forEach(([_, groupSubjects]) => {
+                        const totalInGroup = groupSubjects.length;
+                        const declaredReqCount = groupSubjects[0]?.reqCount || 0;
+                        const reqCount = declaredReqCount > 0 ? declaredReqCount : totalInGroup;
+                        const selectedInGroup = groupSubjects.filter(s => profileForm.completedCourses.includes(s.code)).length;
+                        
+                        totalReq += reqCount;
+                        totalFinishedInReq += Math.min(selectedInGroup, reqCount);
+                      });
+
+                      const percentFinished = totalReq > 0 ? Math.round((totalFinishedInReq / totalReq) * 100) : 0;
 
                       return (
-                        <div key={groupName} className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                          <div className="flex justify-between items-end mb-3">
-                            <h4 className="font-semibold text-gray-900">{groupName}</h4>
-                            <span className="text-xs font-medium bg-purple-100 text-purple-800 px-2.5 py-1 rounded-md">
-                              Completed: {selectedInGroup} / {reqCount}
-                            </span>
+                        <>
+                          <div className="mb-8">
+                            <div className="flex justify-between items-end mb-2">
+                              <div>
+                                <span className="text-gray-900 font-semibold block text-lg">نسبة الإنجاز</span>
+                                <span className="text-sm text-gray-500">
+                                  <AnimatedNumber value={totalFinishedInReq} /> من {totalReq} مقرر منجز
+                                </span>
+                              </div>
+                              <span className="text-gray-900 font-bold text-xl"><AnimatedNumber value={percentFinished} />%</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                              <motion.div 
+                                className="bg-[var(--color-imamu-blue)] h-3 rounded-full"
+                                initial={{ width: 0 }}
+                                animate={{ width: `${percentFinished}%` }}
+                                transition={{ duration: 1, ease: "easeOut" }}
+                              />
+                            </div>
                           </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {groupSubjects.map(s => {
-                              const isChecked = profileForm.completedCourses.includes(s.code);
-                              const isDisabled = !isChecked && isGroupFull;
-                              return (
-                                <label key={s.id} className={`flex items-center gap-2 cursor-pointer p-2 rounded-lg transition ${isDisabled ? 'opacity-50 grayscale' : 'hover:bg-white bg-gray-50/50'}`}>
-                                  <input 
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    disabled={isDisabled}
-                                    onChange={(e) => {
-                                      const checked = e.target.checked;
-                                      setProfileForm(p => ({
-                                        ...p,
-                                        completedCourses: checked 
-                                          ? [...p.completedCourses, s.code]
-                                          : p.completedCourses.filter(c => c !== s.code)
-                                      }));
-                                    }}
-                                    className="w-4 h-4 text-[var(--color-imamu-blue)] rounded border-gray-300 focus:ring-0 disabled:text-gray-400"
-                                  />
-                                  <span className="text-sm font-medium text-gray-700">{s.code}</span>
-                                  <span className="text-xs text-gray-500 truncate" title={s.name}>{s.name}</span>
-                                </label>
-                              );
-                            })}
-                          </div>
-                        </div>
+
+                          {groups.map(([groupName, groupSubjects]: [string, any[]]) => {
+                            const totalInGroup = groupSubjects.length;
+                            const declaredReqCount = groupSubjects[0]?.reqCount || 0;
+                            const reqCount = declaredReqCount > 0 ? declaredReqCount : totalInGroup;
+                            
+                            const selectedInGroup = groupSubjects.filter(s => profileForm.completedCourses.includes(s.code)).length;
+                            const isGroupFull = selectedInGroup >= reqCount;
+
+                            return (
+                              <div key={groupName} className={`border rounded-xl p-4 transition-colors duration-300 ${isGroupFull ? 'bg-emerald-50/50 border-emerald-200' : 'bg-gray-50 border-gray-200'}`}>
+                                <div className="flex justify-between items-center mb-3">
+                                  <h4 className={`font-semibold flex items-center gap-2 ${isGroupFull ? 'text-emerald-900' : 'text-gray-900'}`}>
+                                    {groupName}
+                                    {isGroupFull && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
+                                  </h4>
+                                  <span className={`text-xs font-medium px-2.5 py-1 rounded-md transition-colors ${isGroupFull ? 'bg-emerald-100 text-emerald-800' : 'bg-purple-100 text-purple-800'}`}>
+                                    المنجز: {selectedInGroup} / {reqCount}
+                                  </span>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  {groupSubjects.map(s => {
+                                    const isChecked = profileForm.completedCourses.includes(s.code);
+                                    const isDisabled = !isChecked && isGroupFull;
+                                    return (
+                                      <label key={s.id} className={`flex items-center gap-2 cursor-pointer p-2 rounded-lg transition ${isDisabled ? 'opacity-50 grayscale' : 'hover:bg-white bg-gray-50/50'}`}>
+                                        <input 
+                                          type="checkbox"
+                                          checked={isChecked}
+                                          disabled={isDisabled}
+                                          onChange={(e) => {
+                                            const checked = e.target.checked;
+                                            setProfileForm(p => ({
+                                              ...p,
+                                              completedCourses: checked 
+                                                ? [...p.completedCourses, s.code]
+                                                : p.completedCourses.filter(c => c !== s.code)
+                                            }));
+                                          }}
+                                          className="w-4 h-4 text-[var(--color-imamu-blue)] rounded border-gray-300 focus:ring-0 disabled:text-gray-400"
+                                        />
+                                        <span className="text-sm font-medium text-gray-700">{s.code}</span>
+                                        <span className="text-xs text-gray-500 truncate" title={s.name}>{s.name}</span>
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </>
                       );
-                    })}
+                    })()}
                   </div>
                 ) : (
                   <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-xl border border-gray-100">
-                    No subjects found for progress tracking.
+                    لم يتم العثور على مقررات لتتبع التقدم.
                   </div>
                 )}
               </div>
@@ -483,7 +564,7 @@ export function ProfilePage() {
                 disabled={isSaving || usernameStatus === 'taken' || usernameStatus === 'checking'}
                 className="flex items-center justify-center gap-2 bg-[var(--color-imamu-blue)] text-white font-medium py-3 px-8 rounded-xl hover:bg-[var(--color-imamu-blue-light)] transition disabled:opacity-70 disabled:cursor-not-allowed shadow-sm min-w-[140px]"
               >
-                {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Save Changes'}
+                {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'حفظ التغييرات'}
               </button>
             </div>
           </form>

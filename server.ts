@@ -3,7 +3,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { db } from "./src/db/index";
 import { users, majors, subjects, events, news, majorCourses, newsLikes, newsComments, news_sources, global_settings, verification_codes } from "./src/db/schema";
-import { eq, desc, and, sql, inArray } from "drizzle-orm";
+import { eq, desc, and, sql, inArray, ilike } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "./src/middleware/auth";
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
@@ -116,6 +116,34 @@ async function startServer() {
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: "Failed to register" });
+    }
+  });
+
+  // Auth: Reset Password
+  app.post("/api/auth/reset-password", async (req, res): Promise<any> => {
+    try {
+      const { email, code, newPassword } = req.body;
+      if (!email || !code || !newPassword) return res.status(400).json({ error: "Missing fields" });
+
+      const vc = await db.query.verification_codes.findFirst({
+        where: and(eq(verification_codes.email, email), eq(verification_codes.code, code))
+      });
+
+      if (!vc) return res.status(400).json({ error: "Invalid verification code" });
+      if (new Date() > new Date(vc.expiresAt)) return res.status(400).json({ error: "Code expired" });
+
+      const user = await db.query.users.findFirst({ where: eq(users.email, email) });
+      if (!user) return res.status(400).json({ error: "User not found" });
+
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      await db.update(users).set({ passwordHash: hashedPassword }).where(eq(users.id, user.id));
+
+      await db.delete(verification_codes).where(eq(verification_codes.id, vc.id));
+
+      res.json({ success: true, message: "Password reset successful" });
+    } catch(e) {
+      console.error(e);
+      res.status(500).json({ error: "Server error" });
     }
   });
 
@@ -335,7 +363,7 @@ async function startServer() {
           createdAt: newsComments.createdAt,
           userId: users.uid,
           userName: users.userName,
-          profilePic: sql`null`
+          profilePic: users.profilePicUrl
         })
         .from(newsComments)
         .where(eq(newsComments.newsId, newsId))
@@ -364,7 +392,7 @@ async function startServer() {
          createdAt: newComment.createdAt,
          userId: userRec[0].uid,
          userName: userRec[0].userName || userRec[0].email?.split('@')[0],
-         profilePic: null
+         profilePic: userRec[0].profilePicUrl
       });
     } catch (e) {
       res.status(500).json({ error: "Server error" });
@@ -629,6 +657,29 @@ async function startServer() {
     } catch(e) { res.status(500).json({error:"Error"}); }
   });
 
+  app.post("/api/admin/events/generate-mokafaa", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req))) return res.status(403).json({error: "Admin only"});
+    try {
+      // First, delete any existing mokafaa events to avoid duplicates if generated multiple times
+      await db.delete(events).where(ilike(events.title, '%Mokafaa%'));
+
+      const now = new Date();
+      const eventsToInsert = [];
+      for (let i = 0; i < 12; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() + i, 25);
+        // Format as YYYY-MM-DD
+        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-25`;
+        eventsToInsert.push({
+          title: "Mokafaa (Student Allowance)",
+          date: dateStr,
+          description: "Monthly student allowance disbursement."
+        });
+      }
+      await db.insert(events).values(eventsToInsert);
+      res.json({success: true, message: "Generated 12 Mokafaa events."});
+    } catch(e) { res.status(500).json({error:"Error"}); }
+  });
+
   app.put("/api/admin/events/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req))) return res.status(403).json({error: "Admin only"});
     try {
@@ -774,6 +825,73 @@ async function fetchTweetsFromNitter(handle: string) {
     return { tweets, profilePicUrl };
   }
 
+  app.get("/api/settings", async (req, res): Promise<any> => {
+    try {
+      const settings = await db.query.global_settings.findFirst();
+      res.json({
+        semesterStartDate: settings?.semesterStartDate || null,
+        semesterEndDate: settings?.semesterEndDate || null,
+      });
+    } catch(e) { res.status(500).json({error:"Error"}); }
+  });
+
+  // External APIs protected by apiToken
+  app.get("/api/external/check-phone", async (req, res): Promise<any> => {
+    try {
+      const authHeader = req.headers.authorization;
+      const settings = await db.query.global_settings.findFirst();
+      if (!settings?.apiToken || authHeader !== `Bearer ${settings.apiToken}`) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const { phone } = req.query;
+      if (!phone || typeof phone !== 'string') return res.status(400).json({ error: "Phone number required" });
+
+      // Clean the phone string (remove +, spaces, leading zeros or 966)
+      const cleanPhone = phone.replace(/\D/g, '');
+      let basePhone = cleanPhone;
+      if (cleanPhone.startsWith('966')) basePhone = cleanPhone.substring(3);
+      if (basePhone.startsWith('0')) basePhone = basePhone.substring(1);
+
+      // Now basePhone should be the 9 digit KSA number (e.g. 5xxxxxxxx).
+      // Let's check users.
+      const allUsers = await db.query.users.findMany({ columns: { phone: true } });
+      const exists = allUsers.some(u => {
+        if (!u.phone) return false;
+        let uPhone = u.phone.replace(/\D/g, '');
+        if (uPhone.startsWith('966')) uPhone = uPhone.substring(3);
+        if (uPhone.startsWith('0')) uPhone = uPhone.substring(1);
+        return uPhone === basePhone;
+      });
+
+      res.json({ exists });
+    } catch(e) {
+      console.error(e);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.post("/api/external/notify-phone-change", async (req, res): Promise<any> => {
+    try {
+      const authHeader = req.headers.authorization;
+      const settings = await db.query.global_settings.findFirst();
+      if (!settings?.apiToken || authHeader !== `Bearer ${settings.apiToken}`) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const { oldPhone, newPhone } = req.body;
+      if (!oldPhone || !newPhone) return res.status(400).json({ error: "Missing phone numbers" });
+
+      // For now just logging it, later could be expanded
+      console.log(`[EXTERNAL_API] Phone changed from ${oldPhone} to ${newPhone}`);
+
+      res.json({ success: true, message: "Notification received" });
+    } catch(e) {
+      console.error(e);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   app.get("/api/admin/global_settings", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req))) return res.status(403).json({error: "Admin only"});
     try {
@@ -788,12 +906,12 @@ async function fetchTweetsFromNitter(handle: string) {
   app.put("/api/admin/global_settings", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req))) return res.status(403).json({error: "Admin only"});
     try {
-      const { fetchRangeDays, autoDeleteDays, smtpHost, smtpPort, smtpUser, smtpPass } = req.body;
+      const { fetchRangeDays, autoDeleteDays, smtpHost, smtpPort, smtpUser, smtpPass, semesterStartDate, semesterEndDate, apiToken } = req.body;
       let settings = await db.query.global_settings.findFirst();
       if (!settings) {
-        await db.insert(global_settings).values({ fetchRangeDays, autoDeleteDays, smtpHost, smtpPort, smtpUser, smtpPass });
+        await db.insert(global_settings).values({ fetchRangeDays, autoDeleteDays, smtpHost, smtpPort, smtpUser, smtpPass, semesterStartDate, semesterEndDate, apiToken });
       } else {
-        await db.update(global_settings).set({ fetchRangeDays, autoDeleteDays, smtpHost, smtpPort, smtpUser, smtpPass }).where(eq(global_settings.id, Number(settings.id)));
+        await db.update(global_settings).set({ fetchRangeDays, autoDeleteDays, smtpHost, smtpPort, smtpUser, smtpPass, semesterStartDate, semesterEndDate, apiToken }).where(eq(global_settings.id, Number(settings.id)));
       }
       res.json({success:true});
     } catch(e) { res.status(500).json({error:"Error"}); }
