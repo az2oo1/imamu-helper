@@ -912,6 +912,69 @@ export function AdminPage() {
                 <h3 className="text-xl font-display font-semibold text-gray-900 mb-1">Global Settings</h3>
                 <p className="text-sm text-gray-500">Configure global application settings</p>
               </div>
+              <div className="flex flex-col sm:flex-row items-center gap-3">
+                <label className="bg-[var(--color-imamu-blue)] text-white px-4 py-2 rounded-lg font-medium hover:bg-[var(--color-imamu-blue-light)] transition flex items-center justify-center gap-2 cursor-pointer">
+                  <Upload className="w-4 h-4" /> Import Database
+                  <input
+                    type="file"
+                    accept=".json"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (!window.confirm('WARNING: This will overwrite the current database. Are you sure?')) return;
+                      
+                      try {
+                        const token = await user?.getIdToken();
+                        const fileContent = await file.text();
+                        const payload = JSON.parse(fileContent);
+                        
+                        const res = await fetch('/api/admin/import-db', {
+                          method: 'POST',
+                          headers: { 
+                            Authorization: `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                          },
+                          body: JSON.stringify(payload.data || payload)
+                        });
+                        
+                        if (!res.ok) throw new Error('Failed to import DB');
+                        alert('Database imported successfully! Please reload the page.');
+                        window.location.reload();
+                      } catch(err) {
+                        alert('Error importing database. Invalid file or server error.');
+                        console.error(err);
+                      }
+                      e.target.value = ''; // Reset file input
+                    }}
+                  />
+                </label>
+                <button
+                  onClick={async () => {
+                    try {
+                      const token = await user?.getIdToken();
+                      const res = await fetch('/api/admin/export-db', {
+                        headers: { Authorization: `Bearer ${token}` }
+                      });
+                      if (!res.ok) throw new Error('Failed to export DB');
+                      const blob = await res.blob();
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `imamu_db_export_${new Date().toISOString().split('T')[0]}.json`;
+                      document.body.appendChild(a);
+                      a.click();
+                      window.URL.revokeObjectURL(url);
+                      document.body.removeChild(a);
+                    } catch(e) {
+                      alert('Error exporting database');
+                    }
+                  }}
+                  className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-emerald-700 transition flex items-center justify-center gap-2"
+                >
+                  <Download className="w-4 h-4" /> Export Database
+                </button>
+              </div>
             </div>
 
             <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 mb-8">

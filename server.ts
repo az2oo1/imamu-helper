@@ -44,7 +44,8 @@ async function startServer() {
 
   app.post("/api/auth/send-code", async (req, res) => {
     try {
-      const { email } = req.body;
+      const { email: rawEmail } = req.body;
+      const email = rawEmail?.toLowerCase().trim();
       if (!email) return res.status(400).json({ error: "Email required" });
       
       const code = Math.floor(100000 + Math.random() * 900000).toString();
@@ -90,7 +91,8 @@ async function startServer() {
   // Auth: Register
   app.post("/api/auth/register", async (req, res) => {
     try {
-      const { email, password, phone, userName, code } = req.body;
+      const { email: rawEmail, password, phone, userName, code } = req.body;
+      const email = rawEmail?.toLowerCase().trim();
       if (!email || !password || !userName || !code) return res.status(400).json({ error: "Missing required fields" });
       
       const existing = await db.select().from(users).where(eq(users.email, email));
@@ -106,8 +108,11 @@ async function startServer() {
       const hashedPassword = await bcrypt.hash(password, 10);
       const uid = crypto.randomUUID();
 
+      const allUsers = await db.select().from(users);
+      const isAdmin = allUsers.length === 0;
+
       const result = await db.insert(users)
-        .values({ uid, email, passwordHash: hashedPassword, phone, userName })
+        .values({ uid, email, passwordHash: hashedPassword, phone, userName, isAdmin })
         .returning();
       
       const user = result[0];
@@ -122,7 +127,8 @@ async function startServer() {
   // Auth: Reset Password
   app.post("/api/auth/reset-password", async (req, res): Promise<any> => {
     try {
-      const { email, code, newPassword } = req.body;
+      const { email: rawEmail, code, newPassword } = req.body;
+      const email = rawEmail?.toLowerCase().trim();
       if (!email || !code || !newPassword) return res.status(400).json({ error: "Missing fields" });
 
       const vc = await db.query.verification_codes.findFirst({
@@ -150,7 +156,8 @@ async function startServer() {
   // Auth: Login
   app.post("/api/auth/login", async (req, res) => {
     try {
-      const { email, password } = req.body;
+      const { email: rawEmail, password } = req.body;
+      const email = rawEmail?.toLowerCase().trim();
       if (!email || !password) return res.status(400).json({ error: "Missing email or password" });
 
       const records = await db.select().from(users).where(eq(users.email, email));
@@ -915,6 +922,98 @@ async function fetchTweetsFromNitter(handle: string) {
       }
       res.json({success:true});
     } catch(e) { res.status(500).json({error:"Error"}); }
+  });
+
+  app.get("/api/admin/export-db", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req))) return res.status(403).json({error: "Admin only"});
+    try {
+      const allSettings = await db.query.global_settings.findMany();
+      const allUsers = await db.query.users.findMany({
+        columns: {
+          id: true,
+          uid: true,
+          email: true,
+          phone: true,
+          userName: true,
+          isAdmin: true,
+          major: true,
+          currentGpa: true,
+          finishedHours: true,
+          profilePicUrl: true,
+          createdAt: true
+        }
+      });
+      const allMajors = await db.query.majors.findMany();
+      const allSubjects = await db.query.subjects.findMany();
+      const allEvents = await db.query.events.findMany();
+      const allNews = await db.query.news.findMany();
+      const allNewsSources = await db.query.news_sources.findMany();
+
+      res.json({
+        exportDate: new Date(),
+        data: {
+          settings: allSettings,
+          users: allUsers,
+          majors: allMajors,
+          subjects: allSubjects,
+          events: allEvents,
+          news: allNews,
+          newsSources: allNewsSources
+        }
+      });
+    } catch(e) {
+      console.error(e);
+      res.status(500).json({error: "Failed to export DB"});
+    }
+  });
+
+  app.post("/api/admin/import-db", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req))) return res.status(403).json({error: "Admin only"});
+    try {
+      const data = req.body;
+      if (!data) return res.status(400).json({error: "No data provided"});
+
+      // We need to carefully insert or overwrite tables.
+      // Usually an import replaces everything, but we should be careful.
+      // For simplicity, we can delete existing records and insert new ones, or just insert new ones (ignoring conflicts).
+      
+      if (data.settings && data.settings.length > 0) {
+        await db.delete(global_settings);
+        await db.insert(global_settings).values(data.settings);
+      }
+      
+      if (data.majors && data.majors.length > 0) {
+        await db.delete(majors);
+        await db.insert(majors).values(data.majors);
+      }
+      
+      if (data.subjects && data.subjects.length > 0) {
+        await db.delete(subjects);
+        await db.insert(subjects).values(data.subjects);
+      }
+      
+      if (data.events && data.events.length > 0) {
+        await db.delete(events);
+        await db.insert(events).values(data.events);
+      }
+      
+      if (data.newsSources && data.newsSources.length > 0) {
+        await db.delete(news_sources);
+        await db.insert(news_sources).values(data.newsSources);
+      }
+      
+      if (data.news && data.news.length > 0) {
+        await db.delete(news);
+        await db.insert(news).values(data.news);
+      }
+      
+      // Note: We avoid importing users to prevent overwriting existing passwords and auth data, unless specifically requested.
+
+      res.json({ message: "Import successful" });
+    } catch(e) {
+      console.error(e);
+      res.status(500).json({error: "Failed to import DB"});
+    }
   });
 
   app.post("/api/admin/news_sources/fetch-all", requireAuth, async (req: AuthRequest, res): Promise<any> => {

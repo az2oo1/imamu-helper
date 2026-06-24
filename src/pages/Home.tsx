@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Calculator, BookOpen, Calendar, Newspaper, ArrowRight, Clock, Sparkles } from 'lucide-react';
+import { Calculator, BookOpen, Calendar, Newspaper, ArrowLeft, Clock, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Confetti from 'react-confetti';
 
@@ -234,8 +234,8 @@ export function Home() {
             </div>
             <h3 className="text-2xl font-display font-semibold text-gray-900 mb-3">{feat.name}</h3>
             <p className="text-gray-500 leading-relaxed">{feat.description}</p>
-            <div className="absolute bottom-8 right-8 opacity-0 -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
-              <ArrowRight className="w-6 h-6 text-gray-400" />
+            <div className="absolute bottom-8 left-8 opacity-0 translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
+              <ArrowLeft className="w-6 h-6 text-gray-400" />
             </div>
           </Link>
         ))}

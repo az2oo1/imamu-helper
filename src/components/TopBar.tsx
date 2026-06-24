@@ -51,9 +51,7 @@ export function TopBar() {
                     <link.icon className="w-4 h-4" />
                     {link.name}
                     {isActive && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 2 }}
-                        animate={{ opacity: 1, y: 0 }}
+                      <div
                         className="absolute bottom-0 left-0 right-0 h-[3px] bg-[var(--color-imamu-blue)] rounded-t-full"
                       />
                     )}
