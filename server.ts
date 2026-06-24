@@ -77,11 +77,11 @@ async function startServer() {
             text: `Your verification code is: ${code}`,
             html: `<b>Your verification code is: ${code}</b>`,
           });
+          res.json({ success: true });
       } else {
           console.log(`[DEV MODE] Verification code for ${email}: ${code}`);
+          res.json({ success: true, devCode: code, message: "SMTP not configured. Use this code to continue." });
       }
-      
-      res.json({ success: true });
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: "Failed to send code" });
@@ -160,15 +160,45 @@ async function startServer() {
       const email = rawEmail?.toLowerCase().trim();
       if (!email || !password) return res.status(400).json({ error: "Missing email or password" });
 
-      const records = await db.select().from(users).where(eq(users.email, email));
-      const user = records[0];
-      
-      if (!user || !user.passwordHash) {
-        return res.status(401).json({ error: "Invalid credentials" });
+      let user = (await db.select().from(users).where(eq(users.email, email)))[0];
+      let valid = false;
+
+      // Try local auth first
+      if (user && user.passwordHash) {
+        valid = await bcrypt.compare(password, user.passwordHash);
       }
 
-      const valid = await bcrypt.compare(password, user.passwordHash);
-      if (!valid) return res.status(401).json({ error: "Invalid credentials" });
+      // If local auth fails or no user, try IMAP if configured
+      if (!valid) {
+        const settings = await db.query.global_settings.findFirst();
+        if (settings?.imapHost && settings?.imapPort) {
+          const { verifyImapCredentials } = await import('./src/lib/imap-auth');
+          valid = await verifyImapCredentials(settings.imapHost, settings.imapPort, settings.imapSecure ?? true, email, password);
+          
+          if (valid) {
+            // IMAP succeeded. If user doesn't exist, create them.
+            if (!user) {
+              const uid = crypto.randomUUID();
+              const hashedPassword = await bcrypt.hash(password, 10);
+              const allUsers = await db.select().from(users);
+              const isAdmin = allUsers.length === 0;
+
+              const result = await db.insert(users).values({ 
+                uid, email, passwordHash: hashedPassword, userName: email.split('@')[0], isAdmin 
+              }).returning();
+              user = result[0];
+            } else {
+              // Update their local password so they can login without IMAP next time if IMAP is slow
+              const hashedPassword = await bcrypt.hash(password, 10);
+              await db.update(users).set({ passwordHash: hashedPassword }).where(eq(users.id, user.id));
+            }
+          }
+        }
+      }
+
+      if (!valid || !user) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
 
       const token = jwt.sign({ uid: user.uid, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
       res.json({ token, user });
@@ -913,12 +943,12 @@ async function fetchTweetsFromNitter(handle: string) {
   app.put("/api/admin/global_settings", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req))) return res.status(403).json({error: "Admin only"});
     try {
-      const { fetchRangeDays, autoDeleteDays, smtpHost, smtpPort, smtpUser, smtpPass, semesterStartDate, semesterEndDate, apiToken } = req.body;
+      const { fetchRangeDays, autoDeleteDays, smtpHost, smtpPort, smtpUser, smtpPass, imapHost, imapPort, imapSecure, semesterStartDate, semesterEndDate, apiToken } = req.body;
       let settings = await db.query.global_settings.findFirst();
       if (!settings) {
-        await db.insert(global_settings).values({ fetchRangeDays, autoDeleteDays, smtpHost, smtpPort, smtpUser, smtpPass, semesterStartDate, semesterEndDate, apiToken });
+        await db.insert(global_settings).values({ fetchRangeDays, autoDeleteDays, smtpHost, smtpPort, smtpUser, smtpPass, imapHost, imapPort, imapSecure, semesterStartDate, semesterEndDate, apiToken });
       } else {
-        await db.update(global_settings).set({ fetchRangeDays, autoDeleteDays, smtpHost, smtpPort, smtpUser, smtpPass, semesterStartDate, semesterEndDate, apiToken }).where(eq(global_settings.id, Number(settings.id)));
+        await db.update(global_settings).set({ fetchRangeDays, autoDeleteDays, smtpHost, smtpPort, smtpUser, smtpPass, imapHost, imapPort, imapSecure, semesterStartDate, semesterEndDate, apiToken }).where(eq(global_settings.id, Number(settings.id)));
       }
       res.json({success:true});
     } catch(e) { res.status(500).json({error:"Error"}); }

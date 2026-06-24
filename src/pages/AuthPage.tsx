@@ -94,12 +94,18 @@ export function AuthPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: formData.email })
       });
+      const data = await res.json();
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to send code');
+        throw new Error(data.error || 'Failed to send code');
       }
       setCodeSent(true);
-      setError('Verification code sent to your email.');
+      if (data.devCode) {
+        alert(data.message + "\n\nCode: " + data.devCode);
+        setCode(data.devCode); // Auto-fill it for convenience
+        setError('Verification code generated in Dev Mode.');
+      } else {
+        setError('Verification code sent to your email.');
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to send verification code.');
     }

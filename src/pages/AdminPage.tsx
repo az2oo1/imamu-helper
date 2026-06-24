@@ -1018,47 +1018,90 @@ export function AdminPage() {
             </div>
 
             <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 mb-8">
-               <h4 className="text-lg font-medium text-gray-900 mb-4">SMTP Settings (Verification Codes)</h4>
-               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                 <div className="flex flex-col">
-                   <label className="text-sm text-gray-600 mb-1">SMTP Host</label>
-                   <input 
-                     type="text"
-                     value={globalSettings.smtpHost || ''}
-                     onChange={e => setGlobalSettings(s => ({...s, smtpHost: e.target.value}))}
-                     placeholder="smtp.gmail.com"
-                     className="bg-white border border-gray-300 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)]"
-                   />
+               <h4 className="text-lg font-medium text-gray-900 mb-4">IMAP & SMTP Settings</h4>
+               
+               <div className="mb-6">
+                 <h5 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">IMAP Settings (Direct Authentication)</h5>
+                 <p className="text-xs text-gray-500 mb-4">If configured, users can log in using their university email and password without needing a verification code.</p>
+                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                   <div className="flex flex-col">
+                     <label className="text-sm text-gray-600 mb-1">IMAP Host</label>
+                     <input 
+                       type="text"
+                       value={globalSettings.imapHost || ''}
+                       onChange={e => setGlobalSettings(s => ({...s, imapHost: e.target.value}))}
+                       placeholder="outlook.office365.com"
+                       className="bg-white border border-gray-300 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)]"
+                     />
+                   </div>
+                   <div className="flex flex-col">
+                     <label className="text-sm text-gray-600 mb-1">IMAP Port</label>
+                     <input 
+                       type="number"
+                       value={globalSettings.imapPort || ''}
+                       onChange={e => setGlobalSettings(s => ({...s, imapPort: parseInt(e.target.value) || undefined}))}
+                       placeholder="993"
+                       className="bg-white border border-gray-300 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)]"
+                     />
+                   </div>
+                   <div className="flex flex-col justify-end pb-2">
+                     <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+                       <input 
+                         type="checkbox"
+                         checked={globalSettings.imapSecure !== false}
+                         onChange={e => setGlobalSettings(s => ({...s, imapSecure: e.target.checked}))}
+                         className="rounded text-[var(--color-imamu-blue)] focus:ring-[var(--color-imamu-blue)]"
+                       />
+                       <span>Use Secure TLS (Recommended)</span>
+                     </label>
+                   </div>
                  </div>
-                 <div className="flex flex-col">
-                   <label className="text-sm text-gray-600 mb-1">SMTP Port</label>
-                   <input 
-                     type="number"
-                     value={globalSettings.smtpPort || ''}
-                     onChange={e => setGlobalSettings(s => ({...s, smtpPort: parseInt(e.target.value) || undefined}))}
-                     placeholder="587"
-                     className="bg-white border border-gray-300 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)]"
-                   />
-                 </div>
-                 <div className="flex flex-col">
-                   <label className="text-sm text-gray-600 mb-1">SMTP Username</label>
-                   <input 
-                     type="text"
-                     value={globalSettings.smtpUser || ''}
-                     onChange={e => setGlobalSettings(s => ({...s, smtpUser: e.target.value}))}
-                     placeholder="example@gmail.com"
-                     className="bg-white border border-gray-300 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)]"
-                   />
-                 </div>
-                 <div className="flex flex-col">
-                   <label className="text-sm text-gray-600 mb-1">SMTP Password</label>
-                   <input 
-                     type="password"
-                     value={globalSettings.smtpPass || ''}
-                     onChange={e => setGlobalSettings(s => ({...s, smtpPass: e.target.value}))}
-                     placeholder="App Password"
-                     className="bg-white border border-gray-300 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)]"
-                   />
+               </div>
+
+               <div>
+                 <h5 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">SMTP Settings (Verification Codes)</h5>
+                 <p className="text-xs text-gray-500 mb-4">Used for email verification during sign-up and password reset (if IMAP is not used).</p>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                   <div className="flex flex-col">
+                     <label className="text-sm text-gray-600 mb-1">SMTP Host</label>
+                     <input 
+                       type="text"
+                       value={globalSettings.smtpHost || ''}
+                       onChange={e => setGlobalSettings(s => ({...s, smtpHost: e.target.value}))}
+                       placeholder="smtp.gmail.com"
+                       className="bg-white border border-gray-300 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)]"
+                     />
+                   </div>
+                   <div className="flex flex-col">
+                     <label className="text-sm text-gray-600 mb-1">SMTP Port</label>
+                     <input 
+                       type="number"
+                       value={globalSettings.smtpPort || ''}
+                       onChange={e => setGlobalSettings(s => ({...s, smtpPort: parseInt(e.target.value) || undefined}))}
+                       placeholder="587"
+                       className="bg-white border border-gray-300 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)]"
+                     />
+                   </div>
+                   <div className="flex flex-col">
+                     <label className="text-sm text-gray-600 mb-1">SMTP Username</label>
+                     <input 
+                       type="text"
+                       value={globalSettings.smtpUser || ''}
+                       onChange={e => setGlobalSettings(s => ({...s, smtpUser: e.target.value}))}
+                       placeholder="example@gmail.com"
+                       className="bg-white border border-gray-300 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)]"
+                     />
+                   </div>
+                   <div className="flex flex-col">
+                     <label className="text-sm text-gray-600 mb-1">SMTP Password</label>
+                     <input 
+                       type="password"
+                       value={globalSettings.smtpPass || ''}
+                       onChange={e => setGlobalSettings(s => ({...s, smtpPass: e.target.value}))}
+                       placeholder="App Password"
+                       className="bg-white border border-gray-300 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)]"
+                     />
+                   </div>
                  </div>
                </div>
 
