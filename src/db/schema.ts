@@ -114,3 +114,60 @@ export const verification_codes = pgTable('verification_codes', {
   expiresAt: timestamp('expires_at').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+export const tutorial_sections = pgTable('tutorial_sections', {
+  id: serial('id').primaryKey(),
+  title: text('title').notNull(),
+  icon: text('icon').notNull().default('GraduationCap'),
+  color: text('color').notNull().default('text-blue-600 bg-blue-50 border-blue-100/50'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const tutorials = pgTable('tutorials', {
+  id: serial('id').primaryKey(),
+  sectionId: integer('section_id').references(() => tutorial_sections.id, { onDelete: 'cascade' }).notNull(),
+  title: text('title').notNull(),
+  description: text('description').notNull(),
+  text: text('text').notNull(),
+  steps: text('steps').notNull(), // JSON string array of steps
+  videoUrl: text('video_url'),
+  imageUrl: text('image_url'),
+  linkUrl: text('link_url'),
+  linkTitle: text('link_title'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const tutorial_feedback = pgTable('tutorial_feedback', {
+  id: serial('id').primaryKey(),
+  tutorialId: integer('tutorial_id').references(() => tutorials.id, { onDelete: 'cascade' }).notNull(),
+  userId: text('user_id').notNull(),
+  isHelpful: boolean('is_helpful').notNull(),
+  comment: text('comment'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const feedback_comments = pgTable('feedback_comments', {
+  id: serial('id').primaryKey(),
+  feedbackId: integer('feedback_id').references(() => tutorial_feedback.id, { onDelete: 'cascade' }).notNull(),
+  userId: text('user_id').notNull(),
+  userName: text('user_name'),
+  content: text('content').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const newbie_links = pgTable('newbie_links', {
+  id: serial('id').primaryKey(),
+  title: text('title').notNull(),
+  url: text('url').notNull(),
+  description: text('description'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const tutorial_comments = pgTable('tutorial_comments', {
+  id: serial('id').primaryKey(),
+  tutorialId: integer('tutorial_id').references(() => tutorials.id, { onDelete: 'cascade' }).notNull(),
+  userId: text('user_id').notNull(),
+  userName: text('user_name'),
+  content: text('content').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+});

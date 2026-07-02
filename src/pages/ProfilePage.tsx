@@ -439,7 +439,7 @@ export function ProfilePage() {
                       const userMajor = majors.find(m => m.name === profileForm.major);
                       const displayedSubjects = userMajor ? subjects.filter(s => userMajor.courseIds?.includes(s.id)) : subjects;
                       
-                      const groups = Object.entries(
+                      const groups = (Object.entries(
                         displayedSubjects.reduce((acc, s) => {
                           let g = 'المتطلبات العامة';
                           let reqCount = 0;
@@ -454,7 +454,7 @@ export function ProfilePage() {
                           acc[g].push({...s, reqCount});
                           return acc;
                         }, {} as Record<string, any[]>)
-                      ).sort((a, b) => {
+                      ) as [string, any[]][]).sort((a, b) => {
                         if (a[0] === 'المتطلبات العامة') return -1;
                         if (b[0] === 'المتطلبات العامة') return 1;
                         return a[0].localeCompare(b[0], 'ar');

@@ -17,7 +17,7 @@ export function TopBar() {
     { name: 'المصادر', path: '/resources', icon: BookOpen },
     { name: 'التقويم', path: '/calendar', icon: Calendar },
     { name: 'الأخبار', path: '/news', icon: Newspaper },
-    { name: 'الشروحات', path: '/how-to', icon: HelpCircle },
+    { name: 'الدليلة', path: '/how-to', icon: HelpCircle },
   ];
 
   return (
@@ -99,27 +99,27 @@ export function TopBar() {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
                         transition={{ duration: 0.15 }}
-                        className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50"
+                        className="absolute right-0 mt-2 w-48 bg-zinc-950 rounded-xl shadow-none border border-zinc-800 py-2 z-50"
                       >
                         <Link 
                           to="/profile" 
                           onClick={() => setProfileMenuOpen(false)}
-                          className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-[var(--color-imamu-blue)] transition"
+                          className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-zinc-300 hover:bg-zinc-800 hover:text-zinc-50 transition"
                           dir="rtl"
                         >
-                          <Settings className="w-4 h-4" />
+                          <Settings className="w-4 h-4 text-zinc-400" />
                           إعدادات الملف الشخصي
                         </Link>
-                        <hr className="my-1 border-gray-100" />
+                        <hr className="my-1 border-zinc-800" />
                         <button
                           onClick={() => {
                             signOut();
                             setProfileMenuOpen(false);
                           }}
-                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition"
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-red-400 hover:bg-red-950/20 transition"
                           dir="rtl"
                         >
-                          <LogOut className="w-4 h-4" />
+                          <LogOut className="w-4 h-4 text-red-400" />
                           تسجيل الخروج
                         </button>
                       </motion.div>

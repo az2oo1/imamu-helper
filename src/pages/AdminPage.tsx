@@ -868,20 +868,20 @@ export function AdminPage() {
                   </button>
                 </div>
               </div>
-              <div className="divide-y divide-gray-100 border-t border-gray-100">
+              <div className="divide-y divide-zinc-800 border-t border-zinc-800">
                 {subjects
                   .filter(s => s.code?.toLowerCase().includes(subjectSearch.toLowerCase()) || s.name?.toLowerCase().includes(subjectSearch.toLowerCase()))
                   .slice(0, subjectLimit)
                   .map(s => (
                   <div key={s.id} className="py-4 flex items-center justify-between group">
                     <div className="flex gap-4">
-                      <div className="font-mono text-sm bg-gray-100 px-2.5 py-1 rounded-md text-gray-700 self-start">{s.code}</div>
+                      <div className="font-mono text-sm bg-zinc-950 border border-zinc-800 px-2.5 py-1 rounded-md text-zinc-300 self-start">{s.code}</div>
                       <div className="flex-1">
-                        <div className="font-medium text-gray-900">
+                        <div className="font-medium text-zinc-100">
                           {s.name}
                         </div>
                         <div className="flex gap-4 mt-2">
-                          {s.driveLink && <a href={s.driveLink} target="_blank" rel="noreferrer" className="text-xs text-[var(--color-imamu-blue)] font-medium hover:text-[var(--color-imamu-gold)] hover:underline flex items-center gap-1"><LinkIcon className="w-3 h-3"/> Drive</a>}
+                          {s.driveLink && <a href={s.driveLink} target="_blank" rel="noreferrer" className="text-xs text-blue-400 font-medium hover:underline flex items-center gap-1"><LinkIcon className="w-3 h-3"/> Drive</a>}
                           {s.whatsappLink && <a href={s.whatsappLink} target="_blank" rel="noreferrer" className="text-xs text-green-500 hover:underline flex items-center gap-1"><LinkIcon className="w-3 h-3"/> WhatsApp</a>}
                         </div>
                       </div>
@@ -895,8 +895,8 @@ export function AdminPage() {
                         whatsappLink: s.whatsappLink || '',
                         creditHours: s.creditHours ? s.creditHours.toString() : '3',
                         level: s.level ? s.level.toString() : ''
-                      })} className="p-2 text-gray-400 hover:text-[var(--color-imamu-blue)] hover:bg-[rgba(11,50,96,0.06)] rounded-lg transition text-sm font-medium">Edit</button>
-                      <button onClick={() => handleDelete(`/api/admin/subjects/${s.id}`)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"><Trash2 className="w-5 h-5" /></button>
+                      })} className="p-2 text-zinc-400 hover:text-blue-400 hover:bg-zinc-800/45 rounded-lg transition text-sm font-medium">Edit</button>
+                      <button onClick={() => handleDelete(`/api/admin/subjects/${s.id}`)} className="p-2 text-zinc-500 hover:text-red-400 hover:bg-zinc-900/40 rounded-lg transition"><Trash2 className="w-5 h-5" /></button>
                     </div>
                   </div>
                 ))}
@@ -1122,7 +1122,7 @@ export function AdminPage() {
   };
 
   return (
-    <div className="flex flex-col flex-1 max-w-5xl w-full mx-auto pb-24 px-4 sm:px-6 bg-white">
+    <div className="flex flex-col flex-1 max-w-5xl w-full mx-auto pb-24 px-4 sm:px-6 bg-transparent">
       <div className="mb-10 text-left">
         <h1 className="text-4xl font-display font-bold text-gray-900 mb-2 inline-flex items-center gap-3">
           <ShieldCheck className="w-10 h-10 text-indigo-600" /> Administrative Panel
@@ -1130,7 +1130,7 @@ export function AdminPage() {
         <p className="text-gray-500 max-w-xl">Configure and securely manage platform content across modules.</p>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-12 lg:gap-16 bg-white">
+      <div className="flex flex-col md:flex-row gap-12 lg:gap-16 bg-transparent">
         
         {/* Left Sidebar Menu */}
         <div className="w-full md:w-64 shrink-0">

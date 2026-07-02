@@ -6,10 +6,10 @@
   --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
-  --color-imamu-blue: #0b3260;
-  --color-imamu-blue-light: #164d8c;
-  --color-imamu-gold: #cba863;
-  --color-imamu-gold-light: #e5cd96;
+  --color-imamu-blue: #3b82f6;
+  --color-imamu-blue-light: #60a5fa;
+  --color-imamu-gold: #fbbf24;
+  --color-imamu-gold-light: #fde68a;
 }
 
 html {
@@ -17,8 +17,8 @@ html {
 }
 
 body {
-  background-color: #f8fafc;
-  color: #0f172a;
+  background-color: #121214;
+  color: #fafafa;
 }
 
 /* Custom Scrollbar */
@@ -27,15 +27,157 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f8fafc; 
+  background: #121214; 
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1; 
+  background: #27272a; 
   border-radius: 10px;
-  border: 2px solid #f8fafc;
+  border: 2px solid #121214;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8; 
+  background: #3f3f46; 
+}
+
+/* 
+ * Safe Non-Destructive Dark Theme Overrides
+ * remaps base colors while letting Tailwind specificity and opacity values win.
+ */
+
+.bg-white {
+  background-color: #161619;
+}
+
+/* Handle opacity overlays specifically so they don't render as solid white */
+.bg-white\/80 {
+  background-color: rgba(22, 22, 25, 0.8);
+}
+.bg-white\/70 {
+  background-color: rgba(22, 22, 25, 0.7);
+}
+.bg-white\/60 {
+  background-color: rgba(22, 22, 25, 0.6);
+}
+.bg-white\/85 {
+  background-color: rgba(22, 22, 25, 0.85);
+}
+.bg-white\/10 {
+  background-color: rgba(22, 22, 25, 0.1);
+}
+.bg-white\/5 {
+  background-color: rgba(22, 22, 25, 0.05);
+}
+
+.bg-gray-50, .bg-zinc-50 {
+  background-color: #1e1e22;
+}
+.bg-gray-50\/30, .bg-zinc-50\/30 {
+  background-color: rgba(30, 30, 34, 0.3);
+}
+.bg-gray-50\/50, .bg-zinc-50\/50 {
+  background-color: rgba(30, 30, 34, 0.5);
+}
+
+.bg-gray-100, .bg-zinc-100 {
+  background-color: #2e2e33;
+}
+.bg-gray-200, .bg-zinc-200 {
+  background-color: #48484f;
+}
+
+/* Translucent Alert/Highlight Badges */
+.bg-blue-50, .bg-blue-100\/50 {
+  background-color: rgba(59, 130, 246, 0.1) !important;
+}
+.bg-emerald-50, .bg-emerald-100\/50 {
+  background-color: rgba(16, 185, 129, 0.1) !important;
+}
+.bg-rose-50, .bg-red-50, .bg-rose-100\/50 {
+  background-color: rgba(239, 68, 68, 0.1) !important;
+}
+.bg-amber-50, .bg-amber-100\/50 {
+  background-color: rgba(245, 158, 11, 0.1) !important;
+}
+.bg-indigo-50, .bg-indigo-100\/50 {
+  background-color: rgba(99, 102, 241, 0.1) !important;
+}
+.bg-purple-50, .bg-purple-100\/50 {
+  background-color: rgba(139, 92, 246, 0.1) !important;
+}
+
+/* Hover overrides */
+.hover\:bg-gray-50:hover, 
+.hover\:bg-zinc-50:hover, 
+.hover\:bg-gray-100\/80:hover, 
+.hover\:bg-zinc-100\/70:hover,
+.hover\:bg-gray-100:hover,
+.hover\:bg-zinc-100:hover {
+  background-color: #2e2e33;
+}
+
+/* Borders overrides */
+.border-zinc-200, 
+.border-gray-200, 
+.border-gray-150, 
+.border-gray-100, 
+.border-zinc-100 {
+  border-color: #2d2d31;
+}
+
+/* Texts overrides */
+.text-zinc-950, 
+.text-zinc-900, 
+.text-gray-900, 
+.text-gray-955 {
+  color: #fafafa;
+}
+
+.text-zinc-400, 
+.text-gray-400, 
+.text-zinc-450, 
+.text-gray-450 {
+  color: #a1a1aa;
+}
+
+.text-zinc-500, 
+.text-gray-500 {
+  color: #71717a;
+}
+
+/* Low-contrast dark texts remapped to readable light zinc */
+.text-gray-600, 
+.text-zinc-600, 
+.text-gray-700, 
+.text-zinc-700, 
+.text-gray-800, 
+.text-zinc-800,
+.text-gray-750,
+.text-zinc-750,
+.text-gray-650,
+.text-zinc-650 {
+  color: #d4d4d8 !important;
+}
+
+/* Remap dark blue texts to premium punchy light blue */
+.text-blue-900,
+.text-blue-800,
+.text-blue-700,
+.text-blue-600,
+.text-blue-500,
+.text-blue-450,
+.text-blue-400 {
+  color: #60a5fa !important;
+}
+
+/* Style inputs and textareas nicely in dark mode */
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="password"],
+textarea,
+select {
+  background-color: #09090b;
+  color: #fafafa;
+  border-color: #27272a;
 }

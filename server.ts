@@ -1,8 +1,10 @@
+import 'dotenv/config';
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { db } from "./src/db/index";
-import { users, majors, subjects, events, news, majorCourses, newsLikes, newsComments, news_sources, global_settings, verification_codes } from "./src/db/schema";
+import { users, majors, subjects, events, news, majorCourses, newsLikes, newsComments, news_sources, global_settings, verification_codes, tutorial_sections, tutorials, tutorial_feedback, feedback_comments, newbie_links, tutorial_comments } from "./src/db/schema";
 import { eq, desc, and, sql, inArray, ilike } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "./src/middleware/auth";
 import jwt from 'jsonwebtoken';
@@ -13,6 +15,7 @@ import * as cheerio from "cheerio";
 import nodemailer from "nodemailer";
 // @ts-ignore
 import pdfParse from "pdf-parse/lib/pdf-parse.js";
+import AdmZip from 'adm-zip';
 
 import { GoogleGenAI, Type } from '@google/genai';
 
@@ -35,7 +38,162 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json({ limit: '10mb' }));
+  // Make sure public/uploads folder exists
+  const uploadsDir = path.join(process.cwd(), 'public/uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+  app.use('/uploads', express.static(uploadsDir));
+
+  app.use(express.json({ limit: '50mb' }));
+
+  // Seed default tutorials & sections if empty
+  (async () => {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const existingSections = await db.select().from(tutorial_sections);
+      if (existingSections.length === 0) {
+        console.log('[DB] Seeding default tutorial sections and tutorials...');
+        const [secAcademic] = await db.insert(tutorial_sections).values({
+          title: 'الحياة الأكاديمية والتسجيل',
+          icon: 'GraduationCap',
+          color: 'text-blue-600 bg-blue-50 border-blue-100/50'
+        }).returning();
+
+        const [secServices] = await db.insert(tutorial_sections).values({
+          title: 'الخدمات والمكافآت',
+          icon: 'CreditCard',
+          color: 'text-emerald-600 bg-emerald-50 border-emerald-100/50'
+        }).returning();
+
+        await db.insert(tutorials).values([
+          {
+            sectionId: secAcademic.id,
+            title: 'كيف تسجل المواد في الخدمة الذاتية؟',
+            description: 'شرح مبسط لكيفية إعداد جدولك الأكاديمي وتسجيل المواد عبر نظام الخدمة الذاتية (Banner).',
+            text: 'تسجيل المواد يفتح عادة في فترات محددة حسب جدول التسجيل المقر من عمادة القبول والتسجيل، وتتأثر الأولويات بالمعدل التراكمي وعدد الساعات المنجزة.',
+            steps: JSON.stringify([
+              'ادخل إلى نظام الخدمة الذاتية باستخدام رقمك الجامعي وكلمة المرور الخاصة بك.',
+              'اختر صفحة "التسجيل" ثم اضغط على "التسجيل وتنزيل المواد".',
+              'اختر الفصل الدراسي المناسب (مثال: الفصل الدراسي الأول 1448 هـ).',
+              'أدخل الرموز المرجعية للمواد (CRN) التي قمت بإعدادها مسبقاً، واضغط على "إضافة إلى الجدول".',
+              'تأكد من الضغط على زر "تقديم / Submit" في أسفل اليسار لتثبيت المواد وضمان تسجيلها.'
+            ]),
+            linkUrl: 'https://bstss.imamu.edu.sa/StudentSelfService',
+            linkTitle: 'بوابة الخدمة الذاتية (Banner)'
+          },
+          {
+            sectionId: secAcademic.id,
+            title: 'كيف أحسب معدلي التراكمي؟',
+            description: 'دليل خطوة بخطوة لاستخدام حاسبة المعدل التراكمي والفصلي بفعالية.',
+            text: 'تتيح لك حاسبة المعدل التنبؤ بمعدلك التراكمي والفصلي بدقة، مما يساعدك على تخطيط درجاتك في الفصول القادمة للحفاظ على معدل مرتفع أو تفادي الإنذارات الأكاديمية.',
+            steps: JSON.stringify([
+              'انتقل إلى قسم الأدوات من القائمة الرئيسية، ثم اختر "حاسبة المعدل".',
+              'أدخل معدلك الحالي التراكمي وعدد الساعات المكتسبة الحالية (تجدها في سجلك الأكاديمي).',
+              'أدخل درجات المواد المتوقعة للفصل الحالي وعدد الساعات المعتمدة لكل مادة.',
+              'اضغط على زر "احسب" للحصول على النتيجة وملاحظات الأداء فوراً.'
+            ]),
+            linkUrl: '/tools',
+            linkTitle: 'حاسبة المعدل التراكمي'
+          },
+          {
+            sectionId: secAcademic.id,
+            title: 'كيف أصل لمصادر ومجموعات المواد؟',
+            description: 'دليل تصفح قسم المصادر للحصول على الملفات الدراسية، الاختبارات السابقة، ومجموعات التواصل.',
+            text: 'يحتوي قسم المصادر على ملفات هامة يشاركها زملاؤك الطلاب، بالإضافة إلى روابط مجموعات الواتساب الرسمية لكل مادة لتسهيل التواصل والتعاون الأكاديمي.',
+            steps: JSON.stringify([
+              'توجه إلى قسم "المصادر" من القائمة العلوية للمنصة.',
+              'استخدم مربع البحث السريع أو الفلاتر لتحديد مستواك الدراسي.',
+              'انقر على بطاقة المادة التي ترغب في تصفحها.',
+              'ستظهر لك روابط مجموعات الواتساب وملفات جوجل درايف الخاصة بالمادة لتحميلها.'
+            ]),
+            linkUrl: '/resources',
+            linkTitle: 'بنك المصادر الأكاديمية'
+          },
+          {
+            sectionId: secAcademic.id,
+            title: 'كيف أحول من تخصص إلى آخر؟',
+            description: 'شروط وضوابط التحويل بين التخصصات والكليات داخل جامعة الإمام والمواعيد المعتادة.',
+            text: 'يتاح التحويل نهاية كل فصل دراسي عبر الخدمة الذاتية، ويعتمد قبول طلبك بشكل أساسي على توفر المقاعد ومعدلك التراكمي مقارنة بالطلاب المتقدمين الآخرين.',
+            steps: JSON.stringify([
+              'تأكد من استيفائك لشروط التحويل الخاصة بالكلية المستهدفة (مثل اجتياز ساعات محددة أو حد أدنى للمعدل).',
+              'ادخل للخدمة الذاتية خلال فترة التقديم المعلنة في التقويم الدراسي.',
+              'انتقل إلى "الخدمات الأكاديمية" ثم اختر "طلب التحويل الداخلي".',
+              'حدد الكلية والتخصص المطلوب كأولوية أولى، وقم بتقديم طلبك.',
+              'تابع حالة الطلب بانتظام عبر النظام لمعرفة قرار اللجنة الأكاديمية.'
+            ]),
+            linkUrl: 'https://bstss.imamu.edu.sa/StudentSelfService',
+            linkTitle: 'تقديم طلب تحويل بالخدمة الذاتية'
+          },
+          {
+            sectionId: secServices.id,
+            title: 'كيف أتتبع موعد نزول المكافأة؟',
+            description: 'طريقة التحقق من العد التنازلي وتاريخ نزول المكافآت الجامعية شهرياً.',
+            text: 'تنزل المكافأة الجامعية لطلاب جامعة الإمام عادة في اليوم 27 من كل شهر ميلادي، ما لم يصادف عطلة نهاية الأسبوع حيث يتم تقديمها أو تأخيرها يوماً واحداً.',
+            steps: JSON.stringify([
+              'افتح الصفحة الرئيسية لمنصة مساعد الإمام.',
+              'شاهد قسم العدادات التنازلية مباشرة أسفل قسم الترحيب.',
+              'ستجد عداداً مخصصاً يوضح الأيام والساعات المتبقية لنزول مكافأتك القادمة بدقة.',
+              'في يوم نزول المكافأة، ستشاهد إشعاراً ترحيبياً خاصاً يخبرك بنزول المكافأة في حسابك.'
+            ]),
+            linkUrl: '/',
+            linkTitle: 'الرئيسية (عداد المكافأة)'
+          },
+          {
+            sectionId: secServices.id,
+            title: 'كيف أستخرج بطاقتي الجامعية والمصرفية؟',
+            description: 'خطوات إصدار البطاقة الجامعية الذكية لجامعة الإمام واستلام بطاقة الصراف الآلي للمكافآت.',
+            text: 'البطاقة الجامعية ضرورية للدخول للحرم الجامعي وحضور الاختبارات والاستفادة من خدمات المكتبة المركزية، بينما بطاقة الصراف تمكنك من سحب مكافأتك الأكاديمية.',
+            steps: JSON.stringify([
+              'لالبطاقة الجامعية: قم برفع صورتك الشخصية والملف الشخصي عبر بوابة الخدمة الذاتية.',
+              'بعد الموافقة الإلكترونية، توجه لعمادة شؤون الطلاب (مبنى 309 للطلاب) لاستلام البطاقة المطبوعة.',
+              'لالبطاقة المصرفية: عند إصدار رقم الآيبان الأكاديمي، ستصلك رسالة نصية من مصرف الراجحي.',
+              'توجه لفرع المصرف داخل المدينة الجامعية لاستلام بطاقة صراف الطلاب الخاصة بك وتفعيلها.'
+            ]),
+            linkUrl: 'https://bstss.imamu.edu.sa/StudentSelfService',
+            linkTitle: 'رفع الصورة الشخصية (Banner)'
+          }
+        ]);
+
+        // Seed newbie links
+        const existingLinks = await db.select().from(newbie_links);
+        if (existingLinks.length === 0) {
+          console.log('[DB] Seeding default newbie links...');
+          await db.insert(newbie_links).values([
+            {
+              title: 'بوابة الخدمات الذاتية (Banner)',
+              url: 'https://bstss.imamu.edu.sa/StudentSelfService',
+              description: 'البوابة الرسمية لتسجيل المقررات، إعداد الجداول، ومعرفة المعدل التراكمي والسجل الأكاديمي.'
+            },
+            {
+              title: 'نظام التعليم الإلكتروني (Blackboard)',
+              url: 'https://lms.imamu.edu.sa',
+              description: 'منصة التعليم الإلكتروني الرسمية لحضور المحاضرات الافتراضية، وحل الواجبات، ومتابعة الاختبارات.'
+            },
+            {
+              title: 'بوابة البريد الإلكتروني الجامعي',
+              url: 'https://mail.imamu.edu.sa/imamowa/',
+              description: 'الوصول لبريدك الأكاديمي الرسمي وتفعيل الحساب الجامعي واستقبال الإعلانات الهامة.'
+            },
+            {
+              title: 'الموقع الرسمي لجامعة الإمام',
+              url: 'https://imamu.edu.sa',
+              description: 'موقع الجامعة الإلكتروني للاطلاع على أخبار العمادات، الكليات، والتقويم الدراسي المعتمد.'
+            }
+          ]);
+        }
+
+        // Force update webmail url override
+        await db.update(newbie_links)
+          .set({ url: 'https://mail.imamu.edu.sa/imamowa/' })
+          .where(eq(newbie_links.title, 'بوابة البريد الإلكتروني الجامعي'));
+
+        console.log('[DB] Seeding completed.');
+      }
+    } catch (e) {
+      console.error('[DB] Seeding failed, likely due to migration in progress:', e);
+    }
+  })();
 
   // API Routes
   app.get("/api/health", (req, res) => {
@@ -437,6 +595,408 @@ async function startServer() {
   });
 
 
+  // ==========================================
+  // TUTORIALS & SECTIONS API
+  // ==========================================
+
+  // Get all newbie links
+  app.get("/api/newbie/links", async (req, res) => {
+    try {
+      const list = await db.select().from(newbie_links).orderBy(newbie_links.id);
+      res.json(list);
+    } catch (e) {
+      console.error(e);
+      res.status(550).json({ error: "Server error" });
+    }
+  });
+
+  // Create newbie link (Admin)
+  app.post("/api/admin/newbie/links", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      if (!req.user?.isAdmin) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+      const { title, url, description } = req.body;
+      if (!title || !url) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+      const [newLink] = await db.insert(newbie_links).values({ title, url, description }).returning();
+      res.json(newLink);
+    } catch (e) {
+      console.error(e);
+      res.status(550).json({ error: "Server error" });
+    }
+  });
+
+  // Update newbie link (Admin)
+  app.put("/api/admin/newbie/links/:id", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      if (!req.user?.isAdmin) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+      const id = parseInt(req.params.id);
+      const { title, url, description } = req.body;
+      const [updated] = await db.update(newbie_links)
+        .set({ title, url, description })
+        .where(eq(newbie_links.id, id))
+        .returning();
+      if (!updated) {
+        return res.status(404).json({ error: "Link not found" });
+      }
+      res.json(updated);
+    } catch (e) {
+      console.error(e);
+      res.status(550).json({ error: "Server error" });
+    }
+  });
+
+  // Delete newbie link (Admin)
+  app.delete("/api/admin/newbie/links/:id", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      if (!req.user?.isAdmin) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+      const id = parseInt(req.params.id);
+      await db.delete(newbie_links).where(eq(newbie_links.id, id));
+      res.json({ success: true });
+    } catch (e) {
+      console.error(e);
+      res.status(550).json({ error: "Server error" });
+    }
+  });
+
+  // Get all sections
+  app.get("/api/tutorials/sections", async (req, res) => {
+    try {
+      const sectionsList = await db.select().from(tutorial_sections);
+      res.json(sectionsList);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Get all tutorials
+  app.get("/api/tutorials", async (req, res) => {
+    try {
+      const { sectionId } = req.query;
+      let query = db.select().from(tutorials);
+      if (sectionId) {
+        query = query.where(eq(tutorials.sectionId, parseInt(sectionId as string)));
+      }
+      const list = await query;
+      res.json(list.map((t: any) => ({
+        ...t,
+        steps: JSON.parse(t.steps)
+      })));
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Get single tutorial with feedback
+  app.get("/api/tutorials/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const [tutorial] = await db.select().from(tutorials).where(eq(tutorials.id, id));
+      if (!tutorial) return res.status(404).json({ error: "Tutorial not found" });
+
+      const feedbackList = await db.select().from(tutorial_feedback).where(eq(tutorial_feedback.tutorialId, id));
+
+      const feedbackWithUser = await Promise.all(feedbackList.map(async (fb: any) => {
+        const [userRec] = await db.select().from(users).where(eq(users.uid, fb.userId));
+        return {
+          ...fb,
+          userName: userRec ? (userRec.userName || userRec.email?.split('@')[0]) : 'طالب',
+          profilePicUrl: userRec?.profilePicUrl
+        };
+      }));
+
+      res.json({
+        ...tutorial,
+        steps: JSON.parse(tutorial.steps),
+        feedback: feedbackWithUser
+      });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Submit feedback
+  app.post("/api/tutorials/:id/feedback", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const tutorialId = parseInt(req.params.id);
+      const userId = req.user.uid;
+      const { isHelpful, comment } = req.body;
+
+      const existing = await db.select().from(tutorial_feedback).where(
+        and(
+          eq(tutorial_feedback.tutorialId, tutorialId),
+          eq(tutorial_feedback.userId, userId)
+        )
+      );
+
+      let feedbackRecord;
+      if (existing.length > 0) {
+        [feedbackRecord] = await db.update(tutorial_feedback)
+          .set({ isHelpful, comment: comment || null })
+          .where(eq(tutorial_feedback.id, existing[0].id))
+          .returning();
+      } else {
+        [feedbackRecord] = await db.insert(tutorial_feedback)
+          .values({ tutorialId, userId, isHelpful, comment: comment || null })
+          .returning();
+      }
+
+      res.json(feedbackRecord);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Get comments for specific feedback
+  app.get("/api/feedback/:id/comments", async (req, res) => {
+    try {
+      const feedbackId = parseInt(req.params.id);
+      const commentsList = await db.select().from(feedback_comments).where(eq(feedback_comments.feedbackId, feedbackId));
+      
+      const enriched = await Promise.all(commentsList.map(async (c: any) => {
+        const [userRec] = await db.select().from(users).where(eq(users.uid, c.userId));
+        return {
+          ...c,
+          userName: userRec ? (userRec.userName || userRec.email?.split('@')[0]) : (c.userName || 'طالب'),
+          profilePicUrl: userRec?.profilePicUrl
+        };
+      }));
+
+      res.json(enriched);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Post a comment/reply on feedback
+  app.post("/api/feedback/:id/comments", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const feedbackId = parseInt(req.params.id);
+      const userId = req.user.uid;
+      const { content } = req.body;
+      if (!content || !content.trim()) return res.status(400).json({ error: "Comment text required" });
+
+      const [userRec] = await db.select().from(users).where(eq(users.uid, userId));
+      const userName = userRec ? (userRec.userName || userRec.email?.split('@')[0]) : 'طالب';
+
+      const [newComment] = await db.insert(feedback_comments)
+        .values({
+          feedbackId,
+          userId,
+          userName,
+          content: content.trim()
+        })
+        .returning();
+
+      res.json({
+        ...newComment,
+        profilePicUrl: userRec?.profilePicUrl
+      });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Get public comments for specific tutorial
+  app.get("/api/tutorials/:id/comments", async (req, res) => {
+    try {
+      const tutorialId = parseInt(req.params.id);
+      const commentsList = await db.select().from(tutorial_comments).where(eq(tutorial_comments.tutorialId, tutorialId));
+      
+      const enriched = await Promise.all(commentsList.map(async (c: any) => {
+        const [userRec] = await db.select().from(users).where(eq(users.uid, c.userId));
+        return {
+          ...c,
+          userName: userRec ? (userRec.userName || userRec.email?.split('@')[0]) : (c.userName || 'طالب'),
+          profilePicUrl: userRec?.profilePicUrl
+        };
+      }));
+
+      res.json(enriched);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Post a public comment on specific tutorial
+  app.post("/api/tutorials/:id/comments", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const tutorialId = parseInt(req.params.id);
+      const userId = req.user.uid;
+      const { content } = req.body;
+      if (!content || !content.trim()) return res.status(400).json({ error: "Comment text required" });
+
+      const [userRec] = await db.select().from(users).where(eq(users.uid, userId));
+      const userName = userRec ? (userRec.userName || userRec.email?.split('@')[0]) : 'طالب';
+
+      const [newComment] = await db.insert(tutorial_comments)
+        .values({
+          tutorialId,
+          userId,
+          userName,
+          content: content.trim()
+        })
+        .returning();
+
+      res.json({
+        ...newComment,
+        profilePicUrl: userRec?.profilePicUrl
+      });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Admin: Get all feedback
+  app.get("/api/admin/tutorials/feedback", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
+    try {
+      const allFeedback = await db.select().from(tutorial_feedback);
+      const enriched = await Promise.all(allFeedback.map(async (fb: any) => {
+        const [userRec] = await db.select().from(users).where(eq(users.uid, fb.userId));
+        const [tut] = await db.select().from(tutorials).where(eq(tutorials.id, fb.tutorialId));
+        return {
+          ...fb,
+          tutorialTitle: tut ? tut.title : 'شرح محذوف',
+          userName: userRec ? (userRec.userName || userRec.email?.split('@')[0]) : 'طالب',
+          userEmail: userRec?.email,
+          profilePicUrl: userRec?.profilePicUrl
+        };
+      }));
+      res.json(enriched);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Admin: Manage Sections
+  app.post("/api/admin/tutorials/sections", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
+    try {
+      const { title, icon, color } = req.body;
+      if (!title) return res.status(400).json({ error: "Title required" });
+      const [newSection] = await db.insert(tutorial_sections).values({ title, icon, color }).returning();
+      res.json(newSection);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.put("/api/admin/tutorials/sections/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
+    try {
+      const id = parseInt(req.params.id);
+      const { title, icon, color } = req.body;
+      const [updated] = await db.update(tutorial_sections)
+        .set({ title, icon, color })
+        .where(eq(tutorial_sections.id, id))
+        .returning();
+      res.json(updated);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.delete("/api/admin/tutorials/sections/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
+    try {
+      const id = parseInt(req.params.id);
+      await db.delete(tutorial_sections).where(eq(tutorial_sections.id, id));
+      res.json({ success: true });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Admin: Manage Tutorials
+  app.post("/api/admin/tutorials", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
+    try {
+      const { sectionId, title, description, text: fullText, steps = [], videoUrl, imageUrl, linkUrl, linkTitle } = req.body;
+      if (!sectionId || !title || !description || !fullText) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+      const [newTutorial] = await db.insert(tutorials).values({
+        sectionId: parseInt(sectionId),
+        title,
+        description,
+        text: fullText,
+        steps: JSON.stringify(steps),
+        videoUrl: videoUrl || null,
+        imageUrl: imageUrl || null,
+        linkUrl: linkUrl || null,
+        linkTitle: linkTitle || null
+      }).returning();
+      res.json({
+        ...newTutorial,
+        steps: JSON.parse(newTutorial.steps)
+      });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.put("/api/admin/tutorials/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
+    try {
+      const id = parseInt(req.params.id);
+      const { sectionId, title, description, text: fullText, steps = [], videoUrl, imageUrl, linkUrl, linkTitle } = req.body;
+      const [updated] = await db.update(tutorials)
+        .set({
+          sectionId: parseInt(sectionId),
+          title,
+          description,
+          text: fullText,
+          steps: JSON.stringify(steps),
+          videoUrl: videoUrl || null,
+          imageUrl: imageUrl || null,
+          linkUrl: linkUrl || null,
+          linkTitle: linkTitle || null
+        })
+        .where(eq(tutorials.id, id))
+        .returning();
+      res.json({
+        ...updated,
+        steps: JSON.parse(updated.steps)
+      });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.delete("/api/admin/tutorials/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
+    try {
+      const id = parseInt(req.params.id);
+      await db.delete(tutorials).where(eq(tutorials.id, id));
+      res.json({ success: true });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+
   // Calendar ICS Export
   app.get("/api/calendar.ics", async (req, res) => {
     try {
@@ -464,6 +1024,36 @@ async function startServer() {
     const user = await db.select().from(users).where(eq(users.uid, req.user.uid));
     return user[0]?.isAdmin === true;
   };
+
+  // Configure disk storage for uploaded media files
+  const diskStorage = multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, path.join(process.cwd(), 'public/uploads'));
+    },
+    filename: function (req, file, cb) {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+      cb(null, uniqueSuffix + path.extname(file.originalname));
+    }
+  });
+
+  const diskUpload = multer({ 
+    storage: diskStorage,
+    limits: { fileSize: 50 * 1024 * 1024 } // limit to 50MB
+  });
+
+  app.post("/api/admin/upload", requireAuth, diskUpload.array("files", 10), async (req: AuthRequest & { files?: Express.Multer.File[] }, res): Promise<any> => {
+    if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
+    try {
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ error: "No files uploaded" });
+      }
+      const urls = req.files.map(f => `/uploads/${f.filename}`);
+      res.json({ success: true, urls });
+    } catch (e: any) {
+      console.error(e);
+      res.status(500).json({ error: e.message });
+    }
+  });
 
   app.post("/api/admin/subjects/deduplicate", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req))) return res.status(403).json({error: "Admin only"});
@@ -978,8 +1568,13 @@ async function fetchTweetsFromNitter(handle: string) {
       const allEvents = await db.query.events.findMany();
       const allNews = await db.query.news.findMany();
       const allNewsSources = await db.query.news_sources.findMany();
+      const allTutorialSections = await db.query.tutorial_sections.findMany();
+      const allTutorials = await db.query.tutorials.findMany();
+      const allTutorialFeedback = await db.query.tutorial_feedback.findMany();
+      const allFeedbackComments = await db.query.feedback_comments.findMany();
+      const allNewbieLinks = await db.query.newbie_links.findMany();
 
-      res.json({
+      const backupData = {
         exportDate: new Date(),
         data: {
           settings: allSettings,
@@ -988,20 +1583,68 @@ async function fetchTweetsFromNitter(handle: string) {
           subjects: allSubjects,
           events: allEvents,
           news: allNews,
-          newsSources: allNewsSources
+          newsSources: allNewsSources,
+          tutorialSections: allTutorialSections,
+          tutorials: allTutorials,
+          tutorialFeedback: allTutorialFeedback,
+          feedbackComments: allFeedbackComments,
+          newbieLinks: allNewbieLinks
         }
-      });
+      };
+
+      const zip = new AdmZip();
+      
+      // Add DB export JSON entry
+      zip.addFile('db_export.json', Buffer.from(JSON.stringify(backupData, null, 2), 'utf-8'));
+
+      // Add uploads directory files if it exists
+      const uploadsDir = path.join(process.cwd(), 'public/uploads');
+      if (fs.existsSync(uploadsDir)) {
+        zip.addLocalFolder(uploadsDir, 'uploads');
+      }
+
+      const zipBuffer = zip.toBuffer();
+
+      res.attachment(`imamu_backup_${new Date().toISOString().split('T')[0]}.zip`);
+      res.send(zipBuffer);
     } catch(e) {
       console.error(e);
       res.status(500).json({error: "Failed to export DB"});
     }
   });
 
-  app.post("/api/admin/import-db", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+  const importUpload = multer({ limits: { fileSize: 100 * 1024 * 1024 } });
+
+  app.post("/api/admin/import-db", requireAuth, importUpload.single("file"), async (req: AuthRequest & { file?: Express.Multer.File }, res): Promise<any> => {
     if (!(await checkAdmin(req))) return res.status(403).json({error: "Admin only"});
     try {
-      const data = req.body;
-      if (!data) return res.status(400).json({error: "No data provided"});
+      if (!req.file) return res.status(400).json({error: "No file uploaded"});
+
+      const zip = new AdmZip(req.file.buffer);
+      const zipEntries = zip.getEntries();
+
+      // Find db_export.json
+      const dbEntry = zipEntries.find(e => e.entryName === 'db_export.json');
+      if (!dbEntry) return res.status(400).json({error: "Invalid backup: missing db_export.json"});
+
+      const dbData = JSON.parse(dbEntry.getData().toString('utf-8'));
+      const data = dbData.data || dbData;
+
+      // Extract uploads
+      const uploadsDir = path.join(process.cwd(), 'public/uploads');
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+
+      zipEntries.forEach(entry => {
+        if (entry.entryName.startsWith('uploads/') && !entry.isDirectory) {
+          const fileName = entry.entryName.substring(8); // Remove 'uploads/' prefix
+          if (fileName) {
+            const destPath = path.join(uploadsDir, fileName);
+            fs.writeFileSync(destPath, entry.getData());
+          }
+        }
+      });
 
       // We need to carefully insert or overwrite tables.
       // Usually an import replaces everything, but we should be careful.
@@ -1013,28 +1656,86 @@ async function fetchTweetsFromNitter(handle: string) {
       }
       
       if (data.majors && data.majors.length > 0) {
+        const mapped = data.majors.map((item: any) => ({
+          ...item,
+          createdAt: item.createdAt ? new Date(item.createdAt) : null
+        }));
         await db.delete(majors);
-        await db.insert(majors).values(data.majors);
+        await db.insert(majors).values(mapped);
       }
       
       if (data.subjects && data.subjects.length > 0) {
+        const mapped = data.subjects.map((item: any) => ({
+          ...item,
+          createdAt: item.createdAt ? new Date(item.createdAt) : null
+        }));
         await db.delete(subjects);
-        await db.insert(subjects).values(data.subjects);
+        await db.insert(subjects).values(mapped);
       }
       
       if (data.events && data.events.length > 0) {
+        const mapped = data.events.map((item: any) => ({
+          ...item,
+          createdAt: item.createdAt ? new Date(item.createdAt) : null
+        }));
         await db.delete(events);
-        await db.insert(events).values(data.events);
+        await db.insert(events).values(mapped);
       }
       
       if (data.newsSources && data.newsSources.length > 0) {
+        const mapped = data.newsSources.map((item: any) => ({
+          ...item,
+          createdAt: item.createdAt ? new Date(item.createdAt) : null,
+          lastFetched: item.lastFetched ? new Date(item.lastFetched) : null
+        }));
         await db.delete(news_sources);
-        await db.insert(news_sources).values(data.newsSources);
+        await db.insert(news_sources).values(mapped);
       }
       
       if (data.news && data.news.length > 0) {
+        const mapped = data.news.map((item: any) => ({
+          ...item,
+          createdAt: item.createdAt ? new Date(item.createdAt) : null
+        }));
         await db.delete(news);
-        await db.insert(news).values(data.news);
+        await db.insert(news).values(mapped);
+      }
+
+      if (data.tutorialSections && data.tutorialSections.length > 0) {
+        await db.delete(tutorial_sections);
+        await db.insert(tutorial_sections).values(data.tutorialSections);
+      }
+
+      if (data.tutorials && data.tutorials.length > 0) {
+        await db.delete(tutorials);
+        await db.insert(tutorials).values(data.tutorials);
+      }
+
+      if (data.tutorialFeedback && data.tutorialFeedback.length > 0) {
+        const mapped = data.tutorialFeedback.map((item: any) => ({
+          ...item,
+          createdAt: item.createdAt ? new Date(item.createdAt) : null
+        }));
+        await db.delete(tutorial_feedback);
+        await db.insert(tutorial_feedback).values(mapped);
+      }
+
+      if (data.feedbackComments && data.feedbackComments.length > 0) {
+        const mapped = data.feedbackComments.map((item: any) => ({
+          ...item,
+          createdAt: item.createdAt ? new Date(item.createdAt) : null
+        }));
+        await db.delete(feedback_comments);
+        await db.insert(feedback_comments).values(mapped);
+      }
+
+      if (data.newbieLinks && data.newbieLinks.length > 0) {
+        const mapped = data.newbieLinks.map((item: any) => ({
+          ...item,
+          createdAt: item.createdAt ? new Date(item.createdAt) : null
+        }));
+        await db.delete(newbie_links);
+        await db.insert(newbie_links).values(mapped);
       }
       
       // Note: We avoid importing users to prevent overwriting existing passwords and auth data, unless specifically requested.
