@@ -9,28 +9,35 @@ import path from 'path';
 import fs from 'fs';
 
 let activeDb: any;
+let resolveDbReady!: () => void;
+const dbReadyPromise = new Promise<void>((resolve) => {
+  resolveDbReady = resolve;
+});
 
-// Export a Proxy that dynamically forwards all calls to activeDb
-export const db = new Proxy({}, {
-  get(target, prop, receiver) {
-    if (!activeDb) {
-      throw new Error('[DB] Database is not initialized yet.');
-    }
-    return Reflect.get(activeDb, prop, receiver);
-  }
-}) as any;
+/**
+ * Returns the fully-initialized drizzle db instance.
+ * Waits for PGlite WASM init and schema migrations to complete.
+ * Usage: const db = await getDb(); const rows = await db.select().from(myTable);
+ */
+export async function getDb() {
+  await dbReadyPromise;
+  return activeDb as ReturnType<typeof drizzlePglite<typeof schema>>;
+}
 
 async function initializeDatabase() {
   const migrationsFolder = path.join(process.cwd(), 'drizzle');
   const dbDir = path.join(process.cwd(), '.data', 'db');
   fs.mkdirSync(dbDir, { recursive: true });
 
-  // 1. Initialize PGlite as the default database immediately
+  // 1. Initialize PGlite as the default database
   console.log('[DB] Initializing PostgreSQL (PGlite) fallback with local persistence...');
   const memClient = new PGlite(dbDir);
+
+  // Wait for PGlite WASM to fully initialize before running any queries
+  await memClient.waitReady;
+  console.log('[DB] PGlite WASM initialized.');
+
   const memDb = drizzlePglite(memClient, { schema });
-  
-  // Set it as activeDb immediately so the app can start querying it right away
   activeDb = memDb;
 
   try {
@@ -50,11 +57,10 @@ async function initializeDatabase() {
       password: process.env.SQL_PASSWORD,
       database: process.env.SQL_DB_NAME,
       port: Number(process.env.SQL_PORT) || 5432,
-      connectionTimeoutMillis: 5000, // 5 seconds timeout
+      connectionTimeoutMillis: 5000,
     });
 
     try {
-      // Test the connection
       const client = await pool.connect();
       await client.query('SELECT 1');
       client.release();
@@ -65,15 +71,18 @@ async function initializeDatabase() {
     } catch (err: any) {
       console.error(`[DB] Physical database connection failed: ${err.message || err}`);
       console.log('[DB] Staying on in-memory PostgreSQL (PGlite) fallback.');
-      // Close the pool to free resources
       pool.end().catch(() => {});
     }
   } else {
     console.log('[DB] No SQL_HOST configured. Staying on in-memory PostgreSQL.');
   }
+
+  // Resolve so all getDb() waiters receive the fully initialized db
+  resolveDbReady();
 }
 
 // Start initialization immediately
 initializeDatabase().catch(err => {
   console.error('[DB] Critical database initialization error:', err);
+  resolveDbReady(); // Unblock waiters even on error
 });

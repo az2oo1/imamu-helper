@@ -3,7 +3,7 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
-import { db } from "./src/db/index";
+import { getDb } from "./src/db/index";
 import { users, majors, subjects, events, news, majorCourses, newsLikes, newsComments, news_sources, global_settings, verification_codes, tutorial_sections, tutorials, tutorial_feedback, feedback_comments, newbie_links, tutorial_comments } from "./src/db/schema";
 import { eq, desc, and, sql, inArray, ilike } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "./src/middleware/auth";
@@ -35,6 +35,9 @@ const transporter = nodemailer.createTransport({
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_dev_only';
 
 async function startServer() {
+  // Wait for DB to be fully initialized (PGlite WASM + migrations)
+  const db = await getDb();
+
   const app = express();
   const PORT = 3000;
 
