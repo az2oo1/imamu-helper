@@ -1,9 +1,10 @@
-import { db } from './src/db/index';
+import { getDb } from './src/db/index';
 import { users, verification_codes } from './src/db/schema';
 import { eq, desc } from 'drizzle-orm';
 import crypto from 'crypto';
 
 async function testRegister() {
+  const db = await getDb();
   await new Promise(resolve => setTimeout(resolve, 1500));
   
   try {

@@ -334,7 +334,7 @@ async function startServer() {
         const settings = await db.query.global_settings.findFirst();
         if (settings?.imapHost && settings?.imapPort) {
           const { verifyImapCredentials } = await import('./src/lib/imap-auth');
-          valid = await verifyImapCredentials(settings.imapHost, settings.imapPort, settings.imapSecure ?? true, email, password);
+          valid = await verifyImapCredentials(settings.imapHost as string, settings.imapPort as number, settings.imapSecure as boolean ?? true, email, password);
           
           if (valid) {
             // IMAP succeeded. If user doesn't exist, create them.
@@ -683,11 +683,9 @@ async function startServer() {
   app.get("/api/tutorials", async (req, res) => {
     try {
       const { sectionId } = req.query;
-      let query = db.select().from(tutorials);
-      if (sectionId) {
-        query = query.where(eq(tutorials.sectionId, parseInt(sectionId as string)));
-      }
-      const list = await query;
+      const list = await (sectionId 
+        ? db.select().from(tutorials).where(eq(tutorials.sectionId, parseInt(sectionId as string)))
+        : db.select().from(tutorials));
       res.json(list.map((t: any) => ({
         ...t,
         steps: JSON.parse(t.steps)

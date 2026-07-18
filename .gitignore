@@ -7,3 +7,12 @@ coverage/
 .env*
 !.env.example
 README.md
+
+# Database directory
+.data/
+
+# Temporary and scratch files
+temp.txt
+dummy.pdf
+scratch_*.ts
+scratch_test.ts

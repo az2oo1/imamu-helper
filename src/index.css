@@ -179,5 +179,6 @@ textarea,
 select {
   background-color: #09090b;
   color: #fafafa;
-  border-color: #27272a;
+  border: 1px solid #27272a;
+  border-style: solid !important;
 }

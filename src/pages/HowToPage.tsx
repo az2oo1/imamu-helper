@@ -964,6 +964,27 @@ function renderTutorialContent(text: string) {
                   );
                 }
               }
+              if (block.type === 'buttons') {
+                const buttons = block.buttons || [];
+                return (
+                  <div key={blockIdx} className="flex flex-wrap gap-3 my-6 justify-center" dir="rtl">
+                    {buttons.map((btn: any, btnIdx: number) => {
+                      if (!btn.label || !btn.url) return null;
+                      return (
+                        <a
+                          key={btnIdx}
+                          href={btn.url}
+                          target={btn.url.startsWith('http') ? '_blank' : undefined}
+                          rel={btn.url.startsWith('http') ? 'noopener noreferrer' : undefined}
+                          className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 px-4.5 rounded-md text-xs transition shadow-sm w-full sm:w-auto justify-center"
+                        >
+                          <ExternalLink className="w-4 h-4 shrink-0" /> {btn.label}
+                        </a>
+                      );
+                    })}
+                  </div>
+                );
+              }
               return null;
             })}
           </div>
