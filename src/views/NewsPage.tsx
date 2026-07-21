@@ -295,22 +295,25 @@ export function NewsPage() {
             {/* Author Profile */}
             <div className="flex items-start gap-3 mb-4">
               <div className="w-11 h-11 bg-zinc-950 border border-zinc-800 rounded-full flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
-                {(item.authorAvatar || item.profilePicUrl) ? (
-                  <img src={item.authorAvatar || item.profilePicUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                ) : (
-                  <Twitter className="w-5 h-5 text-[#1DA1F2]" />
-                )}
+                <img 
+                  src={(item.authorAvatar && !item.authorAvatar.includes('googleusercontent')) ? item.authorAvatar : (item.profilePicUrl && !item.profilePicUrl.includes('googleusercontent')) ? item.profilePicUrl : "https://upload.wikimedia.org/wikipedia/ar/e/e0/%D8%B4%D8%B9%D8%A7%D8%B1_%D8%AC%D8%A7%D9%85%D8%B9%D8%A9_%D8%A7%D9%84%D8%A5%D9%85%D8%A7%D9%85_%D9%85%D8%AD%D9%85%D8%AF_%D8%A8%D9%86_%D8%B3%D8%B9%D9%88%D8%AF_%D8%A7%D9%84%D8%A5%D8%B3%D9%84%D8%A7%D9%85%D9%8A%D8%A9.png"} 
+                  className="w-full h-full object-cover p-0.5" 
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    (e.target as HTMLElement).setAttribute('src', 'https://upload.wikimedia.org/wikipedia/ar/e/e0/%D8%B4%D8%B9%D8%A7%D8%B1_%D8%AC%D8%A7%D9%85%D8%B9%D8%A9_%D8%A7%D9%84%D8%A5%D9%85%D8%A7%D9%85_%D9%85%D8%AD%D9%85%D8%AF_%D8%A8%D9%86_%D8%B3%D8%B9%D9%88%D8%AF_%D8%A7%D9%84%D8%A5%D8%B3%D9%84%D8%A7%D9%85%D9%8A%D8%A9.png');
+                  }}
+                />
               </div>
               <div className="flex flex-col flex-1 min-w-0 justify-center min-h-[44px]">
-                <div className="flex items-center gap-1.5 flex-wrap text-right">
+                <div className="flex items-center gap-2 flex-wrap text-right">
                   <span className="font-bold text-zinc-100 text-[14px] hover:underline truncate">
                     {item.authorName || item.source || "أخبار جامعة الإمام"}
                   </span>
-                  <span className="text-zinc-400 text-[10px] whitespace-nowrap" dir="ltr">
+                  <span className="text-zinc-400 text-[11px] whitespace-nowrap">
                     · {item.date ? formatDistanceToNow(parseISO(item.date), { addSuffix: true, locale: ar }) : "مؤخراً"}
                   </span>
                 </div>
-                <span className="text-zinc-500 text-[10px] block" dir="ltr">
+                <span className="text-blue-400/80 text-[11px] block font-mono">
                    {item.authorHandle || "@" + (item.source || "IMAMU_News")}
                 </span>
               </div>
@@ -360,22 +363,25 @@ export function NewsPage() {
         {/* Author Profile */}
         <div className="flex items-start gap-3 mb-4">
           <div className="w-10 h-10 bg-zinc-950 border border-zinc-800 rounded-full flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
-            {(item.authorAvatar || item.profilePicUrl) ? (
-              <img src={item.authorAvatar || item.profilePicUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-            ) : (
-              <Twitter className="w-4.5 h-4.5 text-[#1DA1F2]" />
-            )}
+            <img 
+              src={(item.authorAvatar && !item.authorAvatar.includes('googleusercontent')) ? item.authorAvatar : (item.profilePicUrl && !item.profilePicUrl.includes('googleusercontent')) ? item.profilePicUrl : "https://upload.wikimedia.org/wikipedia/ar/e/e0/%D8%B4%D8%B9%D8%A7%D8%B1_%D8%AC%D8%A7%D9%85%D8%B9%D8%A9_%D8%A7%D9%84%D8%A5%D9%85%D8%A7%D9%85_%D9%85%D8%AD%D9%85%D8%AF_%D8%A8%D9%86_%D8%B3%D8%B9%D9%88%D8%AF_%D8%A7%D9%84%D8%A5%D8%B3%D9%84%D8%A7%D9%85%D9%8A%D8%A9.png"} 
+              className="w-full h-full object-cover p-0.5" 
+              referrerPolicy="no-referrer"
+              onError={(e) => {
+                (e.target as HTMLElement).setAttribute('src', 'https://upload.wikimedia.org/wikipedia/ar/e/e0/%D8%B4%D8%B9%D8%A7%D8%B1_%D8%AC%D8%A7%D9%85%D8%B9%D8%A9_%D8%A7%D9%84%D8%A5%D9%85%D8%A7%D9%85_%D9%85%D8%AD%D9%85%D8%AF_%D8%A8%D9%86_%D8%B3%D8%B9%D9%88%D8%AF_%D8%A7%D9%84%D8%A5%D8%B3%D9%84%D8%A7%D9%85%D9%8A%D8%A9.png');
+              }}
+            />
           </div>
           <div className="flex flex-col flex-1 min-w-0 justify-center min-h-[40px]">
-            <div className="flex items-center gap-1.5 flex-wrap text-right">
+            <div className="flex items-center gap-2 flex-wrap text-right">
               <span className="font-bold text-zinc-100 text-[13.5px] hover:underline truncate">
                 {item.authorName || item.source || "أخبار جامعة الإمام"}
               </span>
-              <span className="text-zinc-450 text-[10px] whitespace-nowrap" dir="ltr">
+              <span className="text-zinc-400 text-[11px] whitespace-nowrap">
                 · {item.date ? formatDistanceToNow(parseISO(item.date), { addSuffix: true, locale: ar }) : "مؤخراً"}
               </span>
             </div>
-            <span className="text-zinc-500 text-[10px] block" dir="ltr">
+            <span className="text-blue-400/80 text-[11px] block font-mono">
                {item.authorHandle || "@" + (item.source || "IMAMU_News")}
             </span>
           </div>

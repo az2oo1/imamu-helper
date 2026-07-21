@@ -54,15 +54,16 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   useEffect(() => {
     const init = async () => {
       const savedToken = localStorage.getItem('token');
-      const savedEmail = localStorage.getItem('user_email');
       const savedUid = localStorage.getItem('user_uid');
-      if (savedToken && savedEmail && savedUid) {
+      // Clear legacy raw email from localStorage if present
+      localStorage.removeItem('user_email');
+      if (savedToken && savedUid) {
         const u: NativeUser = {
           uid: savedUid,
-          email: savedEmail,
+          email: '',
           getIdToken: async () => savedToken,
           accessToken: savedToken,
-          displayName: savedEmail.split('@')[0],
+          displayName: undefined,
         };
         setUser(u);
         await fetchDbUser(u);
@@ -86,14 +87,14 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     
     const data = await res.json();
     localStorage.setItem('token', data.token);
-    localStorage.setItem('user_email', data.user.email);
+    localStorage.removeItem('user_email');
     localStorage.setItem('user_uid', data.user.uid);
     const u: NativeUser = {
       uid: data.user.uid,
-      email: data.user.email,
+      email: '',
       getIdToken: async () => data.token,
       accessToken: data.token,
-      displayName: data.user.email.split('@')[0],
+      displayName: data.user.userName || undefined,
     };
     setUser(u);
     setDbUser(data.user);
@@ -113,14 +114,14 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     
     const data = await res.json();
     localStorage.setItem('token', data.token);
-    localStorage.setItem('user_email', data.user.email);
+    localStorage.removeItem('user_email');
     localStorage.setItem('user_uid', data.user.uid);
     const u: NativeUser = {
       uid: data.user.uid,
-      email: data.user.email,
+      email: '',
       getIdToken: async () => data.token,
       accessToken: data.token,
-      displayName: data.user.email.split('@')[0],
+      displayName: data.user.userName || userName,
     };
     setUser(u);
     setDbUser(data.user);

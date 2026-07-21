@@ -78,7 +78,7 @@ export function TopBar() {
                   className="flex items-center gap-2 focus:outline-none"
                 >
                   <div className="hidden sm:flex flex-col items-end hover:opacity-80 transition-opacity">
-                    <span className="text-sm font-medium text-gray-900 leading-tight">@{dbUser?.userName || user.email?.split('@')[0]}</span>
+                    <span className="text-sm font-medium text-gray-900 leading-tight">@{dbUser?.userName || user.displayName || 'طالب'}</span>
                     <span className="text-xs text-gray-500">{dbUser?.major || 'Student'}</span>
                   </div>
                   <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200 shadow-sm transition hover:ring-2 hover:ring-[var(--color-imamu-blue)] hover:ring-offset-2">
@@ -204,7 +204,7 @@ export function TopBar() {
                       )}
                     </div>
                     <div className="flex flex-col overflow-hidden">
-                      <span className="text-sm font-medium text-gray-900 mb-0.5 truncate">{user.email?.split('@')[0]}</span>
+                      <span className="text-sm font-medium text-gray-900 mb-0.5 truncate">{dbUser?.userName || user.displayName || 'طالب'}</span>
                       <span className="text-xs text-gray-500 truncate">{dbUser?.major || 'Student'}</span>
                     </div>
                   </div>

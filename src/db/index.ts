@@ -43,6 +43,12 @@ async function initializeDatabase() {
   try {
     console.log('[DB] Applying schema migrations to in-memory database...');
     await migrate(memDb, { migrationsFolder });
+    try {
+      await memClient.exec(`
+        ALTER TABLE global_settings ADD COLUMN IF NOT EXISTS twitter_auth_token text;
+        ALTER TABLE global_settings ADD COLUMN IF NOT EXISTS twitter_ct0 text;
+      `);
+    } catch(e) {}
     console.log('[DB] In-memory database is ready.');
   } catch (err) {
     console.error('[DB] Failed to migrate in-memory database:', err);

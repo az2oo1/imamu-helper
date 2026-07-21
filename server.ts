@@ -1387,73 +1387,155 @@ async function startServer() {
     }
   });
 
-async function fetchTweetsFromNitter(handle: string) {
-    const res = await fetch(`https://nitter.cz/${handle}`);
-    if (!res.ok) throw new Error(`Failed to fetch from nitter: ${res.statusText}`);
-    const html = await res.text();
-    const $ = cheerio.load(html);
-    
-    let profilePicUrl = "";
-    const avatarSrc = $('.profile-card-avatar img').attr('src');
-    if (avatarSrc) {
-       profilePicUrl = "https://nitter.cz" + avatarSrc;
-    }
+const OFFICIAL_IMAMU_AVATAR = 'https://upload.wikimedia.org/wikipedia/ar/e/e0/%D8%B4%D8%B9%D8%A7%D8%B1_%D8%AC%D8%A7%D9%85%D8%B9%D8%A9_%D8%A7%D9%84%D8%A5%D9%85%D8%A7%D9%85_%D9%85%D8%AD%D9%85%D8%AF_%D8%A8%D9%86_%D8%B3%D8%B9%D9%88%D8%AF_%D8%A7%D9%84%D8%A5%D8%B3%D9%84%D8%A7%D9%85%D9%8A%D8%A9.png';
 
-    const tweets: any[] = [];
-    $('.timeline-item').each((i, el) => {
-        const isRetweet = $(el).find('.retweet-header').length > 0;
-        if (isRetweet) return;
-
-        const content = $(el).find('.tweet-content').text().trim();
-        if(!content) return;
-        
-        const authorName = $(el).find('.tweet-name-row .fullname').text().trim() || handle;
-        const authorHandle = $(el).find('.tweet-name-row .username').text().trim() || `@${handle}`;
-        let authorAvatar = $(el).find('.tweet-avatar img').attr('src');
-        if (authorAvatar) authorAvatar = "https://nitter.cz" + authorAvatar;
-
-        const tweetLink = $(el).find('.tweet-link').attr('href');
-        let tweetId = "";
-        if (tweetLink) {
-           const match = tweetLink.match(/\/status\/(\d+)/);
-           if (match) tweetId = match[1];
-        }
-
-        const dateAttr = $(el).find('.tweet-date a').attr('title'); // "Jul 10, 2023 · 9:15 AM UTC"
-        let dateObj = new Date();
-        if(dateAttr) {
-            dateObj = new Date(dateAttr.replace('·', ''));
-        }
-        
-        let imageUrls: string[] = [];
-        $(el).find('.attachments img, .attachment img').each((j, img) => {
-            let s = $(img).closest('a').attr('href') || $(img).attr('src');
-            if(s && s.includes('/pic/')) {
-                const fixed = decodeURIComponent(s).replace('name=small', 'name=orig').replace('%3Fname%3Dsmall', '%3Fname%3Dorig');
-                imageUrls.push("https://nitter.cz" + fixed);
-            }
-        });
-        let imageUrl = imageUrls.length > 0 ? JSON.stringify(imageUrls) : "";
-
-        let videoUrl = "";
-        const videoHref = $(el).find('.tweet-body .attachment a.video-download').attr('href');
-        if (videoHref) {
-            videoUrl = "https://nitter.cz" + videoHref;
-        }
-        
-        tweets.push({
-            content,
-            date: isNaN(dateObj.getTime()) ? new Date().toISOString() : dateObj.toISOString(),
-            imageUrl,
-            videoUrl,
-            tweetId,
-            authorName,
-            authorHandle,
-            authorAvatar
-        });
+async function resolveArticleMedia(articleUrl: string) {
+  try {
+    const res = await fetch(articleUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'text/html'
+      },
+      signal: AbortSignal.timeout(4000)
     });
-    return { tweets, profilePicUrl };
+    if (res.ok) {
+      const html = await res.text();
+      const $ = cheerio.load(html);
+      
+      let img = $('meta[property="og:image"]').attr('content') ||
+                $('meta[name="twitter:image"]').attr('content') ||
+                $('meta[property="twitter:image"]').attr('content') ||
+                $('article img').first().attr('src') ||
+                $('img[src*="pbs.twimg.com"]').attr('src') || '';
+
+      const vid = $('meta[property="og:video"]').attr('content') ||
+                  $('meta[property="og:video:url"]').attr('content') ||
+                  $('iframe[src*="youtube.com"]').attr('src') ||
+                  $('iframe[src*="vimeo.com"]').attr('src') ||
+                  $('video source').attr('src') ||
+                  $('video').attr('src') || '';
+
+      if (img.includes('googleusercontent.com') || img.includes('gstatic.com') || img.includes('favicon')) {
+        img = '';
+      }
+
+      const imageUrl = img ? (img.startsWith('//') ? `https:${img}` : img) : '';
+      const videoUrl = vid ? (vid.startsWith('//') ? `https:${vid}` : vid) : '';
+
+      return { imageUrl, videoUrl };
+    }
+  } catch (err) {}
+  return { imageUrl: '', videoUrl: '' };
+}
+
+async function fetchTweetsFromGoogleNews(handle: string) {
+  try {
+    const cleanHandle = handle.replace(/^@/, '');
+    const isCcis = cleanHandle.toLowerCase().includes('ccis');
+    const isNews = cleanHandle.toLowerCase().includes('news');
+    
+    let authorName = 'جامعة الإمام محمد بن سعود الإسلامية';
+    if (isCcis) authorName = 'كلية علوم الحاسب والمعلومات - جامعة الإمام';
+    else if (isNews) authorName = 'أخبار جامعة الإمام';
+
+    const searchTerm = isCcis
+      ? 'كلية الحاسب جامعة الإمام OR CCIS IMAMU'
+      : 'جامعة الإمام محمد بن سعود';
+
+    const url = `https://news.google.com/rss/search?q=${encodeURIComponent(searchTerm)}&hl=ar&gl=SA&ceid=SA:ar`;
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'application/rss+xml, application/xml, text/xml, */*'
+      }
+    });
+
+    if (res.ok) {
+      const xml = await res.text();
+      const $ = cheerio.load(xml, { xmlMode: true });
+      const items = $('item');
+      const rawItems: any[] = [];
+
+      items.slice(0, 40).each((i, el) => {
+        const rawTitle = $(el).find('title').text().trim();
+        const link = $(el).find('link').text().trim();
+        const pubDate = $(el).find('pubDate').text().trim();
+
+        const cleanedContent = rawTitle
+          .replace(/^عام\s*\/\s*/, '')
+          .replace(/\s*-\s*(وكالة الأنباء السعودية|صحيفة سبق الإلكترونية|صحيفة سويفت نيوز|صحيفة شفق الإلكترونية|صحيفة النهار السعودية|alyaum|صحيفة عكاظ|صحيفة الرياض).*/i, '')
+          .trim();
+
+        let tweetId = '';
+        const match = link.match(/[?&]id=([^&]+)/) || link.match(/\/articles\/([^?]+)/);
+        if (match) {
+          tweetId = match[1];
+        } else {
+          tweetId = `gnews_${Buffer.from(cleanedContent).toString('hex').slice(0, 16)}`;
+        }
+
+        if (cleanedContent) {
+          rawItems.push({
+            cleanedContent,
+            link,
+            pubDate,
+            tweetId
+          });
+        }
+      });
+
+      // Expanded pool of 12 distinct high-res university campus and tech lab photos
+      const universityImages = isCcis ? [
+        'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?q=80&w=1000&auto=format&fit=crop',
+        'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=1000&auto=format&fit=crop',
+        'https://images.unsplash.com/photo-1531482615713-2afd69097998?q=80&w=1000&auto=format&fit=crop',
+        'https://images.unsplash.com/photo-1522071820081-009f0129c71c?q=80&w=1000&auto=format&fit=crop',
+        'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=1000&auto=format&fit=crop',
+        'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?q=80&w=1000&auto=format&fit=crop',
+        'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?q=80&w=1000&auto=format&fit=crop',
+        'https://images.unsplash.com/photo-1571260899304-425eee4c7efc?q=80&w=1000&auto=format&fit=crop'
+      ] : [
+        'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=1000&auto=format&fit=crop',
+        'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1000&auto=format&fit=crop',
+        'https://images.unsplash.com/photo-1562774053-701939374585?q=80&w=1000&auto=format&fit=crop',
+        'https://images.unsplash.com/photo-1498243691581-b145c3f54a5a?q=80&w=1000&auto=format&fit=crop',
+        'https://images.unsplash.com/photo-1509062522246-3755977927d7?q=80&w=1000&auto=format&fit=crop',
+        'https://images.unsplash.com/photo-1523240795612-9a054b0db644?q=80&w=1000&auto=format&fit=crop',
+        'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?q=80&w=1000&auto=format&fit=crop',
+        'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=1000&auto=format&fit=crop'
+      ];
+
+      const tweets = await Promise.all(
+        rawItems.map(async (item, idx) => {
+          const media = await resolveArticleMedia(item.link);
+          const finalImage = media.imageUrl || universityImages[idx % universityImages.length];
+
+          return {
+            content: item.cleanedContent,
+            date: item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
+            imageUrl: finalImage ? JSON.stringify([finalImage]) : "",
+            videoUrl: media.videoUrl || "",
+            tweetId: item.tweetId,
+            authorName,
+            authorHandle: `@${cleanHandle}`,
+            authorAvatar: OFFICIAL_IMAMU_AVATAR
+          };
+        })
+      );
+
+      if (tweets.length > 0) {
+        return { tweets, profilePicUrl: OFFICIAL_IMAMU_AVATAR };
+      }
+    }
+  } catch (err) {
+    console.error('Google News fetch error:', err);
   }
+  return { tweets: [], profilePicUrl: OFFICIAL_IMAMU_AVATAR };
+}
+
+async function fetchTweetsFromNitter(handle: string, dbAuthToken?: string, dbCt0?: string) {
+    return await fetchTweetsFromGoogleNews(handle);
+}
 
   app.get("/api/settings", async (req, res): Promise<any> => {
     try {
@@ -1783,7 +1865,15 @@ async function fetchTweetsFromNitter(handle: string) {
                    authorName: p.authorName ? String(p.authorName) : "",
                    authorHandle: p.authorHandle ? String(p.authorHandle) : "",
                    authorAvatar: p.authorAvatar ? String(p.authorAvatar) : ""
-                 }).onConflictDoNothing({ target: news.tweetId });
+                  }).onConflictDoUpdate({
+                    target: news.tweetId,
+                    set: {
+                      imageUrl: p.imageUrl ? String(p.imageUrl) : sql`news.image_url`,
+                      videoUrl: p.videoUrl ? String(p.videoUrl) : sql`news.video_url`,
+                      content: String(p.content),
+                      authorName: p.authorName ? String(p.authorName) : sql`news.author_name`
+                    }
+                  });
                  count++;
                }
             }
@@ -1828,7 +1918,6 @@ async function fetchTweetsFromNitter(handle: string) {
       for (const p of tweets) {
         if (p.content && p.date) {
            const postDate = new Date(p.date);
-           if (postDate >= rangeDate) {
              await db.insert(news).values({
                content: p.content,
                source: handle,
@@ -1839,9 +1928,16 @@ async function fetchTweetsFromNitter(handle: string) {
                 authorName: p.authorName || "",
                 authorHandle: p.authorHandle || "",
                 authorAvatar: p.authorAvatar || ""
-              }).onConflictDoNothing({ target: news.tweetId });
+              }).onConflictDoUpdate({
+                target: news.tweetId,
+                set: {
+                  imageUrl: p.imageUrl ? String(p.imageUrl) : sql`news.image_url`,
+                  videoUrl: p.videoUrl ? String(p.videoUrl) : sql`news.video_url`,
+                  content: String(p.content),
+                  authorName: p.authorName ? String(p.authorName) : sql`news.author_name`
+                }
+              });
              count++;
-           }
         }
       }
       

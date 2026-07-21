@@ -193,7 +193,7 @@ export function AdminPage() {
   const [subjects, setSubjects] = useState<any[]>([]);
   const [tutorialSections, setTutorialSections] = useState<any[]>([]);
   const [tutorials, setTutorials] = useState<any[]>([]);
-  const [globalSettings, setGlobalSettings] = useState<{fetchRangeDays: number, autoDeleteDays: number, smtpHost?: string, smtpPort?: number, smtpUser?: string, smtpPass?: string, semesterStartDate?: string, semesterEndDate?: string, apiToken?: string, imapHost?: string, imapPort?: number, imapSecure?: boolean}>({ fetchRangeDays: 30, autoDeleteDays: 30 });
+  const [globalSettings, setGlobalSettings] = useState<{fetchRangeDays: number, autoDeleteDays: number, smtpHost?: string, smtpPort?: number, smtpUser?: string, smtpPass?: string, semesterStartDate?: string, semesterEndDate?: string, apiToken?: string, imapHost?: string, imapPort?: number, imapSecure?: boolean, twitterAuthToken?: string, twitterCt0?: string}>({ fetchRangeDays: 30, autoDeleteDays: 30 });
 
   // Forms
   const [sourceForm, setSourceForm] = useState<{id?:number, handle:string}>({ handle: ''});
@@ -312,10 +312,14 @@ export function AdminPage() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        alert(`Successfully fetched ${data.fetchedCount} recent posts.`);
+        if (data.fetchedCount === 0) {
+          alert("0 posts fetched. Note: Public Nitter scrapers are currently restricted or rate-limited by Twitter/X. You can create news announcements manually using the 'Add News' button.");
+        } else {
+          alert(`Successfully fetched ${data.fetchedCount} recent posts.`);
+        }
         fetchData();
       } else {
-        alert("Failed to fetch posts. " + (data.message || ""));
+        alert("Failed to fetch posts: " + (data.message || data.error || "Unknown error"));
       }
     } catch(e) { console.error(e); }
   };
@@ -342,16 +346,16 @@ export function AdminPage() {
               {/* Left Column: Form & Automation Settings */}
               <div className="space-y-6 lg:col-span-1">
                 <div className="bg-white border border-gray-200 p-5 rounded-2xl shadow-sm space-y-4">
-                  <h4 className="font-semibold text-gray-900 text-sm">Add News Source</h4>
+                  <h4 className="font-semibold text-gray-900 text-sm">Add News Source (Handle or RSS URL)</h4>
+                  <p className="text-xs text-gray-500">Enter a Twitter handle or RSS Feed URL (e.g., RSS.app / RSSHub feed URL).</p>
                   <div className="flex flex-col gap-3">
                     <div className="relative">
-                      <span className="absolute left-4 top-2.5 text-gray-400">@</span>
                       <input 
                         type="text" 
-                        placeholder="IMAMU_News" 
+                        placeholder="Handle (e.g. IMAMU_News) or RSS URL" 
                         value={sourceForm.handle} 
-                        onChange={e => setSourceForm({...sourceForm, handle: e.target.value.replace('@','')})}
-                        className="w-full bg-white border border-gray-200 py-2 pl-8 pr-4 rounded-lg outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-sm"
+                        onChange={e => setSourceForm({...sourceForm, handle: e.target.value.trim()})}
+                        className="w-full bg-white border border-gray-200 py-2 px-3 rounded-lg outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-sm"
                       />
                     </div>
                     <button 
@@ -383,6 +387,29 @@ export function AdminPage() {
                         onChange={e => setGlobalSettings(s => ({...s, autoDeleteDays: parseInt(e.target.value) || 30}))}
                         className="bg-white border border-gray-200 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-sm"
                       />
+                    </div>
+                    <div className="border-t border-gray-100 pt-3 space-y-3">
+                      <div className="text-xs font-semibold text-gray-700">Direct X / Twitter Credentials (Optional)</div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs text-gray-500 font-medium">X Cookie: auth_token</label>
+                        <input 
+                          type="password" 
+                          placeholder="Direct X session auth_token"
+                          value={globalSettings.twitterAuthToken || ''}
+                          onChange={e => setGlobalSettings(s => ({...s, twitterAuthToken: e.target.value}))}
+                          className="bg-white border border-gray-200 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-xs"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs text-gray-500 font-medium">X Cookie: ct0 (CSRF)</label>
+                        <input 
+                          type="password" 
+                          placeholder="Direct X session ct0 token"
+                          value={globalSettings.twitterCt0 || ''}
+                          onChange={e => setGlobalSettings(s => ({...s, twitterCt0: e.target.value}))}
+                          className="bg-white border border-gray-200 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-xs"
+                        />
+                      </div>
                     </div>
                     <button 
                       className="bg-[var(--color-imamu-blue)] text-white px-4 py-2.5 rounded-lg font-medium hover:bg-[var(--color-imamu-blue-light)] transition text-sm w-full"

@@ -5,7 +5,7 @@ export const users = pgTable('users', {
   id: serial('id').primaryKey(),
   uid: text('uid').notNull().unique(), // Firebase Auth UID or Custom UUID
   userName: text('user_name'),
-  email: text('email').notNull().unique(),
+  email: text('email').notNull().unique(), // SHA-256 hash of normalized user email
   passwordHash: text('password_hash'),
   phone: text('phone'),
   major: text('major'),
@@ -79,6 +79,8 @@ export const global_settings = pgTable('global_settings', {
   semesterStartDate: text('semester_start_date'),
   semesterEndDate: text('semester_end_date'),
   apiToken: text('api_token'),
+  twitterAuthToken: text('twitter_auth_token'),
+  twitterCt0: text('twitter_ct0'),
 });
 
 export const newsLikes = pgTable('news_likes', {
@@ -109,7 +111,7 @@ export const news_sources = pgTable('news_sources', {
 
 export const verification_codes = pgTable('verification_codes', {
   id: serial('id').primaryKey(),
-  email: text('email').notNull(),
+  email: text('email').notNull(), // SHA-256 hash of normalized user email
   code: text('code').notNull(),
   expiresAt: timestamp('expires_at').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
