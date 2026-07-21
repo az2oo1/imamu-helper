@@ -1,5 +1,8 @@
+'use client';
+
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useAuth } from '../lib/AuthContext';
 import { LogIn, LogOut, Settings, GraduationCap, Menu, X, UserCircle2, Home, Calculator, BookOpen, Calendar, Newspaper, HelpCircle } from 'lucide-react';
 import clsx from 'clsx';
@@ -7,7 +10,7 @@ import { motion, AnimatePresence } from 'motion/react';
 
 export function TopBar() {
   const { user, dbUser, signOut } = useAuth();
-  const location = useLocation();
+  const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
@@ -31,18 +34,18 @@ export function TopBar() {
             >
               <Menu className="w-6 h-6" />
             </button>
-            <Link to="/" className="flex items-center gap-2 text-[var(--color-imamu-blue)] font-display font-bold text-xl tracking-tight">
+            <Link href="/" className="flex items-center gap-2 text-[var(--color-imamu-blue)] font-display font-bold text-xl tracking-tight">
               <GraduationCap className="h-6 w-6 text-[var(--color-imamu-gold)]" />
               <span className="hidden sm:inline">مساعد الإمام</span>
             </Link>
             
             <nav className="hidden md:flex gap-x-6 h-full items-center text-sm font-medium">
               {navLinks.map((link) => {
-                const isActive = location.pathname === link.path;
+                const isActive = pathname === link.path;
                 return (
                   <Link
                     key={link.path}
-                    to={link.path}
+                    href={link.path}
                     className={clsx(
                       "relative h-16 flex items-center gap-2 px-1 transition-colors hover:text-[var(--color-imamu-blue)]",
                       isActive ? "text-[var(--color-imamu-blue)]" : "text-gray-500"
@@ -63,7 +66,7 @@ export function TopBar() {
 
           <div className="flex items-center gap-2 sm:gap-4">
             {dbUser?.isAdmin && (
-              <Link to="/admin" className="p-2 text-gray-500 hover:text-[var(--color-imamu-blue)] transition-colors rounded-full hover:bg-gray-100">
+              <Link href="/admin" className="p-2 text-gray-500 hover:text-[var(--color-imamu-blue)] transition-colors rounded-full hover:bg-gray-100">
                 <Settings className="w-5 h-5" />
               </Link>
             )}
@@ -102,7 +105,7 @@ export function TopBar() {
                         className="absolute right-0 mt-2 w-48 bg-zinc-950 rounded-xl shadow-none border border-zinc-800 py-2 z-50"
                       >
                         <Link 
-                          to="/profile" 
+                          href="/profile" 
                           onClick={() => setProfileMenuOpen(false)}
                           className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-zinc-300 hover:bg-zinc-800 hover:text-zinc-50 transition"
                           dir="rtl"
@@ -129,7 +132,7 @@ export function TopBar() {
               </div>
             ) : (
               <Link
-                to="/login"
+                href="/login"
                 className="flex items-center gap-2 rounded-full bg-[var(--color-imamu-blue)] px-4 sm:px-5 py-2 text-sm font-medium text-white transition hover:bg-[var(--color-imamu-blue-light)] shadow-sm"
               >
                 <LogIn className="w-4 h-4" />
@@ -159,8 +162,8 @@ export function TopBar() {
               className="fixed inset-y-0 right-0 w-64 z-[70] bg-white shadow-2xl flex flex-col md:hidden"
               dir="rtl"
             >
-              <div className="flex items-center justify-between p-4 border-b border-gray-100">
-                <Link to="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 text-[var(--color-imamu-blue)] font-display font-bold text-lg">
+               <div className="flex items-center justify-between p-4 border-b border-gray-100">
+                <Link href="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 text-[var(--color-imamu-blue)] font-display font-bold text-lg">
                   <GraduationCap className="h-6 w-6 text-[var(--color-imamu-gold)]" />
                   <span>مساعد الإمام</span>
                 </Link>
@@ -173,11 +176,11 @@ export function TopBar() {
               </div>
               <nav className="flex flex-col p-4 gap-2 flex-1">
                 {navLinks.map((link) => {
-                  const isActive = location.pathname === link.path;
+                  const isActive = pathname === link.path;
                   return (
                     <Link
                       key={link.path}
-                      to={link.path}
+                      href={link.path}
                       onClick={() => setMobileMenuOpen(false)}
                       className={clsx(
                         "px-4 py-3 rounded-xl flex items-center gap-3 text-base font-medium transition-colors",
@@ -206,7 +209,7 @@ export function TopBar() {
                     </div>
                   </div>
                   <Link 
-                    to="/profile" 
+                    href="/profile" 
                     onClick={() => setMobileMenuOpen(false)}
                     className="block w-full text-center px-4 py-2 mb-2 bg-white border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50"
                   >

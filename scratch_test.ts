@@ -4,9 +4,8 @@ import { eq, desc } from 'drizzle-orm';
 import crypto from 'crypto';
 
 async function testRegister() {
-  const db = await getDb();
   await new Promise(resolve => setTimeout(resolve, 1500));
-  
+  const db = await getDb();
   try {
     const email = `test_reg_${Date.now()}@imamu.edu.sa`;
     const code = '123456';

@@ -1,18 +1,42 @@
-node_modules/
-build/
-dist/
-coverage/
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+/dist
+
+# misc
 .DS_Store
+*.pem
 *.log
+*.tmp
+*.temp
+temp.txt
+scratch_*
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
 .env*
 !.env.example
-README.md
 
-# Database directory
-.data/
+# vercel
+.vercel
 
-# Temporary and scratch files
-temp.txt
-dummy.pdf
-scratch_*.ts
-scratch_test.ts
+# typescript
+*.tsbuildinfo
+
+# project data & local caches
+/.data/

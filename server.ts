@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from "express";
 import path from "path";
 import fs from "fs";
-import { createServer as createViteServer } from "vite";
+import next from "next";
 import { getDb } from "./src/db/index";
 import { users, majors, subjects, events, news, majorCourses, newsLikes, newsComments, news_sources, global_settings, verification_codes, tutorial_sections, tutorials, tutorial_feedback, feedback_comments, newbie_links, tutorial_comments } from "./src/db/schema";
 import { eq, desc, and, sql, inArray, ilike } from "drizzle-orm";
@@ -334,7 +334,7 @@ async function startServer() {
         const settings = await db.query.global_settings.findFirst();
         if (settings?.imapHost && settings?.imapPort) {
           const { verifyImapCredentials } = await import('./src/lib/imap-auth');
-          valid = await verifyImapCredentials(settings.imapHost as string, settings.imapPort as number, settings.imapSecure as boolean ?? true, email, password);
+          valid = await verifyImapCredentials(settings.imapHost as string, settings.imapPort as number, (settings.imapSecure as boolean) ?? true, email, password);
           
           if (valid) {
             // IMAP succeeded. If user doesn't exist, create them.
@@ -683,9 +683,11 @@ async function startServer() {
   app.get("/api/tutorials", async (req, res) => {
     try {
       const { sectionId } = req.query;
-      const list = await (sectionId 
-        ? db.select().from(tutorials).where(eq(tutorials.sectionId, parseInt(sectionId as string)))
-        : db.select().from(tutorials));
+      let query = db.select().from(tutorials).$dynamic();
+      if (sectionId) {
+        query = query.where(eq(tutorials.sectionId, parseInt(sectionId as string)));
+      }
+      const list = await query;
       res.json(list.map((t: any) => ({
         ...t,
         steps: JSON.parse(t.steps)
@@ -1292,7 +1294,7 @@ async function startServer() {
       await db.delete(events).where(ilike(events.title, '%Mokafaa%'));
 
       const now = new Date();
-      const eventsToInsert = [];
+      const eventsToInsert: any[] = [];
       for (let i = 0; i < 12; i++) {
         const d = new Date(now.getFullYear(), now.getMonth() + i, 25);
         // Format as YYYY-MM-DD
@@ -2013,7 +2015,7 @@ Formatting and parsing guidelines for this document:
       }
     }
 
-    let resultsArr = [];
+    let resultsArr: any[] = [];
     try {
       resultsArr = JSON.parse(response.text?.trim() || "[]");
     } catch (e) { }
@@ -2050,20 +2052,14 @@ Formatting and parsing guidelines for this document:
 
 
 
-  // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*all', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
-  }
+  const dev = process.env.NODE_ENV !== "production";
+  const nextApp = next({ dev });
+  const handle = nextApp.getRequestHandler();
+  await nextApp.prepare();
+
+  app.all('*', (req, res) => {
+    return handle(req, res);
+  });
 
   // Error handling middleware
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
