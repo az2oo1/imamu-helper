@@ -16,6 +16,7 @@ import nodemailer from "nodemailer";
 // @ts-ignore
 import pdfParse from "pdf-parse/lib/pdf-parse.js";
 import AdmZip from 'adm-zip';
+import { uploadFileToStorage, getFileFromStorage, deleteFileFromStorage, isS3Configured } from "./src/lib/storage";
 
 import { GoogleGenAI, Type } from '@google/genai';
 
@@ -41,11 +42,24 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // Make sure public/uploads folder exists
+  // Make sure public/uploads folder exists for local fallback
   const uploadsDir = path.join(process.cwd(), 'public/uploads');
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
+
+  // Serve uploaded files from RustFS Object Storage or local disk
+  app.get('/uploads/:filename', async (req, res, next) => {
+    const filename = req.params.filename;
+    try {
+      const file = await getFileFromStorage(filename);
+      if (file) {
+        if (file.mimeType) res.setHeader('Content-Type', file.mimeType);
+        return res.send(file.buffer);
+      }
+    } catch (e) {}
+    next();
+  });
   app.use('/uploads', express.static(uploadsDir));
 
   app.use(express.json({ limit: '50mb' }));
@@ -1028,29 +1042,24 @@ async function startServer() {
     return user[0]?.isAdmin === true;
   };
 
-  // Configure disk storage for uploaded media files
-  const diskStorage = multer.diskStorage({
-    destination: function (req, file, cb) {
-      cb(null, path.join(process.cwd(), 'public/uploads'));
-    },
-    filename: function (req, file, cb) {
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-      cb(null, uniqueSuffix + path.extname(file.originalname));
-    }
-  });
-
-  const diskUpload = multer({ 
-    storage: diskStorage,
+  const uploadStorage = multer({ 
+    storage: multer.memoryStorage(),
     limits: { fileSize: 50 * 1024 * 1024 } // limit to 50MB
   });
 
-  app.post("/api/admin/upload", requireAuth, diskUpload.array("files", 10), async (req: AuthRequest & { files?: Express.Multer.File[] }, res): Promise<any> => {
+  app.post("/api/admin/upload", requireAuth, uploadStorage.array("files", 10), async (req: AuthRequest & { files?: Express.Multer.File[] }, res): Promise<any> => {
     if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
     try {
       if (!req.files || req.files.length === 0) {
         return res.status(400).json({ error: "No files uploaded" });
       }
-      const urls = req.files.map(f => `/uploads/${f.filename}`);
+      const urls: string[] = [];
+      for (const file of req.files) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+        const filename = uniqueSuffix + path.extname(file.originalname);
+        const result = await uploadFileToStorage(file.buffer, filename, file.mimetype);
+        urls.push(result.url);
+      }
       res.json({ success: true, urls });
     } catch (e: any) {
       console.error(e);
@@ -1721,15 +1730,14 @@ async function fetchTweetsFromNitter(handle: string, dbAuthToken?: string, dbCt0
         fs.mkdirSync(uploadsDir, { recursive: true });
       }
 
-      zipEntries.forEach(entry => {
+      for (const entry of zipEntries) {
         if (entry.entryName.startsWith('uploads/') && !entry.isDirectory) {
           const fileName = entry.entryName.substring(8); // Remove 'uploads/' prefix
           if (fileName) {
-            const destPath = path.join(uploadsDir, fileName);
-            fs.writeFileSync(destPath, entry.getData());
+            await uploadFileToStorage(entry.getData(), fileName);
           }
         }
-      });
+      }
 
       // We need to carefully insert or overwrite tables.
       // Usually an import replaces everything, but we should be careful.
