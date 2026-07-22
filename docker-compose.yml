@@ -1,9 +1,12 @@
 version: '3.8'
 
 services:
-  # Main Application Service (Uses GitHub Actions pre-built container image)
+  # Main Application Service
   app:
     image: ${APP_IMAGE:-ghcr.io/az2oo1/imamu-helper:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "3000:3000"
     environment:

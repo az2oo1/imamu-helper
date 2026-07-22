@@ -38,7 +38,10 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 # Copy built artifacts from builder
+COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/drizzle ./drizzle
 
 # Expose port
 EXPOSE 3000

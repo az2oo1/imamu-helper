@@ -38,8 +38,10 @@ async function initializeDatabase() {
   activeDb = memDb;
 
   try {
-    console.log('[DB] Applying schema migrations to embedded database...');
-    await migratePglite(memDb, { migrationsFolder });
+    if (fs.existsSync(path.join(migrationsFolder, 'meta', '_journal.json'))) {
+      console.log('[DB] Applying schema migrations to embedded database...');
+      await migratePglite(memDb, { migrationsFolder });
+    }
     try {
       await memClient.exec(`
         ALTER TABLE global_settings ADD COLUMN IF NOT EXISTS twitter_auth_token text;
@@ -47,8 +49,8 @@ async function initializeDatabase() {
       `);
     } catch(e) {}
     console.log('[DB] Embedded database fallback is ready.');
-  } catch (err) {
-    console.error('[DB] Failed to migrate embedded database:', err);
+  } catch (err: any) {
+    console.warn('[DB] Embedded database migration notice:', err.message || err);
   }
 
   // 2. Check for CockroachDB / PostgreSQL connection configuration
