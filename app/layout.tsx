@@ -1,11 +1,12 @@
 import React from 'react';
 import { AuthProvider } from '../src/lib/AuthContext';
+import { ThemeProvider } from '../src/lib/ThemeContext';
 import { TopBar } from '../src/components/TopBar';
 import '../src/index.css';
 
 export const metadata = {
-  title: 'Imamu Helper',
-  description: 'مساعد طالب جامعة الإمام محمد بن سعود الإسلامية',
+  title: 'مساعد الإمام - المنصة الطلابية الشاملة',
+  description: 'المساعد الأكاديمي والطلابي الشامل لطلاب جامعة الإمام محمد بن سعود الإسلامية',
 };
 
 export default function RootLayout({
@@ -14,14 +15,23 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ar" dir="rtl">
-      <body className="antialiased">
-        <AuthProvider>
-          <div className="min-h-screen flex flex-col font-sans bg-[#121214]">
-            <TopBar />
-            {children}
-          </div>
-        </AuthProvider>
+    <html lang="ar" dir="rtl" className="light" suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+      </head>
+      <body className="antialiased min-h-screen relative font-sans transition-colors duration-300">
+        <ThemeProvider>
+          <AuthProvider>
+            <div className="min-h-screen flex flex-col font-sans relative z-0">
+              <TopBar />
+              <main className="flex-1 flex flex-col">
+                {children}
+              </main>
+            </div>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

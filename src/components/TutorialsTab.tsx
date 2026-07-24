@@ -343,15 +343,16 @@ export function TutorialsTab({
     return (
       <div className="space-y-10 text-right bg-transparent" dir="rtl">
         {/* Top Header Card */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-6" style={{ borderColor: 'var(--border-color)' }}>
           <div>
-            <h3 className="text-xl font-display font-bold text-zinc-100 mb-1">إدارة شروحات الدليلة</h3>
-            <p className="text-xs text-zinc-400">إضافة وتعديل الأقسام ومكونات الشروحات التوضيحية للطلاب.</p>
+            <h3 className="text-xl font-display font-bold mb-1" style={{ color: 'var(--text-main)' }}>إدارة شروحات الدليلة</h3>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>إضافة وتعديل الأقسام ومكونات الشروحات التوضيحية للطلاب.</p>
           </div>
           <div className="flex gap-2">
             <button
               onClick={() => setShowSectionForm(true)}
-              className="bg-zinc-900 border border-zinc-800 hover:bg-zinc-850 text-zinc-200 px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+              className="border px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 hover:bg-[var(--bg-subtle)]"
+              style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
             >
               <Plus className="w-4 h-4" /> إضافة تصنيف جديد
             </button>
@@ -511,11 +512,12 @@ export function TutorialsTab({
               </div>
 
               {/* Modal Footer */}
-              <div className="p-5 border-t border-zinc-800/30 flex justify-end gap-3 bg-zinc-950/40">
+              <div className="p-5 border-t flex justify-end gap-3" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-subtle)' }}>
                 <button
                   type="button"
                   onClick={resetSectionForm}
-                  className="px-5 py-2.5 bg-zinc-900 border border-zinc-800/50 text-zinc-300 rounded-xl hover:bg-zinc-800 text-xs font-bold transition"
+                  className="px-5 py-2.5 border rounded-xl text-xs font-bold transition hover:bg-[var(--bg-card)]"
+                  style={{ borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
                 >
                   إلغاء
                 </button>
@@ -535,44 +537,44 @@ export function TutorialsTab({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Sections List Sidebar */}
           <div className="space-y-4">
-            <h4 className="font-bold text-sm text-zinc-200 pr-1">قائمة التصنيفات ({sections.length})</h4>
-            <div className="divide-y divide-zinc-800/50 border border-zinc-800 rounded-2xl overflow-hidden bg-zinc-900/10">
+            <h4 className="font-bold text-sm pr-1" style={{ color: 'var(--text-main)' }}>قائمة التصنيفات ({sections.length})</h4>
+            <div className="divide-y border rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
               {sections.map(sec => (
-                <div key={sec.id} className="p-4 flex items-center justify-between group hover:bg-zinc-900/30 transition">
+                <div key={sec.id} className="p-4 flex items-center justify-between group hover:bg-[var(--bg-subtle)] transition">
                   <div className="flex items-center gap-3">
                     <div className={`w-8.5 h-8.5 rounded-lg flex items-center justify-center shrink-0 border ${sec.color.split(' ').slice(1).join(' ')}`}>
                       <span className={sec.color.split(' ')[0]}>{getDynamicIcon(sec.icon)}</span>
                     </div>
                     <div>
-                      <div className="font-bold text-zinc-200 text-xs">{sec.title}</div>
-                      <div className="text-[10px] text-zinc-500 font-semibold">{tutorials.filter(t => t.sectionId === sec.id).length} شروحات</div>
+                      <div className="font-bold text-xs" style={{ color: 'var(--text-main)' }}>{sec.title}</div>
+                      <div className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>{tutorials.filter(t => t.sectionId === sec.id).length} شروحات</div>
                     </div>
                   </div>
                   <div className="flex gap-1.5 opacity-80 group-hover:opacity-100 transition">
                     <button
                       onClick={() => startEditSection(sec)}
-                      className="p-1 hover:text-blue-400 hover:bg-zinc-950/40 rounded border border-transparent hover:border-zinc-800"
+                      className="p-1 hover:text-blue-400 rounded border border-transparent hover:border-[var(--border-color)]"
                     >
-                      <Edit className="w-3.5 h-3.5 text-zinc-400" />
+                      <Edit className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
                     </button>
                     <button
                       onClick={() => handleDeleteSection(sec.id)}
-                      className="p-1 hover:text-red-400 hover:bg-zinc-955/40 rounded border border-transparent hover:border-zinc-800"
+                      className="p-1 hover:text-red-400 rounded border border-transparent hover:border-[var(--border-color)]"
                     >
-                      <Trash2 className="w-3.5 h-3.5 text-zinc-500" />
+                      <Trash2 className="w-3.5 h-3.5 text-red-400 opacity-70 hover:opacity-100" />
                     </button>
                   </div>
                 </div>
               ))}
               {sections.length === 0 && (
-                <div className="p-8 text-center text-xs text-zinc-500 italic">لا توجد تصنيفات بعد.</div>
+                <div className="p-8 text-center text-xs italic" style={{ color: 'var(--text-muted)' }}>لا توجد تصنيفات بعد.</div>
               )}
             </div>
           </div>
 
           {/* Tutorials List main panel */}
           <div className="lg:col-span-2 space-y-6">
-            <h4 className="font-bold text-sm text-zinc-200 pr-1">قائمة الشروحات المتوفرة ({tutorials.length})</h4>
+            <h4 className="font-bold text-sm pr-1" style={{ color: 'var(--text-main)' }}>قائمة الشروحات المتوفرة ({tutorials.length})</h4>
             <div className="space-y-4">
               {sections.map(sec => {
                 const secTuts = tutorials.filter(t => t.sectionId === sec.id);
@@ -580,28 +582,29 @@ export function TutorialsTab({
 
                 return (
                   <div key={sec.id} className="space-y-2.5">
-                    <div className="text-[10px] uppercase tracking-wider font-bold text-zinc-500 flex items-center gap-1.5 pr-1">
+                    <div className="text-[10px] uppercase tracking-wider font-bold flex items-center gap-1.5 pr-1" style={{ color: 'var(--text-muted)' }}>
                       <span className={sec.color.split(' ')[0]}>{getDynamicIcon(sec.icon)}</span>
                       <span>{sec.title}</span>
                     </div>
                     
-                    <div className="divide-y divide-zinc-800 border border-zinc-800 rounded-2xl bg-zinc-900/10 overflow-hidden">
+                    <div className="divide-y border rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
                       {secTuts.map(tut => (
-                        <div key={tut.id} className="p-4 flex items-center justify-between hover:bg-zinc-900/20 transition gap-4">
+                        <div key={tut.id} className="p-4 flex items-center justify-between hover:bg-[var(--bg-subtle)] transition gap-4">
                           <div className="flex-1 min-w-0">
-                            <h5 className="font-bold text-xs text-zinc-100 truncate">{tut.title}</h5>
-                            <p className="text-[11px] text-zinc-400 mt-1 line-clamp-1">{tut.description}</p>
+                            <h5 className="font-bold text-xs truncate" style={{ color: 'var(--text-main)' }}>{tut.title}</h5>
+                            <p className="text-[11px] mt-1 line-clamp-1" style={{ color: 'var(--text-muted)' }}>{tut.description}</p>
                           </div>
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => startEditTutorial(tut)}
-                              className="px-3 py-1.5 bg-zinc-950 border border-zinc-800 text-zinc-300 hover:bg-zinc-900 hover:text-white rounded-lg text-[10px] font-bold transition"
+                              className="px-3 py-1.5 border rounded-lg text-[10px] font-bold transition hover:bg-[var(--bg-subtle)]"
+                              style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
                             >
                               تعديل الشرح
                             </button>
                             <button
                               onClick={() => handleDeleteTutorial(tut.id)}
-                              className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-950/20 rounded-lg border border-transparent hover:border-red-900/35 transition"
+                              className="p-1.5 text-red-400 hover:bg-red-500/10 rounded-lg border border-transparent transition"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -614,7 +617,7 @@ export function TutorialsTab({
               })}
 
               {tutorials.length === 0 && (
-                <div className="py-20 text-center border border-dashed border-zinc-800 rounded-2xl text-zinc-500 italic text-xs">
+                <div className="py-20 text-center border border-dashed rounded-2xl italic text-xs" style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}>
                   لا توجد شروحات مضافة حالياً. اضغط على "إضافة شرح جديد" للبدء.
                 </div>
               )}

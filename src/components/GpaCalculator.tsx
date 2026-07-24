@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../lib/AuthContext';
-import { Plus, Trash2, Calculator } from 'lucide-react';
+import { Plus, Trash2, Calculator, Award } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { AnimatedNumber } from './ui';
 
 const GRADE_POINTS: Record<string, number> = {
   'A+': 5.0,
@@ -26,7 +27,6 @@ export function GpaCalculator() {
     { id: 1, name: '', credits: 3, grade: 'A+' }
   ]);
 
-  // Load from dbUser context into local state to allow override
   const [prevGpa, setPrevGpa] = useState<string>('');
   const [prevHours, setPrevHours] = useState<string>('');
 
@@ -86,22 +86,26 @@ export function GpaCalculator() {
   }, [courses, prevGpa, prevHours]);
 
   return (
-    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col md:flex-row">
-      <div className="p-8 flex-1 border-b md:border-b-0 md:border-r border-gray-100">
+    <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/90 dark:border-zinc-800 shadow-sm overflow-hidden flex flex-col md:flex-row" dir="rtl">
+      
+      {/* Course Input Section */}
+      <div className="p-6 sm:p-8 flex-1 border-b md:border-b-0 md:border-l border-slate-200/90 dark:border-zinc-800">
         <div className="mb-6 flex justify-between items-center">
           <div>
-            <h2 className="text-xl font-display font-semibold text-gray-900 mb-1 flex items-center gap-2">
-              <Calculator className="w-5 h-5 text-[var(--color-imamu-blue)]" />
-              مواد الفصل الدراسي
+            <h2 className="text-lg sm:text-xl font-display font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-2.5">
+              <div className="p-2 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900/50 rounded-xl text-blue-600 dark:text-blue-400">
+                <Calculator className="w-5 h-5" />
+              </div>
+              <span>مواد الفصل الدراسي</span>
             </h2>
-            <p className="text-sm text-gray-500">حساب النقاط بناءً على مقياس جامعة الإمام 5.0.</p>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-1">حساب النقاط بناءً على سلم جامعة الإمام (من 5.00)</p>
           </div>
         </div>
 
         <div className="space-y-3 mb-6">
-          <div className="grid grid-cols-12 gap-3 text-sm font-medium text-gray-500 px-1">
+          <div className="grid grid-cols-12 gap-3 text-xs font-bold text-slate-500 dark:text-zinc-400 px-2 uppercase tracking-wider">
             <div className="col-span-5">اسم المادة</div>
-            <div className="col-span-3 text-center">ساعات</div>
+            <div className="col-span-3 text-center">الساعات</div>
             <div className="col-span-3 text-center">التقدير</div>
             <div className="col-span-1"></div>
           </div>
@@ -110,19 +114,20 @@ export function GpaCalculator() {
             {courses.map((course, i) => (
               <motion.div 
                 key={course.id}
-                initial={{ opacity: 0, height: 0, overflow: 'hidden' }}
-                animate={{ opacity: 1, height: 'auto', overflow: 'visible' }}
-                exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
-                transition={{ duration: 0.2 }}
-                className="grid grid-cols-12 gap-3 items-center relative"
+                layout="position"
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.15, ease: "easeOut" }}
+                className="grid grid-cols-12 gap-2.5 items-center overflow-hidden"
               >
                 <div className="col-span-5">
                   <input
                     type="text"
-                    placeholder={`المادة ${i + 1}`}
+                    placeholder={`مادة ${i + 1}`}
                     value={course.name}
                     onChange={e => updateCourse(course.id, 'name', e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 py-2.5 px-3 rounded-xl focus:ring-2 focus:ring-[var(--color-imamu-blue)] focus:ring-inset outline-none text-sm transition"
+                    className="w-full bg-slate-50 dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 py-2.5 px-3.5 rounded-xl focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 focus:border-blue-600 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition"
                   />
                 </div>
                 <div className="col-span-3">
@@ -132,25 +137,26 @@ export function GpaCalculator() {
                     max="10"
                     value={course.credits}
                     onChange={e => updateCourse(course.id, 'credits', Number(e.target.value))}
-                    className="w-full bg-gray-50 border border-gray-200 py-2.5 px-3 text-center rounded-xl focus:ring-2 focus:ring-[var(--color-imamu-blue)] focus:ring-inset outline-none text-sm transition"
+                    className="w-full bg-slate-50 dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 py-2.5 px-3 text-center rounded-xl focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 focus:border-blue-600 text-xs sm:text-sm text-slate-900 dark:text-white font-bold outline-none transition"
                   />
                 </div>
                 <div className="col-span-3">
                   <select
                     value={course.grade}
                     onChange={e => updateCourse(course.id, 'grade', e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 py-2.5 px-1 sm:px-3 text-center rounded-xl focus:ring-2 focus:ring-[var(--color-imamu-blue)] focus:ring-inset outline-none text-sm transition appearance-none cursor-pointer"
+                    className="w-full bg-slate-50 dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 py-2.5 px-2 sm:px-3 text-center rounded-xl focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 focus:border-blue-600 text-xs sm:text-sm text-slate-900 dark:text-white font-bold outline-none cursor-pointer transition"
                   >
                     {GRADES.map(g => (
-                      <option key={g} value={g}>{g}</option>
+                      <option key={g} value={g} className="bg-white dark:bg-zinc-900 text-slate-900 dark:text-white">{g} ({GRADE_POINTS[g]})</option>
                     ))}
                   </select>
                 </div>
-                <div className="col-span-1 flex justify-end">
+                <div className="col-span-1 flex justify-center">
                   <button 
                     onClick={() => removeCourse(course.id)}
                     disabled={courses.length <= 1}
-                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400"
+                    className="p-2 text-slate-400 dark:text-zinc-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition disabled:opacity-30 disabled:hover:bg-transparent"
+                    title="حذف المادة"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -162,54 +168,67 @@ export function GpaCalculator() {
 
         <button 
           onClick={addCourse}
-          className="w-full flex items-center justify-center gap-2 py-3 bg-gray-50 text-gray-700 hover:bg-gray-100 font-medium rounded-xl border border-gray-200 border-dashed transition"
+          className="w-full flex items-center justify-center gap-2 py-3.5 bg-blue-50/50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-400 font-bold text-xs rounded-2xl border border-dashed border-blue-200 dark:border-blue-900/60 transition active:scale-[0.99]"
         >
-          <Plus className="w-4 h-4" /> إضافة مادة
+          <Plus className="w-4 h-4" /> إضافة مادة جديدة
         </button>
       </div>
 
-      <div className="p-8 w-full md:w-72 bg-gray-50/50 flex flex-col items-center justify-center flex-shrink-0 relative overflow-hidden">
-        {/* Prior GPA Settings */}
-        <div className="w-full mb-8 pt-4 border-b border-gray-200/60 pb-6">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-4 text-center">السجل الأكاديمي السابق</h3>
-          <div className="grid grid-cols-2 gap-3">
-             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">المعدل السابق</label>
-              <input 
-                type="number" step="0.01" min="0" max="5.0" placeholder="مثال 4.5"
-                value={prevGpa} onChange={e => setPrevGpa(e.target.value)}
-                className="w-full bg-white border border-gray-200 py-2 px-3 text-center rounded-lg text-sm outline-none focus:ring-1 focus:ring-[var(--color-imamu-blue)]"
+      {/* Results Sidebar */}
+      <div className="p-6 sm:p-8 w-full md:w-80 bg-slate-50/80 dark:bg-zinc-950/80 flex flex-col items-center justify-between flex-shrink-0 relative overflow-hidden">
+        <div className="w-full">
+          {/* Prior GPA Settings */}
+          <div className="w-full mb-6 pb-6 border-b border-slate-200 dark:border-zinc-800">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-3.5 flex items-center justify-center gap-1.5">
+              <Award className="w-4 h-4 text-blue-600 dark:text-blue-400" /> السجل الأكاديمي السابق
+            </h3>
+            <div className="grid grid-cols-2 gap-2.5">
+              <div>
+                <label className="block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1">المعدل السابق</label>
+                <input 
+                  type="number" step="0.01" min="0" max="5.0" placeholder="4.50"
+                  value={prevGpa} onChange={e => setPrevGpa(e.target.value)}
+                  className="w-full bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-800 py-2 px-3 text-center rounded-xl text-sm text-slate-900 dark:text-white font-bold outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 focus:border-blue-600"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1">الساعات المجتازة</label>
+                <input 
+                  type="number" min="0" placeholder="85"
+                  value={prevHours} onChange={e => setPrevHours(e.target.value)}
+                  className="w-full bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-800 py-2 px-3 text-center rounded-xl text-sm text-slate-900 dark:text-white font-bold outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 focus:border-blue-600"
+                />
+              </div>
+            </div>
+            {!dbUser && <p className="text-[10px] text-slate-400 dark:text-zinc-500 mt-2 text-center">سجل الدخول لحفظ بياناتك تلقائياً.</p>}
+          </div>
+
+          {/* Results Display */}
+          <div className="text-center w-full py-2">
+            <h3 className="text-xs font-bold text-slate-500 dark:text-zinc-400 mb-1">المعدل الفصلي</h3>
+            <div className="text-4xl sm:text-5xl font-display font-black text-blue-600 dark:text-blue-400 mb-1 tracking-tight">
+              <AnimatedNumber
+                value={parseFloat(calculations.semesterGpa)}
+                format={(val) => val.toFixed(2)}
               />
             </div>
-            <div>
-               <label className="block text-xs font-medium text-gray-600 mb-1">الساعات المجتازة</label>
-              <input 
-                type="number" min="0" placeholder="مثال 85"
-                value={prevHours} onChange={e => setPrevHours(e.target.value)}
-                className="w-full bg-white border border-gray-200 py-2 px-3 text-center rounded-lg text-sm outline-none focus:ring-1 focus:ring-[var(--color-imamu-blue)]"
-              />
+            <p className="text-xs text-slate-500 dark:text-zinc-400 font-medium tracking-wide mb-6">
+              من أصل <span className="text-slate-900 dark:text-white font-bold">{calculations.semesterCredits}</span> ساعات
+            </p>
+
+            <div className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-2xs">
+              <h3 className="text-xs font-bold text-slate-500 dark:text-zinc-400 mb-1">المعدل التراكمي المتوقع</h3>
+              <div className="text-2xl sm:text-3xl font-display font-black text-slate-900 dark:text-white mb-1">
+                <AnimatedNumber
+                  value={parseFloat(Number(prevHours) > 0 ? calculations.newCumulativeGpa : calculations.semesterGpa)}
+                  format={(val) => val.toFixed(2)}
+                />
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-zinc-400 font-medium">
+                إجمالي <span className="text-blue-600 dark:text-blue-400 font-bold">{calculations.totalCredits}</span> ساعة أكاديمية
+              </p>
             </div>
           </div>
-          {!dbUser && <p className="text-[10px] text-gray-400 mt-2 text-center">سجل الدخول لحفظ هذا تلقائياً.</p>}
-        </div>
-
-        {/* Results */}
-        <div className="text-center w-full">
-          <h3 className="text-sm font-medium text-gray-500 mb-1">المعدل الفصلي</h3>
-          <div className="text-5xl font-display font-bold text-[var(--color-imamu-blue)] mb-2">
-            {calculations.semesterGpa}
-          </div>
-          <p className="text-xs text-gray-400 font-medium tracking-wide mb-6" dir="rtl">
-            من {calculations.semesterCredits} ساعات
-          </p>
-
-          <h3 className="text-sm font-medium text-gray-500 mb-1">المعدل التراكمي الجديد</h3>
-          <div className="text-3xl font-display font-bold text-gray-900 mb-1">
-            {Number(prevHours) > 0 ? calculations.newCumulativeGpa : calculations.semesterGpa}
-          </div>
-          <p className="text-xs text-gray-400 font-medium tracking-wide" dir="rtl">
-            إجمالي {calculations.totalCredits} ساعات
-          </p>
         </div>
       </div>
     </div>

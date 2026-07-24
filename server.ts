@@ -1,10 +1,11 @@
 import 'dotenv/config';
 import express from "express";
+import compression from "compression";
 import path from "path";
 import fs from "fs";
 import next from "next";
 import { getDb } from "./src/db/index";
-import { users, majors, subjects, events, news, majorCourses, newsLikes, newsComments, news_sources, global_settings, verification_codes, tutorial_sections, tutorials, tutorial_feedback, feedback_comments, newbie_links, tutorial_comments } from "./src/db/schema";
+import { users, majors, subjects, courses, course_resources, events, news, majorCourses, newsLikes, newsComments, news_sources, global_settings, verification_codes, tutorial_sections, tutorials, tutorial_feedback, feedback_comments, newbie_links, tutorial_comments } from "./src/db/schema";
 import { eq, desc, and, sql, inArray, ilike } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "./src/middleware/auth";
 import jwt from 'jsonwebtoken';
@@ -40,6 +41,7 @@ async function startServer() {
   const db = await getDb();
 
   const app = express();
+  app.use(compression());
   const PORT = 3000;
 
   // Make sure public/uploads folder exists for local fallback
@@ -429,17 +431,20 @@ async function startServer() {
     }
   });
 
-  // Subjects (protected to prevent stealing)
-  app.get("/api/subjects", requireAuth, async (req: AuthRequest, res) => {
+  // Subjects & Courses (protected)
+  const getSubjectsHandler = async (req: AuthRequest, res: express.Response) => {
     try {
       const allSubjects = await db.select().from(subjects);
       const allMajorCourses = await db.select().from(majorCourses);
+      const allCourseResources = await db.select().from(course_resources);
       
       const mapped = allSubjects.map(s => {
         const related = allMajorCourses.filter(mc => mc.subjectId === s.id);
+        const resources = allCourseResources.filter(cr => cr.subjectId === s.id);
         return {
           ...s,
-          majorId: related[0]?.majorId || null
+          majorId: related[0]?.majorId || null,
+          resources
         };
       });
       
@@ -448,7 +453,10 @@ async function startServer() {
       console.error(error);
       res.status(500).json({ error: "Failed to fetch subjects" });
     }
-  });
+  };
+
+  app.get("/api/subjects", requireAuth, getSubjectsHandler);
+  app.get("/api/courses", requireAuth, getSubjectsHandler);
 
   // Majors
   app.get("/api/majors", requireAuth, async (req: AuthRequest, res) => {
@@ -470,6 +478,69 @@ async function startServer() {
       res.status(500).json({ error: "Failed to fetch majors" });
     }
   });
+
+  // Public Resources API
+  app.get("/api/resources", async (req, res) => {
+    try {
+      const allSubjects = await db.select().from(subjects);
+      const allMajors = await db.select().from(majors);
+      const allMajorCourses = await db.select().from(majorCourses);
+      const allCourseResources = await db.select().from(course_resources);
+
+      const resourcesList: any[] = [];
+
+      // 1. Resources from dedicated course_resources table
+      for (const cr of allCourseResources) {
+        const s = allSubjects.find(subj => subj.id === cr.subjectId);
+        if (!s) continue;
+        const mc = allMajorCourses.find(m => m.subjectId === s.id);
+        const major = allMajors.find(m => m.id === mc?.majorId);
+        resourcesList.push({
+          id: cr.id,
+          subjectId: s.id,
+          title: cr.title || s.name,
+          courseCode: s.code,
+          courseName: s.name,
+          major: major?.name || 'عام',
+          type: cr.type || 'drive',
+          fileUrl: cr.url,
+          driveUrl: (cr.type === 'drive' || cr.type === 'summary') ? cr.url : undefined,
+          whatsappUrl: (cr.type === 'whatsapp' || cr.type === 'group') ? cr.url : undefined,
+          telegramUrl: cr.type === 'telegram' ? cr.url : undefined,
+          description: cr.description,
+          createdAt: cr.createdAt ? cr.createdAt.toISOString() : new Date().toISOString()
+        });
+      }
+
+      // 2. Legacy fallback for subjects with direct driveLink or whatsappLink without course_resources
+      for (const s of allSubjects) {
+        const hasResources = allCourseResources.some(cr => cr.subjectId === s.id);
+        if (!hasResources && (s.driveLink || s.whatsappLink)) {
+          const mc = allMajorCourses.find(m => m.subjectId === s.id);
+          const major = allMajors.find(m => m.id === mc?.majorId);
+          resourcesList.push({
+            id: s.id * 10000,
+            subjectId: s.id,
+            title: s.name,
+            courseCode: s.code,
+            courseName: s.name,
+            major: major?.name || 'عام',
+            type: s.driveLink ? 'summary' : s.whatsappLink ? 'group' : 'exam',
+            fileUrl: s.driveLink || '',
+            driveUrl: s.driveLink || undefined,
+            whatsappUrl: s.whatsappLink || undefined,
+            createdAt: new Date().toISOString()
+          });
+        }
+      }
+
+      res.json(resourcesList);
+    } catch (error) {
+      console.error(error);
+      res.json([]);
+    }
+  });
+
 
   // Events
   app.get("/api/events", async (req, res) => {
@@ -1047,6 +1118,162 @@ async function startServer() {
     limits: { fileSize: 50 * 1024 * 1024 } // limit to 50MB
   });
 
+  // ===== ADMIN DASHBOARD ROUTES =====
+
+  // Dashboard statistics
+  app.get("/api/admin/stats", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req))) return res.status(403).json({error: "Admin only"});
+    try {
+      const [userCount] = await db.select({ count: sql<number>`count(*)` }).from(users);
+      const [subjectCount] = await db.select({ count: sql<number>`count(*)` }).from(subjects);
+      const [majorCount] = await db.select({ count: sql<number>`count(*)` }).from(majors);
+      const [eventCount] = await db.select({ count: sql<number>`count(*)` }).from(events);
+      const [newsCount] = await db.select({ count: sql<number>`count(*)` }).from(news);
+      const [tutorialCount] = await db.select({ count: sql<number>`count(*)` }).from(tutorials);
+      const [newbieLinkCount] = await db.select({ count: sql<number>`count(*)` }).from(newbie_links);
+      const [sourceCount] = await db.select({ count: sql<number>`count(*)` }).from(news_sources);
+
+      // Users in last 7 days
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const [recentUsers] = await db.select({ count: sql<number>`count(*)` }).from(users).where(sql`${users.createdAt} >= ${sevenDaysAgo}`);
+
+      // Users in last 30 days
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const [monthUsers] = await db.select({ count: sql<number>`count(*)` }).from(users).where(sql`${users.createdAt} >= ${thirtyDaysAgo}`);
+
+      // User registrations by day (last 30 days)
+      const usersByDay = await db.select({
+        day: sql<string>`to_char(${users.createdAt}, 'YYYY-MM-DD')`,
+        count: sql<number>`count(*)`
+      }).from(users).where(sql`${users.createdAt} >= ${thirtyDaysAgo}`).groupBy(sql`to_char(${users.createdAt}, 'YYYY-MM-DD')`).orderBy(sql`to_char(${users.createdAt}, 'YYYY-MM-DD')`);
+
+      // News by source
+      const newsBySource = await db.select({
+        source: news.source,
+        count: sql<number>`count(*)`
+      }).from(news).groupBy(news.source);
+
+      res.json({
+        users: Number(userCount.count),
+        subjects: Number(subjectCount.count),
+        majors: Number(majorCount.count),
+        events: Number(eventCount.count),
+        news: Number(newsCount.count),
+        tutorials: Number(tutorialCount.count),
+        newbieLinks: Number(newbieLinkCount.count),
+        newsSources: Number(sourceCount.count),
+        recentUsers7d: Number(recentUsers.count),
+        recentUsers30d: Number(monthUsers.count),
+        usersByDay,
+        newsBySource
+      });
+    } catch(e: any) {
+      console.error('Stats error:', e);
+      res.status(500).json({error: e.message || "Error"});
+    }
+  });
+
+  // Admin user management
+  app.get("/api/admin/users", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req))) return res.status(403).json({error: "Admin only"});
+    try {
+      const search = req.query.search as string || '';
+      const limit = parseInt(req.query.limit as string) || 50;
+      let query = db.select({
+        id: users.id,
+        uid: users.uid,
+        userName: users.userName,
+        email: users.email,
+        phone: users.phone,
+        major: users.major,
+        currentGpa: users.currentGpa,
+        finishedHours: users.finishedHours,
+        isAdmin: users.isAdmin,
+        profilePicUrl: users.profilePicUrl,
+        createdAt: users.createdAt
+      }).from(users).orderBy(desc(users.createdAt)).limit(limit);
+
+      if (search) {
+        const allUsers = await db.select({
+          id: users.id, uid: users.uid, userName: users.userName, email: users.email,
+          phone: users.phone, major: users.major, currentGpa: users.currentGpa,
+          finishedHours: users.finishedHours, isAdmin: users.isAdmin,
+          profilePicUrl: users.profilePicUrl, createdAt: users.createdAt
+        }).from(users).orderBy(desc(users.createdAt));
+        const filtered = allUsers.filter(u => 
+          (u.userName || '').toLowerCase().includes(search.toLowerCase()) ||
+          (u.email || '').toLowerCase().includes(search.toLowerCase()) ||
+          (u.phone || '').includes(search) ||
+          (u.major || '').toLowerCase().includes(search.toLowerCase())
+        );
+        return res.json(filtered.slice(0, limit));
+      }
+
+      const result = await query;
+      res.json(result);
+    } catch(e: any) {
+      console.error('Users error:', e);
+      res.status(500).json({error: e.message || "Error"});
+    }
+  });
+
+  // Toggle admin status
+  app.put("/api/admin/users/:id/toggle-admin", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req))) return res.status(403).json({error: "Admin only"});
+    try {
+      const userId = parseInt(req.params.id);
+      const [targetUser] = await db.select().from(users).where(eq(users.id, userId));
+      if (!targetUser) return res.status(404).json({error: "User not found"});
+      // Prevent self-demotion
+      if (targetUser.uid === req.user?.uid) return res.status(400).json({error: "Cannot change your own admin status"});
+      await db.update(users).set({ isAdmin: !targetUser.isAdmin }).where(eq(users.id, userId));
+      res.json({ success: true, isAdmin: !targetUser.isAdmin });
+    } catch(e: any) {
+      res.status(500).json({error: e.message || "Error"});
+    }
+  });
+
+  // Delete user
+  app.delete("/api/admin/users/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req))) return res.status(403).json({error: "Admin only"});
+    try {
+      const userId = parseInt(req.params.id);
+      const [targetUser] = await db.select().from(users).where(eq(users.id, userId));
+      if (!targetUser) return res.status(404).json({error: "User not found"});
+      if (targetUser.uid === req.user?.uid) return res.status(400).json({error: "Cannot delete yourself"});
+      await db.delete(users).where(eq(users.id, userId));
+      res.json({ success: true });
+    } catch(e: any) {
+      res.status(500).json({error: e.message || "Error"});
+    }
+  });
+
+  // System health
+  app.get("/api/admin/health", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req))) return res.status(403).json({error: "Admin only"});
+    try {
+      const mem = process.memoryUsage();
+      const uptime = process.uptime();
+      let dbStatus = 'connected';
+      try { await db.execute(sql`SELECT 1`); } catch { dbStatus = 'error'; }
+      const storageStatus = isS3Configured() ? 'S3 Connected' : 'Local Disk';
+      res.json({
+        uptime: Math.floor(uptime),
+        memory: {
+          rss: Math.round(mem.rss / 1024 / 1024),
+          heapUsed: Math.round(mem.heapUsed / 1024 / 1024),
+          heapTotal: Math.round(mem.heapTotal / 1024 / 1024)
+        },
+        dbStatus,
+        storageStatus,
+        nodeVersion: process.version,
+        platform: process.platform
+      });
+    } catch(e: any) {
+      res.status(500).json({error: e.message || "Error"});
+    }
+  });
+
   app.post("/api/admin/upload", requireAuth, uploadStorage.array("files", 10), async (req: AuthRequest & { files?: Express.Multer.File[] }, res): Promise<any> => {
     if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
     try {
@@ -1158,6 +1385,51 @@ async function startServer() {
       await db.delete(subjects).where(eq(subjects.id, parseInt(req.params.id)));
       res.json({success:true});
     } catch(e) { res.status(500).json({error:"Error"}); }
+  });
+
+  // Course Resources API
+  const addResourceHandler = async (req: AuthRequest, res: express.Response): Promise<any> => {
+    if (!(await checkAdmin(req))) return res.status(403).json({error: "Admin only"});
+    try {
+      const subjectId = parseInt(req.params.subjectId || req.params.id);
+      const { title, type, url, description } = req.body;
+      if (!title || !url) return res.status(400).json({ error: "Title and URL required" });
+      const inserted = await db.insert(course_resources).values({
+        subjectId,
+        title: title.trim(),
+        type: type || 'drive',
+        url: url.trim(),
+        description: description ? description.trim() : null
+      }).returning();
+      res.json({ success: true, resource: inserted[0] });
+    } catch(e) { console.error(e); res.status(500).json({ error: "Error adding resource" }); }
+  };
+
+  app.post("/api/admin/subjects/:subjectId/resources", requireAuth, addResourceHandler);
+  app.post("/api/admin/courses/:subjectId/resources", requireAuth, addResourceHandler);
+
+  app.put("/api/admin/resources/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req))) return res.status(403).json({error: "Admin only"});
+    try {
+      const id = parseInt(req.params.id);
+      const { title, type, url, description } = req.body;
+      await db.update(course_resources).set({
+        title,
+        type,
+        url,
+        description
+      }).where(eq(course_resources.id, id));
+      res.json({ success: true });
+    } catch(e) { console.error(e); res.status(500).json({ error: "Error updating resource" }); }
+  });
+
+  app.delete("/api/admin/resources/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req))) return res.status(403).json({error: "Admin only"});
+    try {
+      const id = parseInt(req.params.id);
+      await db.delete(course_resources).where(eq(course_resources.id, id));
+      res.json({ success: true });
+    } catch(e) { console.error(e); res.status(500).json({ error: "Error deleting resource" }); }
   });
 
   app.post("/api/admin/majors", requireAuth, async (req: AuthRequest, res): Promise<any> => {
@@ -1659,6 +1931,7 @@ async function fetchTweetsFromNitter(handle: string, dbAuthToken?: string, dbCt0
       });
       const allMajors = await db.query.majors.findMany();
       const allSubjects = await db.query.subjects.findMany();
+      const allCourseResources = await db.query.course_resources.findMany();
       const allEvents = await db.query.events.findMany();
       const allNews = await db.query.news.findMany();
       const allNewsSources = await db.query.news_sources.findMany();
@@ -1675,6 +1948,7 @@ async function fetchTweetsFromNitter(handle: string, dbAuthToken?: string, dbCt0
           users: allUsers,
           majors: allMajors,
           subjects: allSubjects,
+          courseResources: allCourseResources,
           events: allEvents,
           news: allNews,
           newsSources: allNewsSources,
@@ -1764,6 +2038,15 @@ async function fetchTweetsFromNitter(handle: string, dbAuthToken?: string, dbCt0
         }));
         await db.delete(subjects);
         await db.insert(subjects).values(mapped);
+      }
+
+      if (data.courseResources && data.courseResources.length > 0) {
+        const mapped = data.courseResources.map((item: any) => ({
+          ...item,
+          createdAt: item.createdAt ? new Date(item.createdAt) : null
+        }));
+        await db.delete(course_resources);
+        await db.insert(course_resources).values(mapped);
       }
       
       if (data.events && data.events.length > 0) {

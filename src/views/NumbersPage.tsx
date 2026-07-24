@@ -29,6 +29,13 @@ const phoneContacts: PhoneContact[] = [
   { department: 'إدارة الأمن الجامعي والمتابعة', number: '0112582222', category: 'safety' }
 ];
 
+const filterTabs: { key: 'all' | 'core' | 'colleges' | 'safety'; label: string }[] = [
+  { key: 'all', label: 'الكل' },
+  { key: 'core', label: 'العمادات والخدمات الرئيسية' },
+  { key: 'colleges', label: 'إدارات الكليات' },
+  { key: 'safety', label: 'الأمن والسلامة والطوارئ' },
+];
+
 export function NumbersPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -48,7 +55,7 @@ export function NumbersPage() {
       {/* Back Button */}
       <button 
         onClick={() => router.push('/how-to')}
-        className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-[var(--color-imamu-blue)] transition font-semibold mb-6 bg-gray-50 hover:bg-gray-100 py-2.5 px-4 rounded-xl border border-gray-250/50 self-start"
+        className="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition font-semibold mb-6 bg-white dark:bg-zinc-900/40 hover:bg-slate-50 dark:hover:bg-zinc-800/40 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-xs self-start"
       >
         <ArrowLeft className="w-4 h-4 rotate-180" /> العودة إلى الدليلة
       </button>
@@ -56,104 +63,77 @@ export function NumbersPage() {
       {/* Header Info */}
       <div className="mb-8">
         <div className="inline-flex items-center gap-3 mb-2.5">
-          <div className="w-10 h-10 bg-zinc-900 border border-zinc-800 rounded-lg flex items-center justify-center shadow-sm text-zinc-400">
+          <div className="w-10 h-10 bg-blue-50 dark:bg-zinc-900 border border-blue-200 dark:border-zinc-800 rounded-xl flex items-center justify-center shadow-xs text-blue-600 dark:text-zinc-400">
             <Phone className="w-5 h-5" />
           </div>
-          <h1 className="text-3xl font-display font-bold text-gray-955">دليل الأرقام الهاتفية والتحويلات</h1>
+          <h1 className="text-3xl font-display font-bold text-slate-900 dark:text-zinc-100">دليل الأرقام الهاتفية والتحويلات</h1>
         </div>
-        <p className="text-sm text-gray-450 mr-13 font-semibold leading-relaxed">
+        <p className="text-sm text-slate-500 dark:text-zinc-400 mr-13 font-semibold leading-relaxed">
           الأرقام والخطوط الهاتفية الرسمية المعتمدة للتواصل المباشر مع إدارات وكليات جامعة الإمام بالرياض.
         </p>
       </div>
 
       {/* Categories and Filters Grid */}
       <div className="flex flex-wrap gap-2.5 mb-6">
-        <button 
-          onClick={() => setActiveCategory('all')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold border transition ${
-            activeCategory === 'all' 
-              ? 'bg-[var(--color-imamu-blue)] border-transparent text-white shadow-sm' 
-              : 'bg-white border-gray-150 text-gray-600 hover:bg-gray-50'
-          }`}
-        >
-          الكل
-        </button>
-        <button 
-          onClick={() => setActiveCategory('core')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold border transition ${
-            activeCategory === 'core' 
-              ? 'bg-[var(--color-imamu-blue)] border-transparent text-white shadow-sm' 
-              : 'bg-white border-gray-150 text-gray-600 hover:bg-gray-50'
-          }`}
-        >
-          العمادات والخدمات الرئيسية
-        </button>
-        <button 
-          onClick={() => setActiveCategory('colleges')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold border transition ${
-            activeCategory === 'colleges' 
-              ? 'bg-[var(--color-imamu-blue)] border-transparent text-white shadow-sm' 
-              : 'bg-white border-gray-150 text-gray-600 hover:bg-gray-50'
-          }`}
-        >
-          إدارات الكليات
-        </button>
-        <button 
-          onClick={() => setActiveCategory('safety')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold border transition ${
-            activeCategory === 'safety' 
-              ? 'bg-[var(--color-imamu-blue)] border-transparent text-white shadow-sm' 
-              : 'bg-white border-gray-150 text-gray-600 hover:bg-gray-50'
-          }`}
-        >
-          الأمن والسلامة والطوارئ
-        </button>
+        {filterTabs.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveCategory(tab.key)}
+            className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all duration-200 ${
+              activeCategory === tab.key
+                ? 'bg-blue-600 border-transparent text-white shadow-sm'
+                : 'bg-white dark:bg-zinc-900/60 border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800 hover:text-slate-900 dark:hover:text-zinc-100'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* Search Input */}
       <div className="relative w-full mb-6">
         <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
-          <Search className="w-4.5 h-4.5 text-gray-400" />
+          <Search className="w-4 h-4 text-slate-400 dark:text-zinc-500" />
         </div>
         <input 
           type="text"
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
           placeholder="ابحث عن كلية، قسم، مسؤول أو رقم..."
-          className="w-full pr-11 pl-4 py-3 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-[var(--color-imamu-blue)] focus:border-transparent outline-none transition shadow-sm text-xs"
+          className="w-full pr-11 pl-4 py-3 bg-white dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-700 rounded-2xl outline-none transition shadow-xs text-xs text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:border-blue-500 dark:focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
         />
       </div>
 
       {/* Numbers Catalog Table Card */}
-      <div className="bg-white border border-gray-150 rounded-3xl p-6 shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-zinc-900/50 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm overflow-hidden">
         {filteredContacts.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-right border-collapse text-xs">
-              <thead className="bg-gray-50/50 border-b border-gray-150 text-gray-450 font-bold">
+              <thead className="bg-slate-50/80 dark:bg-zinc-950/60 border-b border-slate-150 dark:border-zinc-800 text-slate-500 dark:text-zinc-400 font-bold">
                 <tr>
                   <th className="p-3.5">الجهة / القسم</th>
                   <th className="p-3.5 text-right">رقم التواصل المباشر</th>
                   <th className="p-3.5 text-center w-20">اتصال</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 text-gray-650">
+              <tbody className="divide-y divide-slate-100 dark:divide-zinc-800/60 text-slate-700 dark:text-zinc-300">
                 {filteredContacts.map((contact, idx) => (
-                  <tr key={idx} className="hover:bg-gray-50/50 transition">
-                    <td className="p-3.5 font-bold text-gray-900 flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full ${
+                  <tr key={idx} className="hover:bg-slate-50/80 dark:hover:bg-zinc-800/30 transition">
+                    <td className="p-3.5 font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${
                         contact.category === 'safety' ? 'bg-red-500' :
                         contact.category === 'colleges' ? 'bg-indigo-500' : 'bg-blue-500'
                       }`} />
                       {contact.department}
                     </td>
-                    <td className="p-3.5 font-mono text-gray-600 text-sm" dir="ltr">{contact.number}</td>
+                    <td className="p-3.5 font-mono text-slate-500 dark:text-zinc-400 text-sm" dir="ltr">{contact.number}</td>
                     <td className="p-3.5 text-center">
                       <a 
                         href={`tel:${contact.number}`}
-                        className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition shadow-sm"
+                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 dark:bg-zinc-800 border border-blue-200 dark:border-zinc-700 text-blue-600 dark:text-zinc-300 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 dark:hover:text-white hover:border-transparent transition shadow-xs"
                         title="اتصال مباشر"
                       >
-                        <Phone className="w-3 h-3" />
+                        <Phone className="w-3.5 h-3.5" />
                       </a>
                     </td>
                   </tr>
@@ -162,9 +142,9 @@ export function NumbersPage() {
             </table>
           </div>
         ) : (
-          <div className="text-center py-12 flex flex-col items-center justify-center gap-3 text-gray-400">
-            <Phone className="w-10 h-10 text-gray-300" />
-            <h4 className="text-sm font-bold text-gray-900">لا توجد نتائج مطابقة</h4>
+          <div className="text-center py-14 flex flex-col items-center justify-center gap-3 text-slate-400 dark:text-zinc-500">
+            <Phone className="w-10 h-10 text-slate-300 dark:text-zinc-600" />
+            <h4 className="text-sm font-bold text-slate-700 dark:text-zinc-300">لا توجد نتائج مطابقة</h4>
             <p className="text-[11px] leading-relaxed max-w-xs">تأكد من كتابة الكلمة بشكل صحيح، أو ابحث في تصنيف آخر.</p>
           </div>
         )}

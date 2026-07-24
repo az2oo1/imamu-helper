@@ -1,73 +1,83 @@
 'use client';
 
 import React from 'react';
-import { Calculator, FileText, ArrowRight, LayoutGrid } from 'lucide-react';
+import { Calculator, FileText, ChevronLeft, LayoutGrid } from 'lucide-react';
 import Link from 'next/link';
+import { InView, SpotlightCard } from '../components/ui';
 
 export function Tools() {
-  const toolCategories = [
+  const allTools = [
     {
-      title: "Academic Calculations",
-      tools: [
-        {
-          id: "gpa",
-          name: "GPA Calculator",
-          description: "Estimate your semester GPA and see your cumulative academic standing.",
-          icon: <Calculator className="w-6 h-6 text-[var(--color-imamu-blue)]" />,
-          link: "/tools/gpa",
-        }
-      ]
+      id: "gpa",
+      name: "حاسبة المعدل والتوقعات",
+      description: "حساب دقيق للمعدل الفصلي والتراكمي وفق سلم جامعة الإمام، ومعاينة التوقعات المستقبلية.",
+      category: "الحسابات الأكاديمية",
+      icon: <Calculator className="w-5 h-5 text-blue-600 dark:text-blue-400" />,
+      link: "/tools/gpa",
     },
     {
-      title: "Planning & Registration",
-      tools: [
-        {
-          id: "plans",
-          name: "Study Plans",
-          description: "Download official major study plans and course prerequisite trees.",
-          icon: <FileText className="w-6 h-6 text-emerald-500" />,
-          link: "/tools/plans",
-        }
-      ]
+      id: "plans",
+      name: "الخطط والشجرات الدراسية",
+      description: "تصفح وتحميل الخطط الدراسية الرسمية والمستندات لكافة تخصصات الكليات.",
+      category: "التخطيط والتسجيل",
+      icon: <FileText className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />,
+      link: "/tools/plans",
     }
   ];
 
   return (
-    <div className="flex flex-col flex-1 w-full max-w-5xl mx-auto pb-24">
-      <div className="mb-10 text-left">
-        <h1 className="text-4xl font-display font-bold text-gray-900 mb-4">Academic Tools</h1>
-        <p className="text-gray-500 max-w-xl">A collection of utilities to help you manage your academic life at IMAMU.</p>
+    <div className="flex flex-col flex-1 w-full max-w-5xl mx-auto pb-24 px-4 sm:px-6 pt-8 text-right" dir="rtl">
+      {/* Compact Header */}
+      <div className="mb-8">
+        <span className="text-xs font-semibold tracking-widest text-blue-600 dark:text-blue-400 uppercase mb-1.5 block">
+          الأدوات الأكاديمية
+        </span>
+        <h1 className="text-2xl sm:text-3xl font-display font-bold tracking-tight text-slate-900 dark:text-white mb-2">
+          الأدوات والخدمات الطلابية
+        </h1>
+        <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-lg">
+          أدوات وحاسبات منظمة مخصصة لتسهيل تجربتك الأكاديمية بجامعة الإمام.
+        </p>
       </div>
 
-      <div className="space-y-12">
-        {toolCategories.map(category => (
-          <div key={category.title}>
-            <h2 className="text-xl font-display font-semibold text-gray-900 mb-6 flex items-center gap-2">
-              <LayoutGrid className="w-5 h-5 text-gray-400" />
-              {category.title}
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {category.tools.map(tool => (
-                <Link 
-                  key={tool.id} 
-                  href={tool.link}
-                  className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition group flex flex-col h-full"
-                >
-                  <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                    {tool.icon}
+      {/* Sleek Compact Grid */}
+      <InView preset="fade-up" className="w-full">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {allTools.map(tool => (
+            <Link 
+              key={tool.id} 
+              href={tool.link}
+              className="block group"
+            >
+              <SpotlightCard className="h-full border border-slate-200/80 dark:border-zinc-800/80 bg-white/80 dark:bg-zinc-900/90 backdrop-blur-xl p-5 hover:border-blue-500/40 transition-all duration-250 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-3.5">
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700/60 flex items-center justify-center group-hover:scale-105 transition-transform">
+                      {tool.icon}
+                    </div>
+                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-slate-500 dark:text-zinc-400">
+                      {tool.category}
+                    </span>
                   </div>
-                  <h3 className="text-lg font-display font-semibold text-gray-900 mb-2">{tool.name}</h3>
-                  <p className="text-sm text-gray-500 mb-6 flex-1 leading-relaxed">{tool.description}</p>
-                  <div className="flex items-center text-sm font-medium text-[var(--color-imamu-blue)] group-hover:translate-x-1 transition-transform">
-                    Open Tool <ArrowRight className="w-4 h-4 ml-1" />
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
+
+                  <h3 className="text-base font-display font-bold text-slate-900 dark:text-white mb-1.5 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                    {tool.name}
+                  </h3>
+                  
+                  <p className="text-xs text-slate-600 dark:text-zinc-400 mb-5 leading-relaxed">
+                    {tool.description}
+                  </p>
+                </div>
+
+                <div className="flex items-center text-xs font-bold text-blue-600 dark:text-blue-400 group-hover:-translate-x-1 transition-transform border-t border-slate-100 dark:border-zinc-800/80 pt-3 mt-auto">
+                  <span>دخول الأداة</span>
+                  <ChevronLeft className="w-3.5 h-3.5 mr-1" />
+                </div>
+              </SpotlightCard>
+            </Link>
+          ))}
+        </div>
+      </InView>
     </div>
   );
 }
-

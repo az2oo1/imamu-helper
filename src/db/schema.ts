@@ -35,6 +35,18 @@ export const subjects = pgTable('subjects', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+export const courses = subjects;
+
+export const course_resources = pgTable('course_resources', {
+  id: serial('id').primaryKey(),
+  subjectId: integer('subject_id').references(() => subjects.id, { onDelete: 'cascade' }).notNull(),
+  title: text('title').notNull(),
+  type: text('type').notNull().default('drive'),
+  url: text('url').notNull(),
+  description: text('description'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
 export const majorCourses = pgTable('major_courses', {
   id: serial('id').primaryKey(),
   majorId: integer('major_id').references(() => majors.id, { onDelete: 'cascade' }).notNull(),

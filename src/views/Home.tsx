@@ -1,39 +1,70 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { motion } from 'motion/react';
-import { Calculator, BookOpen, Calendar, Newspaper, ArrowLeft, Clock, Sparkles, Award } from 'lucide-react';
+import { 
+  Calculator, 
+  BookOpen, 
+  Calendar, 
+  Newspaper, 
+  Clock, 
+  ChevronLeft, 
+  ExternalLink, 
+  ArrowUpRight, 
+  Award,
+  Sparkles
+} from 'lucide-react';
 import Link from 'next/link';
-import Confetti from 'react-confetti';
+import dynamic from 'next/dynamic';
+import { 
+  AnimatedNumber, 
+  InView, 
+  SpotlightCard, 
+  TextEffect
+} from '../components/ui';
+
+const DynamicConfetti = dynamic(() => import('react-confetti'), { ssr: false });
 
 const features = [
   {
-    name: 'حاسبة المعدل والخطط',
-    description: 'احسب معدلك بدقة وحمل الخطط الدراسية لكل تخصص.',
+    id: 'gpa',
+    name: 'الأدوات الأكاديمية',
+    description: 'احسب معدلك الفصلي والتراكمي بدقة متناهية وفق سلم جامعة الإمام، وتعرف على السيناريوهات المستقبلية للرفع من معدلك.',
     icon: Calculator,
     path: '/tools',
-    color: 'bg-blue-950/40 text-blue-400 border border-blue-900/50',
+    badge: 'الأكثر استخداماً',
+    color: 'text-blue-600 dark:text-blue-400 bg-blue-500/10 border-blue-500/20',
+    spotlight: 'rgba(37, 99, 235, 0.15)',
   },
   {
-    name: 'المصادر الطلابية',
-    description: 'احصل على ملفات PDF، واختبارات سابقة، ومجموعات واتساب لكل مادة.',
+    id: 'resources',
+    name: 'المصادر والملفات الطلابية',
+    description: 'مكتبة شاملة تحتوي على ملفات PDF، اختبارات سابقة، تجميعات معتمدة، وروابط مجموعات الواتساب الأكاديمية لكل مادة.',
     icon: BookOpen,
     path: '/resources',
-    color: 'bg-amber-950/40 text-amber-400 border border-amber-900/50',
+    badge: 'تحديثات مستمرة',
+    color: 'text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20',
+    spotlight: 'rgba(217, 119, 6, 0.15)',
   },
   {
-    name: 'التقويم الجامعي',
-    description: 'ابق على اطلاع بأهم الفعاليات الجامعية والمواعيد الأكاديمية.',
+    id: 'calendar',
+    name: 'التقويم الأكاديمي',
+    description: 'متابعة حية للمواعيد الأكاديمية الرسمية، بداية ونهاية الفصول، فترات الاختبارات النهائية، ومواعيد إيداع المكافأة.',
     icon: Calendar,
     path: '/calendar',
-    color: 'bg-emerald-950/40 text-emerald-400 border border-emerald-900/50',
+    badge: 'تحديثات مباشرة',
+    color: 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+    spotlight: 'rgba(5, 150, 105, 0.15)',
   },
   {
+    id: 'news',
     name: 'أخبار جامعة الإمام',
-    description: 'آخر التحديثات والإعلانات مباشرة من مصادر الجامعة الرسمية.',
+    description: 'تغطية فورية ومركزة لأهم الإعلانات، والقرارات الأكاديمية، والفعاليات الجامعية مباشرة من المصادر المعتمدة.',
     icon: Newspaper,
     path: '/news',
-    color: 'bg-purple-950/40 text-purple-400 border border-purple-900/50',
+    badge: 'إعلانات عاجلة',
+    color: 'text-purple-600 dark:text-purple-400 bg-purple-500/10 border-purple-500/20',
+    spotlight: 'rgba(147, 51, 234, 0.15)',
   },
 ];
 
@@ -67,14 +98,29 @@ function getCountdownValues(now: Date, targetDate: Date | null) {
   }
 }
 
-function CountdownBox({ value, label }: { value: number, label: string }) {
+const CountdownBox = memo(function CountdownBox({ value, label }: { value: number, label: string }) {
   return (
-    <div className="flex flex-col items-center bg-zinc-950 border border-zinc-850 rounded-lg p-4 min-w-[75px] sm:min-w-[85px] shadow-sm transition-all duration-200 hover:shadow-md">
-      <span className="text-2xl sm:text-3xl font-display font-bold text-zinc-50">{String(value).padStart(2, '0')}</span>
-      <span className="text-[10px] sm:text-xs text-zinc-400 font-medium tracking-wider mt-1">{label}</span>
+    <div className="flex flex-col items-center justify-center bg-slate-100/90 dark:bg-zinc-900/90 border border-slate-200/80 dark:border-zinc-800/80 backdrop-blur-md rounded-2xl py-3 px-2 sm:py-3.5 sm:px-4 flex-1 min-w-[56px] sm:min-w-[76px] shadow-2xs transition-all duration-300 hover:border-blue-500/40">
+      <span className="text-xl sm:text-3xl font-display font-extrabold text-slate-900 dark:text-white tracking-tight">
+        <AnimatedNumber value={value} padZeroes={2} />
+      </span>
+      <span className="text-[10px] sm:text-xs text-slate-500 dark:text-zinc-400 font-semibold tracking-wider mt-0.5 sm:mt-1">{label}</span>
     </div>
   );
-}
+});
+
+const LiveCountdownBoxes = memo(function LiveCountdownBoxes({ targetDate }: { targetDate: Date | null }) {
+  const now = useCurrentTime();
+  const time = getCountdownValues(now, targetDate);
+  return (
+    <div className="flex w-full justify-center gap-1.5 sm:gap-3 px-1" dir="rtl">
+      <CountdownBox value={time.days} label="أيام" />
+      <CountdownBox value={time.hours} label="ساعات" />
+      <CountdownBox value={time.minutes} label="دقائق" />
+      <CountdownBox value={time.seconds} label="ثواني" />
+    </div>
+  );
+});
 
 function CountdownsSection() {
   const [settings, setSettings] = useState<{semesterStartDate?: string, semesterEndDate?: string} | null>(null);
@@ -132,34 +178,31 @@ function CountdownsSection() {
     }).catch(() => {});
   }, []);
 
-  const now = useCurrentTime();
   let semesterTargetDate: Date | null = null;
   let semesterLabel = "يبدأ الفصل الدراسي خلال";
   
   if (settings?.semesterStartDate || settings?.semesterEndDate) {
     const start = settings.semesterStartDate ? new Date(settings.semesterStartDate) : null;
     const end = settings.semesterEndDate ? new Date(settings.semesterEndDate) : null;
+    const today = new Date();
     
-    if (start && now < start) {
+    if (start && today < start) {
       semesterTargetDate = start;
       semesterLabel = "يبدأ الفصل الدراسي خلال";
-    } else if (end && now <= end) {
+    } else if (end && today <= end) {
       semesterTargetDate = end;
       semesterLabel = "ينتهي الفصل الدراسي خلال";
-    } else if (start && !end && now >= start) {
+    } else if (start && !end && today >= start) {
       semesterLabel = "بدأ الفصل الدراسي";
-    } else if (end && now > end) {
+    } else if (end && today > end) {
       semesterLabel = "انتهى الفصل الدراسي";
     }
   }
 
-  const semesterTime = getCountdownValues(now, semesterTargetDate);
-  const mokafaaTime = getCountdownValues(now, nextMokafaaDate);
-
   return (
-    <div className="w-full max-w-5xl px-4 mt-12 flex flex-col gap-6 relative">
+    <InView preset="fade-up" delay={0.15} className="w-full max-w-5xl px-4 mt-24 sm:mt-36 flex flex-col gap-8 sm:gap-10 relative">
       {showConfetti && (
-        <Confetti 
+        <DynamicConfetti 
           width={windowSize.width} 
           height={windowSize.height} 
           recycle={false} 
@@ -169,82 +212,90 @@ function CountdownsSection() {
         />
       )}
       
-      <div className="flex flex-col md:flex-row gap-6 w-full">
-        {/* Semester Countdown */}
-        <div className="flex-1 bg-zinc-900/50 border border-zinc-800 rounded-xl p-8 shadow-sm flex flex-col items-center justify-center text-center">
-          <div className="flex items-center gap-2 mb-5">
-            <div className="p-2 bg-zinc-800 rounded-md">
-              <Clock className="w-5 h-5 text-zinc-100" />
-            </div>
-            <h3 className="text-sm font-semibold text-zinc-200">{semesterTargetDate ? semesterLabel : "العد التنازلي للفصل الدراسي"}</h3>
-          </div>
-          {semesterTargetDate ? (
-            <div className="flex gap-3 sm:gap-4" dir="ltr">
-              <CountdownBox value={semesterTime.days} label="أيام" />
-              <CountdownBox value={semesterTime.hours} label="ساعات" />
-              <CountdownBox value={semesterTime.minutes} label="دقائق" />
-              <CountdownBox value={semesterTime.seconds} label="ثواني" />
-            </div>
-          ) : (
-            <p className="text-sm text-zinc-300 font-medium">
-              {semesterLabel === "يبدأ الفصل الدراسي خلال" && !semesterTargetDate ? "لم يتم تحديد المواعيد الأكاديمية بعد." : semesterLabel}
-            </p>
-          )}
-        </div>
-
+      <div className="flex flex-col md:flex-row gap-6 sm:gap-8 w-full" dir="rtl">
         {/* Mokafaa Countdown */}
         {nextMokafaaDate && (
-          <div className="flex-1 bg-zinc-900/50 border border-zinc-800 rounded-xl p-8 shadow-sm flex flex-col items-center justify-center text-center">
-            <div className="flex items-center gap-2 mb-5">
-              <div className="p-2 bg-zinc-800 rounded-md">
-                <Sparkles className="w-5 h-5 text-zinc-100" />
+          <SpotlightCard 
+            spotlightColor="rgba(245, 158, 11, 0.12)"
+            className="flex-1 bg-white/80 dark:bg-zinc-900/90 backdrop-blur-xl border border-slate-200/80 dark:border-zinc-800/80 rounded-3xl p-5 sm:p-7 shadow-sm flex flex-col items-center justify-center text-center relative overflow-hidden w-full"
+          >
+            <div className="flex items-center justify-center gap-2.5 mb-4 sm:mb-5 w-full">
+              <div className="p-2 sm:p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-amber-600 dark:text-amber-400 shrink-0">
+                <Clock className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
               </div>
-              <h3 className="text-sm font-semibold text-zinc-200">المكافأة القادمة</h3>
+              <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">موعد المكافأة القادمة</h3>
             </div>
             
             {isMokafaaToday ? (
-              <div className="bg-zinc-900 backdrop-blur-md px-6 py-5 rounded-md border border-emerald-500/20 shadow-sm relative overflow-hidden flex flex-col items-center justify-center max-w-sm">
-                <div className="absolute inset-0 bg-emerald-500/5 animate-pulse pointer-events-none" />
-                <span className="text-lg font-bold text-emerald-500 z-10 flex items-center gap-2">
-                  🎉 اليوم تنزل المكافأة! 🎉
+              <div className="bg-emerald-500/10 border border-emerald-500/20 px-6 py-5 rounded-2xl shadow-2xs relative overflow-hidden flex flex-col items-center justify-center max-w-sm">
+                <span className="text-base font-bold text-emerald-700 dark:text-emerald-400 z-10 flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-emerald-500 animate-pulse" />
+                  اليوم نزلت المكافأة!
                 </span>
-                <p className="text-xs text-emerald-400 mt-2 font-medium z-10 leading-relaxed">
-                  شيك حسابك البنكي، نزلت المكافأة! دلع نفسك!
+                <p className="text-xs text-emerald-600 dark:text-emerald-300 mt-1 font-medium z-10 text-center leading-relaxed">
+                  تفقّد حسابك البنكي، تم إيداع المكافأة الرسمية!
                 </p>
               </div>
             ) : (
-              <div className="flex gap-3 sm:gap-4" dir="ltr">
-                <CountdownBox value={mokafaaTime.days} label="أيام" />
-                <CountdownBox value={mokafaaTime.hours} label="ساعات" />
-                <CountdownBox value={mokafaaTime.minutes} label="دقائق" />
-                <CountdownBox value={mokafaaTime.seconds} label="ثواني" />
-              </div>
+              <LiveCountdownBoxes targetDate={nextMokafaaDate} />
             )}
-          </div>
+          </SpotlightCard>
         )}
+
+        {/* Semester Countdown */}
+        <SpotlightCard 
+          spotlightColor="rgba(37, 99, 235, 0.12)"
+          className="flex-1 bg-white/80 dark:bg-zinc-900/90 backdrop-blur-xl border border-slate-200/80 dark:border-zinc-800/80 rounded-3xl p-5 sm:p-7 shadow-sm flex flex-col items-center justify-center text-center relative overflow-hidden w-full"
+        >
+          <div className="flex items-center justify-center gap-2.5 mb-4 sm:mb-5 w-full">
+            <div className="p-2 sm:p-2.5 bg-blue-500/10 border border-blue-500/20 rounded-2xl text-blue-600 dark:text-blue-400 shrink-0">
+              <Calendar className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
+            </div>
+            <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">{semesterTargetDate ? semesterLabel : "العد التنازلي للفصل الدراسي"}</h3>
+          </div>
+          {semesterTargetDate ? (
+            <LiveCountdownBoxes targetDate={semesterTargetDate} />
+          ) : (
+            <p className="text-sm text-slate-500 dark:text-zinc-400 font-medium">
+              {semesterLabel === "يبدأ الفصل الدراسي خلال" && !semesterTargetDate ? "لم يتم تحديد المواعيد الأكاديمية بعد." : semesterLabel}
+            </p>
+          )}
+        </SpotlightCard>
       </div>
 
       {/* External Student Platforms */}
-      <div className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 sm:p-7 shadow-sm text-right">
-        <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4 flex items-center gap-2 pr-1">
-          <Sparkles className="w-4 h-4 text-blue-500" /> منصات وأدوات خارجية تهمك 🚀
-        </h4>
+      <SpotlightCard 
+        spotlightColor="rgba(99, 102, 241, 0.10)"
+        className="w-full bg-white/80 dark:bg-zinc-900/90 backdrop-blur-xl border border-slate-200/80 dark:border-zinc-800/80 rounded-3xl p-6 sm:p-7 shadow-sm text-right" 
+      >
+        <div className="flex items-center justify-between mb-5">
+          <h4 className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest flex items-center gap-2">
+            <ExternalLink className="w-4 h-4 text-blue-600 dark:text-blue-400" /> 
+            منصات وأدوات خارجية تهمك
+          </h4>
+          <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+            روابط سريعة
+          </span>
+        </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4" dir="rtl">
           {/* Qeeem */}
           <a 
             href="https://qeeem.com/" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="flex items-center gap-3.5 p-4 bg-zinc-950 border border-zinc-800 rounded-lg hover:shadow-sm hover:border-zinc-700 transition text-right group w-full"
+            className="group flex items-center justify-between gap-3 p-4 bg-slate-50/80 dark:bg-zinc-950/80 border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl hover:border-blue-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 text-right w-full"
           >
-            <div className="w-9 h-9 rounded-md bg-zinc-900 flex items-center justify-center shrink-0 border border-zinc-850 overflow-hidden p-1">
-              <img src="https://qeeem.com/logo.svg" className="w-full h-full object-contain" alt="Qeeem Logo" />
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-11 h-11 rounded-xl bg-white dark:bg-zinc-900 flex items-center justify-center shrink-0 border border-slate-200 dark:border-zinc-800 p-2 shadow-2xs group-hover:border-blue-500/30 transition-colors">
+                <img src="https://qeeem.com/logo.svg" className="w-full h-full object-contain" alt="Qeeem Logo" />
+              </div>
+              <div className="text-right min-w-0">
+                <h5 className="font-bold text-xs text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">منصة قيم</h5>
+                <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5 truncate">تقييم ومراجعات الدكاترة</p>
+              </div>
             </div>
-            <div>
-              <h5 className="font-bold text-xs text-zinc-100 group-hover:text-zinc-50 transition-colors">منصة قيم 📝</h5>
-              <p className="text-[10px] text-zinc-400 mt-0.5 leading-relaxed">لمشاهدة وتقييم أعضاء هيئة التدريس والمحاضرين بالجامعة.</p>
-            </div>
+            <ArrowUpRight className="w-4 h-4 text-slate-400 dark:text-zinc-500 group-hover:text-blue-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all shrink-0" />
           </a>
 
           {/* Trtebh */}
@@ -252,15 +303,18 @@ function CountdownsSection() {
             href="https://trtebh.com/" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="flex items-center gap-3.5 p-4 bg-zinc-950 border border-zinc-800 rounded-lg hover:shadow-sm hover:border-zinc-700 transition text-right group w-full"
+            className="group flex items-center justify-between gap-3 p-4 bg-slate-50/80 dark:bg-zinc-950/80 border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl hover:border-blue-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 text-right w-full"
           >
-            <div className="w-9 h-9 rounded-md bg-zinc-900 flex items-center justify-center shrink-0 border border-zinc-850 overflow-hidden p-1">
-              <img src="https://trtebh.com/brand/favicon-32x32.png" className="w-full h-full object-contain rounded" alt="Trtebh Logo" />
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-11 h-11 rounded-xl bg-white dark:bg-zinc-900 flex items-center justify-center shrink-0 border border-slate-200 dark:border-zinc-800 p-2 shadow-2xs group-hover:border-blue-500/30 transition-colors">
+                <img src="https://trtebh.com/brand/favicon-32x32.png" className="w-full h-full object-contain rounded" alt="Trtebh Logo" />
+              </div>
+              <div className="text-right min-w-0">
+                <h5 className="font-bold text-xs text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">منصة ترتيبة</h5>
+                <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5 truncate">بناء الجداول التلقائية</p>
+              </div>
             </div>
-            <div>
-              <h5 className="font-bold text-xs text-zinc-100 group-hover:text-zinc-50 transition-colors">منصة ترتيبة 📅</h5>
-              <p className="text-[10px] text-zinc-400 mt-0.5 leading-relaxed">أداتك الذكية لبناء الجدول الدراسي المثالي. اختر موادك المفضلة، وسيقوم النظام بترتيب آلاف الاحتمالات لتختار الأنسب.</p>
-            </div>
+            <ArrowUpRight className="w-4 h-4 text-slate-400 dark:text-zinc-500 group-hover:text-blue-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all shrink-0" />
           </a>
 
           {/* Moqraraty */}
@@ -268,84 +322,128 @@ function CountdownsSection() {
             href="https://moqraraty.com/ar" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="flex items-center gap-3.5 p-4 bg-zinc-950 border border-zinc-800 rounded-lg hover:shadow-sm hover:border-zinc-700 transition text-right group w-full"
+            className="group flex items-center justify-between gap-3 p-4 bg-slate-50/80 dark:bg-zinc-950/80 border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl hover:border-blue-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 text-right w-full"
           >
-            <div className="w-9 h-9 rounded-md bg-zinc-900 flex items-center justify-center shrink-0 border border-zinc-850 overflow-hidden p-1">
-              <img src="https://moqraraty.com/logo.png" className="w-full h-full object-contain rounded" alt="Moqraraty Logo" />
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-11 h-11 rounded-xl bg-white dark:bg-zinc-900 flex items-center justify-center shrink-0 border border-slate-200 dark:border-zinc-800 p-2 shadow-2xs group-hover:border-blue-500/30 transition-colors">
+                <img src="https://moqraraty.com/logo.png" className="w-full h-full object-contain rounded" alt="Moqraraty Logo" />
+              </div>
+              <div className="text-right min-w-0">
+                <h5 className="font-bold text-xs text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">منصة مقرراتي</h5>
+                <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5 truncate">متابعة الواجبات والغياب</p>
+              </div>
             </div>
-            <div>
-              <h5 className="font-bold text-xs text-zinc-100 group-hover:text-zinc-50 transition-colors">منصة مقرراتي 📚</h5>
-              <p className="text-[10px] text-zinc-400 mt-0.5 leading-relaxed">منصّتك لتنظيم الجدول الأكاديمي، تسجيل المهام، متابعة الغيابات، وحساب المعدل بكل سهولة.</p>
-            </div>
+            <ArrowUpRight className="w-4 h-4 text-slate-400 dark:text-zinc-500 group-hover:text-blue-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all shrink-0" />
           </a>
         </div>
-      </div>
-    </div>
+      </SpotlightCard>
+    </InView>
   );
 }
 
 export function Home() {
   return (
-    <div className="flex flex-col items-center flex-1 w-full pt-12 pb-16 bg-transparent" dir="rtl">
+    <div className="flex flex-col items-center flex-1 w-full pt-16 sm:pt-28 pb-32 sm:pb-48 bg-transparent" dir="rtl">
       {/* Hero Section */}
-      <motion.div 
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
-        className="text-center max-w-3xl px-4"
-      >
-        <h1 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold tracking-tight text-zinc-100 mb-6 leading-tight">
-          مسيرتك الأكاديمية،<br />
-          <span className="text-blue-500">أسهل مع مساعد الإمام.</span>
-        </h1>
-        <p className="text-lg md:text-xl text-zinc-400 mb-10 leading-relaxed font-light max-w-2xl mx-auto">
-          منصة ذكية صممت من قبل الطلاب لخدمة طلاب جامعة الإمام. احسب معدلك التراكمي، وابحث عن المصادر الأساسية، وتتبع التقويم الأكاديمي بيسر وسهولة.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-          <Link href="/tools" className="px-8 py-3.5 rounded-full bg-blue-600 text-white font-medium shadow-sm hover:bg-blue-500 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 w-full sm:w-auto text-center">
-            اكتشف الأدوات
-          </Link>
-          <Link href="/resources" className="px-8 py-3.5 rounded-full bg-transparent border border-zinc-700 text-zinc-200 font-medium hover:bg-zinc-800/50 hover:text-zinc-50 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 w-full sm:w-auto text-center">
-            تصفح المصادر
-          </Link>
-        </div>
-      </motion.div>
+      <div className="text-center max-w-4xl px-4 flex flex-col items-center relative z-10">
+        
+        {/* Clean Eyebrow Title */}
+        <InView preset="fade-down" delay={0.05}>
+          <span className="text-xs sm:text-sm font-semibold tracking-widest text-blue-600 dark:text-blue-400 uppercase mb-5 block">
+            منصة طلابية مستقلة غير رسمية لطلاب جامعة الإمام
+          </span>
+        </InView>
 
-      {/* Countdowns Panel */}
+        {/* Staggered Text Effect Title */}
+        <TextEffect 
+          per="word" 
+          preset="slide" 
+          delay={0.1}
+          className="text-4xl sm:text-6xl md:text-7xl font-display font-extrabold tracking-tight text-slate-900 dark:text-white mb-8 leading-[1.15] justify-center"
+        >
+          مسيرتك الأكاديمية، أسهل وأوضح مع مساعد الإمام.
+        </TextEffect>
+
+        {/* Subtitle with Clean Connected Arabic Typography */}
+        <InView preset="fade-up" delay={0.25} className="max-w-2xl mx-auto mb-12 sm:mb-14 text-center">
+          <p className="text-base sm:text-lg md:text-xl text-slate-600 dark:text-zinc-400 font-medium leading-relaxed sm:leading-loose">
+            صُممت المنصة بأيدي الطلاب لتلبي كافة الاحتياجات الأكاديمية. احسب معدلك التراكمي بدقة، تصفح المصادر والاختبارات السابقة، وتتبع التقويم الأكاديمي بيسر وسهولة.
+          </p>
+        </InView>
+        
+        {/* Action Buttons Matching Card Radii & Single Line Layout */}
+        <InView preset="scale-up" delay={0.35} className="flex flex-col sm:flex-row gap-4 justify-center items-center w-full max-w-md">
+          <Link 
+            href="/tools" 
+            className="px-6 py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm sm:text-base shadow-md shadow-blue-600/20 active:scale-95 transition-all duration-200 w-full sm:w-auto text-center flex items-center justify-center gap-2.5 whitespace-nowrap group border border-blue-500/30"
+          >
+            <Calculator className="w-4 h-4 text-blue-200 shrink-0" />
+            <span>الأدوات وحاسبة المعدل</span>
+            <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform shrink-0" />
+          </Link>
+          <Link 
+            href="/resources" 
+            className="px-6 py-3.5 rounded-2xl bg-slate-100 dark:bg-zinc-900/90 hover:bg-slate-200/80 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-800 text-slate-800 dark:text-zinc-200 font-bold text-sm sm:text-base shadow-2xs backdrop-blur-md active:scale-95 transition-all duration-200 w-full sm:w-auto text-center flex items-center justify-center gap-2.5 whitespace-nowrap group"
+          >
+            <BookOpen className="w-4 h-4 text-slate-500 dark:text-zinc-400 shrink-0" />
+            <span>المصادر والتجميعات</span>
+          </Link>
+        </InView>
+      </div>
+
+      {/* Countdowns & External Tools Section */}
       <CountdownsSection />
 
       {/* Features Grid */}
-      <motion.div 
-        initial={{ opacity: 0, y: 25 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, delay: 0.15, ease: "easeOut" }}
-        className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-20 w-full max-w-5xl px-4"
-      >
-        {features.map((feat) => (
-          <Link 
-            key={feat.name} 
-            href={feat.path} 
-            className="group relative bg-zinc-900/50 rounded-xl p-8 shadow-sm border border-zinc-800 hover:shadow-md hover:border-zinc-750 hover:-translate-y-0.5 transition-all duration-200"
-          >
-            <div className={`w-12 h-12 rounded-lg ${feat.color} flex items-center justify-center mb-5 transition-transform duration-300 group-hover:scale-110`}>
-              <feat.icon className="w-5.5 h-5.5" />
-            </div>
-            <h3 className="text-xl font-display font-bold text-zinc-100 mb-2.5">{feat.name}</h3>
-            <p className="text-sm text-zinc-400 leading-relaxed pr-1">{feat.description}</p>
-            <div className="absolute bottom-8 left-8 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
-              <ArrowLeft className="w-5 h-5 text-zinc-450" />
-            </div>
-          </Link>
-        ))}
-      </motion.div>
+      <InView preset="fade-up" delay={0.2} className="w-full max-w-5xl px-4 mt-28 sm:mt-40">
+        <div className="flex flex-col items-center text-center mb-12 sm:mb-16">
+          <h2 className="text-2xl sm:text-3xl font-display font-extrabold text-slate-900 dark:text-white mb-3">
+            جميع الخدمات في مكان واحد
+          </h2>
+          <p className="text-sm sm:text-base text-slate-600 dark:text-zinc-400 max-w-lg leading-relaxed">
+            كل ما يحتاجه طالب وطالبة جامعة الإمام في تجربة سلسة ومنظمة.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8" dir="rtl">
+          {features.map((feat) => (
+            <Link key={feat.id} href={feat.path} className="block group">
+              <SpotlightCard 
+                spotlightColor={feat.spotlight} 
+                className="h-full border border-slate-200/80 dark:border-zinc-800/80 bg-white/80 dark:bg-zinc-900/90 backdrop-blur-xl p-7 sm:p-8 hover:border-blue-500/40 transition-all duration-300"
+              >
+                <div className="flex justify-between items-start mb-6">
+                  <div className={`w-12 h-12 rounded-2xl ${feat.color} border flex items-center justify-center shadow-2xs group-hover:scale-110 transition-transform duration-300`}>
+                    <feat.icon className="w-6 h-6" />
+                  </div>
+                  <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-400">
+                    {feat.badge}
+                  </span>
+                </div>
+                
+                <h3 className="text-xl font-display font-bold text-slate-900 dark:text-white mb-2 flex items-center justify-between group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                  <span>{feat.name}</span>
+                  <ChevronLeft className="w-5 h-5 text-slate-400 dark:text-zinc-500 group-hover:-translate-x-1 group-hover:text-blue-500 transition-all" />
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 leading-relaxed">
+                  {feat.description}
+                </p>
+              </SpotlightCard>
+            </Link>
+          ))}
+        </div>
+      </InView>
 
       {/* Footer Section */}
-      <footer className="mt-24 w-full max-w-5xl px-4 border-t border-zinc-800/80 pt-8 pb-4 flex flex-col items-center justify-center text-center text-xs text-zinc-500">
-        <p className="mb-2 leading-relaxed">
-          تم التطوير والتصميم بكل ❤️ بواسطة <a href="https://gassem.me" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline font-semibold transition-colors duration-200">قاسم</a>
-        </p>
-        <p className="text-[10px] text-gray-400/70">
-          مساعد الإمام هو مشروع طلابي مستقل غير رسمي، ولا يمثل الجهات الرسمية لجامعة الإمام محمد بن سعود الإسلامية.
+      <footer className="mt-32 sm:mt-48 w-full max-w-5xl px-4 border-t border-slate-200/80 dark:border-zinc-800/80 pt-14 pb-10 flex flex-col items-center justify-center text-center text-xs sm:text-sm text-slate-500 dark:text-zinc-500 space-y-4">
+        <div className="flex items-center gap-2">
+          <Award className="w-4.5 h-4.5 text-blue-500" />
+          <p className="leading-relaxed font-medium">
+            تم التطوير والتصميم بواسطة <a href="https://gassem.me" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline font-bold transition-colors">قاسم</a>
+          </p>
+        </div>
+        <p className="text-[11px] sm:text-xs text-slate-400 dark:text-zinc-500 max-w-xl leading-relaxed">
+          مساعد الإمام هو مشروع طلابي مستقل غير رسمي، يهدف لخدمة الطلاب والطالبات وتسهيل مسيرتهم الأكاديمية، ولا يمثل الجهات الرسمية لجامعة الإمام محمد بن سعود الإسلامية.
         </p>
       </footer>
     </div>

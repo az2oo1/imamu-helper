@@ -1,184 +1,115 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
+@variant dark (&:where(.dark, .dark *));
+
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Cairo", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Cairo", "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
-  --color-imamu-blue: #3b82f6;
-  --color-imamu-blue-light: #60a5fa;
-  --color-imamu-gold: #fbbf24;
-  --color-imamu-gold-light: #fde68a;
+  --color-imamu-blue: #2563eb;
+  --color-imamu-blue-dark: #1e3a8a;
+  --color-imamu-blue-light: #3b82f6;
+  --color-imamu-gold: #d97706;
+  --color-imamu-gold-light: #f59e0b;
+}
+
+/* Default Light Theme Variables */
+:root, html.light {
+  color-scheme: light;
+  --bg-canvas: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-subtle: #f1f5f9;
+  --border-color: #e2e8f0;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+}
+
+/* Dark Theme Variables */
+html.dark {
+  color-scheme: dark;
+  --bg-canvas: #09090b;
+  --bg-card: #121217;
+  --bg-subtle: #181820;
+  --border-color: #27272a;
+  --text-main: #f4f4f5;
+  --text-muted: #a1a1aa;
 }
 
 html {
   overflow-y: scroll;
+  scroll-behavior: smooth;
+  background-color: var(--bg-canvas);
+  color: var(--text-main);
+  font-family: var(--font-sans);
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 body {
-  background-color: #121214;
-  color: #fafafa;
+  background-color: var(--bg-canvas);
+  color: var(--text-main);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
-/* Custom Scrollbar */
+/* Custom Scrollbars */
 ::-webkit-scrollbar {
-  width: 10px;
+  width: 8px;
 }
 
-::-webkit-scrollbar-track {
-  background: #121214; 
+html.light ::-webkit-scrollbar-track {
+  background: #f1f5f9; 
+}
+html.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1; 
+  border-radius: 9999px;
+  border: 2px solid #f1f5f9;
 }
 
-::-webkit-scrollbar-thumb {
+html.dark ::-webkit-scrollbar-track {
+  background: #09090b; 
+}
+html.dark ::-webkit-scrollbar-thumb {
   background: #27272a; 
-  border-radius: 10px;
-  border: 2px solid #121214;
+  border-radius: 9999px;
+  border: 2px solid #09090b;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #3f3f46; 
+/* Form controls refinement for light and dark modes */
+html.light input[type="text"],
+html.light input[type="number"],
+html.light input[type="email"],
+html.light input[type="password"],
+html.light textarea,
+html.light select {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 0.75rem;
 }
 
-/* 
- * Safe Non-Destructive Dark Theme Overrides
- * remaps base colors while letting Tailwind specificity and opacity values win.
- */
-
-.bg-white {
-  background-color: #161619;
+html.dark input[type="text"],
+html.dark input[type="number"],
+html.dark input[type="email"],
+html.dark input[type="password"],
+html.dark textarea,
+html.dark select {
+  background-color: #121218 !important;
+  color: #f4f4f5 !important;
+  border: 1px solid #27272a !important;
+  border-radius: 0.75rem;
 }
 
-/* Handle opacity overlays specifically so they don't render as solid white */
-.bg-white\/80 {
-  background-color: rgba(22, 22, 25, 0.8);
-}
-.bg-white\/70 {
-  background-color: rgba(22, 22, 25, 0.7);
-}
-.bg-white\/60 {
-  background-color: rgba(22, 22, 25, 0.6);
-}
-.bg-white\/85 {
-  background-color: rgba(22, 22, 25, 0.85);
-}
-.bg-white\/10 {
-  background-color: rgba(22, 22, 25, 0.1);
-}
-.bg-white\/5 {
-  background-color: rgba(22, 22, 25, 0.05);
+input:focus, textarea:focus, select:focus {
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
+  outline: none !important;
 }
 
-.bg-gray-50, .bg-zinc-50 {
-  background-color: #1e1e22;
-}
-.bg-gray-50\/30, .bg-zinc-50\/30 {
-  background-color: rgba(30, 30, 34, 0.3);
-}
-.bg-gray-50\/50, .bg-zinc-50\/50 {
-  background-color: rgba(30, 30, 34, 0.5);
-}
-
-.bg-gray-100, .bg-zinc-100 {
-  background-color: #2e2e33;
-}
-.bg-gray-200, .bg-zinc-200 {
-  background-color: #48484f;
-}
-
-/* Translucent Alert/Highlight Badges */
-.bg-blue-50, .bg-blue-100\/50 {
-  background-color: rgba(59, 130, 246, 0.1) !important;
-}
-.bg-emerald-50, .bg-emerald-100\/50 {
-  background-color: rgba(16, 185, 129, 0.1) !important;
-}
-.bg-rose-50, .bg-red-50, .bg-rose-100\/50 {
-  background-color: rgba(239, 68, 68, 0.1) !important;
-}
-.bg-amber-50, .bg-amber-100\/50 {
-  background-color: rgba(245, 158, 11, 0.1) !important;
-}
-.bg-indigo-50, .bg-indigo-100\/50 {
-  background-color: rgba(99, 102, 241, 0.1) !important;
-}
-.bg-purple-50, .bg-purple-100\/50 {
-  background-color: rgba(139, 92, 246, 0.1) !important;
-}
-
-/* Hover overrides */
-.hover\:bg-gray-50:hover, 
-.hover\:bg-zinc-50:hover, 
-.hover\:bg-gray-100\/80:hover, 
-.hover\:bg-zinc-100\/70:hover,
-.hover\:bg-gray-100:hover,
-.hover\:bg-zinc-100:hover {
-  background-color: #2e2e33;
-}
-
-/* Borders overrides */
-.border-zinc-200, 
-.border-gray-200, 
-.border-gray-150, 
-.border-gray-100, 
-.border-zinc-100 {
-  border-color: #2d2d31;
-}
-
-/* Texts overrides */
-.text-zinc-950, 
-.text-zinc-900, 
-.text-gray-900, 
-.text-gray-955 {
-  color: #fafafa;
-}
-
-.text-zinc-400, 
-.text-gray-400, 
-.text-zinc-450, 
-.text-gray-450 {
-  color: #a1a1aa;
-}
-
-.text-zinc-500, 
-.text-gray-500 {
-  color: #71717a;
-}
-
-/* Low-contrast dark texts remapped to readable light zinc */
-.text-gray-600, 
-.text-zinc-600, 
-.text-gray-700, 
-.text-zinc-700, 
-.text-gray-800, 
-.text-zinc-800,
-.text-gray-750,
-.text-zinc-750,
-.text-gray-650,
-.text-zinc-650 {
-  color: #d4d4d8 !important;
-}
-
-/* Remap dark blue texts to premium punchy light blue */
-.text-blue-900,
-.text-blue-800,
-.text-blue-700,
-.text-blue-600,
-.text-blue-500,
-.text-blue-450,
-.text-blue-400 {
-  color: #60a5fa !important;
-}
-
-/* Style inputs and textareas nicely in dark mode */
-input[type="text"],
-input[type="number"],
-input[type="email"],
-input[type="password"],
-textarea,
-select {
-  background-color: #09090b;
-  color: #fafafa;
-  border: 1px solid #27272a;
-  border-style: solid !important;
+/* Custom Selection */
+::selection {
+  background: rgba(37, 99, 235, 0.2);
+  color: inherit;
 }

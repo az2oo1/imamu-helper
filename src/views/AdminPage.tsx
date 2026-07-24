@@ -1,246 +1,287 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../lib/AuthContext';
-import { ShieldAlert, Plus, ShieldCheck, Twitter, Calendar, BookOpen, FileText, Trash2, Link as LinkIcon, Download, Sparkles, Upload, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, HelpCircle, X, ExternalLink, PlusCircle } from 'lucide-react';
+import {
+  ShieldAlert, ShieldCheck, Twitter, Calendar, BookOpen, FileText,
+  Trash2, Link as LinkIcon, Download, Upload, Plus, Search, X,
+  Users, BarChart3, Settings, HelpCircle, ExternalLink, PlusCircle,
+  ChevronDown, ChevronUp, Activity, Server, Database, Cpu, Globe,
+  Shield, UserCheck, UserX, Eye, Sparkles, Command, Hash, Clock,
+  CheckCircle2, AlertTriangle, Info, XCircle, RefreshCw, Zap, 
+  LayoutDashboard, Newspaper, GraduationCap, BookMarked, Link2,
+  MoreHorizontal, ArrowUpRight, TrendingUp, Bell, Folder
+} from 'lucide-react';
 import { format } from 'date-fns';
-import * as Icons from 'lucide-react';
 import { TutorialsTab } from '../components/TutorialsTab';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area
+} from 'recharts';
 
-type Tab = 'news_sources' | 'majors' | 'events' | 'subjects' | 'tutorials' | 'settings';
+// ============================================================================
+// TYPES
+// ============================================================================
+type Tab = 'dashboard' | 'users' | 'news_sources' | 'majors' | 'events' | 'subjects' | 'tutorials' | 'newbie_links' | 'settings';
 
-function AiImporter({ 
-  prompt, 
-  type, 
-  onParsed 
-}: { 
-  prompt: string, 
-  type: string, 
-  onParsed: (data: any[]) => void 
-}) {
-  const [loading, setLoading] = useState(false);
-  const [showPaste, setShowPaste] = useState(false);
-  const [pasteText, setPasteText] = useState('');
-  const { user } = useAuth();
-  
-  const handleParse = async (payload: { file?: File, text?: string }) => {
-    setLoading(true);
-    try {
-      const data = new FormData();
-      if (payload.file) data.append('file', payload.file);
-      if (payload.text) data.append('text', payload.text);
-      data.append('prompt', prompt);
-      data.append('type', type);
-      
-      const token = await user?.getIdToken();
-      const res = await fetch('/api/admin/ai_parse', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: data
-      });
-      const textRes = await res.text();
-      let json;
-      try {
-        json = JSON.parse(textRes);
-      } catch (e) {
-        console.error("Failed to parse JSON response:", textRes);
-        throw new Error("Invalid format returned from server");
-      }
-      if(json.success) {
-        onParsed(json.data);
-        setShowPaste(false);
-        setPasteText('');
-      }
-      else alert("Parse failed: " + (json.message || json.error));
-    } catch(err) {
-      console.error(err);
-      alert("Error parsing AI Request. See console.");
-    } finally {
-      setLoading(false);
-    }
-  };
+interface Toast {
+  id: string;
+  type: 'success' | 'error' | 'info' | 'warning';
+  message: string;
+}
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if(!file) return;
+interface Stats {
+  users: number;
+  subjects: number;
+  majors: number;
+  events: number;
+  news: number;
+  tutorials: number;
+  newbieLinks: number;
+  newsSources: number;
+  recentUsers7d: number;
+  recentUsers30d: number;
+  usersByDay: { day: string; count: number }[];
+  newsBySource: { source: string; count: number }[];
+}
 
-    if (file.name.endsWith('.json') || file.type === 'application/json') {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const json = JSON.parse(e.target?.result as string);
-          if (Array.isArray(json)) {
-            onParsed(json);
-          } else {
-            alert("The uploaded JSON must be an array of objects.");
-          }
-        } catch (err) {
-          alert("Invalid JSON file.");
-        }
-      };
-      reader.readAsText(file);
-      e.target.value = ''; // reset
-      return;
-    }
+interface HealthInfo {
+  uptime: number;
+  memory: { rss: number; heapUsed: number; heapTotal: number };
+  dbStatus: string;
+  storageStatus: string;
+  nodeVersion: string;
+  platform: string;
+}
 
-    if (file.name.endsWith('.csv') || file.type === 'text/csv') {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const text = e.target?.result as string;
-          const rows = text.split('\n').filter(row => row.trim().length > 0);
-          const headers = rows[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-          const data = rows.slice(1).map(row => {
-            const values = row.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-            const obj: any = {};
-            headers.forEach((h, i) => { obj[h] = values[i] || ""; });
-            return obj;
-          });
-          
-          if (type === 'majors') {
-             // Basic transform for majors from CSV (assuming columns: majorName, courseCode, batchName, batchReqCount)
-             const majorMap = new Map<string, any>();
-             data.forEach(row => {
-                if (!row.majorName) return;
-                if (!majorMap.has(row.majorName)) {
-                   majorMap.set(row.majorName, { name: row.majorName, batches: [], courses: [] });
-                }
-                const m = majorMap.get(row.majorName);
-                if (row.batchName && !m.batches.find((b:any) => b.name === row.batchName)) {
-                   m.batches.push({ name: row.batchName, reqCount: parseInt(row.batchReqCount) || 1 });
-                }
-                if (row.courseCode) {
-                   m.courses.push({ subjectCode: row.courseCode, optionalGroup: row.batchName || "", optionalGroupReqCount: parseInt(row.batchReqCount) || 1 });
-                }
-             });
-             onParsed(Array.from(majorMap.values()));
-          } else {
-            onParsed(data);
-          }
-        } catch(err) { alert("Failed to parse CSV locally"); }
-      };
-      reader.readAsText(file);
-      e.target.value = '';
-      return;
-    }
-
-    handleParse({ file });
-    e.target.value = ''; // reset
-  };
-  
+// ============================================================================
+// TOAST SYSTEM
+// ============================================================================
+function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: string) => void }) {
   return (
-    <div className="bg-purple-50 rounded-xl p-4 border border-purple-100 flex flex-col gap-4 mb-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Sparkles className="w-5 h-5 text-purple-600" />
-          <div>
-            <h4 className="text-sm font-semibold text-gray-900">Bulk Importer</h4>
-            <p className="text-xs text-gray-600">Choose an import method. Offline CSV/JSON imports are free and do not use AI.</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button 
-            type="button"
-            onClick={() => setShowPaste(!showPaste)}
-            className="bg-white border border-purple-200 text-purple-700 font-medium px-4 py-2 rounded-lg text-sm hover:bg-purple-100 transition shadow-sm"
-          >
-            Paste Text (AI)
+    <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-2 pointer-events-none">
+      {toasts.map(t => (
+        <div
+          key={t.id}
+          className="pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border backdrop-blur-xl animate-[slideUp_0.3s_ease-out] min-w-[280px]"
+          style={{
+            background: t.type === 'success' ? 'rgba(16,185,129,0.12)' : t.type === 'error' ? 'rgba(239,68,68,0.12)' : t.type === 'warning' ? 'rgba(245,158,11,0.12)' : 'rgba(59,130,246,0.12)',
+            borderColor: t.type === 'success' ? 'rgba(16,185,129,0.3)' : t.type === 'error' ? 'rgba(239,68,68,0.3)' : t.type === 'warning' ? 'rgba(245,158,11,0.3)' : 'rgba(59,130,246,0.3)',
+            color: t.type === 'success' ? '#10b981' : t.type === 'error' ? '#ef4444' : t.type === 'warning' ? '#f59e0b' : '#3b82f6'
+          }}
+        >
+          {t.type === 'success' && <CheckCircle2 className="w-5 h-5 shrink-0" />}
+          {t.type === 'error' && <XCircle className="w-5 h-5 shrink-0" />}
+          {t.type === 'warning' && <AlertTriangle className="w-5 h-5 shrink-0" />}
+          {t.type === 'info' && <Info className="w-5 h-5 shrink-0" />}
+          <span className="text-sm font-medium flex-1" style={{ color: 'var(--text-main)' }}>{t.message}</span>
+          <button onClick={() => onDismiss(t.id)} className="opacity-50 hover:opacity-100 transition">
+            <X className="w-4 h-4" />
           </button>
-          
-          <label className="cursor-pointer bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition flex items-center gap-2 shadow-sm">
-            <><Upload className="w-4 h-4" /> CSV/JSON (No AI)</>
-            <input type="file" className="hidden" accept=".csv,.json" onChange={handleFile} disabled={loading} />
-          </label>
-
-          <label className="cursor-pointer bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-700 transition flex items-center gap-2 shadow-sm">
-            {loading && !showPaste ? "Processing..." : <><Sparkles className="w-4 h-4" /> PDF/Image (AI)</>}
-            <input type="file" className="hidden" accept=".txt,.pdf,.png,.jpg,.jpeg" onChange={handleFile} disabled={loading} />
-          </label>
         </div>
-      </div>
-      {showPaste && (
-        <div className="flex flex-col gap-2">
-          <textarea
-            className="w-full h-32 p-3 text-sm rounded-lg border border-purple-200 outline-none focus:ring-2 focus:ring-purple-500 bg-white"
-            placeholder="Paste your raw text or table data here..."
-            value={pasteText}
-            onChange={(e) => setPasteText(e.target.value)}
-          ></textarea>
-          <div className="flex justify-end">
-            <button 
-              type="button" 
-              onClick={() => handleParse({ text: pasteText })}
-              disabled={loading || !pasteText.trim()}
-              className="bg-purple-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50 transition"
-            >
-              {loading ? "Processing..." : "Parse Text"}
-            </button>
-          </div>
-        </div>
-      )}
+      ))}
     </div>
   );
 }
 
+// ============================================================================
+// COMMAND PALETTE
+// ============================================================================
+function CommandPalette({ open, onClose, onSelect, tabs }: { open: boolean; onClose: () => void; onSelect: (tab: Tab) => void; tabs: { id: Tab; label: string; icon: React.ReactNode }[] }) {
+  const [query, setQuery] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open) {
+      setQuery('');
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [open]);
+
+  if (!open) return null;
+
+  const filtered = tabs.filter(t => t.label.toLowerCase().includes(query.toLowerCase()));
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-start justify-center pt-[20vh]" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <div
+        className="relative w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl border"
+        style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--border-color)' }}>
+          <Command className="w-5 h-5 opacity-40" />
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search admin sections..."
+            className="flex-1 bg-transparent outline-none text-sm"
+            style={{ color: 'var(--text-main)' }}
+            onKeyDown={e => {
+              if (e.key === 'Escape') onClose();
+              if (e.key === 'Enter' && filtered.length > 0) { onSelect(filtered[0].id); onClose(); }
+            }}
+          />
+          <kbd className="text-[10px] font-mono px-1.5 py-0.5 rounded border opacity-40" style={{ borderColor: 'var(--border-color)' }}>ESC</kbd>
+        </div>
+        <div className="max-h-64 overflow-y-auto p-2">
+          {filtered.map(t => (
+            <button
+              key={t.id}
+              onClick={() => { onSelect(t.id); onClose(); }}
+              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition hover:bg-[var(--bg-subtle)]"
+              style={{ color: 'var(--text-main)' }}
+            >
+              {t.icon}
+              {t.label}
+            </button>
+          ))}
+          {filtered.length === 0 && <div className="text-center py-6 text-sm opacity-40">No results</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// ANIMATED COUNTER
+// ============================================================================
+function AnimatedNumber({ value, duration = 800 }: { value: number; duration?: number }) {
+  const [display, setDisplay] = useState(0);
+  useEffect(() => {
+    let start = 0;
+    const startTime = Date.now();
+    const tick = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplay(Math.round(eased * value));
+      if (progress < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, [value, duration]);
+  return <>{display.toLocaleString()}</>;
+}
+
+// ============================================================================
+// STAT CARD
+// ============================================================================
+function StatCard({ label, value, icon, color, sub }: { label: string; value: number; icon: React.ReactNode; color: string; sub?: string }) {
+  return (
+    <div
+      className="relative rounded-2xl p-5 border overflow-hidden group transition-all duration-300 hover:scale-[1.02] hover:shadow-lg"
+      style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+    >
+      <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl" style={{ background: color }} />
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{label}</p>
+          <p className="text-3xl font-bold tracking-tight" style={{ color: 'var(--text-main)' }}>
+            <AnimatedNumber value={value} />
+          </p>
+          {sub && <p className="text-xs mt-1.5 font-medium" style={{ color }}>{sub}</p>}
+        </div>
+        <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: `${color}18`, color }}>
+          {icon}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// MAIN ADMIN PAGE
+// ============================================================================
 export function AdminPage() {
   const { user, dbUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<Tab>('news_sources');
+  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [cmdOpen, setCmdOpen] = useState(false);
+
+  // Toast
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const toast = useCallback((type: Toast['type'], message: string) => {
+    const id = Math.random().toString(36).slice(2);
+    setToasts(t => [...t, { id, type, message }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 4000);
+  }, []);
+  const dismissToast = useCallback((id: string) => setToasts(t => t.filter(x => x.id !== id)), []);
 
   // Data states
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [health, setHealth] = useState<HealthInfo | null>(null);
+  const [adminUsers, setAdminUsers] = useState<any[]>([]);
+  const [userSearch, setUserSearch] = useState('');
   const [newsSources, setNewsSources] = useState<any[]>([]);
   const [majors, setMajors] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [tutorialSections, setTutorialSections] = useState<any[]>([]);
   const [tutorials, setTutorials] = useState<any[]>([]);
-  const [globalSettings, setGlobalSettings] = useState<{fetchRangeDays: number, autoDeleteDays: number, smtpHost?: string, smtpPort?: number, smtpUser?: string, smtpPass?: string, semesterStartDate?: string, semesterEndDate?: string, apiToken?: string, imapHost?: string, imapPort?: number, imapSecure?: boolean, twitterAuthToken?: string, twitterCt0?: string}>({ fetchRangeDays: 30, autoDeleteDays: 30 });
+  const [newbieLinks, setNewbieLinks] = useState<any[]>([]);
+  const [globalSettings, setGlobalSettings] = useState<any>({ fetchRangeDays: 30, autoDeleteDays: 30 });
 
   // Forms
-  const [sourceForm, setSourceForm] = useState<{id?:number, handle:string}>({ handle: ''});
-  const [majorForm, setMajorForm] = useState<{id?:number, name:string, pdfUrl:string, courses: {subjectId: number, optionalGroup: string, optionalGroupReqCount: string}[], batches: {name: string, reqCount: string}[]}>({ name: '', pdfUrl: '', courses: [], batches: [] });
+  const [sourceForm, setSourceForm] = useState<{ id?: number; handle: string }>({ handle: '' });
+  const [majorForm, setMajorForm] = useState<{
+    id?: number; name: string; pdfUrl: string;
+    courses: { subjectId: number; optionalGroup: string; optionalGroupReqCount: string }[];
+    batches: { name: string; reqCount: string }[]
+  }>({ name: '', pdfUrl: '', courses: [], batches: [] });
   const [draggedSubjectId, setDraggedSubjectId] = useState<number | null>(null);
-  const [eventForm, setEventForm] = useState<{id?:number, title:string, date:string, description:string}>({ title: '', date: '', description: '' });
-  const [subjectForm, setSubjectForm] = useState<{id?:number, code:string, name:string, driveLink:string, whatsappLink:string, creditHours:string, level:string}>({ code: '', name: '', driveLink: '', whatsappLink: '', creditHours: '3', level: '' });
-  const [unassignedSearch, setUnassignedSearch] = useState('');
-  const [includedCoursesSearch, setIncludedCoursesSearch] = useState('');
+  const [eventForm, setEventForm] = useState<{ id?: number; title: string; date: string; description: string }>({ title: '', date: '', description: '' });
+  const [subjectForm, setSubjectForm] = useState<{ id?: number; code: string; name: string; driveLink: string; whatsappLink: string; creditHours: string; level: string }>({ code: '', name: '', driveLink: '', whatsappLink: '', creditHours: '3', level: '' });
+  const [newbieLinkForm, setNewbieLinkForm] = useState<{ id?: number; title: string; url: string; description: string }>({ title: '', url: '', description: '' });
 
+  // Search & pagination
   const [subjectSearch, setSubjectSearch] = useState('');
   const [subjectLimit, setSubjectLimit] = useState(20);
-
   const [majorSearch, setMajorSearch] = useState('');
   const [majorLimit, setMajorLimit] = useState(10);
-
   const [eventSearch, setEventSearch] = useState('');
   const [eventLimit, setEventLimit] = useState(20);
+  const [unassignedSearch, setUnassignedSearch] = useState('');
+  const [expandedCourseId, setExpandedCourseId] = useState<number | null>(null);
+  const [resourceForm, setResourceForm] = useState<{ id?: number; subjectId?: number; title: string; type: string; url: string; description: string }>({ title: '', type: 'drive', url: '', description: '' });
 
-  // Native Delete Modal
-  const [deleteModal, setDeleteModal] = useState<{url: string, message: string} | null>(null);
-  
-  // AI Preview Modal
-  const [aiPreview, setAiPreview] = useState<{type: string, data: any[]} | null>(null);
+  // Modals
+  const [deleteModal, setDeleteModal] = useState<{ url: string; message: string } | null>(null);
 
-  const handleAiParsed = (type: string, data: any[]) => {
-    setAiPreview({ type, data });
-  };
+  // Keyboard shortcut
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); setCmdOpen(true); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
-  const confirmDelete = async () => {
-    if(!deleteModal) return;
-    try {
-      const token = await user?.getIdToken();
-      const res = await fetch(deleteModal.url, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if(res.ok) fetchData();
-    } catch(e) { console.error(e); }
-    setDeleteModal(null);
-  };
+  // Tab definitions
+  const tabDefs: { id: Tab; label: string; icon: React.ReactNode }[] = [
+    { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
+    { id: 'users', label: 'User Management', icon: <Users className="w-5 h-5" /> },
+    { id: 'news_sources', label: 'News Sources', icon: <Newspaper className="w-5 h-5" /> },
+    { id: 'majors', label: 'Academic Majors', icon: <GraduationCap className="w-5 h-5" /> },
+    { id: 'events', label: 'Calendar Dates', icon: <Calendar className="w-5 h-5" /> },
+    { id: 'subjects', label: 'Courses & Resources', icon: <BookOpen className="w-5 h-5" /> },
+    { id: 'tutorials', label: 'Tutorials Manager', icon: <HelpCircle className="w-5 h-5" /> },
+    { id: 'newbie_links', label: 'Newbie Links', icon: <Link2 className="w-5 h-5" /> },
+    { id: 'settings', label: 'Global Settings', icon: <Settings className="w-5 h-5" /> },
+  ];
+
+  // ============================================================================
+  // API HELPERS
+  // ============================================================================
+  const getToken = async () => user?.getIdToken() || '';
+  const authHeaders = async () => ({ Authorization: `Bearer ${await getToken()}`, 'Content-Type': 'application/json' });
 
   const fetchData = async () => {
     if (!user) return;
-    const t = await user.getIdToken();
+    const t = await getToken();
     const opts = { headers: { Authorization: `Bearer ${t}` } };
-    
+
     Promise.all([
       fetch('/api/admin/news_sources', opts).then(r => r.ok && r.json()),
       fetch('/api/majors', opts).then(r => r.ok && r.json()),
@@ -248,8 +289,11 @@ export function AdminPage() {
       fetch('/api/subjects', opts).then(r => r.ok && r.json()),
       fetch('/api/admin/global_settings', opts).then(r => r.ok ? r.json() : { fetchRangeDays: 30, autoDeleteDays: 30 }),
       fetch('/api/tutorials/sections', opts).then(r => r.ok && r.json()),
-      fetch('/api/tutorials', opts).then(r => r.ok && r.json())
-    ]).then(([ns, m, e, s, gs, ts, tuts]) => {
+      fetch('/api/tutorials', opts).then(r => r.ok && r.json()),
+      fetch('/api/newbie/links', opts).then(r => r.ok && r.json()),
+      fetch('/api/admin/stats', opts).then(r => r.ok ? r.json() : null),
+      fetch('/api/admin/health', opts).then(r => r.ok ? r.json() : null),
+    ]).then(([ns, m, e, s, gs, ts, tuts, nl, st, hl]) => {
       if (ns) setNewsSources(ns);
       if (m) setMajors(m);
       if (e) setEvents(e);
@@ -257,1183 +301,1297 @@ export function AdminPage() {
       if (gs) setGlobalSettings(gs);
       if (ts) setTutorialSections(ts);
       if (tuts) setTutorials(tuts);
+      if (nl) setNewbieLinks(nl);
+      if (st) setStats(st);
+      if (hl) setHealth(hl);
     }).catch(console.error);
+  };
+
+  const fetchUsers = async (search = '') => {
+    const t = await getToken();
+    const res = await fetch(`/api/admin/users?search=${encodeURIComponent(search)}&limit=100`, { headers: { Authorization: `Bearer ${t}` } });
+    if (res.ok) setAdminUsers(await res.json());
   };
 
   useEffect(() => {
     if (user && dbUser?.isAdmin) {
       fetchData();
+      fetchUsers();
     }
   }, [user, dbUser]);
 
-  if (!user || !dbUser?.isAdmin) {
-    return (
-      <div className="flex flex-col items-center justify-center py-32 text-center">
-        <ShieldAlert className="w-20 h-20 text-red-500 mb-6" />
-        <h1 className="text-3xl font-display font-bold text-gray-900 mb-2">Access Denied</h1>
-        <p className="text-gray-500">You must be an administrator to view this page.</p>
-      </div>
-    );
-  }
-
   const handlePostWithMethod = async (url: string, method: string, data: any, resetCb: () => void) => {
     try {
-      const token = await user?.getIdToken();
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(data)
-      });
-      if(res.ok) {
+      const headers = await authHeaders();
+      const res = await fetch(url, { method, headers, body: JSON.stringify(data) });
+      if (res.ok) {
         resetCb();
         fetchData();
+        toast('success', 'Operation completed successfully');
       } else {
         const err = await res.json().catch(() => ({}));
-        alert(`Error: ${err.message || err.error || 'Failed to save record'}`);
+        toast('error', err.message || err.error || 'Failed to save record');
       }
-    } catch(e) { console.error(e); }
+    } catch (e) { console.error(e); toast('error', 'Network error'); }
   };
 
-  const handlePost = async (url: string, data: any, resetCb: () => void) => {
-    return handlePostWithMethod(url, 'POST', data, resetCb);
+  const handlePost = async (url: string, data: any, resetCb: () => void) => handlePostWithMethod(url, 'POST', data, resetCb);
+
+  const handleDelete = (url: string, prefix: string = 'this item') => {
+    setDeleteModal({ url, message: `Are you sure you want to delete ${prefix}? This action cannot be undone.` });
   };
 
-  const handleDelete = (url: string, prefix: string = 'this') => {
-    setDeleteModal({url, message: `Are you sure you want to delete ${prefix}? This action cannot be undone.`});
+  const confirmDelete = async () => {
+    if (!deleteModal) return;
+    try {
+      const t = await getToken();
+      const res = await fetch(deleteModal.url, { method: 'DELETE', headers: { Authorization: `Bearer ${t}` } });
+      if (res.ok) { fetchData(); fetchUsers(); toast('success', 'Deleted successfully'); }
+      else toast('error', 'Failed to delete');
+    } catch (e) { console.error(e); toast('error', 'Network error'); }
+    setDeleteModal(null);
   };
 
   const handleFetchPosts = async (handle: string, fetchAll: boolean = false) => {
     try {
-      const token = await user?.getIdToken();
+      const t = await getToken();
       const url = fetchAll ? `/api/admin/news_sources/fetch-all` : `/api/admin/news_sources/${handle}/fetch`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${t}` } });
       const data = await res.json();
       if (res.ok && data.success) {
-        if (data.fetchedCount === 0) {
-          alert("0 posts fetched. Note: Public Nitter scrapers are currently restricted or rate-limited by Twitter/X. You can create news announcements manually using the 'Add News' button.");
-        } else {
-          alert(`Successfully fetched ${data.fetchedCount} recent posts.`);
-        }
+        if (data.fetchedCount === 0) toast('warning', 'No new posts fetched. Sources may be rate-limited.');
+        else toast('success', `Fetched ${data.fetchedCount} recent posts`);
         fetchData();
-      } else {
-        alert("Failed to fetch posts: " + (data.message || data.error || "Unknown error"));
-      }
-    } catch(e) { console.error(e); }
+      } else toast('error', 'Failed to fetch: ' + (data.message || data.error || 'Unknown error'));
+    } catch (e) { console.error(e); toast('error', 'Network error'); }
   };
 
-  const renderTabContent = () => {
-    switch(activeTab) {
-      case 'news_sources':
-        return (
-          <div className="space-y-8">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-150 pb-5">
-              <div>
-                <h3 className="text-xl font-display font-semibold text-gray-900 mb-1">X/Twitter News Sources</h3>
-                <p className="text-sm text-gray-500">Track handles to fetch announcements</p>
+  // ============================================================================
+  // ACCESS CHECK
+  // ============================================================================
+  if (!user || !dbUser?.isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center py-32 text-center">
+        <ShieldAlert className="w-20 h-20 text-red-500 mb-6" />
+        <h1 className="text-3xl font-display font-bold mb-2" style={{ color: 'var(--text-main)' }}>Access Denied</h1>
+        <p style={{ color: 'var(--text-muted)' }}>You must be an administrator to view this page.</p>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // CHART COLORS
+  // ============================================================================
+  const chartColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+
+  // ============================================================================
+  // TAB: DASHBOARD
+  // ============================================================================
+  const renderDashboard = () => (
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-2xl font-display font-bold" style={{ color: 'var(--text-main)' }}>Dashboard Overview</h3>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Real-time platform metrics and system status</p>
+        </div>
+        <button
+          onClick={() => fetchData()}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition hover:bg-[var(--bg-subtle)]"
+          style={{ borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
+        >
+          <RefreshCw className="w-4 h-4" /> Refresh
+        </button>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard label="Total Users" value={stats?.users || 0} icon={<Users className="w-5 h-5" />} color="#3b82f6" sub={`+${stats?.recentUsers7d || 0} this week`} />
+        <StatCard label="News Items" value={stats?.news || 0} icon={<Newspaper className="w-5 h-5" />} color="#10b981" sub={`${stats?.newsSources || 0} sources`} />
+        <StatCard label="Events" value={stats?.events || 0} icon={<Calendar className="w-5 h-5" />} color="#f59e0b" />
+        <StatCard label="Courses" value={stats?.subjects || 0} icon={<BookOpen className="w-5 h-5" />} color="#8b5cf6" sub={`${stats?.majors || 0} majors`} />
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard label="Tutorials" value={stats?.tutorials || 0} icon={<HelpCircle className="w-5 h-5" />} color="#ec4899" />
+        <StatCard label="Newbie Links" value={stats?.newbieLinks || 0} icon={<Link2 className="w-5 h-5" />} color="#06b6d4" />
+        <StatCard label="New (30d)" value={stats?.recentUsers30d || 0} icon={<TrendingUp className="w-5 h-5" />} color="#84cc16" />
+        <StatCard label="Academic Majors" value={stats?.majors || 0} icon={<GraduationCap className="w-5 h-5" />} color="#f97316" />
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* User Registrations Chart */}
+        <div className="rounded-2xl p-5 border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+          <h4 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-main)' }}>User Registrations (30 Days)</h4>
+          <div className="h-48">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={stats?.usersByDay || []}>
+                <defs>
+                  <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                <XAxis dataKey="day" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickFormatter={v => v?.slice(5) || ''} />
+                <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} />
+                <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '0.75rem', fontSize: 12 }} />
+                <Area type="monotone" dataKey="count" stroke="#3b82f6" fill="url(#colorUsers)" strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* News by Source Chart */}
+        <div className="rounded-2xl p-5 border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+          <h4 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-main)' }}>News Distribution by Source</h4>
+          <div className="h-48">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={stats?.newsBySource || []}
+                  dataKey="count"
+                  nameKey="source"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={70}
+                  innerRadius={40}
+                  paddingAngle={2}
+                >
+                  {(stats?.newsBySource || []).map((_, i) => (
+                    <Cell key={i} fill={chartColors[i % chartColors.length]} />
+                  ))}
+                </Pie>
+                <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '0.75rem', fontSize: 12 }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {(stats?.newsBySource || []).map((s, i) => (
+              <span key={i} className="text-[10px] font-medium px-2 py-0.5 rounded-full border" style={{ borderColor: 'var(--border-color)', color: chartColors[i % chartColors.length] }}>
+                @{s.source || 'unknown'}: {s.count}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* System Health */}
+      {health && (
+        <div className="rounded-2xl p-5 border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+          <h4 className="text-sm font-semibold mb-4 flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
+            <Activity className="w-4 h-4 text-emerald-500" /> System Health
+          </h4>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="flex flex-col gap-1">
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Uptime</span>
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
+                {Math.floor(health.uptime / 3600)}h {Math.floor((health.uptime % 3600) / 60)}m
+              </span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Memory (Heap)</span>
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
+                {health.memory.heapUsed}MB / {health.memory.heapTotal}MB
+              </span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Database</span>
+              <span className={`text-sm font-semibold ${health.dbStatus === 'connected' ? 'text-emerald-500' : 'text-red-500'}`}>
+                {health.dbStatus === 'connected' ? '● Connected' : '● Error'}
+              </span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Storage</span>
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>{health.storageStatus}</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  // ============================================================================
+  // TAB: USERS
+  // ============================================================================
+  const renderUsers = () => (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 className="text-2xl font-display font-bold" style={{ color: 'var(--text-main)' }}>User Management</h3>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>View, search, and manage platform users</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 opacity-40" />
+            <input
+              type="text"
+              placeholder="Search users..."
+              value={userSearch}
+              onChange={e => { setUserSearch(e.target.value); fetchUsers(e.target.value); }}
+              className="pl-9 pr-3 py-2 rounded-xl text-sm border w-64"
+              style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
+            />
+          </div>
+          <button onClick={() => fetchUsers(userSearch)} className="p-2 rounded-xl border transition hover:bg-[var(--bg-subtle)]" style={{ borderColor: 'var(--border-color)' }}>
+            <RefreshCw className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+          </button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                <th className="text-start px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>User</th>
+                <th className="text-start px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Major</th>
+                <th className="text-start px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Phone</th>
+                <th className="text-start px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Role</th>
+                <th className="text-start px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Joined</th>
+                <th className="text-end px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
+              {adminUsers.map(u => (
+                <tr key={u.id} className="transition hover:bg-[var(--bg-subtle)]" style={{ borderColor: 'var(--border-color)' }}>
+                  <td className="px-4 py-3 text-start">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold overflow-hidden shrink-0" style={{ background: 'var(--bg-subtle)', color: 'var(--text-muted)' }}>
+                        {u.profilePicUrl ? <img src={u.profilePicUrl} className="w-full h-full object-cover" /> : (u.userName?.[0] || '?')}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-semibold text-sm truncate max-w-[180px]" style={{ color: 'var(--text-main)' }}>{u.userName || 'Unnamed'}</div>
+                        <div className="text-xs truncate max-w-[180px]" style={{ color: 'var(--text-muted)' }}>{u.email}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-start" style={{ color: 'var(--text-muted)' }}>{u.major || '—'}</td>
+                  <td className="px-4 py-3 text-xs font-mono text-start" style={{ color: 'var(--text-muted)' }}>{u.phone || '—'}</td>
+                  <td className="px-4 py-3 text-start">
+                    <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${u.isAdmin ? 'bg-amber-500/15 text-amber-500' : 'bg-blue-500/10 text-blue-500'}`}>
+                      {u.isAdmin ? 'Admin' : 'User'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-start" style={{ color: 'var(--text-muted)' }}>
+                    {u.createdAt ? format(new Date(u.createdAt), 'MMM dd, yyyy') : '—'}
+                  </td>
+                  <td className="px-4 py-3 text-end">
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        onClick={async () => {
+                          const t = await getToken();
+                          const res = await fetch(`/api/admin/users/${u.id}/toggle-admin`, { method: 'PUT', headers: { Authorization: `Bearer ${t}` } });
+                          if (res.ok) { fetchUsers(userSearch); fetchData(); toast('success', `${u.userName || 'User'} admin status toggled`); }
+                          else { const err = await res.json().catch(() => ({})); toast('error', err.error || 'Failed'); }
+                        }}
+                        className="p-1.5 rounded-lg transition hover:bg-[var(--bg-subtle)]"
+                        title={u.isAdmin ? 'Demote to User' : 'Promote to Admin'}
+                      >
+                        {u.isAdmin ? <UserX className="w-4 h-4 text-amber-500" /> : <UserCheck className="w-4 h-4 text-blue-500" />}
+                      </button>
+                      <button
+                        onClick={() => handleDelete(`/api/admin/users/${u.id}`, u.userName || 'this user')}
+                        className="p-1.5 rounded-lg transition hover:bg-red-500/10"
+                      >
+                        <Trash2 className="w-4 h-4 text-red-400" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {adminUsers.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-12 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No users found.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ============================================================================
+  // TAB: NEWS SOURCES
+  // ============================================================================
+  const renderNewsSources = () => (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 className="text-2xl font-display font-bold" style={{ color: 'var(--text-main)' }}>News Sources</h3>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Track handles & RSS feeds to fetch announcements</p>
+        </div>
+        <button
+          onClick={() => handleFetchPosts('', true)}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition shadow-sm"
+        >
+          <RefreshCw className="w-4 h-4" /> Fetch All Now
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        {/* Add Source + Settings */}
+        <div className="space-y-4">
+          <div className="rounded-2xl p-5 border space-y-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>Add News Source</h4>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Enter a Twitter handle or RSS Feed URL.</p>
+            <input
+              type="text"
+              placeholder="Handle (e.g. IMAMU_News) or RSS URL"
+              value={sourceForm.handle}
+              onChange={e => setSourceForm({ ...sourceForm, handle: e.target.value.trim() })}
+              className="w-full py-2 px-3 rounded-xl text-sm border"
+              style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
+            />
+            <button
+              onClick={() => handlePost('/api/admin/news_sources', sourceForm, () => setSourceForm({ handle: '' }))}
+              className="w-full bg-[var(--color-imamu-blue)] text-white px-4 py-2 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-blue-light)] transition"
+            >
+              Add Source
+            </button>
+          </div>
+
+          <div className="rounded-2xl p-5 border space-y-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>Automation Settings</h4>
+            <div className="space-y-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Fetch Range (Days)</label>
+                <input type="number" min="1" value={globalSettings.fetchRangeDays} onChange={e => setGlobalSettings((s: any) => ({ ...s, fetchRangeDays: parseInt(e.target.value) || 30 }))} className="py-2 px-3 rounded-xl text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Auto-Delete Older Than (Days)</label>
+                <input type="number" min="1" value={globalSettings.autoDeleteDays} onChange={e => setGlobalSettings((s: any) => ({ ...s, autoDeleteDays: parseInt(e.target.value) || 30 }))} className="py-2 px-3 rounded-xl text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+              </div>
+              <div className="border-t pt-3 space-y-3" style={{ borderColor: 'var(--border-color)' }}>
+                <div className="text-xs font-semibold" style={{ color: 'var(--text-main)' }}>X / Twitter Credentials (Optional)</div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs" style={{ color: 'var(--text-muted)' }}>auth_token</label>
+                  <input type="password" placeholder="X session auth_token" value={globalSettings.twitterAuthToken || ''} onChange={e => setGlobalSettings((s: any) => ({ ...s, twitterAuthToken: e.target.value }))} className="py-2 px-3 rounded-xl text-xs border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs" style={{ color: 'var(--text-muted)' }}>ct0 (CSRF)</label>
+                  <input type="password" placeholder="X session ct0 token" value={globalSettings.twitterCt0 || ''} onChange={e => setGlobalSettings((s: any) => ({ ...s, twitterCt0: e.target.value }))} className="py-2 px-3 rounded-xl text-xs border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+                </div>
               </div>
               <button
-                onClick={() => handleFetchPosts('', true)}
-                className="bg-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-purple-700 transition flex items-center justify-center gap-2 text-sm shadow-sm"
+                className="w-full bg-[var(--color-imamu-blue)] text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-blue-light)] transition"
+                onClick={() => handlePostWithMethod('/api/admin/global_settings', 'PUT', globalSettings, () => toast('success', 'Settings saved!'))}
               >
-                <Sparkles className="w-4 h-4" /> Fetch All Now
+                Save Settings
               </button>
             </div>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-              {/* Left Column: Form & Automation Settings */}
-              <div className="space-y-6 lg:col-span-1">
-                <div className="bg-white border border-gray-200 p-5 rounded-2xl shadow-sm space-y-4">
-                  <h4 className="font-semibold text-gray-900 text-sm">Add News Source (Handle or RSS URL)</h4>
-                  <p className="text-xs text-gray-500">Enter a Twitter handle or RSS Feed URL (e.g., RSS.app / RSSHub feed URL).</p>
-                  <div className="flex flex-col gap-3">
-                    <div className="relative">
-                      <input 
-                        type="text" 
-                        placeholder="Handle (e.g. IMAMU_News) or RSS URL" 
-                        value={sourceForm.handle} 
-                        onChange={e => setSourceForm({...sourceForm, handle: e.target.value.trim()})}
-                        className="w-full bg-white border border-gray-200 py-2 px-3 rounded-lg outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-sm"
-                      />
-                    </div>
-                    <button 
-                      onClick={() => handlePost('/api/admin/news_sources', sourceForm, () => setSourceForm({handle:''}))}
-                      className="bg-[var(--color-imamu-blue)] text-white px-4 py-2 rounded-lg font-medium hover:bg-[var(--color-imamu-blue-light)] transition text-sm w-full"
-                    >
-                      Add Source
-                    </button>
-                  </div>
-                </div>
+          </div>
+        </div>
 
-                <div className="bg-white border border-gray-200 p-5 rounded-2xl shadow-sm space-y-4">
-                  <h4 className="font-semibold text-gray-900 text-sm">Automation Settings</h4>
-                  <div className="space-y-4">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs text-gray-500 font-medium">Fetch Range (Days)</label>
-                      <input 
-                        type="number" min="1"
-                        value={globalSettings.fetchRangeDays}
-                        onChange={e => setGlobalSettings(s => ({...s, fetchRangeDays: parseInt(e.target.value) || 30}))}
-                        className="bg-white border border-gray-200 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-sm"
-                      />
+        {/* Sources List */}
+        <div className="lg:col-span-2">
+          <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border-color)' }}>
+              <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>Current Sources ({newsSources.length})</h4>
+            </div>
+            <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
+              {newsSources.map(s => (
+                <div key={s.id} className="p-4 flex flex-col xl:flex-row xl:items-center justify-between gap-4 transition hover:bg-[var(--bg-subtle)]" style={{ borderColor: 'var(--border-color)' }}>
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-[#1DA1F2]/10 rounded-full flex items-center justify-center shrink-0 overflow-hidden">
+                      {s.profilePicUrl ? <img src={s.profilePicUrl} className="w-full h-full object-cover" /> : <Twitter className="w-5 h-5 text-[#1DA1F2]" />}
                     </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs text-gray-500 font-medium">Auto-Delete Older Than (Days)</label>
-                      <input 
-                        type="number" min="1"
-                        value={globalSettings.autoDeleteDays}
-                        onChange={e => setGlobalSettings(s => ({...s, autoDeleteDays: parseInt(e.target.value) || 30}))}
-                        className="bg-white border border-gray-200 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-sm"
-                      />
-                    </div>
-                    <div className="border-t border-gray-100 pt-3 space-y-3">
-                      <div className="text-xs font-semibold text-gray-700">Direct X / Twitter Credentials (Optional)</div>
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs text-gray-500 font-medium">X Cookie: auth_token</label>
-                        <input 
-                          type="password" 
-                          placeholder="Direct X session auth_token"
-                          value={globalSettings.twitterAuthToken || ''}
-                          onChange={e => setGlobalSettings(s => ({...s, twitterAuthToken: e.target.value}))}
-                          className="bg-white border border-gray-200 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-xs"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs text-gray-500 font-medium">X Cookie: ct0 (CSRF)</label>
-                        <input 
-                          type="password" 
-                          placeholder="Direct X session ct0 token"
-                          value={globalSettings.twitterCt0 || ''}
-                          onChange={e => setGlobalSettings(s => ({...s, twitterCt0: e.target.value}))}
-                          className="bg-white border border-gray-200 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-xs"
-                        />
+                    <div>
+                      <div className="font-semibold text-lg" style={{ color: 'var(--text-main)' }}>@{s.handle}</div>
+                      <div className="text-xs mt-1 flex gap-2 flex-wrap" style={{ color: 'var(--text-muted)' }}>
+                        <span className="font-medium px-2 py-0.5 rounded" style={{ background: 'var(--bg-subtle)' }}>{s.newsCount || 0} posts</span>
+                        <span style={{ color: 'var(--border-color)' }}>•</span>
+                        <span>Last fetched: {s.lastFetched ? new Date(s.lastFetched).toLocaleString() : 'Never'}</span>
                       </div>
                     </div>
-                    <button 
-                      className="bg-[var(--color-imamu-blue)] text-white px-4 py-2.5 rounded-lg font-medium hover:bg-[var(--color-imamu-blue-light)] transition text-sm w-full"
-                      onClick={() => handlePostWithMethod('/api/admin/global_settings', 'PUT', globalSettings, () => alert('Settings saved!'))}
-                    >
-                      Save Settings
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button onClick={() => handleFetchPosts(s.handle, false)} className="bg-blue-500/10 text-blue-500 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-500/20 transition whitespace-nowrap">Fetch Now</button>
+                    <button onClick={() => handleDelete(`/api/admin/news_sources/${s.handle}/posts`, `all posts from @${s.handle}`)} className="bg-red-500/10 text-red-400 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-500/20 transition whitespace-nowrap">Empty Posts</button>
+                    <button onClick={() => handleDelete(`/api/admin/news_sources/${s.id}`, `@${s.handle}`)} className="p-1.5 rounded-lg hover:bg-red-500/10 transition" title="Delete Source">
+                      <Trash2 className="w-5 h-5 text-red-400" />
                     </button>
                   </div>
                 </div>
+              ))}
+              {newsSources.length === 0 && <div className="py-12 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No sources added yet.</div>}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ============================================================================
+  // TAB: MAJORS
+  // ============================================================================
+  const renderMajors = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-2xl font-display font-bold" style={{ color: 'var(--text-main)' }}>Academic Majors</h3>
+        <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Configure degree planning programs, requirement groups, and courses</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        {/* Form + List */}
+        <div className="space-y-4">
+          <div className="rounded-2xl p-5 border space-y-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>{majorForm.id ? 'Edit Major' : 'Add New Major'}</h4>
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Major Name</label>
+                <input type="text" placeholder="e.g. Computer Science" value={majorForm.name} onChange={e => setMajorForm(s => ({ ...s, name: e.target.value }))} className="py-2.5 px-3 rounded-xl text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
               </div>
-
-              {/* Right Column: Current Sources list */}
-              <div className="lg:col-span-2 space-y-6">
-                <div className="bg-white border border-gray-200 p-5 rounded-2xl shadow-sm">
-                  <h4 className="font-bold text-gray-900 text-sm mb-4">Current Sources</h4>
-                  <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden bg-white">
-                    {newsSources.map(s => (
-                      <div key={s.id} className="p-4 flex flex-col xl:flex-row xl:items-center justify-between gap-4 group hover:bg-gray-50 transition">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-[#1DA1F2]/10 rounded-full flex items-center justify-center shrink-0 overflow-hidden">
-                             {s.profilePicUrl ? <img src={s.profilePicUrl} className="w-full h-full object-cover" /> : <Twitter className="w-5 h-5 text-[#1DA1F2]" />}
-                          </div>
-                          <div>
-                             <div className="font-semibold text-gray-900 leading-tight text-lg">@{s.handle}</div>
-                             <div className="text-xs text-gray-500 mt-1 flex gap-2 flex-wrap">
-                                <span className="font-medium bg-gray-100 px-2 py-0.5 rounded">{s.newsCount || 0} posts</span>
-                                <span className="text-gray-300">•</span>
-                                <span>Last fetched: {s.lastFetched ? new Date(s.lastFetched).toLocaleString() : 'Never'}</span>
-                             </div>
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                           <button 
-                            onClick={() => handleFetchPosts(s.handle, false)}
-                            className="bg-purple-50 text-purple-600 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-purple-100 transition whitespace-nowrap"
-                          >
-                            Fetch Now
-                          </button>
-                          <button 
-                            onClick={() => handleDelete(`/api/admin/news_sources/${s.handle}/posts`, 'all posts from @' + s.handle)}
-                            className="bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-100 transition whitespace-nowrap"
-                            title="Delete All Posts from Source"
-                          >
-                            Empty Posts
-                          </button>
-                          <button 
-                            onClick={() => handleDelete(`/api/admin/news_sources/${s.id}`, '@' + s.handle)}
-                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
-                            title="Delete Source"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    {newsSources.length === 0 && <div className="py-8 text-center text-gray-400 text-sm">No sources added yet.</div>}
-                  </div>
-                </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>PDF Plan URL</label>
+                <input type="text" placeholder="PDF Plan URL" value={majorForm.pdfUrl} onChange={e => setMajorForm(s => ({ ...s, pdfUrl: e.target.value }))} className="py-2.5 px-3 rounded-xl text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const url = majorForm.id ? `/api/admin/majors/${majorForm.id}` : '/api/admin/majors';
+                    const method = majorForm.id ? 'PUT' : 'POST';
+                    handlePostWithMethod(url, method, majorForm, () => setMajorForm({ id: undefined, name: '', pdfUrl: '', courses: [], batches: [] }));
+                  }}
+                  className="flex-1 bg-[var(--color-imamu-blue)] text-white py-2 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-blue-light)] transition"
+                >
+                  {majorForm.id ? 'Update Major' : 'Add Major'}
+                </button>
+                {majorForm.id && <button onClick={() => setMajorForm({ id: undefined, name: '', pdfUrl: '', courses: [], batches: [] })} className="px-3 py-2 border rounded-xl text-sm font-medium transition hover:bg-[var(--bg-subtle)]" style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}>Cancel</button>}
               </div>
             </div>
           </div>
-        );
-      
-      case 'majors':
-        return (
-          <div className="space-y-8">
-            <div className="border-b border-gray-150 pb-5">
-              <h3 className="text-xl font-display font-semibold text-gray-900 mb-1">Academic Majors</h3>
-              <p className="text-sm text-gray-500">Configure degree planning programs, requirement groups, and syllabus courses</p>
-            </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-              {/* Left Column: Form & Current list (1/3) */}
-              <div className="lg:col-span-1 space-y-6">
-                <div className="bg-white border border-gray-200 p-5 rounded-2xl shadow-sm space-y-4">
-                  <h4 className="font-semibold text-gray-900 text-sm">{majorForm.id ? "Edit Major" : "Add New Major"}</h4>
-                  <div className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-gray-500 font-medium">Major Name</label>
-                      <input 
-                        type="text" placeholder="e.g. Computer Science" 
-                        value={majorForm.name} onChange={e=>setMajorForm(s=>({...s,name:e.target.value}))} 
-                        className="bg-white border border-gray-200 py-2.5 px-4 rounded-lg outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-sm" 
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-gray-500 font-medium">PDF Plan URL</label>
-                      <input 
-                        type="text" placeholder="PDF Plan URL" 
-                        value={majorForm.pdfUrl} onChange={e=>setMajorForm(s=>({...s,pdfUrl:e.target.value}))} 
-                        className="bg-white border border-gray-200 py-2.5 px-4 rounded-lg outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-sm" 
-                      />
-                    </div>
-                    
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={() => {
-                          const url = majorForm.id ? `/api/admin/majors/${majorForm.id}` : '/api/admin/majors';
-                          const method = majorForm.id ? 'PUT' : 'POST';
-                          handlePostWithMethod(url, method, majorForm, () => setMajorForm({id:undefined, name:'', pdfUrl:'', courses: [], batches: []}))
-                        }}
-                        className="flex-1 bg-[var(--color-imamu-blue)] text-white py-2 rounded-lg font-medium hover:bg-[var(--color-imamu-blue-light)] transition text-sm"
-                      >
-                        {majorForm.id ? "Update Major" : "Add Major"}
-                      </button>
-                      {majorForm.id && (
-                        <button onClick={() => setMajorForm({id:undefined, name:'', pdfUrl:'', courses: [], batches: []})} className="px-3 py-2 border border-gray-250 text-gray-500 hover:text-gray-900 rounded-lg transition text-sm font-medium">Cancel</button>
-                      )}
-                    </div>
+          <div className="rounded-2xl p-5 border space-y-3" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>Current Majors ({majors.length})</h4>
+            </div>
+            <input type="text" placeholder="Search majors..." value={majorSearch} onChange={e => setMajorSearch(e.target.value)} className="w-full py-1.5 px-3 rounded-xl text-xs border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+            <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
+              {majors.filter(m => m.name?.toLowerCase().includes(majorSearch.toLowerCase())).slice(0, majorLimit).map(m => (
+                <div key={m.id} className="py-3 flex items-center justify-between group">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-sm truncate" style={{ color: 'var(--text-main)' }}>{m.name}</div>
+                    {m.pdfUrl && <a href={m.pdfUrl} target="_blank" rel="noreferrer" className="text-[10px] text-[var(--color-imamu-blue)] font-medium hover:underline flex items-center gap-1 mt-1"><LinkIcon className="w-2.5 h-2.5" /> PDF Plan</a>}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => {
+                        const courses = m.courses?.map((c: any) => ({ ...c, optionalGroupReqCount: c.optionalGroupReqCount?.toString() || '1' })) || [];
+                        const bMap = new Map();
+                        courses.forEach((c: any) => { if (c.optionalGroup) bMap.set(c.optionalGroup, c.optionalGroupReqCount); });
+                        const batches = Array.from(bMap.entries()).map(([name, reqCount]) => ({ name, reqCount }));
+                        setMajorForm({ ...m, courses, batches });
+                      }}
+                      className="px-2 py-1 rounded transition text-xs font-semibold hover:bg-[var(--bg-subtle)]"
+                      style={{ color: 'var(--text-muted)' }}
+                    >Edit</button>
+                    <button onClick={() => handleDelete(`/api/admin/majors/${m.id}`, m.name)} className="p-1.5 rounded transition hover:bg-red-500/10"><Trash2 className="w-4 h-4 text-red-400" /></button>
                   </div>
                 </div>
+              ))}
+              {majors.length === 0 && <div className="py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No majors added yet.</div>}
+            </div>
+          </div>
+        </div>
 
-                <div className="bg-white border border-gray-200 p-5 rounded-2xl shadow-sm space-y-4">
-                  <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                    <h4 className="font-semibold text-gray-900 text-sm">Current Majors ({majors.length})</h4>
+        {/* Batches + Courses Planner */}
+        <div className="lg:col-span-2 space-y-4">
+          <div className="rounded-2xl p-5 border space-y-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <div className="flex justify-between items-center border-b pb-3" style={{ borderColor: 'var(--border-color)' }}>
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>Plan Levels & Batches (المستويات والحزم)</span>
+              <button type="button" onClick={() => setMajorForm(f => ({ ...f, batches: [...f.batches, { name: `Batch ${f.batches.length + 1}`, reqCount: '1' }] }))} className="text-xs text-[var(--color-imamu-blue)] font-medium hover:underline">+ Add Batch</button>
+            </div>
+            {majorForm.batches.length > 0 && (
+              <div className="rounded-xl p-3 space-y-2 border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}>
+                {majorForm.batches.map((b, i) => (
+                  <div key={i} className="flex gap-2 items-center">
+                    <input type="text" value={b.name} placeholder="Batch Name" onChange={e => { const newName = e.target.value; const oldName = b.name; setMajorForm(f => ({ ...f, batches: f.batches.map((batch, idx) => idx === i ? { ...batch, name: newName } : batch), courses: f.courses.map(c => c.optionalGroup === oldName ? { ...c, optionalGroup: newName } : c) })); }} className="flex-1 py-1.5 px-3 rounded-lg text-sm border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+                    <input type="number" min="1" value={b.reqCount} placeholder="Req" title="Required count" onChange={e => setMajorForm(f => ({ ...f, batches: f.batches.map((batch, idx) => idx === i ? { ...batch, reqCount: e.target.value } : batch), courses: f.courses.map(c => c.optionalGroup === b.name ? { ...c, optionalGroupReqCount: e.target.value } : c) }))} className="w-24 py-1.5 px-3 rounded-lg text-sm border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+                    <button type="button" onClick={() => setMajorForm(f => ({ ...f, batches: f.batches.filter((_, idx) => idx !== i), courses: f.courses.map(c => c.optionalGroup === b.name ? { ...c, optionalGroup: '', optionalGroupReqCount: '1' } : c) }))} className="text-red-400 hover:text-red-500 p-1"><Trash2 className="w-4 h-4" /></button>
                   </div>
-                  <input
-                    type="text"
-                    placeholder="Search majors..."
-                    value={majorSearch}
-                    onChange={(e) => setMajorSearch(e.target.value)}
-                    className="w-full bg-white border border-gray-200 py-1.5 px-3 rounded-lg text-xs outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)]"
-                  />
-                  <div className="divide-y divide-gray-100">
-                    {majors
-                      .filter(m => m.name?.toLowerCase().includes(majorSearch.toLowerCase()))
-                      .slice(0, majorLimit)
-                      .map(m => (
-                      <div key={m.id} className="py-3 flex items-center justify-between group">
-                        <div className="min-w-0 flex-1">
-                          <div className="font-medium text-gray-900 text-sm truncate">{m.name}</div>
-                          {m.pdfUrl && <a href={m.pdfUrl} target="_blank" rel="noreferrer" className="text-[10px] text-[var(--color-imamu-blue)] font-medium hover:text-[var(--color-imamu-gold)] hover:underline flex items-center gap-1 mt-1"><LinkIcon className="w-2.5 h-2.5" /> PDF Plan</a>}
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button 
-                            onClick={() => {
-                              const courses = m.courses?.map((c:any) => ({...c, optionalGroupReqCount: c.optionalGroupReqCount?.toString() || '1'})) || [];
-                              const bMap = new Map();
-                              courses.forEach((c:any) => {
-                                if (c.optionalGroup) bMap.set(c.optionalGroup, c.optionalGroupReqCount);
-                              });
-                              const batches = Array.from(bMap.entries()).map(([name, reqCount]) => ({ name, reqCount }));
-                              setMajorForm({ ...m, courses, batches });
-                            }} 
-                            className="px-2 py-1 text-zinc-400 hover:text-[var(--color-imamu-blue)] hover:bg-zinc-800/40 rounded transition text-xs font-semibold"
-                          >Edit</button>
-                          <button 
-                            onClick={() => handleDelete(`/api/admin/majors/${m.id}`, m.name)}
-                            className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-zinc-900/40 rounded transition"
-                          ><Trash2 className="w-4.5 h-4.5" /></button>
+                ))}
+              </div>
+            )}
+
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Select Included Courses:</span>
+              <select
+                value=""
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val) {
+                    const subjectNum = parseInt(val);
+                    if (!majorForm.courses.some(c => c.subjectId === subjectNum)) {
+                      setMajorForm(f => ({ ...f, courses: [...f.courses, { subjectId: subjectNum, optionalGroup: '', optionalGroupReqCount: '1' }] }));
+                    }
+                  }
+                }}
+                className="w-full py-2 px-3 rounded-xl text-sm border"
+                style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
+              >
+                <option value="">Search courses to include...</option>
+                {subjects.map(subj => <option key={subj.id} value={subj.id}>{subj.code} - {subj.name}</option>)}
+              </select>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto rounded-xl p-2.5 border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}>
+                {subjects.map(subj => {
+                  const isSelected = majorForm.courses.some(c => c.subjectId === subj.id);
+                  return (
+                    <div key={subj.id} className="flex items-center text-xs">
+                      <label className="flex items-center gap-2 cursor-pointer select-none w-full truncate" style={{ color: 'var(--text-muted)' }}>
+                        <input type="checkbox" checked={isSelected} onChange={(e) => {
+                          if (e.target.checked) setMajorForm(f => ({ ...f, courses: [...f.courses, { subjectId: subj.id, optionalGroup: '', optionalGroupReqCount: '1' }] }));
+                          else setMajorForm(f => ({ ...f, courses: f.courses.filter(c => c.subjectId !== subj.id) }));
+                        }} />
+                        <span className="font-medium shrink-0" style={{ color: 'var(--text-main)' }}>{subj.code}</span>
+                        <span className="truncate">{subj.name}</span>
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {majorForm.courses.length > 0 && (
+                <div className="mt-4 border-t pt-4" style={{ borderColor: 'var(--border-color)' }}>
+                  <span className="block text-xs font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>Drag & Drop Courses into Batches/Levels:</span>
+                  <div className="flex gap-4 overflow-x-auto pb-4 items-start">
+                    {[{ name: '', title: 'Unassigned (Default)' }, ...majorForm.batches.map(b => ({ name: b.name, title: b.name }))].map(batch => (
+                      <div
+                        key={batch.name || 'unassigned'}
+                        className="flex-shrink-0 w-60 rounded-xl p-3 flex flex-col min-h-[120px] max-h-[40vh] h-[450px] border"
+                        style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          if (draggedSubjectId) {
+                            const newBatch = majorForm.batches.find(b => b.name === batch.name);
+                            setMajorForm(f => ({ ...f, courses: f.courses.map(c => c.subjectId === draggedSubjectId ? { ...c, optionalGroup: batch.name, optionalGroupReqCount: newBatch ? newBatch.reqCount : '1' } : c) }));
+                            setDraggedSubjectId(null);
+                          }
+                        }}
+                      >
+                        <h4 className="font-semibold text-xs border-b pb-2 mb-2 flex justify-between items-center shrink-0" style={{ borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>
+                          <span className="truncate max-w-[120px]">{batch.title}</span>
+                          {batch.name && <span className="bg-purple-500/15 text-purple-400 text-[10px] px-1.5 py-0.5 rounded-full shrink-0">{majorForm.batches.find(b => b.name === batch.name)?.reqCount} Req</span>}
+                        </h4>
+
+                        {!batch.name && (
+                          <input type="text" placeholder="Search..." value={unassignedSearch} onChange={(e) => setUnassignedSearch(e.target.value)} className="mb-2 w-full py-1 px-2 rounded text-xs border shrink-0" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+                        )}
+
+                        <div className="flex flex-col gap-1.5 overflow-y-auto flex-1 pr-1 pb-2">
+                          {majorForm.courses.filter(c => {
+                            if ((c.optionalGroup || '') !== batch.name) return false;
+                            if (!batch.name && unassignedSearch) {
+                              const subj = subjects.find(s => s.id === c.subjectId);
+                              if (!subj) return false;
+                              const term = unassignedSearch.toLowerCase();
+                              return subj.name.toLowerCase().includes(term) || subj.code.toLowerCase().includes(term);
+                            }
+                            return true;
+                          }).map(c => {
+                            const subj = subjects.find(s => s.id === c.subjectId);
+                            if (!subj) return null;
+                            return (
+                              <div
+                                key={c.subjectId}
+                                draggable
+                                onDragStart={(e) => { setDraggedSubjectId(c.subjectId); e.dataTransfer.setData('text/plain', c.subjectId.toString()); }}
+                                className="p-2 rounded shadow-sm text-xs cursor-grab active:cursor-grabbing border transition hover:border-[var(--color-imamu-blue)] shrink-0"
+                                style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+                              >
+                                <div className="font-semibold" style={{ color: 'var(--text-main)' }}>{subj.code}</div>
+                                <div className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>{subj.name}</div>
+                              </div>
+                            );
+                          })}
+                          {majorForm.courses.filter(c => (c.optionalGroup || '') === batch.name).length === 0 && (
+                            <div className="italic flex-1 flex items-center justify-center border border-dashed rounded-lg min-h-[60px] text-[10px]" style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}>Drop here</div>
+                          )}
                         </div>
                       </div>
                     ))}
-                    {majors.length === 0 && <div className="py-8 text-center text-gray-400 text-sm">No majors added yet.</div>}
                   </div>
                 </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ============================================================================
+  // TAB: EVENTS
+  // ============================================================================
+  const renderEvents = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-2xl font-display font-bold" style={{ color: 'var(--text-main)' }}>Calendar Dates</h3>
+        <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Manage academic dates, events, subscriptions, and allowances</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <div className="space-y-4">
+          <div className="rounded-2xl p-5 border space-y-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>{eventForm.id ? 'Edit Calendar Event' : 'Add Calendar Event'}</h4>
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Event Title</label>
+                <input type="text" placeholder="e.g. Final Exams Begin" value={eventForm.title} onChange={e => setEventForm(s => ({ ...s, title: e.target.value }))} className="py-2 px-3 rounded-xl text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
               </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Event Date</label>
+                <input type="date" value={eventForm.date} onChange={e => setEventForm(s => ({ ...s, date: e.target.value }))} className="py-2 px-3 rounded-xl text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Description</label>
+                <textarea placeholder="Event Description (optional)" value={eventForm.description} onChange={e => setEventForm(s => ({ ...s, description: e.target.value }))} className="py-2 px-3 rounded-xl min-h-[80px] text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => {
+                    const url = eventForm.id ? `/api/admin/events/${eventForm.id}` : '/api/admin/events';
+                    const method = eventForm.id ? 'PUT' : 'POST';
+                    handlePostWithMethod(url, method, eventForm, () => setEventForm({ id: undefined, title: '', date: '', description: '' }));
+                  }}
+                  className="flex-1 bg-[var(--color-imamu-blue)] text-white py-2 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-blue-light)] transition"
+                >
+                  {eventForm.id ? 'Update Event' : 'Add Event'}
+                </button>
+                {eventForm.id && <button onClick={() => setEventForm({ id: undefined, title: '', date: '', description: '' })} className="px-3 py-2 border rounded-xl text-sm font-medium transition hover:bg-[var(--bg-subtle)]" style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}>Cancel</button>}
+              </div>
+            </div>
+          </div>
 
-              {/* Right Column: AI Importer & Drag-Drop Planner (2/3) */}
-              <div className="lg:col-span-2 space-y-6">
-                <AiImporter prompt="Extract university academic majors. CRITICAL: Do NOT extract 'levels' (المستويات) or 'optional batches' (حزم اختيارية) or 'university requirements' (متطلب جامعي) as separate major objects! They belong INSIDE the 'batches' array of the parent degree program. If the document contains multiple different degrees (e.g., 'بكا-عال تقني' vs 'تج-عال تقني'), ONLY THEN extract them as separate major objects. For each major, extract EVERY associated course code in the entire plan. Extract ALL distinct groupings (levels/blocks/packages) like 'المستوى الأول', 'متطلب جامعي اجباري', 'اختياري-الحوسبة', 'المهارات المهنية وسوق العمل', 'مقررات حرة لكلية' as distinct batches. Map each course to its exact level/batch name." type="majors" onParsed={(data) => handleAiParsed('majors', data)} />
-                
-                <div className="bg-white border border-gray-200 p-5 rounded-2xl shadow-sm space-y-4">
-                  <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-                    <span className="block text-sm font-semibold text-gray-900">Plan Levels & Batches (المستويات والحزم)</span>
-                    <button type="button" onClick={() => setMajorForm(f => ({...f, batches: [...f.batches, {name: `Batch ${f.batches.length + 1}`, reqCount: '1'}]}))} className="text-xs text-[var(--color-imamu-blue)] font-medium hover:underline">+ Add Batch</button>
+          <div className="rounded-2xl p-4 border space-y-3" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <h4 className="font-semibold text-xs" style={{ color: 'var(--text-main)' }}>Calendar Feed Subscriptions</h4>
+            <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Users can sync using ICS format.</p>
+            <a href="/api/calendar.ics" download className="flex items-center justify-center gap-2 border font-medium py-1.5 rounded-xl text-xs w-full transition hover:bg-[var(--bg-subtle)]" style={{ borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>
+              <Download className="w-3.5 h-3.5" /> Download .ics Feed
+            </a>
+          </div>
+
+          <div className="rounded-2xl p-4 border space-y-3" style={{ background: 'rgba(16,185,129,0.05)', borderColor: 'rgba(16,185,129,0.2)' }}>
+            <h4 className="font-semibold text-xs text-emerald-500">Mokafaa Allowance Scheduler</h4>
+            <p className="text-[11px] text-emerald-400/80">Generates allowance dates on the 25th of every month for 12 months.</p>
+            <button
+              onClick={() => handlePost('/api/admin/events/generate-mokafaa', {}, () => { toast('success', 'Generated 12 Mokafaa events!'); fetchData(); })}
+              className="flex items-center justify-center gap-2 bg-emerald-600 text-white font-medium py-1.5 rounded-xl text-xs w-full hover:bg-emerald-700 transition"
+            >
+              <Zap className="w-3.5 h-3.5" /> Generate Mokafaa Dates
+            </button>
+          </div>
+        </div>
+
+        <div className="lg:col-span-2">
+          <div className="rounded-2xl border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <div className="px-5 py-4 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3" style={{ borderColor: 'var(--border-color)' }}>
+              <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>Upcoming Events ({events.length})</h4>
+              <input type="text" placeholder="Search events..." value={eventSearch} onChange={e => setEventSearch(e.target.value)} className="py-1.5 px-3 rounded-xl text-xs border w-full sm:w-48" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+            </div>
+            <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
+              {events.filter(e => e.title?.toLowerCase().includes(eventSearch.toLowerCase()) || e.description?.toLowerCase().includes(eventSearch.toLowerCase())).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).slice(0, eventLimit).map(e => (
+                <div key={e.id} className="py-3.5 px-5 flex items-center justify-between group transition hover:bg-[var(--bg-subtle)]">
+                  <div className="min-w-0 flex-1 pr-3">
+                    <div className="font-medium text-sm truncate" style={{ color: 'var(--text-main)' }}>{e.title}</div>
+                    <div className="text-xs mt-1 flex gap-2 flex-wrap" style={{ color: 'var(--text-muted)' }}>
+                      <span className="font-semibold text-[var(--color-imamu-blue)]">{format(new Date(e.date), 'MMM dd, yyyy')}</span>
+                      {e.description && (<><span style={{ color: 'var(--border-color)' }}>•</span><span className="truncate">{e.description}</span></>)}
+                    </div>
                   </div>
-                  {majorForm.batches.length > 0 && (
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2">
-                      {majorForm.batches.map((b, i) => (
-                        <div key={i} className="flex gap-2 items-center">
-                          <input 
-                            type="text" 
-                            value={b.name} 
-                            placeholder="Batch Name (e.g. حزمة اختيارية 1)"
-                            onChange={e => {
-                               const newName = e.target.value;
-                               const oldName = b.name;
-                               setMajorForm(f => ({
-                                  ...f,
-                                  batches: f.batches.map((batch, idx) => idx === i ? {...batch, name: newName} : batch),
-                                  courses: f.courses.map(c => c.optionalGroup === oldName ? {...c, optionalGroup: newName} : c)
-                               }))
-                            }} 
-                            className="flex-1 bg-white border border-gray-200 py-1.5 px-3 rounded outline-none text-sm" 
-                          />
-                          <input 
-                            type="number" 
-                            min="1"
-                            value={b.reqCount} 
-                            placeholder="Req Count"
-                            title="Required Courses Count from this batch"
-                            onChange={e => setMajorForm(f => ({
-                              ...f, 
-                              batches: f.batches.map((batch, idx) => idx === i ? {...batch, reqCount: e.target.value} : batch),
-                              courses: f.courses.map(c => c.optionalGroup === b.name ? {...c, optionalGroupReqCount: e.target.value} : c)
-                            }))} 
-                            className="w-24 bg-white border border-gray-200 py-1.5 px-3 rounded outline-none text-sm" 
-                          />
-                          <button 
-                            type="button"
-                            onClick={() => setMajorForm(f => ({
-                              ...f, 
-                              batches: f.batches.filter((_, idx) => idx !== i),
-                              courses: f.courses.map(c => c.optionalGroup === b.name ? {...c, optionalGroup: '', optionalGroupReqCount: '1'} : c)
-                            }))} 
-                            className="text-red-500 hover:text-red-700 p-1"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button onClick={() => setEventForm(e)} className="px-2 py-1 rounded transition text-xs font-semibold hover:bg-[var(--bg-subtle)]" style={{ color: 'var(--text-muted)' }}>Edit</button>
+                    <button onClick={() => handleDelete(`/api/admin/events/${e.id}`, e.title)} className="p-1.5 rounded transition hover:bg-red-500/10"><Trash2 className="w-4 h-4 text-red-400" /></button>
+                  </div>
+                </div>
+              ))}
+              {events.length === 0 && <div className="py-12 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No events scheduled.</div>}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
-                  <div className="flex flex-col gap-2">
-                    <span className="block text-xs font-semibold text-gray-500">Select Included Courses:</span>
-                    <div className="relative">
-                      <select 
-                        value="" 
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val) {
-                            const subjectNum = parseInt(val);
-                            if (!majorForm.courses.some(c => c.subjectId === subjectNum)) {
-                              setMajorForm(f => ({...f, courses: [...f.courses, {subjectId: subjectNum, optionalGroup: '', optionalGroupReqCount: '1'}]}));
-                            }
-                          }
-                        }}
-                        className="w-full bg-white border border-gray-200 py-2 px-3 rounded-lg text-sm outline-none"
-                      >
-                        <option value="">Search courses to include...</option>
-                        {subjects.map(subj => (
-                          <option key={subj.id} value={subj.id}>{subj.code} - {subj.name}</option>
-                        ))}
-                      </select>
-                    </div>
+  // ============================================================================
+  // TAB: SUBJECTS / COURSES & RESOURCES
+  // ============================================================================
+  const renderSubjects = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-2xl font-display font-bold" style={{ color: 'var(--text-main)' }}>Courses & Resources (المقررات والمصادر)</h3>
+        <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Manage university courses and attach multiple resources (Drive, WhatsApp, Exams, Summaries, PDFs)</p>
+      </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-gray-250 rounded-lg p-2.5 bg-gray-50">
-                      {subjects.map(subj => {
-                        const isSelected = majorForm.courses.some(c => c.subjectId === subj.id);
-                        return (
-                          <div key={subj.id} className="flex items-center text-xs">
-                            <label className="flex items-center gap-2 cursor-pointer select-none text-gray-700 truncate w-full">
-                              <input 
-                                type="checkbox" 
-                                checked={isSelected}
-                                onChange={(e) => {
-                                  if (e.target.checked) setMajorForm(f => ({...f, courses: [...f.courses, {subjectId: subj.id, optionalGroup: '', optionalGroupReqCount: '1'}]}));
-                                  else setMajorForm(f => ({...f, courses: f.courses.filter(c => c.subjectId !== subj.id)}));
-                                }}
-                              /> <span className="font-medium text-gray-900 shrink-0">{subj.code}</span> <span className="truncate">{subj.name}</span>
-                            </label>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        {/* Left Column: Add / Edit Course */}
+        <div className="space-y-4">
+          <div className="rounded-2xl p-5 border space-y-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>{subjectForm.id ? 'Edit Course' : 'Add New Course'}</h4>
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Course Code (رمز المادة)</label>
+                <input type="text" placeholder="e.g. CS101 or عال101" value={subjectForm.code} onChange={e => setSubjectForm(s => ({ ...s, code: e.target.value }))} className="py-2 px-3 rounded-xl text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Course Name (اسم المادة)</label>
+                <input type="text" placeholder="e.g. برمجة 1" value={subjectForm.name} onChange={e => setSubjectForm(s => ({ ...s, name: e.target.value }))} className="py-2 px-3 rounded-xl text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Credit Hours (الساعات)</label>
+                  <input type="number" placeholder="3" value={subjectForm.creditHours} onChange={e => setSubjectForm(s => ({ ...s, creditHours: e.target.value }))} className="py-2 px-3 rounded-xl text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Plan Level (المستوى)</label>
+                  <input type="number" placeholder="e.g. 1" value={subjectForm.level} onChange={e => setSubjectForm(s => ({ ...s, level: e.target.value }))} className="py-2 px-3 rounded-xl text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => {
+                    const url = subjectForm.id ? `/api/admin/subjects/${subjectForm.id}` : '/api/admin/subjects';
+                    const method = subjectForm.id ? 'PUT' : 'POST';
+                    handlePostWithMethod(url, method, subjectForm, () => setSubjectForm({ id: undefined, code: '', name: '', driveLink: '', whatsappLink: '', creditHours: '3', level: '' }));
+                  }}
+                  className="flex-1 bg-[var(--color-imamu-blue)] text-white py-2 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-blue-light)] transition"
+                >
+                  {subjectForm.id ? 'Update Course' : 'Add Course'}
+                </button>
+                {subjectForm.id && <button onClick={() => setSubjectForm({ id: undefined, code: '', name: '', driveLink: '', whatsappLink: '', creditHours: '3', level: '' })} className="px-3 py-2 border rounded-xl text-sm font-medium transition hover:bg-[var(--bg-subtle)]" style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}>Cancel</button>}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Courses & Resources List */}
+        <div className="lg:col-span-2">
+          <div className="rounded-2xl border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <div className="px-5 py-4 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3" style={{ borderColor: 'var(--border-color)' }}>
+              <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>Current Courses ({subjects.length})</h4>
+              <div className="flex items-center gap-2">
+                <input type="text" placeholder="Search courses..." value={subjectSearch} onChange={e => setSubjectSearch(e.target.value)} className="flex-1 sm:w-48 py-1.5 px-3 rounded-xl text-xs border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+                <select value={subjectLimit} onChange={e => setSubjectLimit(Number(e.target.value))} className="py-1.5 px-2.5 rounded-xl text-xs border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>
+                  <option value={10}>10</option><option value={20}>20</option><option value={50}>50</option><option value={100}>100</option><option value={1000}>All</option>
+                </select>
+                <button
+                  onClick={() => { if (confirm('Deduplicate courses? Keeps only the best per course code.')) handlePost('/api/admin/subjects/deduplicate', {}, () => toast('success', 'Duplicates removed!')); }}
+                  className="p-2 rounded-xl transition hover:bg-amber-500/10" title="Clean Duplicates"
+                >
+                  <Zap className="w-4 h-4 text-amber-500" />
+                </button>
+              </div>
+            </div>
+
+            <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
+              {subjects.filter(s => s.code?.toLowerCase().includes(subjectSearch.toLowerCase()) || s.name?.toLowerCase().includes(subjectSearch.toLowerCase())).slice(0, subjectLimit).map(s => {
+                const resList: any[] = s.resources || [];
+                const isExpanded = expandedCourseId === s.id;
+                return (
+                  <div key={s.id} className="transition" style={{ borderColor: 'var(--border-color)' }}>
+                    <div className="py-3 px-5 flex items-center justify-between group hover:bg-[var(--bg-subtle)]">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="font-mono text-xs px-2 py-0.5 rounded-md self-start border font-semibold shrink-0" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>{s.code}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm truncate" style={{ color: 'var(--text-main)' }}>{s.name}</div>
+                          <div className="flex items-center gap-2 mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                            <span>{s.creditHours || 3} Hours</span>
+                            <span>•</span>
+                            <span>Level {s.level || 1}</span>
+                            <span className="font-semibold text-blue-500 bg-blue-500/10 px-2 py-0.2 rounded-full">
+                              {resList.length} {resList.length === 1 ? 'Resource' : 'Resources'}
+                            </span>
                           </div>
-                        );
-                      })}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => {
+                            setExpandedCourseId(isExpanded ? null : s.id);
+                            setResourceForm({ title: '', type: 'drive', url: '', description: '' });
+                          }}
+                          className={`px-3 py-1 rounded-xl text-xs font-semibold border transition flex items-center gap-1 ${isExpanded ? 'bg-blue-600 text-white border-blue-600' : 'hover:bg-[var(--bg-subtle)]'}`}
+                          style={!isExpanded ? { borderColor: 'var(--border-color)', color: 'var(--text-main)' } : undefined}
+                        >
+                          <Folder className="w-3.5 h-3.5" />
+                          <span>{isExpanded ? 'Close Resources' : 'Manage Resources'}</span>
+                        </button>
+                        <button onClick={() => setSubjectForm({ id: s.id, code: s.code || '', name: s.name || '', driveLink: s.driveLink || '', whatsappLink: s.whatsappLink || '', creditHours: s.creditHours?.toString() || '3', level: s.level?.toString() || '' })} className="px-2 py-1 rounded transition text-xs font-semibold hover:bg-[var(--bg-subtle)]" style={{ color: 'var(--text-muted)' }}>Edit</button>
+                        <button onClick={() => handleDelete(`/api/admin/subjects/${s.id}`, s.name)} className="p-1.5 rounded transition hover:bg-red-500/10"><Trash2 className="w-4 h-4 text-red-400" /></button>
+                      </div>
                     </div>
 
-                    {majorForm.courses.length > 0 && (
-                      <div className="mt-6 border-t border-gray-150 pt-4">
-                        <span className="block text-xs font-semibold text-gray-500 mb-2">Drag & Drop Courses into Batches/Levels:</span>
-                        <div className="flex gap-4 overflow-x-auto pb-4 items-start">
-                          {[{ name: '', title: 'Unassigned (Default)' }, ...majorForm.batches.map(b => ({ name: b.name, title: b.name }))].map(batch => (
-                            <div 
-                              key={batch.name || 'unassigned'}
-                              className="flex-shrink-0 w-60 bg-gray-50/50 border border-gray-200 rounded-xl p-3 flex flex-col min-h-[120px] max-h-[40vh] h-[450px]"
-                              onDragOver={(e) => e.preventDefault()}
-                              onDrop={(e) => {
-                                e.preventDefault();
-                                if (draggedSubjectId) {
-                                  const newBatch = majorForm.batches.find(b => b.name === batch.name);
-                                  setMajorForm(f => ({
-                                    ...f,
-                                    courses: f.courses.map(c => c.subjectId === draggedSubjectId ? {...c, optionalGroup: batch.name, optionalGroupReqCount: newBatch ? newBatch.reqCount : '1'} : c)
-                                  }));
-                                  setDraggedSubjectId(null);
-                                }
-                              }}
-                            >
-                              <h4 className="font-semibold text-gray-700 text-xs border-b border-gray-200 pb-2 mb-2 flex justify-between items-center shrink-0">
-                                <span className="truncate max-w-[120px]">{batch.title}</span>
-                                {batch.name && <span className="bg-purple-100 text-purple-800 text-[10px] px-1.5 py-0.5 rounded-full shrink-0">{majorForm.batches.find(b=>b.name===batch.name)?.reqCount} Req</span>}
-                              </h4>
-                              
-                              {!batch.name && (
-                                <input 
-                                  type="text" 
-                                  placeholder="Search..." 
-                                  value={unassignedSearch}
-                                  onChange={(e) => setUnassignedSearch(e.target.value)}
-                                  className="mb-2 w-full bg-white border border-gray-200 py-1 px-2 rounded text-xs outline-none shrink-0"
-                                />
-                              )}
+                    {/* Expandable Resources Drawer for this Course */}
+                    {isExpanded && (
+                      <div className="p-4 bg-[var(--bg-subtle)] border-t space-y-4" style={{ borderColor: 'var(--border-color)' }}>
+                        <div className="flex items-center justify-between">
+                          <h5 className="text-xs font-bold uppercase tracking-wider text-blue-500 flex items-center gap-1.5">
+                            <BookOpen className="w-4 h-4" /> Dedicated Resources for {s.code} ({resList.length})
+                          </h5>
+                          {resourceForm.id && (
+                            <button onClick={() => setResourceForm({ title: '', type: 'drive', url: '', description: '' })} className="text-xs text-amber-500 hover:underline font-medium">
+                              Cancel Edit
+                            </button>
+                          )}
+                        </div>
 
-                              <div className="flex flex-col gap-1.5 overflow-y-auto flex-1 pr-1 pb-2">
-                                {majorForm.courses.filter(c => {
-                                  if ((c.optionalGroup || '') !== batch.name) return false;
-                                  if (!batch.name && unassignedSearch) {
-                                    const subj = subjects.find(s => s.id === c.subjectId);
-                                    if (!subj) return false;
-                                    const term = unassignedSearch.toLowerCase();
-                                    return subj.name.toLowerCase().includes(term) || subj.code.toLowerCase().includes(term);
-                                  }
-                                  return true;
-                                }).map(c => {
-                                  const subj = subjects.find(s => s.id === c.subjectId);
-                                  if (!subj) return null;
-                                  return (
-                                    <div 
-                                      key={c.subjectId}
-                                      draggable
-                                      onDragStart={(e) => {
-                                        setDraggedSubjectId(c.subjectId);
-                                        e.dataTransfer.setData('text/plain', c.subjectId.toString());
-                                      }}
-                                      className="bg-white border border-gray-200 p-2 rounded shadow-sm text-xs cursor-grab active:cursor-grabbing hover:border-[var(--color-imamu-blue)] transition shrink-0"
-                                    >
-                                      <div className="font-semibold text-gray-900">{subj.code}</div>
-                                      <div className="text-gray-500 text-[10px] mt-0.5 truncate">{subj.name}</div>
-                                    </div>
-                                  )
-                                })}
-                                {majorForm.courses.filter(c => (c.optionalGroup || '') === batch.name).length === 0 && (
-                                  <div className="text-gray-400 text-[10px] italic flex-1 flex items-center justify-center border border-dashed border-gray-200 rounded-lg min-h-[60px]">Drop here</div>
-                                )}
+                        {/* Resource Creation/Edition Form */}
+                        <div className="p-3 rounded-xl border bg-[var(--bg-card)] space-y-3" style={{ borderColor: 'var(--border-color)' }}>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <input
+                              type="text"
+                              placeholder="Resource Title (e.g. مجلد التجميعات)"
+                              value={resourceForm.title}
+                              onChange={e => setResourceForm(f => ({ ...f, title: e.target.value }))}
+                              className="py-1.5 px-3 rounded-lg text-xs border"
+                              style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
+                            />
+                            <select
+                              value={resourceForm.type}
+                              onChange={e => setResourceForm(f => ({ ...f, type: e.target.value }))}
+                              className="py-1.5 px-3 rounded-lg text-xs border"
+                              style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
+                            >
+                              <option value="drive">Drive Folder (مجلد درايف)</option>
+                              <option value="whatsapp">WhatsApp Group (جروب واتساب)</option>
+                              <option value="telegram">Telegram Group (قناة تلجرام)</option>
+                              <option value="exam">Past Exam (اختبارات سابقة)</option>
+                              <option value="summary">Summary (ملخصات ودراسات)</option>
+                              <option value="pdf">PDF File (ملف)</option>
+                              <option value="link">Other Link (رابط خارجي)</option>
+                            </select>
+                            <input
+                              type="text"
+                              placeholder="URL (https://...)"
+                              value={resourceForm.url}
+                              onChange={e => setResourceForm(f => ({ ...f, url: e.target.value }))}
+                              className="py-1.5 px-3 rounded-lg text-xs border"
+                              style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              placeholder="Description (Optional)"
+                              value={resourceForm.description}
+                              onChange={e => setResourceForm(f => ({ ...f, description: e.target.value }))}
+                              className="flex-1 py-1.5 px-3 rounded-lg text-xs border"
+                              style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
+                            />
+                            <button
+                              onClick={() => {
+                                if (!resourceForm.title || !resourceForm.url) return toast('warning', 'Title & URL are required');
+                                const url = resourceForm.id ? `/api/admin/resources/${resourceForm.id}` : `/api/admin/courses/${s.id}/resources`;
+                                const method = resourceForm.id ? 'PUT' : 'POST';
+                                handlePostWithMethod(url, method, resourceForm, () => {
+                                  setResourceForm({ title: '', type: 'drive', url: '', description: '' });
+                                  toast('success', resourceForm.id ? 'Resource updated' : 'Resource added');
+                                });
+                              }}
+                              className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-xs font-semibold hover:bg-blue-700 transition"
+                            >
+                              {resourceForm.id ? 'Update Resource' : '+ Add Resource'}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* List of Attached Resources */}
+                        <div className="space-y-2">
+                          {resList.map((res: any) => (
+                            <div key={res.id} className="p-2.5 rounded-xl border flex items-center justify-between gap-3 bg-[var(--bg-card)] text-xs" style={{ borderColor: 'var(--border-color)' }}>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold" style={{ color: 'var(--text-main)' }}>{res.title}</span>
+                                  <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">{res.type}</span>
+                                </div>
+                                <a href={res.url} target="_blank" rel="noreferrer" className="text-[11px] text-blue-400 hover:underline truncate block mt-0.5">
+                                  {res.url}
+                                </a>
+                                {res.description && <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{res.description}</p>}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => setResourceForm({ id: res.id, subjectId: s.id, title: res.title || '', type: res.type || 'drive', url: res.url || '', description: res.description || '' })}
+                                  className="px-2 py-1 rounded text-[11px] font-medium hover:bg-[var(--bg-subtle)]"
+                                  style={{ color: 'var(--text-muted)' }}
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(`/api/admin/resources/${res.id}`, res.title)}
+                                  className="p-1 rounded text-red-400 hover:bg-red-500/10"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
                               </div>
                             </div>
                           ))}
+
+                          {resList.length === 0 && (
+                            <div className="text-center py-4 text-xs italic" style={{ color: 'var(--text-muted)' }}>
+                              No resources added for this course yet. Use the form above to attach Drive links, WhatsApp groups, PDFs or exams.
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
                   </div>
-                </div>
+                );
+              })}
+              {subjects.length === 0 && <div className="py-12 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No courses added yet.</div>}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ============================================================================
+  // TAB: NEWBIE LINKS
+  // ============================================================================
+  const renderNewbieLinks = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-2xl font-display font-bold" style={{ color: 'var(--text-main)' }}>Newbie Links</h3>
+        <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Manage orientation links for new students</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <div>
+          <div className="rounded-2xl p-5 border space-y-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>{newbieLinkForm.id ? 'Edit Link' : 'Add New Link'}</h4>
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Title</label>
+                <input type="text" placeholder="e.g. Student Portal" value={newbieLinkForm.title} onChange={e => setNewbieLinkForm(s => ({ ...s, title: e.target.value }))} className="py-2 px-3 rounded-xl text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>URL</label>
+                <input type="text" placeholder="https://..." value={newbieLinkForm.url} onChange={e => setNewbieLinkForm(s => ({ ...s, url: e.target.value }))} className="py-2 px-3 rounded-xl text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Description</label>
+                <textarea placeholder="Brief description..." value={newbieLinkForm.description} onChange={e => setNewbieLinkForm(s => ({ ...s, description: e.target.value }))} className="py-2 px-3 rounded-xl min-h-[60px] text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => {
+                    const url = newbieLinkForm.id ? `/api/admin/newbie/links/${newbieLinkForm.id}` : '/api/admin/newbie/links';
+                    const method = newbieLinkForm.id ? 'PUT' : 'POST';
+                    handlePostWithMethod(url, method, newbieLinkForm, () => setNewbieLinkForm({ id: undefined, title: '', url: '', description: '' }));
+                  }}
+                  className="flex-1 bg-[var(--color-imamu-blue)] text-white py-2 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-blue-light)] transition"
+                >
+                  {newbieLinkForm.id ? 'Update Link' : 'Add Link'}
+                </button>
+                {newbieLinkForm.id && <button onClick={() => setNewbieLinkForm({ id: undefined, title: '', url: '', description: '' })} className="px-3 py-2 border rounded-xl text-sm font-medium transition hover:bg-[var(--bg-subtle)]" style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}>Cancel</button>}
               </div>
             </div>
           </div>
-        );
+        </div>
 
-      case 'events':
-        return (
-          <div className="space-y-8">
-            <div className="border-b border-gray-150 pb-5">
-              <h3 className="text-xl font-display font-semibold text-gray-900 mb-1">Calendar Dates</h3>
-              <p className="text-sm text-gray-500">Manage academic dates, events, subscriptions, and allowances</p>
+        <div className="lg:col-span-2">
+          <div className="rounded-2xl border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border-color)' }}>
+              <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>Current Links ({newbieLinks.length})</h4>
             </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-              {/* Left Column: Subscriptions, Mokafaa Generator & Form (1/3) */}
-              <div className="lg:col-span-1 space-y-6">
-                <div className="bg-white border border-gray-200 p-5 rounded-2xl shadow-sm space-y-4">
-                  <h4 className="font-semibold text-gray-900 text-sm">{eventForm.id ? "Edit Calendar Event" : "Add Calendar Event"}</h4>
-                  <div className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-gray-500 font-medium">Event Title</label>
-                      <input 
-                        type="text" placeholder="e.g. Final Exams Begin" 
-                        value={eventForm.title} onChange={e=>setEventForm(s=>({...s,title:e.target.value}))} 
-                        className="bg-white border border-gray-200 py-2 px-3 rounded-lg outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-sm" 
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-gray-500 font-medium">Event Date</label>
-                      <input 
-                        type="date" 
-                        value={eventForm.date} onChange={e=>setEventForm(s=>({...s,date:e.target.value}))} 
-                        className="bg-white border border-gray-200 py-2 px-3 rounded-lg outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-sm" 
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-gray-500 font-medium">Event Description</label>
-                      <textarea 
-                        placeholder="Event Description (optional)" 
-                        value={eventForm.description} onChange={e=>setEventForm(s=>({...s,description:e.target.value}))} 
-                        className="bg-white border border-gray-200 py-2 px-3 rounded-lg outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] min-h-[80px] text-sm" 
-                      />
-                    </div>
-                    
-                    <div className="flex gap-2 pt-2">
-                      <button 
-                        onClick={() => {
-                          const url = eventForm.id ? `/api/admin/events/${eventForm.id}` : '/api/admin/events';
-                          const method = eventForm.id ? 'PUT' : 'POST';
-                          handlePostWithMethod(url, method, eventForm, () => setEventForm({id:undefined, title:'', date:'', description:''}))
-                        }}
-                        className="flex-1 bg-[var(--color-imamu-blue)] text-white py-2 rounded-lg font-medium hover:bg-[var(--color-imamu-blue-light)] transition text-sm"
-                      >
-                        {eventForm.id ? "Update Event" : "Add Event"}
-                      </button>
-                      {eventForm.id && (
-                        <button onClick={() => setEventForm({id:undefined, title:'', date:'', description:''})} className="px-3 py-2 border border-gray-250 text-gray-500 hover:text-gray-900 rounded-lg transition text-sm font-medium">Cancel</button>
-                      )}
-                    </div>
+            <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
+              {newbieLinks.map((link: any) => (
+                <div key={link.id} className="py-3.5 px-5 flex items-center justify-between group transition hover:bg-[var(--bg-subtle)]">
+                  <div className="min-w-0 flex-1 pr-3">
+                    <div className="font-medium text-sm" style={{ color: 'var(--text-main)' }}>{link.title}</div>
+                    <a href={link.url} target="_blank" rel="noreferrer" className="text-xs text-[var(--color-imamu-blue)] hover:underline flex items-center gap-1 mt-0.5">
+                      <ExternalLink className="w-3 h-3" /> {link.url?.length > 50 ? link.url.slice(0, 50) + '...' : link.url}
+                    </a>
+                    {link.description && <p className="text-xs mt-1 truncate" style={{ color: 'var(--text-muted)' }}>{link.description}</p>}
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button onClick={() => setNewbieLinkForm({ id: link.id, title: link.title || '', url: link.url || '', description: link.description || '' })} className="px-2 py-1 rounded transition text-xs font-semibold hover:bg-[var(--bg-subtle)]" style={{ color: 'var(--text-muted)' }}>Edit</button>
+                    <button onClick={() => handleDelete(`/api/admin/newbie/links/${link.id}`, link.title)} className="p-1.5 rounded transition hover:bg-red-500/10"><Trash2 className="w-4 h-4 text-red-400" /></button>
                   </div>
                 </div>
+              ))}
+              {newbieLinks.length === 0 && <div className="py-12 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No links added yet.</div>}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
-                <div className="bg-[rgba(11,50,96,0.02)] p-4 rounded-2xl border border-[rgba(11,50,96,0.08)] space-y-3">
-                  <div>
-                    <h4 className="font-semibold text-gray-950 text-xs">Calendar Feed Subscriptions</h4>
-                    <p className="text-[11px] text-gray-500 mt-0.5">Users can sync this calendar directly using the ICS format.</p>
-                  </div>
-                  <a href="/api/calendar.ics" download className="flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 font-medium py-1.5 rounded-lg hover:bg-gray-50 transition shadow-sm text-xs w-full">
-                    <Download className="w-3.5 h-3.5" /> Download .ics Feed
-                  </a>
-                </div>
+  // ============================================================================
+  // TAB: SETTINGS
+  // ============================================================================
+  const renderSettings = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-2xl font-display font-bold" style={{ color: 'var(--text-main)' }}>Global Settings</h3>
+        <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Configure database backups, schedules, and mailing setups</p>
+      </div>
 
-                <div className="bg-emerald-50/40 p-4 rounded-2xl border border-emerald-100/60 space-y-3">
-                  <div>
-                    <h4 className="font-semibold text-emerald-950 text-xs">Mokafaa Allowance Scheduler</h4>
-                    <p className="text-[11px] text-emerald-700 mt-0.5">Batch-generates student allowance dates on the 25th of every month for the next 12 months.</p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      handlePost('/api/admin/events/generate-mokafaa', {}, () => {
-                        alert('Generated 12 Mokafaa events successfully!');
-                        fetchData();
-                      });
-                    }}
-                    className="flex items-center justify-center gap-2 bg-emerald-600 text-white font-medium py-1.5 rounded-lg hover:bg-emerald-700 transition shadow-sm text-xs w-full"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" /> Generate Mokafaa Dates
-                  </button>
-                </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <div className="space-y-4">
+          <div className="rounded-2xl p-5 border space-y-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>Database Utilities</h4>
+            <div className="flex flex-col gap-3">
+              <label className="bg-[var(--color-imamu-blue)] text-white px-4 py-2 rounded-xl font-medium flex items-center justify-center gap-2 cursor-pointer text-sm hover:bg-[var(--color-imamu-blue-light)] transition w-full">
+                <Upload className="w-4 h-4" /> Import Database
+                <input type="file" accept=".json,.zip" className="hidden" onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (!window.confirm('WARNING: This will overwrite the current database. Are you sure?')) return;
+                  try {
+                    const t = await getToken();
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    const res = await fetch('/api/admin/import-db', { method: 'POST', headers: { Authorization: `Bearer ${t}` }, body: formData });
+                    if (!res.ok) throw new Error('Failed');
+                    toast('success', 'Database imported! Reloading...');
+                    setTimeout(() => window.location.reload(), 1000);
+                  } catch { toast('error', 'Error importing database'); }
+                  e.target.value = '';
+                }} />
+              </label>
+              <button
+                onClick={async () => {
+                  try {
+                    const t = await getToken();
+                    const res = await fetch('/api/admin/export-db', { headers: { Authorization: `Bearer ${t}` } });
+                    if (!res.ok) throw new Error('Failed');
+                    const blob = await res.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `imamu_backup_${new Date().toISOString().split('T')[0]}.zip`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    toast('success', 'Database exported successfully');
+                  } catch { toast('error', 'Error exporting database'); }
+                }}
+                className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-medium flex items-center justify-center gap-2 text-sm hover:bg-emerald-700 transition w-full"
+              >
+                <Download className="w-4 h-4" /> Export Database
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-2xl p-5 border space-y-3" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>Semester Countdowns</h4>
+            <div className="space-y-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Semester Start Date</label>
+                <input type="date" value={globalSettings.semesterStartDate || ''} onChange={e => setGlobalSettings((s: any) => ({ ...s, semesterStartDate: e.target.value }))} className="py-2 px-3 rounded-xl text-sm border w-full" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
               </div>
-
-              {/* Right Column: AI Importer & Listings (2/3) */}
-              <div className="lg:col-span-2 space-y-6">
-                <AiImporter prompt="Extract a list of academic calendar events. Find title, date (YYYY-MM-DD), and description." type="events" onParsed={(data) => handleAiParsed('events', data)} />
-                
-                <div className="bg-white border border-gray-200 p-5 rounded-2xl shadow-sm space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
-                    <h4 className="font-bold text-gray-900 text-sm">Upcoming Events ({events.length})</h4>
-                    <input
-                      type="text"
-                      placeholder="Search events..."
-                      value={eventSearch}
-                      onChange={(e) => setEventSearch(e.target.value)}
-                      className="bg-white border border-gray-200 py-1.5 px-3 rounded-lg text-xs outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] w-full sm:w-48"
-                    />
-                  </div>
-
-                  <div className="divide-y divide-gray-100">
-                    {events
-                      .filter(e => e.title?.toLowerCase().includes(eventSearch.toLowerCase()) || e.description?.toLowerCase().includes(eventSearch.toLowerCase()))
-                      .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                      .slice(0, eventLimit)
-                      .map(e => (
-                      <div key={e.id} className="py-3.5 flex items-center justify-between group">
-                        <div className="min-w-0 flex-1 pr-3">
-                          <div className="font-medium text-gray-900 text-sm truncate">{e.title}</div>
-                          <div className="text-xs text-gray-500 mt-1 flex gap-2 flex-wrap">
-                            <span className="font-semibold text-[var(--color-imamu-blue)]">{format(new Date(e.date), 'MMM dd, yyyy')}</span>
-                            {e.description && (
-                              <>
-                                <span className="text-gray-300">•</span>
-                                <span className="truncate">{e.description}</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <button onClick={() => setEventForm(e)} className="px-2 py-1 text-zinc-400 hover:text-[var(--color-imamu-blue)] hover:bg-zinc-800/40 rounded transition text-xs font-semibold">Edit</button>
-                          <button 
-                            onClick={() => handleDelete(`/api/admin/events/${e.id}`, e.title)}
-                            className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-zinc-900/40 rounded transition"
-                          >
-                            <Trash2 className="w-4.5 h-4.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    {events.length === 0 && <div className="py-8 text-center text-gray-400 text-sm">No events scheduled.</div>}
-                  </div>
-                </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Semester End Date</label>
+                <input type="date" value={globalSettings.semesterEndDate || ''} onChange={e => setGlobalSettings((s: any) => ({ ...s, semesterEndDate: e.target.value }))} className="py-2 px-3 rounded-xl text-sm border w-full" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
               </div>
             </div>
           </div>
-        );
 
-      case 'subjects':
-        return (
-          <div className="space-y-8">
-            <div className="border-b border-gray-150 pb-5">
-              <h3 className="text-xl font-display font-semibold text-gray-900 mb-1">Course Resources</h3>
-              <p className="text-sm text-gray-500">Manage university subjects, syllabus levels, and community groups</p>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-              {/* Left Column: Form (1/3) */}
-              <div className="lg:col-span-1 space-y-6">
-                <div className="bg-white border border-gray-200 p-5 rounded-2xl shadow-sm space-y-4">
-                  <h4 className="font-semibold text-gray-900 text-sm">{subjectForm.id ? "Edit Course Resource" : "Add Course Resource"}</h4>
-                  <div className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-gray-500 font-medium">Course Code</label>
-                      <input type="text" placeholder="e.g. CS101" value={subjectForm.code} onChange={e=>setSubjectForm(s=>({...s,code:e.target.value}))} className="bg-white border border-gray-200 py-2 px-3 rounded-lg outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-sm" />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-gray-500 font-medium">Course Name</label>
-                      <input type="text" placeholder="e.g. Intro to CS" value={subjectForm.name} onChange={e=>setSubjectForm(s=>({...s,name:e.target.value}))} className="bg-white border border-gray-200 py-2 px-3 rounded-lg outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-sm" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-xs text-gray-500 font-medium">Credit Hours</label>
-                        <input type="number" placeholder="3" value={subjectForm.creditHours} onChange={e=>setSubjectForm(s=>({...s,creditHours:e.target.value}))} className="bg-white border border-gray-200 py-2 px-3 rounded-lg outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-sm" />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-xs text-gray-500 font-medium">Plan Level</label>
-                        <input type="number" placeholder="e.g. 1" value={subjectForm.level} onChange={e=>setSubjectForm(s=>({...s,level:e.target.value}))} className="bg-white border border-gray-200 py-2 px-3 rounded-lg outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-sm" />
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-gray-500 font-medium">Drive Link</label>
-                      <input type="text" placeholder="https://drive.google.com/..." value={subjectForm.driveLink} onChange={e=>setSubjectForm(s=>({...s,driveLink:e.target.value}))} className="bg-white border border-gray-200 py-2 px-3 rounded-lg outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-sm" />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-gray-500 font-medium">WhatsApp Link</label>
-                      <input type="text" placeholder="https://chat.whatsapp.com/..." value={subjectForm.whatsappLink} onChange={e=>setSubjectForm(s=>({...s,whatsappLink:e.target.value}))} className="bg-white border border-gray-200 py-2 px-3 rounded-lg outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-sm" />
-                    </div>
-                    
-                    <div className="flex gap-2 pt-2">
-                      <button 
-                        onClick={()=>{
-                          const url = subjectForm.id ? `/api/admin/subjects/${subjectForm.id}` : '/api/admin/subjects';
-                          const method = subjectForm.id ? 'PUT' : 'POST';
-                          return handlePostWithMethod(url, method, subjectForm, () => setSubjectForm({id:undefined, code:'',name:'',driveLink:'',whatsappLink:'', creditHours:'3', level:''}));
-                        }} 
-                        className="flex-1 bg-[var(--color-imamu-blue)] text-white py-2 rounded-lg font-medium hover:bg-[var(--color-imamu-blue-light)] transition text-sm"
-                      >
-                        {subjectForm.id ? "Update Subject" : "Add Subject"}
-                      </button>
-                      {subjectForm.id && (
-                        <button onClick={() => setSubjectForm({id:undefined, code:'',name:'',driveLink:'',whatsappLink:'', creditHours:'3', level:''})} className="px-3 py-2 border border-gray-250 text-gray-500 hover:text-gray-900 rounded-lg transition text-sm font-medium">Cancel</button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Column: AI Importer & Listings (2/3) */}
-              <div className="lg:col-span-2 space-y-6">
-                <AiImporter prompt="Extract a list of university courses from the provided text. Include course code (e.g., CS101 or تال١٣٨٤), name, and credit hours. Make sure to carefully process right-to-left Arabic course codes like تال١٣٨٤ and try to infer their names if omitted or separate them correctly from the grid structure." type="subjects" onParsed={(data) => handleAiParsed('subjects', data)} />
-                
-                <div className="bg-white border border-gray-200 p-5 rounded-2xl shadow-sm space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
-                    <h4 className="font-bold text-gray-900 text-sm">Current Subjects ({subjects.length})</h4>
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
-                      <input
-                        type="text"
-                        placeholder="Search subjects..."
-                        value={subjectSearch}
-                        onChange={(e) => setSubjectSearch(e.target.value)}
-                        className="flex-1 sm:w-48 bg-white border border-gray-200 py-1.5 px-3 rounded-lg text-xs outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)]"
-                      />
-                      <select
-                        value={subjectLimit}
-                        onChange={(e) => setSubjectLimit(Number(e.target.value))}
-                        className="bg-white border border-gray-200 py-1.5 px-2.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)]"
-                      >
-                        <option value={10}>10</option>
-                        <option value={20}>20</option>
-                        <option value={50}>50</option>
-                        <option value={100}>100</option>
-                        <option value={1000}>All</option>
-                      </select>
-                      <button
-                        onClick={() => {
-                          if(confirm("Are you sure you want to deduplicate subjects? This will keep only the best one per course code.")) {
-                            handlePost('/api/admin/subjects/deduplicate', {}, () => alert('Duplicates removed!'));
-                          }
-                        }}
-                        className="p-2 bg-orange-50 text-orange-600 hover:bg-orange-100 rounded-lg font-medium transition flex items-center justify-center"
-                        title="Clean Duplicates"
-                      >
-                        <Sparkles className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="divide-y divide-zinc-800">
-                    {subjects
-                      .filter(s => s.code?.toLowerCase().includes(subjectSearch.toLowerCase()) || s.name?.toLowerCase().includes(subjectSearch.toLowerCase()))
-                      .slice(0, subjectLimit)
-                      .map(s => (
-                      <div key={s.id} className="py-3 flex items-center justify-between group">
-                        <div className="flex gap-3">
-                          <div className="font-mono text-xs bg-zinc-950 border border-zinc-800 px-2 py-0.5 rounded-md text-zinc-300 self-start">{s.code}</div>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-zinc-100 text-sm truncate max-w-[280px]">
-                              {s.name}
-                            </div>
-                            <div className="flex gap-3 mt-1.5">
-                              {s.driveLink && <a href={s.driveLink} target="_blank" rel="noreferrer" className="text-[10px] text-blue-400 font-medium hover:underline flex items-center gap-1"><LinkIcon className="w-2.5 h-2.5"/> Drive</a>}
-                              {s.whatsappLink && <a href={s.whatsappLink} target="_blank" rel="noreferrer" className="text-[10px] text-green-500 hover:underline flex items-center gap-1"><LinkIcon className="w-2.5 h-2.5"/> WhatsApp</a>}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <button onClick={() => setSubjectForm({
-                            id: s.id,
-                            code: s.code || '',
-                            name: s.name || '',
-                            driveLink: s.driveLink || '',
-                            whatsappLink: s.whatsappLink || '',
-                            creditHours: s.creditHours ? s.creditHours.toString() : '3',
-                            level: s.level ? s.level.toString() : ''
-                          })} className="px-2 py-1 text-zinc-400 hover:text-blue-450 hover:bg-zinc-800/40 rounded transition text-xs font-semibold">Edit</button>
-                          <button onClick={() => handleDelete(`/api/admin/subjects/${s.id}`)} className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-zinc-900/40 rounded transition"><Trash2 className="w-4.5 h-4.5" /></button>
-                        </div>
-                      </div>
-                    ))}
-                    {subjects.length === 0 && <div className="py-8 text-center text-gray-400 text-sm">No subjects added yet.</div>}
-                  </div>
-                </div>
-              </div>
+          <div className="rounded-2xl p-5 border space-y-3" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>External API Settings</h4>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>API Endpoint Token</label>
+              <input type="text" value={globalSettings.apiToken || ''} onChange={e => setGlobalSettings((s: any) => ({ ...s, apiToken: e.target.value }))} placeholder="super_secret_token_123" className="py-2 px-3 rounded-xl text-sm border w-full" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
             </div>
           </div>
-        );
-      case 'settings':
-        return (
-          <div className="space-y-8">
-            <div className="border-b border-gray-150 pb-5">
-              <h3 className="text-xl font-display font-semibold text-gray-900 mb-1">Global Settings</h3>
-              <p className="text-sm text-gray-500">Configure global application database backups, schedules, and mailing setups</p>
+        </div>
+
+        <div className="lg:col-span-2 space-y-4">
+          <div className="rounded-2xl p-6 border space-y-6" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <div>
+              <h4 className="font-semibold text-sm mb-1" style={{ color: 'var(--text-main)' }}>IMAP Configuration (Direct Email Auth)</h4>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Enable students to log in directly via university credentials.</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-b pb-5" style={{ borderColor: 'var(--border-color)' }}>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>IMAP Host</label>
+                <input type="text" value={globalSettings.imapHost || ''} onChange={e => setGlobalSettings((s: any) => ({ ...s, imapHost: e.target.value }))} placeholder="outlook.office365.com" className="py-2 px-3 rounded-xl text-sm border w-full" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>IMAP Port</label>
+                <input type="number" value={globalSettings.imapPort || ''} onChange={e => setGlobalSettings((s: any) => ({ ...s, imapPort: parseInt(e.target.value) || undefined }))} placeholder="993" className="py-2 px-3 rounded-xl text-sm border w-full" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+              </div>
+              <div className="flex flex-col justify-end pb-2">
+                <label className="flex items-center gap-2 cursor-pointer text-xs" style={{ color: 'var(--text-muted)' }}>
+                  <input type="checkbox" checked={globalSettings.imapSecure !== false} onChange={e => setGlobalSettings((s: any) => ({ ...s, imapSecure: e.target.checked }))} className="rounded" />
+                  <span>Use Secure TLS</span>
+                </label>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-              {/* Left Column: Database backup, API token, Semester countdowns (1/3) */}
-              <div className="lg:col-span-1 space-y-6">
-                <div className="bg-white border border-gray-200 p-5 rounded-2xl shadow-sm space-y-4">
-                  <h4 className="font-semibold text-gray-900 text-sm">Database Utilities</h4>
-                  <div className="flex flex-col gap-3">
-                    <label className="bg-[var(--color-imamu-blue)] text-white px-4 py-2 rounded-lg font-medium hover:bg-[var(--color-imamu-blue-light)] transition flex items-center justify-center gap-2 cursor-pointer text-sm shadow-sm w-full">
-                      <Upload className="w-4 h-4" /> Import Database
-                      <input
-                        type="file"
-                        accept=".json"
-                        className="hidden"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          if (!window.confirm('WARNING: This will overwrite the current database. Are you sure?')) return;
-                          
-                          try {
-                            const token = await user?.getIdToken();
-                            const fileContent = await file.text();
-                            const payload = JSON.parse(fileContent);
-                            
-                            const res = await fetch('/api/admin/import-db', {
-                              method: 'POST',
-                              headers: { 
-                                Authorization: `Bearer ${token}`,
-                                'Content-Type': 'application/json'
-                              },
-                              body: JSON.stringify(payload.data || payload)
-                            });
-                            
-                            if (!res.ok) throw new Error('Failed to import DB');
-                            alert('Database imported successfully! Please reload the page.');
-                            window.location.reload();
-                          } catch(err) {
-                            alert('Error importing database. Invalid file or server error.');
-                            console.error(err);
-                          }
-                          e.target.value = ''; // Reset file input
-                        }}
-                      />
-                    </label>
-
-                    <button
-                      onClick={async () => {
-                        try {
-                          const token = await user?.getIdToken();
-                          const res = await fetch('/api/admin/export-db', {
-                            headers: { Authorization: `Bearer ${token}` }
-                          });
-                          if (!res.ok) throw new Error('Failed to export DB');
-                          const blob = await res.blob();
-                          const url = window.URL.createObjectURL(blob);
-                          const a = document.createElement('a');
-                          a.href = url;
-                          a.download = `imamu_db_export_${new Date().toISOString().split('T')[0]}.json`;
-                          document.body.appendChild(a);
-                          a.click();
-                          window.URL.revokeObjectURL(url);
-                          document.body.removeChild(a);
-                        } catch(e) {
-                          alert('Error exporting database');
-                        }
-                      }}
-                      className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-emerald-700 transition flex items-center justify-center gap-2 text-sm shadow-sm w-full"
-                    >
-                      <Download className="w-4 h-4" /> Export Database
-                    </button>
-                  </div>
-                </div>
-
-                <div className="bg-white border border-gray-200 p-5 rounded-2xl shadow-sm space-y-4">
-                  <h4 className="font-semibold text-gray-900 text-sm">Semester Countdowns</h4>
-                  <div className="space-y-3">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-gray-500 font-medium">Semester Start Date</label>
-                      <input 
-                        type="date"
-                        value={globalSettings.semesterStartDate || ''}
-                        onChange={e => setGlobalSettings(s => ({...s, semesterStartDate: e.target.value}))}
-                        className="bg-white border border-gray-200 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-sm"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-gray-500 font-medium">Semester End Date</label>
-                      <input 
-                        type="date"
-                        value={globalSettings.semesterEndDate || ''}
-                        onChange={e => setGlobalSettings(s => ({...s, semesterEndDate: e.target.value}))}
-                        className="bg-white border border-gray-200 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-sm"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white border border-gray-200 p-5 rounded-2xl shadow-sm space-y-4">
-                  <h4 className="font-semibold text-gray-900 text-sm">External API Settings</h4>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs text-gray-500 font-medium">API Endpoint Token</label>
-                    <input 
-                      type="text"
-                      value={globalSettings.apiToken || ''}
-                      onChange={e => setGlobalSettings(s => ({...s, apiToken: e.target.value}))}
-                      placeholder="super_secret_token_123"
-                      className="bg-white border border-gray-200 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-sm"
-                    />
-                  </div>
-                </div>
+            <div>
+              <h4 className="font-semibold text-sm mb-1" style={{ color: 'var(--text-main)' }}>SMTP Configuration (Verification Mails)</h4>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Required for email verifications and passcodes.</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>SMTP Host</label>
+                <input type="text" value={globalSettings.smtpHost || ''} onChange={e => setGlobalSettings((s: any) => ({ ...s, smtpHost: e.target.value }))} placeholder="smtp.gmail.com" className="py-2 px-3 rounded-xl text-sm border w-full" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
               </div>
-
-              {/* Right Column: IMAP & SMTP Server configuration (2/3) */}
-              <div className="lg:col-span-2 space-y-6">
-                <div className="bg-white border border-gray-200 p-6 rounded-2xl shadow-sm space-y-6">
-                  <div>
-                    <h4 className="font-semibold text-gray-950 text-sm mb-1">IMAP Configuration (Direct Email Auth)</h4>
-                    <p className="text-xs text-gray-500">Enable students to log in directly via university credentials without receiving PIN codes.</p>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-b border-gray-150 pb-5">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-gray-500 font-medium">IMAP Host</label>
-                      <input 
-                        type="text"
-                        value={globalSettings.imapHost || ''}
-                        onChange={e => setGlobalSettings(s => ({...s, imapHost: e.target.value}))}
-                        placeholder="outlook.office365.com"
-                        className="bg-white border border-gray-200 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-sm"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-gray-500 font-medium">IMAP Port</label>
-                      <input 
-                        type="number"
-                        value={globalSettings.imapPort || ''}
-                        onChange={e => setGlobalSettings(s => ({...s, imapPort: parseInt(e.target.value) || undefined}))}
-                        placeholder="993"
-                        className="bg-white border border-gray-200 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-sm"
-                      />
-                    </div>
-                    <div className="flex flex-col justify-end pb-2">
-                      <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-700">
-                        <input 
-                          type="checkbox"
-                          checked={globalSettings.imapSecure !== false}
-                          onChange={e => setGlobalSettings(s => ({...s, imapSecure: e.target.checked}))}
-                          className="rounded text-[var(--color-imamu-blue)] focus:ring-[var(--color-imamu-blue)]"
-                        />
-                        <span>Use Secure TLS</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h4 className="font-semibold text-gray-950 text-sm mb-1">SMTP Configuration (Verification Mails)</h4>
-                    <p className="text-xs text-gray-500">Required to dispatch email verifications and passcodes if IMAP login is bypassed.</p>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-gray-500 font-medium">SMTP Host</label>
-                      <input 
-                        type="text"
-                        value={globalSettings.smtpHost || ''}
-                        onChange={e => setGlobalSettings(s => ({...s, smtpHost: e.target.value}))}
-                        placeholder="smtp.gmail.com"
-                        className="bg-white border border-gray-200 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-sm"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-gray-500 font-medium">SMTP Port</label>
-                      <input 
-                        type="number"
-                        value={globalSettings.smtpPort || ''}
-                        onChange={e => setGlobalSettings(s => ({...s, smtpPort: parseInt(e.target.value) || undefined}))}
-                        placeholder="587"
-                        className="bg-white border border-gray-200 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-sm"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-gray-500 font-medium">SMTP Username</label>
-                      <input 
-                        type="text"
-                        value={globalSettings.smtpUser || ''}
-                        onChange={e => setGlobalSettings(s => ({...s, smtpUser: e.target.value}))}
-                        placeholder="example@gmail.com"
-                        className="bg-white border border-gray-200 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-sm"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-gray-500 font-medium">SMTP Password</label>
-                      <input 
-                        type="password"
-                        value={globalSettings.smtpPass || ''}
-                        onChange={e => setGlobalSettings(s => ({...s, smtpPass: e.target.value}))}
-                        placeholder="App Password"
-                        className="bg-white border border-gray-200 py-2 px-3 rounded-lg w-full outline-none focus:ring-2 focus:ring-[var(--color-imamu-blue)] text-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t border-gray-150 flex justify-end">
-                    <button 
-                      className="bg-[var(--color-imamu-blue)] text-white px-5 py-2 rounded-lg font-medium hover:bg-[var(--color-imamu-blue-light)] transition text-sm shadow-sm"
-                      onClick={() => handlePostWithMethod('/api/admin/global_settings', 'PUT', globalSettings, () => alert('Settings saved!'))}
-                    >
-                      Save All Settings
-                    </button>
-                  </div>
-                </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>SMTP Port</label>
+                <input type="number" value={globalSettings.smtpPort || ''} onChange={e => setGlobalSettings((s: any) => ({ ...s, smtpPort: parseInt(e.target.value) || undefined }))} placeholder="587" className="py-2 px-3 rounded-xl text-sm border w-full" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
               </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>SMTP Username</label>
+                <input type="text" value={globalSettings.smtpUser || ''} onChange={e => setGlobalSettings((s: any) => ({ ...s, smtpUser: e.target.value }))} placeholder="example@gmail.com" className="py-2 px-3 rounded-xl text-sm border w-full" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>SMTP Password</label>
+                <input type="password" value={globalSettings.smtpPass || ''} onChange={e => setGlobalSettings((s: any) => ({ ...s, smtpPass: e.target.value }))} placeholder="App Password" className="py-2 px-3 rounded-xl text-sm border w-full" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+              </div>
+            </div>
+
+            <div className="pt-4 border-t flex justify-end" style={{ borderColor: 'var(--border-color)' }}>
+              <button
+                className="bg-[var(--color-imamu-blue)] text-white px-5 py-2 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-blue-light)] transition"
+                onClick={() => handlePostWithMethod('/api/admin/global_settings', 'PUT', globalSettings, () => toast('success', 'Settings saved!'))}
+              >
+                Save All Settings
+              </button>
             </div>
           </div>
-        );
-      case 'tutorials':
-        return (
-          <TutorialsTab
-            user={user}
-            sections={tutorialSections}
-            tutorials={tutorials}
-            onRefresh={fetchData}
-          />
-        );
-      default:
-        return null;
+
+          {/* System Health Panel */}
+          {health && (
+            <div className="rounded-2xl p-5 border space-y-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+              <h4 className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
+                <Server className="w-4 h-4 text-blue-500" /> System Information
+              </h4>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Node Version</span>
+                  <span className="text-sm font-mono font-medium" style={{ color: 'var(--text-main)' }}>{health.nodeVersion}</span>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Platform</span>
+                  <span className="text-sm font-mono font-medium" style={{ color: 'var(--text-main)' }}>{health.platform}</span>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>RSS Memory</span>
+                  <span className="text-sm font-mono font-medium" style={{ color: 'var(--text-main)' }}>{health.memory.rss} MB</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  // ============================================================================
+  // TAB SWITCHER
+  // ============================================================================
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'dashboard': return renderDashboard();
+      case 'users': return renderUsers();
+      case 'news_sources': return renderNewsSources();
+      case 'majors': return renderMajors();
+      case 'events': return renderEvents();
+      case 'subjects': return renderSubjects();
+      case 'tutorials': return <TutorialsTab user={user} sections={tutorialSections} tutorials={tutorials} onRefresh={fetchData} />;
+      case 'newbie_links': return renderNewbieLinks();
+      case 'settings': return renderSettings();
+      default: return null;
     }
   };
 
+  // ============================================================================
+  // RENDER
+  // ============================================================================
   return (
-    <div className="flex flex-col flex-1 max-w-[1400px] w-full mx-auto pb-24 px-4 sm:px-6 bg-transparent">
-      <div className="mb-10 text-left">
-        <h1 className="text-4xl font-display font-bold text-gray-900 mb-2 inline-flex items-center gap-3">
-          <ShieldCheck className="w-10 h-10 text-indigo-600" /> Administrative Panel
-        </h1>
-        <p className="text-gray-500 max-w-xl">Configure and securely manage platform content across modules.</p>
+    <div className="flex flex-col flex-1 max-w-[1400px] w-full mx-auto pb-24 px-4 sm:px-6">
+      {/* Header */}
+      <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl sm:text-4xl font-display font-bold inline-flex items-center gap-3" style={{ color: 'var(--text-main)' }}>
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
+              <ShieldCheck className="w-6 h-6 text-white" />
+            </div>
+            Admin Console
+          </h1>
+          <p className="mt-1" style={{ color: 'var(--text-muted)' }}>Manage and monitor your platform</p>
+        </div>
+        <button
+          onClick={() => setCmdOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm border transition hover:bg-[var(--bg-subtle)]"
+          style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
+        >
+          <Command className="w-4 h-4" />
+          <span className="hidden sm:inline">Quick Navigate</span>
+          <kbd className="text-[10px] font-mono px-1.5 py-0.5 rounded border ml-1" style={{ borderColor: 'var(--border-color)' }}>⌘K</kbd>
+        </button>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-12 lg:gap-16 bg-transparent">
-        
-        {/* Left Sidebar Menu */}
-        <div className="w-full md:w-64 shrink-0">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-4 px-3">Settings Menu</h3>
-          <nav className="flex flex-col space-y-1">
-            <button 
-              onClick={() => setActiveTab('news_sources')} 
-              className={`flex items-center gap-3 w-full px-4 py-3 text-left rounded-xl font-medium transition ${activeTab === 'news_sources' ? 'bg-[var(--color-imamu-blue)] text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100/80 hover:text-gray-900'}`}
-            >
-              <Twitter className="w-5 h-5 shrink-0" /> News Sources
-            </button>
-            <button 
-              onClick={() => setActiveTab('majors')} 
-              className={`flex items-center gap-3 w-full px-4 py-3 text-left rounded-xl font-medium transition ${activeTab === 'majors' ? 'bg-[var(--color-imamu-blue)] text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100/80 hover:text-gray-900'}`}
-            >
-              <FileText className="w-5 h-5 shrink-0" /> Academic Majors
-            </button>
-            <button 
-              onClick={() => setActiveTab('events')} 
-              className={`flex items-center gap-3 w-full px-4 py-3 text-left rounded-xl font-medium transition ${activeTab === 'events' ? 'bg-[var(--color-imamu-blue)] text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100/80 hover:text-gray-900'}`}
-            >
-              <Calendar className="w-5 h-5 shrink-0" /> Calendar Dates
-            </button>
-            <button 
-              onClick={() => setActiveTab('subjects')} 
-              className={`flex items-center gap-3 w-full px-4 py-3 text-left rounded-xl font-medium transition ${activeTab === 'subjects' ? 'bg-[var(--color-imamu-blue)] text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100/80 hover:text-gray-900'}`}
-            >
-              <BookOpen className="w-5 h-5 shrink-0" /> Course Resources
-            </button>
-            <button 
-              onClick={() => setActiveTab('tutorials')} 
-              className={`flex items-center gap-3 w-full px-4 py-3 text-left rounded-xl font-medium transition ${activeTab === 'tutorials' ? 'bg-[var(--color-imamu-blue)] text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100/80 hover:text-gray-900'}`}
-            >
-              <HelpCircle className="w-5 h-5 shrink-0" /> Tutorials Manager
-            </button>
-            <button 
-              onClick={() => setActiveTab('settings')} 
-              className={`flex items-center gap-3 w-full px-4 py-3 text-left rounded-xl font-medium transition ${activeTab === 'settings' ? 'bg-[var(--color-imamu-blue)] text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100/80 hover:text-gray-900'}`}
-            >
-              <ShieldCheck className="w-5 h-5 shrink-0" /> Global Settings
-            </button>
+      <div className="flex flex-col md:flex-row gap-8 lg:gap-10">
+        {/* Sidebar */}
+        <div className="w-full md:w-56 shrink-0">
+          <nav className="flex flex-col space-y-0.5">
+            {tabDefs.map(t => (
+              <button
+                key={t.id}
+                onClick={() => setActiveTab(t.id)}
+                className={`flex items-center gap-3 w-full px-3.5 py-2.5 text-left rounded-xl text-sm font-medium transition-all duration-200 ${
+                  activeTab === t.id
+                    ? 'bg-[var(--color-imamu-blue)] text-white shadow-md shadow-blue-500/20'
+                    : 'hover:bg-[var(--bg-subtle)]'
+                }`}
+                style={activeTab !== t.id ? { color: 'var(--text-muted)' } : undefined}
+              >
+                {t.icon}
+                <span className="truncate">{t.label}</span>
+              </button>
+            ))}
           </nav>
         </div>
 
-        {/* Right Content Area */}
+        {/* Content */}
         <div className="flex-1 w-full min-w-0 max-w-7xl">
           {renderTabContent()}
         </div>
       </div>
 
-      {aiPreview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl w-full max-w-2xl overflow-hidden shadow-xl flex flex-col max-h-[80vh]">
-            <div className="p-6 border-b border-gray-100 flex items-center gap-3">
-               <Sparkles className="w-6 h-6 text-purple-600" />
-               <h3 className="text-xl font-display font-semibold text-gray-900">Review AI Import</h3>
-            </div>
-            <div className="p-6 overflow-y-auto flex-1 bg-gray-50 border-b border-gray-100 space-y-3">
-              {aiPreview.data.map((item, i) => {
-                let conflict = false;
-                const normalizeCode = (c: string) => {
-                  if (!c) return '';
-                  const arabicNumbers = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-                  let str = c.toLowerCase().replace(/\s+/g,'').replace(/-/g, '').replace(/_/g, '').trim();
-                  for (let n = 0; n < 10; n++) {
-                    str = str.replace(new RegExp(arabicNumbers[n], 'g'), n.toString());
-                  }
-                  return str;
-                };
+      {/* Command Palette */}
+      <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} onSelect={setActiveTab} tabs={tabDefs} />
 
-                if (aiPreview.type === 'subjects') conflict = !!subjects.find(s => normalizeCode(s.code) === normalizeCode(item.code));
-                else if (aiPreview.type === 'majors') conflict = !!majors.find(m => m.name === item.name);
-                else if (aiPreview.type === 'events') conflict = !!events.find(e => e.title === item.title && e.date === item.date);
-
-                return (
-                  <div key={i} className={`p-4 rounded-xl shadow-sm border ${conflict ? 'bg-orange-50 border-orange-200' : 'bg-white border-gray-200'}`}>
-                    <div className="flex justify-between items-start mb-2">
-                      <span className={`text-xs font-bold uppercase tracking-wider ${conflict ? 'text-orange-600' : 'text-green-600'}`}>
-                        {conflict 
-                          ? (aiPreview.type === 'events' ? 'Identical Event & Date (Will Merge)' : 'Conflict Detected (Will Overwrite)') 
-                          : 'New Record'}
-                      </span>
-                      <button onClick={() => {
-                        const newData = [...aiPreview.data];
-                        newData.splice(i, 1);
-                        setAiPreview({...aiPreview, data: newData});
-                      }} className="text-gray-400 hover:text-red-500 text-xs font-medium">Remove</button>
-                    </div>
-                    <div className="text-sm font-mono text-gray-700 whitespace-pre-wrap">{JSON.stringify(item, null, 2)}</div>
-                  </div>
-                );
-              })}
-              {aiPreview.data.length === 0 && <p className="text-gray-500 text-center py-4">No complete records extracted from the file.</p>}
-            </div>
-            <div className="p-6 flex gap-3">
-              <button onClick={() => setAiPreview(null)} className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-lg font-medium hover:bg-gray-200 transition">Cancel</button>
-              <button 
-                onClick={async () => {
-                  try {
-                    const token = await user?.getIdToken();
-                    for(const item of aiPreview.data) {
-                      let conflictId = null;
-                      const normalizeCode = (c: string) => {
-                        if (!c) return '';
-                        const arabicNumbers = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-                        let str = c.toLowerCase().replace(/\s+/g,'').replace(/-/g, '').replace(/_/g, '').trim();
-                        for (let n = 0; n < 10; n++) {
-                          str = str.replace(new RegExp(arabicNumbers[n], 'g'), n.toString());
-                        }
-                        return str;
-                      };
-                      if (aiPreview.type === 'subjects') conflictId = subjects.find(s => normalizeCode(s.code) === normalizeCode(item.code))?.id;
-                      else if (aiPreview.type === 'majors') conflictId = majors.find(m => m.name === item.name)?.id;
-                      else if (aiPreview.type === 'events') conflictId = events.find(e => e.title === item.title && e.date === item.date)?.id;
-                      
-                      const url = conflictId ? `/api/admin/${aiPreview.type}/${conflictId}` : `/api/admin/${aiPreview.type}`;
-                      const method = conflictId ? 'PUT' : 'POST';
-                      
-                      await fetch(url, {
-                        method,
-                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                        body: JSON.stringify(item)
-                      });
-                    }
-                    setAiPreview(null);
-                    fetchData();
-                  } catch(e) { console.error(e); }
-                }}
-                className="flex-1 bg-purple-600 text-white py-2.5 rounded-lg font-medium hover:bg-purple-700 transition"
-              >
-                Merge {aiPreview.data.length} Items
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
+      {/* Delete Modal */}
       {deleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-xl animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
             <div className="p-6 text-center">
-              <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4">
+              <div className="w-12 h-12 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center mx-auto mb-4">
                 <Trash2 className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Confirmation</h3>
-              <p className="text-sm text-gray-500 mb-6">{deleteModal.message}</p>
+              <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-main)' }}>Delete Confirmation</h3>
+              <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>{deleteModal.message}</p>
               <div className="flex gap-3">
-                <button 
-                  onClick={() => setDeleteModal(null)} 
-                  className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-lg font-medium hover:bg-gray-200 transition"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={confirmDelete}
-                  className="flex-1 bg-red-600 text-white py-2.5 rounded-lg font-medium hover:bg-red-700 transition"
-                >
-                  Delete
-                </button>
+                <button onClick={() => setDeleteModal(null)} className="flex-1 py-2.5 rounded-xl font-medium transition border hover:bg-[var(--bg-subtle)]" style={{ borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>Cancel</button>
+                <button onClick={confirmDelete} className="flex-1 bg-red-600 text-white py-2.5 rounded-xl font-medium hover:bg-red-700 transition">Delete</button>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Toasts */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+
+      {/* Animation keyframes */}
+      <style>{`
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(12px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
