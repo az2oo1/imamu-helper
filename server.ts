@@ -8,6 +8,7 @@ import { getDb } from "./src/db/index";
 import { users, majors, subjects, courses, course_resources, events, news, majorCourses, newsLikes, newsComments, news_sources, global_settings, verification_codes, tutorial_sections, tutorials, tutorial_feedback, feedback_comments, newbie_links, tutorial_comments } from "./src/db/schema";
 import { eq, desc, and, sql, inArray, ilike } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "./src/middleware/auth";
+import { requestLogger, logger } from "./src/middleware/logger";
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
@@ -41,6 +42,7 @@ async function startServer() {
   const db = await getDb();
 
   const app = express();
+  app.use(requestLogger);
   app.use(compression());
   const PORT = 3000;
 
@@ -2450,7 +2452,7 @@ Formatting and parsing guidelines for this document:
 
   // Error handling middleware
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    console.error("Express Error:", err);
+    logger.error("Express Error:", err);
     if (req.path.startsWith('/api/')) {
       res.status(err.status || 500).json({ error: err.message || "Internal Server Error" });
     } else {
@@ -2459,7 +2461,7 @@ Formatting and parsing guidelines for this document:
   });
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    logger.info(`Server running on http://localhost:${PORT}`);
   });
 }
 
