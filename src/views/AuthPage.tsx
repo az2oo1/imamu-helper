@@ -28,10 +28,8 @@ export function AuthPage() {
     e.preventDefault();
     setError('');
 
-    // Mild validation for college email (Optional but helps enforce intention)
-    // If not strict, at least check if it's an email
     if (!formData.email.includes('@')) {
-      return setError('Please enter a valid email address.');
+      return setError('يرجى إدخال بريد إلكتروني صحيح.');
     }
 
     try {
@@ -39,9 +37,9 @@ export function AuthPage() {
         if (!codeSent) {
           return handleSendCode();
         }
-        if (!code) return setError('Verification code is required.');
-        if (formData.password !== repeatPassword) return setError('Passwords do not match.');
-        if (formData.password.length < 6) return setError('Password must be at least 6 characters.');
+        if (!code) return setError('رمز التحقق مطلوب.');
+        if (formData.password !== repeatPassword) return setError('كلمات المرور غير متطابقة.');
+        if (formData.password.length < 6) return setError('يجب أن تكون كلمة المرور 6 خانات على الأقل.');
         
         const res = await fetch('/api/auth/reset-password', {
           method: 'POST',
@@ -50,13 +48,13 @@ export function AuthPage() {
         });
         if (!res.ok) {
           const err = await res.json();
-          throw new Error(err.error || 'Failed to reset password');
+          throw new Error(err.error || 'فشل إعادة ضبط كلمة المرور');
         }
         setIsForgotPassword(false);
         setCodeSent(false);
         setCode('');
         setRepeatPassword('');
-        return setError('Password reset successfully. You can now log in.');
+        return setError('تم إعادة ضبط كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن.');
       }
 
       if (isLogin) {
@@ -67,26 +65,26 @@ export function AuthPage() {
           return handleSendCode();
         }
         if (!formData.phone) {
-          return setError('Phone number is required for student verification.');
+          return setError('رقم الجوال مطلوب للتحقق من هوية الطالب.');
         }
         if (!formData.userName) {
-          return setError('Username is required.');
+          return setError('اسم المستخدم مطلوب.');
         }
         if (!code) {
-          return setError('Verification code is required.');
+          return setError('رمز التحقق مطلوب.');
         }
         await signUpWithEmail(formData.email, formData.password, formData.phone, formData.userName, code);
         router.push('/');
       }
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'An error occurred during authentication.');
+      setError(err.message || 'حدث خطأ أثناء عملية المصادقة.');
     }
   };
 
   const handleSendCode = async () => {
     if (!formData.email.includes('@')) {
-      return setError('Please enter a valid email address.');
+      return setError('يرجى إدخال بريد إلكتروني صحيح.');
     }
     setSendingCode(true);
     setError('');
@@ -98,63 +96,66 @@ export function AuthPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to send code');
+        throw new Error(data.error || 'فشل إرسال رمز التحقق');
       }
       setCodeSent(true);
       if (data.devCode) {
-        alert(data.message + "\n\nCode: " + data.devCode);
-        setCode(data.devCode); // Auto-fill it for convenience
-        setError('Verification code generated in Dev Mode.');
+        alert(data.message + "\n\nالرمز: " + data.devCode);
+        setCode(data.devCode);
+        setError('تم إنشاء رمز التحقق في وضع التطوير.');
       } else {
-        setError('Verification code sent to your email.');
+        setError('تم إرسال رمز التحقق إلى بريدك الإلكتروني.');
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to send verification code.');
+      setError(err.message || 'فشل إرسال رمز التحقق.');
     }
     setSendingCode(false);
   };
 
   return (
-    <div className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8" dir="rtl">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="max-w-md w-full bg-white rounded-3xl p-8 border border-gray-100 shadow-xl"
+        className="max-w-md w-full bg-white dark:bg-zinc-900 rounded-3xl p-8 border border-slate-100 dark:border-zinc-800 shadow-xl text-right"
       >
         <div className="text-center mb-10">
-          <div className="mx-auto h-16 w-16 bg-[rgba(11,50,96,0.06)] rounded-2xl flex items-center justify-center mb-4">
-            <Lock className="h-8 w-8 text-[var(--color-imamu-blue)]" />
+          <div className="mx-auto h-16 w-16 bg-blue-50 dark:bg-blue-950/40 rounded-2xl flex items-center justify-center mb-4">
+            <Lock className="h-8 w-8 text-blue-600 dark:text-blue-400" />
           </div>
-          <h2 className="text-3xl font-display font-bold text-gray-900">
-            {isForgotPassword ? 'Reset Password' : (isLogin ? 'Welcome Back' : 'Create Account')}
+          <h2 className="text-3xl font-display font-bold text-slate-900 dark:text-white">
+            {isForgotPassword ? 'إعادة ضبط كلمة المرور' : (isLogin ? 'مرحباً بعودتك' : 'إنشاء حساب جديد')}
           </h2>
-          <p className="mt-2 text-sm text-gray-500">
-            {isForgotPassword ? 'Enter your email to reset your password' : (isLogin 
-              ? 'Sign in with your university credentials' 
-              : 'Sign up using your college email and phone number')}
+          <p className="mt-2 text-sm text-slate-500 dark:text-zinc-400">
+            {isForgotPassword ? 'أدخل بريدك الإلكتروني الجامعي لإعادة ضبط كلمة المرور' : (isLogin 
+              ? 'سجّل الدخول باستخدام بياناتك الجامعية' 
+              : 'سجّل باستخدام بريدك الإلكتروني الجامعي ورقم الجوال')}
           </p>
         </div>
 
         {error && (
-          <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-xl text-sm border border-red-100">
+          <div className="mb-6 p-4 bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 rounded-xl text-sm border border-red-100 dark:border-red-900/40 text-right">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">College Email</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1 text-right">
+              البريد الإلكتروني الجامعي
+            </label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Mail className="h-5 w-5 text-gray-400" />
+              <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                <Mail className="h-5 w-5 text-slate-400 dark:text-zinc-500" />
               </div>
               <input
                 type="email"
                 required
                 value={formData.email}
                 onChange={x => setFormData({ ...formData, email: x.target.value })}
-                className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-imamu-blue)] outline-none transition"
+                className="w-full pr-11 pl-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-600 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
                 placeholder="student@imamu.edu.sa"
+                dir="ltr"
               />
             </div>
           </div>
@@ -169,33 +170,37 @@ export function AuthPage() {
               >
                 <div className="pt-1 pb-1 space-y-5">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Verification Code</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1 text-right">
+                      رمز التحقق
+                    </label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Mail className="h-5 w-5 text-gray-400" />
+                      <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                        <Mail className="h-5 w-5 text-slate-400 dark:text-zinc-500" />
                       </div>
                       <input
                         type="text"
                         required={isForgotPassword && codeSent}
                         value={code}
                         onChange={x => setCode(x.target.value)}
-                        className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-imamu-blue)] outline-none transition"
+                        className="w-full pr-11 pl-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-600 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
                         placeholder="123456"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Repeat Password</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1 text-right">
+                      تأكيد كلمة المرور
+                    </label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <LockKeyhole className="h-5 w-5 text-gray-400" />
+                      <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                        <LockKeyhole className="h-5 w-5 text-slate-400 dark:text-zinc-500" />
                       </div>
                       <input
                         type="password"
                         required={isForgotPassword && codeSent}
                         value={repeatPassword}
                         onChange={x => setRepeatPassword(x.target.value)}
-                        className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-imamu-blue)] outline-none transition"
+                        className="w-full pr-11 pl-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-600 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
                         placeholder="••••••••"
                       />
                     </div>
@@ -213,52 +218,58 @@ export function AuthPage() {
               >
                 <div className="pt-1 pb-1 space-y-5">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1 text-right">
+                      اسم المستخدم
+                    </label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <User className="h-5 w-5 text-gray-400" />
+                      <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                        <User className="h-5 w-5 text-slate-400 dark:text-zinc-500" />
                       </div>
                       <input
                         type="text"
                         required={!isLogin}
                         value={formData.userName}
                         onChange={x => setFormData({ ...formData, userName: x.target.value })}
-                        className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-imamu-blue)] outline-none transition"
-                        placeholder="coolstudent123"
+                        className="w-full pr-11 pl-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-600 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
+                        placeholder="طالب_الجامعة"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1 text-right">
+                      رقم الجوال
+                    </label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Phone className="h-5 w-5 text-gray-400" />
+                      <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                        <Phone className="h-5 w-5 text-slate-400 dark:text-zinc-500" />
                       </div>
                       <input
                         type="tel"
                         required={!isLogin}
                         value={formData.phone}
                         onChange={x => setFormData({ ...formData, phone: x.target.value })}
-                        className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-imamu-blue)] outline-none transition"
+                        className="w-full pr-11 pl-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-600 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
                         placeholder="05X XXX XXXX"
                       />
                     </div>
-                    <p className="mt-1 text-xs text-gray-500">The bot will approve the number immediately when you join the group.</p>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400 text-right">سيتم اعتماد الرقم تلقائياً فور انضمامك للمجموعة.</p>
                   </div>
                   
                   {codeSent && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Verification Code</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1 text-right">
+                      رمز التحقق
+                    </label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Mail className="h-5 w-5 text-gray-400" />
+                      <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                        <Mail className="h-5 w-5 text-slate-400 dark:text-zinc-500" />
                       </div>
                       <input
                         type="text"
                         required={!isLogin && codeSent}
                         value={code}
                         onChange={x => setCode(x.target.value)}
-                        className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-imamu-blue)] outline-none transition"
+                        className="w-full pr-11 pl-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-600 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
                         placeholder="123456"
                       />
                     </div>
@@ -271,17 +282,19 @@ export function AuthPage() {
 
           {(!isForgotPassword || codeSent) && (
           <div className={isForgotPassword ? "mt-5" : ""}>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{isForgotPassword ? 'New Password' : 'Password'}</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1 text-right">
+              {isForgotPassword ? 'كلمة المرور الجديدة' : 'كلمة المرور'}
+            </label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <LockKeyhole className="h-5 w-5 text-gray-400" />
+              <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                <LockKeyhole className="h-5 w-5 text-slate-400 dark:text-zinc-500" />
               </div>
               <input
                 type="password"
                 required
                 value={formData.password}
                 onChange={x => setFormData({ ...formData, password: x.target.value })}
-                className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-imamu-blue)] outline-none transition"
+                className="w-full pr-11 pl-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-600 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
                 placeholder="••••••••"
               />
             </div>
@@ -289,13 +302,13 @@ export function AuthPage() {
           )}
 
           {isLogin && !isForgotPassword && (
-            <div className="flex justify-end">
+            <div className="flex justify-start">
               <button 
                 type="button" 
                 onClick={() => { setIsForgotPassword(true); setError(''); setCodeSent(false); }}
-                className="text-sm font-medium text-[var(--color-imamu-blue)] hover:underline"
+                className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
               >
-                Forgot password?
+                نسيت كلمة المرور؟
               </button>
             </div>
           )}
@@ -303,17 +316,19 @@ export function AuthPage() {
           <button
             type="submit"
             disabled={sendingCode}
-            className="w-full flex justify-center py-3.5 px-4 rounded-xl text-white bg-[var(--color-imamu-blue)] hover:bg-[var(--color-imamu-blue-light)] shadow-sm font-medium transition disabled:opacity-50"
+            className="w-full flex justify-center py-3.5 px-4 rounded-xl text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 shadow-sm font-bold transition disabled:opacity-50"
           >
             {isForgotPassword 
-              ? (codeSent ? 'Reset Password' : (sendingCode ? 'Sending Code...' : 'Send Reset Code'))
-              : (isLogin ? 'Sign In' : (codeSent ? 'Create Account' : (sendingCode ? 'Sending Code...' : 'Send Verification Code')))
+              ? (codeSent ? 'إعادة ضبط كلمة المرور' : (sendingCode ? 'جاري إرسال الرمز...' : 'إرسال رمز التحقق'))
+              : (isLogin ? 'تسجيل الدخول' : (codeSent ? 'إنشاء الحساب' : (sendingCode ? 'جاري إرسال الرمز...' : 'إرسال رمز التحقق')))
             }
           </button>
         </form>
 
-        <div className="mt-8 text-center text-sm text-gray-500 border-t border-gray-100 pt-6">
-          {isForgotPassword ? "Remember your password? " : (isLogin ? "Don't have an account? " : "Already have an account? ")}
+        <div className="mt-8 text-center text-sm text-slate-500 dark:text-zinc-400 border-t border-slate-100 dark:border-zinc-800 pt-6">
+          <span>
+            {isForgotPassword ? "تذكرت كلمة المرور؟ " : (isLogin ? "ليس لديك حساب؟ " : "لديك حساب بالفعل؟ ")}
+          </span>
           <button 
             type="button"
             onClick={() => {
@@ -325,9 +340,9 @@ export function AuthPage() {
               }
               setError('');
             }}
-            className="text-[var(--color-imamu-blue)] font-medium hover:underline"
+            className="text-blue-600 dark:text-blue-400 font-bold hover:underline"
           >
-            {isForgotPassword ? 'Sign In' : (isLogin ? 'Sign Up' : 'Sign In')}
+            {isForgotPassword ? 'تسجيل الدخول' : (isLogin ? 'إنشاء حساب' : 'تسجيل الدخول')}
           </button>
         </div>
       </motion.div>

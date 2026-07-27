@@ -1,8 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '../lib/AuthContext';
 import { BookOpen, Search, Download, ExternalLink, Filter, Folder, FileText, CheckCircle2, MessageCircle, Info } from 'lucide-react';
 import { InView, SpotlightCard } from '../components/ui';
+import { CourseDetailsModal } from '../components/CourseDetailsModal';
 
 interface Resource {
   id: number;
@@ -19,16 +22,32 @@ interface Resource {
 }
 
 export function Resources() {
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [resources, setResources] = useState<Resource[]>([]);
   const [majors, setMajors] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [selectedMajor, setSelectedMajor] = useState('all');
   const [selectedType, setSelectedType] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [selectedCourse, setSelectedCourse] = useState<string | number | null>(null);
+
 
   useEffect(() => {
-    fetch('/api/resources')
+    if (!authLoading && !user) {
+      router.push('/login');
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    fetch('/api/resources', {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+    })
       .then(res => {
+        if (res.status === 401) {
+          router.push('/login');
+          return [];
+        }
         if (!res.ok) return [];
         const contentType = res.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
@@ -48,7 +67,7 @@ export function Resources() {
         console.error('Failed to load resources:', err);
         setLoading(false);
       });
-  }, []);
+  }, [authLoading, user, router]);
 
   const filteredResources = resources.filter(r => {
     const matchesSearch = 
@@ -158,27 +177,23 @@ export function Resources() {
 
                 {/* Resource Links */}
                 <div className="flex flex-wrap gap-2 border-t border-slate-100 dark:border-zinc-800 pt-4 mt-auto">
+                  <button
+                    onClick={() => setSelectedCourse(item.courseCode || item.id)}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 text-xs font-bold transition"
+                  >
+                    <Info className="w-3.5 h-3.5" />
+                    <span>تفاصيل المادة</span>
+                  </button>
+
                   {item.driveUrl && (
                     <a
                       href={item.driveUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 text-xs font-bold transition"
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 text-xs font-bold transition"
                     >
                       <Folder className="w-3.5 h-3.5" />
-                      <span>مجلد Drive</span>
-                    </a>
-                  )}
-
-                  {item.fileUrl && (
-                    <a
-                      href={item.fileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 text-xs font-bold transition"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>تحميل</span>
+                      <span>Drive</span>
                     </a>
                   )}
 
@@ -200,6 +215,12 @@ export function Resources() {
         )}
       </InView>
 
+      <CourseDetailsModal 
+        isOpen={!!selectedCourse} 
+        onClose={() => setSelectedCourse(null)} 
+        courseIdOrCode={selectedCourse} 
+      />
     </div>
   );
 }
+

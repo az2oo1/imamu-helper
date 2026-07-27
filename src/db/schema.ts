@@ -32,8 +32,16 @@ export const subjects = pgTable('subjects', {
   whatsappLink: text('whatsapp_link'),
   creditHours: integer('credit_hours').default(3),
   level: integer('level'),
+  description: text('description'),
+  syllabus: text('syllabus'),
+  freeResourcesUrl: text('free_resources_url'),
+  paidResourcesUrl: text('paid_resources_url'),
+  avatarUrl: text('avatar_url'),
+  bannerUrl: text('banner_url'),
+  tags: text('tags'),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
 
 export const courses = subjects;
 

@@ -29,7 +29,6 @@ export function CalendarPage() {
       })
       .then(data => {
         if(Array.isArray(data)) {
-          // Sort by date ascending
           data.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
           setEvents(data);
         }
@@ -59,7 +58,7 @@ export function CalendarPage() {
     };
     
     const startStr = formatDatePart(d);
-    const endD = new Date(d.getTime() + 60 * 60 * 1000); // 1 hour duration
+    const endD = new Date(d.getTime() + 60 * 60 * 1000);
     const endStr = formatDatePart(endD);
     return `${startStr}/${endStr}`;
   };
@@ -105,18 +104,16 @@ export function CalendarPage() {
     ].join('\r\n');
 
     const blob = new Blob([icsText], { type: 'text/calendar;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = url;
-    link.download = `${ev.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.ics`;
+    link.href = window.URL.createObjectURL(blob);
+    link.setAttribute('download', `${ev.title}.ics`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(url);
   };
 
   const monthStart = startOfMonth(currentDate);
-  const monthEnd = endOfMonth(currentDate);
+  const monthEnd = endOfMonth(monthStart);
   const startDateMonth = startOfWeek(monthStart, { weekStartsOn: 0 });
   const endDateMonth = endOfWeek(monthEnd, { weekStartsOn: 0 });
 
@@ -135,7 +132,6 @@ export function CalendarPage() {
 
   const upcomingEvents = events.filter(e => isAfter(parseISO(e.date), startOfDay(new Date()))).slice(0, 5);
 
-  // Generate WebCal URL for direct Apple Calendar subscription
   const webcalUrl = typeof window !== 'undefined' 
     ? `webcal://${window.location.host}/api/calendar.ics` 
     : '';
@@ -145,86 +141,90 @@ export function CalendarPage() {
     : '#';
 
   return (
-    <div className="flex flex-col lg:flex-row flex-1 w-full bg-transparent h-full overflow-hidden text-right" dir="rtl">
+    <div className="flex flex-col lg:flex-row flex-1 w-full bg-transparent min-h-screen text-right" dir="rtl">
       
-      {/* Sidebar: Upcoming Events */}
-      <div className="w-full lg:w-80 lg:shrink-0 border-l border-zinc-800 bg-zinc-900 flex flex-col h-full overflow-y-auto">
-        <div className="p-6 pb-5 border-b border-zinc-800 sticky top-0 bg-zinc-900/95 backdrop-blur z-10 text-right">
-          <h1 className="text-2xl font-display font-bold text-zinc-50 inline-flex items-center gap-2">
-            <CalendarIcon className="w-6 h-6 text-blue-500" />
-            التقويم الدراسي
+      {/* Sidebar: Upcoming Events & Sync Options */}
+      <div className="w-full lg:w-80 lg:shrink-0 border-b lg:border-b-0 lg:border-l border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex flex-col overflow-y-auto">
+        <div className="p-6 pb-5 border-b border-slate-200 dark:border-zinc-800 sticky top-0 bg-white/95 dark:bg-zinc-900/95 backdrop-blur z-10 text-right">
+          <span className="text-xs sm:text-sm font-semibold tracking-widest text-blue-600 dark:text-blue-400 uppercase mb-2 block">
+            المواعيد الرسمية
+          </span>
+          <h1 className="text-2xl font-display font-bold text-slate-900 dark:text-white inline-flex items-center gap-2">
+            <CalendarIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            التقويم الأكاديمي
           </h1>
-          <p className="text-xs text-zinc-400 mt-1.5 mb-4 leading-relaxed">تابع المواعيد والتقويم الدراسي لجامعة الإمام بيسر.</p>
+          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1.5 mb-4 leading-relaxed">
+            تابع المواعيد الأكاديمية والجدول التقويمي لجامعة الإمام.
+          </p>
+          
           <div className="flex flex-col gap-2">
             <a 
               href={googleCalendarUrl}
               target="_blank" 
               rel="noopener noreferrer" 
-              className="text-[11px] bg-blue-600 text-white px-3.5 py-2.5 rounded-md font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-blue-700 transition-colors shadow-sm"
-              title="مزامنة التقويم بالكامل مع تقويم Google الخاص بك"
+              className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2.5 rounded-xl font-bold inline-flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+              title="مزامنة التقويم بالكامل مع تقويم Google"
             >
               <CalendarPlus className="w-4 h-4" /> ربط بـ تقويم Google
             </a>
             <a 
               href={webcalUrl}
-              className="text-[11px] bg-transparent border border-zinc-800 text-zinc-300 px-3.5 py-2.5 rounded-md font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-zinc-850 hover:text-zinc-50 transition-colors shadow-sm"
-              title="الاشتراك المباشر والتلقائي في التقويم على أجهزة Apple أو Outlook"
+              className="text-xs bg-slate-100 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700/60 text-slate-800 dark:text-zinc-200 px-3.5 py-2.5 rounded-xl font-bold inline-flex items-center justify-center gap-1.5 hover:bg-slate-200 dark:hover:bg-zinc-700 transition-colors shadow-2xs"
+              title="الاشتراك التلقائي في التقويم على أجهزة Apple"
             >
-              <CalendarIcon className="w-4 h-4 text-emerald-500" /> الاشتراك في تقويم Apple (iOS)
+              <CalendarIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> الاشتراك في تقويم Apple
             </a>
           </div>
         </div>
         
         <div className="p-6 flex-1">
           {selectedEvent && (
-            <div className="mb-6 bg-blue-950/20 border border-blue-900/30 rounded-xl p-4.5 relative animate-in fade-in slide-in-from-top-1 duration-200 shadow-sm">
+            <div className="mb-6 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 rounded-2xl p-4.5 relative shadow-sm">
               <button 
                 onClick={() => setSelectedEvent(null)}
-                className="absolute top-3.5 left-3.5 p-1 text-zinc-400 hover:text-zinc-200 rounded-full hover:bg-zinc-800 transition duration-150"
+                className="absolute top-3.5 left-3.5 p-1 text-slate-400 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-zinc-200 rounded-full hover:bg-slate-200 dark:hover:bg-zinc-800 transition"
                 title="إلغاء التحديد"
               >
                 <X className="w-4 h-4" />
               </button>
-              <div className="text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                 <Info className="w-3.5 h-3.5" /> تفاصيل الموعد
               </div>
-              <h3 className="font-bold text-zinc-50 text-sm mb-1.5 leading-snug" dir="auto">{selectedEvent.title}</h3>
-              <p className="text-[11px] text-zinc-400 mb-4 flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 inline text-blue-400" />
+              <h3 className="font-bold text-slate-900 dark:text-white text-sm mb-1.5 leading-snug" dir="auto">{selectedEvent.title}</h3>
+              <p className="text-[11px] text-slate-500 dark:text-zinc-400 mb-3 flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 inline text-blue-500" />
                 <span>{format(parseISO(selectedEvent.date), 'EEEE، d MMMM yyyy • h:mm a', { locale: ar })}</span>
               </p>
               {selectedEvent.description ? (
-                <div className="text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 rounded-xl p-3 leading-relaxed max-h-40 overflow-y-auto mb-3 text-right" dir="auto">
+                <div className="text-xs text-slate-700 dark:text-zinc-300 bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl p-3 leading-relaxed max-h-40 overflow-y-auto mb-3 text-right" dir="auto">
                   {selectedEvent.description}
                 </div>
               ) : (
-                <span className="text-xs italic text-zinc-500 block pt-1 mb-3">لا يوجد وصف متاح لهذا الموعد.</span>
+                <span className="text-xs italic text-slate-400 dark:text-zinc-500 block pt-1 mb-3">لا يوجد وصف متاح لهذا الموعد.</span>
               )}
               
-              {/* Quick Actions for Selected Event */}
-              <div className="flex gap-2 border-t border-zinc-800 pt-3 mt-3">
+              <div className="flex gap-2 border-t border-slate-200 dark:border-zinc-800 pt-3 mt-3">
                 <a 
                   href={getGoogleCalendarUrl(selectedEvent)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 text-[10px] bg-transparent border border-zinc-800 text-zinc-300 py-2 px-2.5 rounded-md font-semibold inline-flex items-center justify-center gap-1 hover:bg-zinc-800 transition-colors"
+                  className="flex-1 text-[11px] bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 py-2 px-2.5 rounded-xl font-bold inline-flex items-center justify-center gap-1 hover:bg-slate-50 dark:hover:bg-zinc-800 transition"
                 >
-                  <ExternalLink className="w-3.5 h-3.5 text-zinc-500" /> لتقويم Google
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-400" /> Google
                 </a>
                 <button 
                   onClick={() => downloadSingleIcs(selectedEvent)}
-                  className="flex-1 text-[10px] bg-transparent border border-zinc-800 text-zinc-300 py-2 px-2.5 rounded-md font-semibold inline-flex items-center justify-center gap-1 hover:bg-zinc-800 transition-colors"
+                  className="flex-1 text-[11px] bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 py-2 px-2.5 rounded-xl font-bold inline-flex items-center justify-center gap-1 hover:bg-slate-50 dark:hover:bg-zinc-800 transition"
                 >
-                  <Download className="w-3.5 h-3.5 text-zinc-500" /> تحميل ملف ICS
+                  <Download className="w-3.5 h-3.5 text-slate-400" /> ICS
                 </button>
               </div>
             </div>
           )}
 
-          <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-5 pr-1">المواعيد القادمة</h2>
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500 mb-4 pr-1">المواعيد القادمة</h2>
           
-          {/* Smart Connected Timeline Layout */}
-          <div className="relative border-r border-zinc-800 mr-2.5 pl-1 space-y-5">
+          <div className="relative border-r border-slate-200 dark:border-zinc-800 mr-2.5 pl-1 space-y-4">
             {upcomingEvents.map((ev, i) => {
               const d = parseISO(ev.date);
               const dayStr = format(d, 'd');
@@ -239,32 +239,29 @@ export function CalendarPage() {
                     setCurrentDate(d);
                     setSelectedEvent(ev);
                   }}
-                  className="relative group cursor-pointer pr-5 transition-all duration-205"
-                  title="انقر لعرض تفاصيل هذا الموعد"
+                  className="relative group cursor-pointer pr-5 transition-all duration-200"
                 >
-                  {/* Timeline Connection Bullet */}
-                  <div className={`absolute -right-[5px] top-2.5 w-2.5 h-2.5 rounded-full border-2 transition-all duration-300 ${
+                  <div className={`absolute -right-[5px] top-3 w-2.5 h-2.5 rounded-full border-2 transition-all duration-300 ${
                     isSelected 
-                      ? 'bg-blue-500 border-blue-500 scale-125 shadow-sm shadow-blue-500/30' 
-                      : 'bg-zinc-950 border-zinc-700 group-hover:border-blue-500'
+                      ? 'bg-blue-600 border-blue-600 scale-125 shadow-xs' 
+                      : 'bg-slate-300 dark:bg-zinc-800 border-white dark:border-zinc-950 group-hover:border-blue-500'
                   }`} />
 
-                  {/* Compact Event Item Box */}
-                  <div className={`rounded-xl border p-3 transition-all duration-200 ${
+                  <div className={`rounded-2xl border p-3.5 transition-all duration-200 ${
                     isSelected
-                      ? 'bg-blue-950/20 border-blue-900/30 shadow-none'
-                      : 'bg-zinc-950/40 border-zinc-850 group-hover:border-zinc-700 group-hover:bg-zinc-900/40 group-hover:shadow-none'
+                      ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-900/50 shadow-2xs'
+                      : 'bg-slate-50 dark:bg-zinc-950/60 border-slate-200 dark:border-zinc-800/80 hover:border-blue-400 dark:hover:border-zinc-700'
                   }`}>
                     <div className="flex justify-between items-baseline gap-2 mb-1">
-                      <h3 className="text-xs font-bold text-zinc-200 group-hover:text-blue-400 transition-colors truncate max-w-[130px]" title={ev.title}>
+                      <h3 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate max-w-[130px]">
                         {ev.title}
                       </h3>
-                      <span className="text-[9px] font-bold text-blue-400 bg-blue-950/40 border border-blue-900/30 px-1.5 py-0.5 rounded-md shrink-0">
+                      <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900/50 px-2 py-0.5 rounded-lg shrink-0">
                         {dayStr} {monthStr}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1 text-[9px] text-zinc-400 font-medium">
-                      <Clock className="w-2.5 h-2.5 text-zinc-500" />
+                    <div className="flex items-center gap-1 text-[10px] text-slate-500 dark:text-zinc-400 font-medium">
+                      <Clock className="w-3 h-3 text-slate-400 dark:text-zinc-500" />
                       <span>{timeStr}</span>
                     </div>
                   </div>
@@ -273,7 +270,7 @@ export function CalendarPage() {
             })}
             
             {upcomingEvents.length === 0 && (
-              <div className="text-xs text-zinc-500 text-center py-10 border border-dashed border-zinc-800 rounded-xl bg-zinc-950/20 mr-2.5">
+              <div className="text-xs text-slate-400 dark:text-zinc-500 text-center py-8 border border-dashed border-slate-200 dark:border-zinc-800 rounded-2xl bg-slate-50 dark:bg-zinc-950/40 mr-2.5">
                 لا توجد مواعيد قادمة حالياً.
               </div>
             )}
@@ -281,39 +278,39 @@ export function CalendarPage() {
         </div>
       </div>
 
-      {/* Main Calendar Area */}
-      <div className="flex-1 flex flex-col h-full max-w-full overflow-hidden">
-        {/* Calendar Header Constraints */}
-        <div className="p-4 sm:p-6 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-900 shrink-0">
+      {/* Main Calendar Section */}
+      <div className="flex-1 flex flex-col h-full max-w-full overflow-hidden bg-white dark:bg-zinc-950">
+        
+        {/* Calendar Navigation Header */}
+        <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 shrink-0">
           <div className="flex items-center gap-4">
-            <h2 className="text-xl sm:text-2xl font-display font-bold text-zinc-50 min-w-[200px]">
+            <h2 className="text-xl sm:text-2xl font-display font-extrabold text-slate-900 dark:text-white min-w-[200px]">
               {viewState === 'month' 
                 ? format(currentDate, 'MMMM yyyy', { locale: ar }) 
                 : `${format(weekStart, 'd MMMM', { locale: ar })} - ${format(weekEnd, 'd MMMM yyyy', { locale: ar })}`}
             </h2>
-            <div className="flex items-center bg-zinc-950 rounded-xl p-1 border border-zinc-800 shadow-none" dir="ltr">
-              {/* Left arrow goes to next period in RTL */}
+            
+            <div className="flex items-center bg-slate-100 dark:bg-zinc-950 rounded-2xl p-1 border border-slate-200 dark:border-zinc-800" dir="ltr">
               <button 
                 onClick={nextPeriod}
-                className="p-1.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors"
+                className="p-2 text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-zinc-800 rounded-xl transition-colors"
                 title="الفترة القادمة"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
               <button 
                 onClick={goToday}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${
+                className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-colors ${
                   isTodayDate 
-                    ? 'text-blue-400 bg-blue-950/40 border border-blue-900/30' 
-                    : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100'
+                    ? 'text-blue-600 dark:text-blue-400 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 shadow-2xs' 
+                    : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-200 dark:hover:bg-zinc-800'
                 }`}
               >
                 اليوم
               </button>
-              {/* Right arrow goes to previous period in RTL */}
               <button 
                 onClick={prevPeriod}
-                className="p-1.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors"
+                className="p-2 text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-zinc-800 rounded-xl transition-colors"
                 title="الفترة السابقة"
               >
                 <ChevronRight className="w-5 h-5" />
@@ -321,23 +318,23 @@ export function CalendarPage() {
             </div>
           </div>
 
-          <div className="flex bg-zinc-950 p-1 rounded-xl border border-zinc-800">
+          <div className="flex bg-slate-100 dark:bg-zinc-950 p-1 rounded-2xl border border-slate-200 dark:border-zinc-800">
             <button 
               onClick={() => setViewState('month')}
-              className={`px-4 py-1.5 text-xs sm:text-sm font-semibold rounded-lg flex items-center gap-2 transition-colors ${
+              className={`px-4 py-1.5 text-xs sm:text-sm font-bold rounded-xl flex items-center gap-2 transition-colors ${
                 viewState === 'month' 
-                  ? 'bg-zinc-900 text-zinc-100 shadow-none border border-zinc-800' 
-                  : 'text-zinc-400 hover:text-zinc-100'
+                  ? 'bg-white dark:bg-zinc-800 text-blue-600 dark:text-blue-400 shadow-2xs border border-slate-200 dark:border-zinc-700' 
+                  : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <LayoutGrid className="w-4 h-4" /> شهر
             </button>
             <button 
               onClick={() => setViewState('week')}
-              className={`px-4 py-1.5 text-xs sm:text-sm font-semibold rounded-lg flex items-center gap-2 transition-colors ${
+              className={`px-4 py-1.5 text-xs sm:text-sm font-bold rounded-xl flex items-center gap-2 transition-colors ${
                 viewState === 'week' 
-                  ? 'bg-zinc-900 text-zinc-100 shadow-none border border-zinc-800' 
-                  : 'text-zinc-400 hover:text-zinc-100'
+                  ? 'bg-white dark:bg-zinc-800 text-blue-600 dark:text-blue-400 shadow-2xs border border-slate-200 dark:border-zinc-700' 
+                  : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <List className="w-4 h-4" /> أسبوع
@@ -345,74 +342,73 @@ export function CalendarPage() {
           </div>
         </div>
 
-        {/* Calendar Grid */}
-        <div className="flex-1 flex flex-col bg-zinc-950/40 overflow-auto">
-          {/* Days of week header */}
-          <div className="grid grid-cols-7 border-b border-zinc-800 bg-zinc-900 shrink-0 sticky top-0 z-10">
-            {['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'].map((day, i) => (
-              <div key={day} className="py-3 text-center">
-                <span className={`text-xs font-bold ${i === 5 || i === 6 ? 'text-zinc-550' : 'text-zinc-400'}`}>
-                  {day}
-                </span>
-              </div>
-            ))}
-          </div>
+        {/* Days Header */}
+        <div className="grid grid-cols-7 border-b border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-900/90 shrink-0">
+          {['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'].map((day, i) => (
+            <div key={day} className="py-3 text-center">
+              <span className={`text-xs font-bold ${i === 5 || i === 6 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-700 dark:text-zinc-300'}`}>
+                {day}
+              </span>
+            </div>
+          ))}
+        </div>
 
-          {/* Grid Cells */}
-          <div className={`flex-1 grid grid-cols-7 ${viewState === 'month' ? 'auto-rows-[minmax(120px,1fr)]' : 'auto-rows-[minmax(300px,1fr)]'}`}>
-            {daysToShow.map((day, idx) => {
-              const isCurrMonth = isSameMonth(day, currentDate);
-              const isDayToday = isToday(day);
-              const dayEvents = getEventsForDay(day);
+        {/* Calendar Grid Cells */}
+        <div className={`flex-1 grid grid-cols-7 bg-white dark:bg-zinc-950 overflow-auto ${viewState === 'month' ? 'auto-rows-[minmax(110px,1fr)]' : 'auto-rows-[minmax(280px,1fr)]'}`}>
+          {daysToShow.map((day) => {
+            const isCurrMonth = isSameMonth(day, currentDate);
+            const isDayToday = isToday(day);
+            const dayEvents = getEventsForDay(day);
 
-              return (
-                <div 
-                  key={day.toString()} 
-                  className={`border-l border-b border-zinc-800 p-2 flex flex-col transition-colors duration-250 ${
-                    !isCurrMonth && viewState === 'month' ? 'bg-zinc-950/30' : 'bg-zinc-900/10 hover:bg-zinc-800/10'
-                  }`}
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <span 
-                      className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-semibold ${
-                        isDayToday 
-                          ? 'bg-blue-600 text-white font-bold shadow-sm' 
-                          : !isCurrMonth && viewState === 'month'
-                          ? 'text-zinc-600' 
-                          : 'text-zinc-300'
-                      }`}
-                    >
-                      {format(day, 'd')}
-                    </span>
-                  </div>
-                  
-                  <div className="flex-1 overflow-y-auto space-y-1.5 scrollbar-thin scrollbar-thumb-zinc-800 pl-1">
-                    {dayEvents.map((ev, i) => (
-                      <div 
-                        key={ev.id || i}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedEvent(ev);
-                        }}
-                        className={`px-2 py-2 rounded-xl border transition-all duration-150 cursor-pointer text-right border-r-3 ${
-                          selectedEvent && selectedEvent.title === ev.title && selectedEvent.date === ev.date
-                            ? 'bg-blue-600 text-white border-transparent border-r-transparent font-medium scale-[1.01]'
-                            : 'border-zinc-800 border-r-blue-500 bg-blue-950/20 text-blue-400 hover:bg-blue-950/40 hover:border-zinc-700 font-semibold'
-                        }`}
-                        title="انقر لعرض تفاصيل الفعالية"
-                      >
-                        <div className="font-bold truncate text-[11px] leading-relaxed">{ev.title}</div>
-                        <div className="opacity-75 truncate text-[9px] flex items-center gap-1 mt-1">
-                          <Clock className="w-3 h-3 inline text-zinc-500" />
-                          {format(parseISO(ev.date), 'h:mm a', { locale: ar })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+            return (
+              <div 
+                key={day.toString()} 
+                className={`border-l border-b border-slate-200 dark:border-zinc-800/80 p-2 flex flex-col transition-colors duration-200 ${
+                  !isCurrMonth && viewState === 'month' 
+                    ? 'bg-slate-50/70 dark:bg-zinc-950/80' 
+                    : 'bg-white dark:bg-zinc-900/30 hover:bg-blue-50/40 dark:hover:bg-zinc-900/60'
+                }`}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <span 
+                    className={`inline-flex items-center justify-center w-7 h-7 rounded-xl text-xs font-bold ${
+                      isDayToday 
+                        ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
+                        : !isCurrMonth && viewState === 'month'
+                        ? 'text-slate-400 dark:text-zinc-600' 
+                        : 'text-slate-800 dark:text-zinc-200'
+                    }`}
+                  >
+                    {format(day, 'd')}
+                  </span>
                 </div>
-              );
-            })}
-          </div>
+                
+                <div className="flex-1 overflow-y-auto space-y-1.5 pr-0.5">
+                  {dayEvents.map((ev, i) => (
+                    <div 
+                      key={ev.id || i}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedEvent(ev);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-xl border transition-all duration-150 cursor-pointer text-right border-r-3 ${
+                        selectedEvent && selectedEvent.title === ev.title && selectedEvent.date === ev.date
+                          ? 'bg-blue-600 text-white border-transparent shadow-sm'
+                          : 'border-blue-200 dark:border-blue-900/50 border-r-blue-600 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/60 font-bold'
+                      }`}
+                      title="انقر لعرض تفاصيل الفعالية"
+                    >
+                      <div className="font-bold truncate text-[11px] leading-relaxed">{ev.title}</div>
+                      <div className="opacity-75 truncate text-[9px] flex items-center gap-1 mt-0.5">
+                        <Clock className="w-2.5 h-2.5 inline" />
+                        {format(parseISO(ev.date), 'h:mm a', { locale: ar })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

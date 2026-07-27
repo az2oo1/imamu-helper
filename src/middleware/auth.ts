@@ -12,12 +12,24 @@ export const requireAuth = async (
   res: Response,
   next: NextFunction
 ): Promise<any> => {
+  let token: string | undefined;
+
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split('Bearer ')[1];
+  } else if ((req as any).cookies && (req as any).cookies.token) {
+    token = (req as any).cookies.token;
+  } else if (req.headers.cookie) {
+    const match = req.headers.cookie.match(/(?:^|;\s*)token=([^;]*)/);
+    if (match) {
+      token = decodeURIComponent(match[1]);
+    }
+  }
+
+  if (!token) {
     return res.status(401).json({ error: 'Unauthorized: Missing token' });
   }
 
-  const token = authHeader.split('Bearer ')[1];
   try {
     const decodedToken = jwt.verify(token, JWT_SECRET);
     req.user = decodedToken;

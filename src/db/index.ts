@@ -46,9 +46,31 @@ async function initializeDatabase() {
       await memClient.exec(`
         ALTER TABLE global_settings ADD COLUMN IF NOT EXISTS twitter_auth_token text;
         ALTER TABLE global_settings ADD COLUMN IF NOT EXISTS twitter_ct0 text;
+        CREATE TABLE IF NOT EXISTS "Course" (
+          id text PRIMARY KEY,
+          name text NOT NULL,
+          code text UNIQUE NOT NULL,
+          description text,
+          syllabus text,
+          "freeResourcesUrl" text,
+          "paidResourcesUrl" text,
+          "avatarUrl" text,
+          "bannerUrl" text,
+          tags text
+        );
+        CREATE TABLE IF NOT EXISTS "User" (
+          id text PRIMARY KEY,
+          username text UNIQUE,
+          "passwordHash" text,
+          "studentEmail" text UNIQUE,
+          "googleEmail" text UNIQUE,
+          name text,
+          role text DEFAULT 'USER'
+        );
       `);
     } catch(e) {}
     console.log('[DB] Embedded database fallback is ready.');
+
   } catch (err: any) {
     console.warn('[DB] Embedded database migration notice:', err.message || err);
   }

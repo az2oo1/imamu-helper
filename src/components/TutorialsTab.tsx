@@ -367,25 +367,27 @@ export function TutorialsTab({
 
         {/* Modern Modal backdrop */}
         {showSectionForm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
             {/* Modal Box */}
             <form 
               onSubmit={handleSaveSection}
-              className="bg-zinc-900 border border-zinc-800/40 rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 text-right" 
+              className="border rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 text-right" 
+              style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
               dir="rtl"
             >
               {/* Modal Header */}
-              <div className="p-5 border-b border-zinc-800/30 flex items-center justify-between bg-zinc-950/40">
+              <div className="p-5 border-b flex items-center justify-between" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}>
                 <div className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-blue-400" />
-                  <h3 className="text-base font-bold text-zinc-100">
+                  <Sparkles className="w-5 h-5 text-blue-500" />
+                  <h3 className="text-base font-bold" style={{ color: 'var(--text-main)' }}>
                     {editingSection ? 'تعديل التصنيف' : 'إضافة تصنيف جديد'}
                   </h3>
                 </div>
                 <button 
                   type="button"
                   onClick={resetSectionForm}
-                  className="p-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-lg transition"
+                  className="p-1.5 rounded-lg transition hover:bg-[var(--bg-card)]"
+                  style={{ color: 'var(--text-muted)' }}
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -395,19 +397,19 @@ export function TutorialsTab({
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
                 
                 {/* 1. Live Preview - Single Centered Catalog Card */}
-                <div className="bg-zinc-950/20 p-5 rounded-2xl flex flex-col items-center justify-center space-y-3">
-                  <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">معاينة التصنيف في الدليل</span>
-                  <div className="w-full max-w-sm bg-zinc-900/40 border border-zinc-800/30 rounded-xl p-4 flex items-start gap-3 text-right">
+                <div className="p-5 rounded-2xl flex flex-col items-center justify-center space-y-3" style={{ background: 'var(--bg-subtle)' }}>
+                  <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>معاينة التصنيف في الدليل</span>
+                  <div className="w-full max-w-sm border rounded-xl p-4 flex items-start gap-3 text-right" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
                     <div className={`p-2 rounded-md shrink-0 border ${secColor.split(' ').slice(1).join(' ')}`}>
                       <span className={secColor.split(' ')[0]}>
                         {React.createElement((Icons as any)[secIcon] || HelpCircle, { className: "w-5 h-5" })}
                       </span>
                     </div>
                     <div className="flex-1 min-w-0 pr-1 text-right">
-                      <h3 className="text-xs font-bold text-zinc-100 truncate">
+                      <h3 className="text-xs font-bold truncate" style={{ color: 'var(--text-main)' }}>
                         {secTitle || 'اسم التصنيف الجديد'}
                       </h3>
-                      <p className="text-[10px] text-zinc-400 mt-0.5">
+                      <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
                         هنا ستظهر الشروحات الأكاديمية التابعة له...
                       </p>
                     </div>
@@ -416,26 +418,26 @@ export function TutorialsTab({
 
                 {/* 2. Category Title Input */}
                 <div className="flex flex-col gap-2">
-                  <label className="text-xs text-zinc-350 font-bold">اسم التصنيف:</label>
+                  <label className="text-xs font-bold" style={{ color: 'var(--text-muted)' }}>اسم التصنيف:</label>
                   <input
                     type="text"
                     required
                     placeholder="مثال: الخدمات الأكاديمية، المكافآت..."
                     value={secTitle}
                     onChange={e => setSecTitle(e.target.value)}
-                    className="bg-zinc-950 border border-zinc-800/40 focus:border-zinc-700/50 text-zinc-100 rounded-xl py-3 px-4 outline-none text-xs transition animate-none"
+                    className="rounded-xl py-3 px-4 outline-none text-xs transition animate-none"
                   />
                 </div>
 
                 {/* 3. Color Slider */}
                 <div className="flex flex-col gap-2">
                   <div className="flex justify-between items-center">
-                    <label className="text-xs text-zinc-350 font-bold">لون التصنيف:</label>
-                    <span className="text-[10px] text-zinc-400 font-bold">
+                    <label className="text-xs font-bold" style={{ color: 'var(--text-muted)' }}>لون التصنيف:</label>
+                    <span className="text-[10px] font-bold" style={{ color: 'var(--text-main)' }}>
                       {colorOptions.find(o => o.value === secColor)?.label || 'أزرق'}
                     </span>
                   </div>
-                  <div className="relative flex items-center bg-zinc-950 p-4 rounded-2xl border border-zinc-800/30">
+                  <div className="relative flex items-center p-4 rounded-2xl border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}>
                     <input
                       type="range"
                       min="0"
@@ -446,7 +448,7 @@ export function TutorialsTab({
                         const idx = parseInt(e.target.value, 10);
                         setSecColor(colorOptions[idx].value);
                       }}
-                      className="w-full h-1.5 bg-gradient-to-r from-blue-500 via-amber-500 via-emerald-500 to-purple-500 rounded-lg appearance-none cursor-pointer outline-none accent-zinc-200"
+                      className="w-full h-1.5 bg-gradient-to-r from-blue-500 via-amber-500 via-emerald-500 to-purple-500 rounded-lg appearance-none cursor-pointer outline-none"
                     />
                   </div>
                 </div>
@@ -454,8 +456,8 @@ export function TutorialsTab({
                 {/* 3. Icon Search Engine */}
                 <div className="flex flex-col gap-3">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs text-zinc-350 font-bold">أيقونة التصنيف:</label>
-                    <span className="text-[10px] text-zinc-550 font-medium">اختر أيقونة معبرة من محرك البحث</span>
+                    <label className="text-xs font-bold" style={{ color: 'var(--text-muted)' }}>أيقونة التصنيف:</label>
+                    <span className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>اختر أيقونة معبرة من محرك البحث</span>
                   </div>
                   
                   {/* Search Input field */}
@@ -465,14 +467,14 @@ export function TutorialsTab({
                       placeholder="ابحث عن أيقونة... (مثال: book, cap, phone, card)"
                       value={iconSearchQuery}
                       onChange={e => setIconSearchQuery(e.target.value)}
-                      className="w-full pr-4 pl-10 py-2.5 bg-zinc-950 border border-zinc-800/40 focus:border-zinc-700/50 text-zinc-150 rounded-xl outline-none text-xs transition"
+                      className="w-full pr-4 pl-10 py-2.5 rounded-xl outline-none text-xs transition"
                     />
-                    <Icons.Search className="absolute left-3.5 top-3 w-4 h-4 text-zinc-500" />
+                    <Icons.Search className="absolute left-3.5 top-3 w-4 h-4 text-zinc-400" />
                     {iconSearchQuery && (
                       <button
                         type="button"
                         onClick={() => setIconSearchQuery('')}
-                        className="absolute left-10 top-3 text-zinc-500 hover:text-zinc-300"
+                        className="absolute left-10 top-3 text-zinc-400 hover:text-zinc-600"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -480,7 +482,7 @@ export function TutorialsTab({
                   </div>
 
                   {/* Icons Grid with Pagination/Limit */}
-                  <div className="grid grid-cols-6 sm:grid-cols-8 gap-2.5 max-h-48 overflow-y-auto p-3.5 bg-zinc-950 rounded-2xl border border-zinc-800/20">
+                  <div className="grid grid-cols-6 sm:grid-cols-8 gap-2.5 max-h-48 overflow-y-auto p-3.5 rounded-2xl border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}>
                     {filteredIcons.slice(0, 80).map(icoName => {
                       const IconComponent = (Icons as any)[icoName];
                       const isSelected = secIcon === icoName;
@@ -492,9 +494,10 @@ export function TutorialsTab({
                           onClick={() => setSecIcon(icoName)}
                           className={`p-3 rounded-xl flex items-center justify-center border transition-all ${
                             isSelected 
-                              ? 'bg-blue-600/10 border border-blue-500/50 text-blue-400 scale-105 shadow-inner' 
-                              : 'bg-zinc-900/40 border border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+                              ? 'bg-blue-600/10 border-blue-500 text-blue-500 scale-105 shadow-inner' 
+                              : 'hover:bg-[var(--bg-card)]'
                           }`}
+                          style={!isSelected ? { background: 'var(--bg-card)', borderColor: 'var(--border-color)', color: 'var(--text-muted)' } : {}}
                           title={icoName}
                         >
                           <IconComponent className="w-4.5 h-4.5" />
@@ -502,7 +505,7 @@ export function TutorialsTab({
                       );
                     })}
                     {filteredIcons.length === 0 && (
-                      <div className="col-span-full py-8 text-center text-xs text-zinc-500 italic">
+                      <div className="col-span-full py-8 text-center text-xs italic" style={{ color: 'var(--text-muted)' }}>
                         لا توجد أيقونات تطابق البحث
                       </div>
                     )}
@@ -632,37 +635,46 @@ export function TutorialsTab({
   return (
     <div className="space-y-8 text-right bg-transparent" dir="rtl">
       {/* Header bar */}
-      <div className="flex items-center justify-between border-b border-zinc-800 pb-5">
+      <div className="flex items-center justify-between border-b pb-5" style={{ borderColor: 'var(--border-color)' }}>
         <div className="flex items-center gap-3">
           <button
             onClick={() => {
               setEditingTutorial(null);
               setIsCreating(false);
             }}
-            className="w-8 h-8 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-850 flex items-center justify-center text-zinc-400 hover:text-zinc-150 transition"
+            className="w-8 h-8 rounded-xl border flex items-center justify-center transition hover:bg-[var(--bg-subtle)]"
+            style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
           >
             <ArrowRight className="w-4.5 h-4.5" />
           </button>
           <div>
-            <h3 className="text-lg font-display font-bold text-zinc-150">
+            <h3 className="text-lg font-display font-bold" style={{ color: 'var(--text-main)' }}>
               {isCreating ? 'إضافة شرح جديد' : 'تعديل الشرح'}
             </h3>
-            <p className="text-[10px] text-zinc-500 font-semibold">{tutTitle || 'مخطط شرح الدليلة'}</p>
+            <p className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>{tutTitle || 'مخطط شرح الدليلة'}</p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           {/* Sub Tab switcher */}
-          <div className="bg-zinc-950 border border-zinc-800/80 p-1 rounded-xl flex gap-1">
+          <div className="border p-1 rounded-xl flex gap-1" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}>
             <button
               onClick={() => setActiveSubTab('edit')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeSubTab === 'edit' ? 'bg-zinc-850 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-200'}`}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-xs"
+              style={{
+                background: activeSubTab === 'edit' ? 'var(--bg-card)' : 'transparent',
+                color: activeSubTab === 'edit' ? 'var(--text-main)' : 'var(--text-muted)'
+              }}
             >
               التحرير (Editor)
             </button>
             <button
               onClick={() => setActiveSubTab('preview')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeSubTab === 'preview' ? 'bg-zinc-850 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-200'}`}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-xs"
+              style={{
+                background: activeSubTab === 'preview' ? 'var(--bg-card)' : 'transparent',
+                color: activeSubTab === 'preview' ? 'var(--text-main)' : 'var(--text-muted)'
+              }}
             >
               المعاينة الحية (Live Preview)
             </button>
@@ -681,41 +693,41 @@ export function TutorialsTab({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Left panel: Info & Meta Fields */}
           <div className="space-y-6">
-            <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-5 space-y-4">
-              <h4 className="font-bold text-xs text-zinc-300 border-b border-zinc-850 pb-2 flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-emerald-400" />
+            <div className="border rounded-2xl p-5 space-y-4 shadow-sm" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+              <h4 className="font-bold text-xs border-b pb-2 flex items-center gap-1.5" style={{ color: 'var(--text-main)', borderColor: 'var(--border-color)' }}>
+                <Sparkles className="w-4 h-4 text-emerald-500" />
                 بيانات الشرح الأساسية
               </h4>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] text-zinc-450 font-bold">العنوان:</label>
+                <label className="text-[11px] font-bold" style={{ color: 'var(--text-muted)' }}>العنوان:</label>
                 <input
                   type="text"
                   required
                   placeholder="مثال: كيفية حذف وإضافة مادة"
                   value={tutTitle}
                   onChange={e => setTutTitle(e.target.value)}
-                  className="bg-zinc-950 border border-zinc-800 text-zinc-100 rounded-xl py-2 px-3 outline-none text-xs text-right font-medium"
+                  className="rounded-xl py-2 px-3 text-xs text-right font-medium"
                 />
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] text-zinc-455 font-bold">وصف الشرح مختصر:</label>
+                <label className="text-[11px] font-bold" style={{ color: 'var(--text-muted)' }}>وصف الشرح مختصر:</label>
                 <textarea
                   required
                   placeholder="اكتب وصفاً موجزاً يظهر للطلاب في قائمة الشروحات..."
                   value={tutDescription}
                   onChange={e => setTutDescription(e.target.value)}
-                  className="bg-zinc-950 border border-zinc-800 text-zinc-150 rounded-xl py-2 px-3 outline-none text-xs text-right font-normal resize-none h-20"
+                  className="rounded-xl py-2 px-3 text-xs text-right font-normal resize-none h-20"
                 />
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] text-zinc-455 font-bold">التصنيف / القسم:</label>
+                <label className="text-[11px] font-bold" style={{ color: 'var(--text-muted)' }}>التصنيف / القسم:</label>
                 <select
                   value={tutSectionId}
                   onChange={e => setTutSectionId(Number(e.target.value))}
-                  className="bg-zinc-950 border border-zinc-800 text-zinc-200 rounded-xl py-2 px-3 outline-none text-xs font-semibold"
+                  className="rounded-xl py-2 px-3 text-xs font-semibold"
                 >
                   <option value="" disabled>اختر التصنيف المناسب</option>
                   {sections.map(sec => (
@@ -726,31 +738,31 @@ export function TutorialsTab({
             </div>
 
             {/* External Links Info */}
-            <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-5 space-y-4">
-              <h4 className="font-bold text-xs text-zinc-300 border-b border-zinc-850 pb-2 flex items-center gap-1.5">
-                <Link className="w-4 h-4 text-blue-400" />
+            <div className="border rounded-2xl p-5 space-y-4 shadow-sm" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+              <h4 className="font-bold text-xs border-b pb-2 flex items-center gap-1.5" style={{ color: 'var(--text-main)', borderColor: 'var(--border-color)' }}>
+                <Link className="w-4 h-4 text-blue-500" />
                 زر رابط خارجي اختياري (Call to Action)
               </h4>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] text-zinc-450 font-bold">رابط التوجيه المباشر:</label>
+                <label className="text-[11px] font-bold" style={{ color: 'var(--text-muted)' }}>رابط التوجيه المباشر:</label>
                 <input
                   type="text"
                   placeholder="https://selfservice.imamu.edu..."
                   value={tutLinkUrl}
                   onChange={e => setTutLinkUrl(e.target.value)}
-                  className="bg-zinc-950 border border-zinc-800 text-zinc-150 rounded-xl py-2 px-3 outline-none text-xs text-left"
+                  className="rounded-xl py-2 px-3 text-xs text-left"
                 />
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] text-zinc-450 font-bold">عنوان الزر:</label>
+                <label className="text-[11px] font-bold" style={{ color: 'var(--text-muted)' }}>عنوان الزر:</label>
                 <input
                   type="text"
                   placeholder="مثال: الانتقال للخدمة الذاتية 🔗"
                   value={tutLinkTitle}
                   onChange={e => setTutLinkTitle(e.target.value)}
-                  className="bg-zinc-950 border border-zinc-800 text-zinc-100 rounded-xl py-2 px-3 outline-none text-xs"
+                  className="rounded-xl py-2 px-3 text-xs"
                 />
               </div>
             </div>
@@ -759,50 +771,56 @@ export function TutorialsTab({
           {/* Right panel: Structured Block-based Canvas Editor */}
           <div className="md:col-span-2 space-y-6">
             {/* Block Toolbar Add buttons */}
-            <div className="bg-zinc-950 border border-zinc-800/80 p-4 rounded-2xl flex flex-wrap gap-2 items-center justify-between shadow-sm">
-              <span className="text-xs text-zinc-400 font-bold">إضافة مكونات إلى الشرح:</span>
+            <div className="border p-4 rounded-2xl flex flex-wrap gap-2 items-center justify-between shadow-sm" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+              <span className="text-xs font-bold" style={{ color: 'var(--text-main)' }}>إضافة مكونات إلى الشرح:</span>
               <div className="flex flex-wrap gap-1.5">
                 <button
                   type="button"
                   onClick={() => addBlock('text')}
-                  className="px-3 py-1.5 bg-zinc-900 border border-zinc-800 hover:bg-zinc-850 text-zinc-250 text-xs rounded-xl transition flex items-center gap-1 font-bold"
+                  className="px-3 py-1.5 border hover:bg-[var(--bg-subtle)] text-xs rounded-xl transition flex items-center gap-1.5 font-bold shadow-xs"
+                  style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
                 >
-                  <FileText className="w-3.5 h-3.5 text-blue-400" /> نص فقرة
+                  <FileText className="w-3.5 h-3.5 text-blue-500" /> نص توضيحي
                 </button>
                 <button
                   type="button"
                   onClick={() => addBlock('steps')}
-                  className="px-3 py-1.5 bg-zinc-900 border border-zinc-800 hover:bg-zinc-850 text-zinc-250 text-xs rounded-xl transition flex items-center gap-1 font-bold"
+                  className="px-3 py-1.5 border hover:bg-[var(--bg-subtle)] text-xs rounded-xl transition flex items-center gap-1.5 font-bold shadow-xs"
+                  style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
                 >
-                  <CheckSquare className="w-3.5 h-3.5 text-amber-400" /> خطوات
+                  <CheckSquare className="w-3.5 h-3.5 text-amber-500" /> خطوات
                 </button>
                 <button
                   type="button"
                   onClick={() => addBlock('list')}
-                  className="px-3 py-1.5 bg-zinc-900 border border-zinc-800 hover:bg-zinc-850 text-zinc-250 text-xs rounded-xl transition flex items-center gap-1 font-bold"
+                  className="px-3 py-1.5 border hover:bg-[var(--bg-subtle)] text-xs rounded-xl transition flex items-center gap-1.5 font-bold shadow-xs"
+                  style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
                 >
-                  <Compass className="w-3.5 h-3.5 text-purple-400" /> قائمة
+                  <Compass className="w-3.5 h-3.5 text-purple-500" /> قائمة
                 </button>
                 <button
                   type="button"
                   onClick={() => addBlock('table')}
-                  className="px-3 py-1.5 bg-zinc-900 border border-zinc-800 hover:bg-zinc-850 text-zinc-250 text-xs rounded-xl transition flex items-center gap-1 font-bold"
+                  className="px-3 py-1.5 border hover:bg-[var(--bg-subtle)] text-xs rounded-xl transition flex items-center gap-1.5 font-bold shadow-xs"
+                  style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
                 >
-                  <PlusCircle className="w-3.5 h-3.5 text-emerald-400" /> جدول
+                  <PlusCircle className="w-3.5 h-3.5 text-emerald-500" /> جدول
                 </button>
                 <button
                   type="button"
                   onClick={() => addBlock('media')}
-                  className="px-3 py-1.5 bg-zinc-900 border border-zinc-800 hover:bg-zinc-850 text-zinc-250 text-xs rounded-xl transition flex items-center gap-1 font-bold"
+                  className="px-3 py-1.5 border hover:bg-[var(--bg-subtle)] text-xs rounded-xl transition flex items-center gap-1.5 font-bold shadow-xs"
+                  style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
                 >
-                  <Image className="w-3.5 h-3.5 text-rose-400" /> صورة / فيديو
+                  <Image className="w-3.5 h-3.5 text-rose-500" /> صورة / فيديو
                 </button>
                 <button
                   type="button"
                   onClick={() => addBlock('buttons')}
-                  className="px-3 py-1.5 bg-zinc-900 border border-zinc-800 hover:bg-zinc-850 text-zinc-250 text-xs rounded-xl transition flex items-center gap-1 font-bold"
+                  className="px-3 py-1.5 border hover:bg-[var(--bg-subtle)] text-xs rounded-xl transition flex items-center gap-1.5 font-bold shadow-xs"
+                  style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
                 >
-                  <ExternalLink className="w-3.5 h-3.5 text-indigo-400" /> أزرار روابط
+                  <ExternalLink className="w-3.5 h-3.5 text-indigo-500" /> أزرار روابط
                 </button>
               </div>
             </div>
@@ -812,19 +830,20 @@ export function TutorialsTab({
               {blocks.map((block, blockIdx) => (
                 <div 
                   key={blockIdx}
-                  className="bg-zinc-900/40 border border-zinc-800/90 rounded-2xl overflow-hidden shadow-inner flex flex-col transition hover:border-zinc-750 duration-200"
+                  className="border rounded-2xl overflow-hidden shadow-sm flex flex-col transition duration-200"
+                  style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
                 >
                   {/* Block Header */}
-                  <div className="bg-zinc-950/60 border-b border-zinc-850 px-4 py-3 flex items-center justify-between">
+                  <div className="border-b px-4 py-3 flex items-center justify-between" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}>
                     <div className="flex items-center gap-2">
-                      <span className="text-zinc-500 font-mono text-xs font-semibold">#{blockIdx + 1}</span>
-                      <span className="text-xs font-bold text-zinc-350 flex items-center gap-1.5">
-                        {block.type === 'text' && <><FileText className="w-4 h-4 text-blue-400" /> نص توضيحي</>}
-                        {block.type === 'steps' && <><CheckSquare className="w-4 h-4 text-amber-400" /> خطوات الشرح التوضيحي</>}
-                        {block.type === 'list' && <><Compass className="w-4 h-4 text-purple-400" /> عناصر القائمة النقطية</>}
-                        {block.type === 'table' && <><PlusCircle className="w-4 h-4 text-emerald-400" /> جدول بيانات</>}
-                        {block.type === 'media' && <><Image className="w-4 h-4 text-rose-400" /> وسائط (صورة أو فيديو)</>}
-                        {block.type === 'buttons' && <><ExternalLink className="w-4 h-4 text-indigo-400" /> أزرار توجيه للطلاب</>}
+                      <span className="font-mono text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>#{blockIdx + 1}</span>
+                      <span className="text-xs font-bold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
+                        {block.type === 'text' && <><FileText className="w-4 h-4 text-blue-500" /> نص توضيحي</>}
+                        {block.type === 'steps' && <><CheckSquare className="w-4 h-4 text-amber-500" /> خطوات الشرح التوضيحي</>}
+                        {block.type === 'list' && <><Compass className="w-4 h-4 text-purple-500" /> عناصر القائمة النقطية</>}
+                        {block.type === 'table' && <><PlusCircle className="w-4 h-4 text-emerald-500" /> جدول بيانات</>}
+                        {block.type === 'media' && <><Image className="w-4 h-4 text-rose-500" /> وسائط (صورة أو فيديو)</>}
+                        {block.type === 'buttons' && <><ExternalLink className="w-4 h-4 text-indigo-500" /> أزرار توجيه للطلاب</>}
                       </span>
                     </div>
 
@@ -834,7 +853,8 @@ export function TutorialsTab({
                         type="button"
                         onClick={() => moveBlock(blockIdx, 'up')}
                         disabled={blockIdx === 0}
-                        className="p-1 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 rounded disabled:opacity-30 transition"
+                        className="p-1 rounded disabled:opacity-30 transition hover:bg-[var(--bg-card)]"
+                        style={{ color: 'var(--text-muted)' }}
                       >
                         <ChevronUp className="w-4 h-4" />
                       </button>
@@ -842,16 +862,17 @@ export function TutorialsTab({
                         type="button"
                         onClick={() => moveBlock(blockIdx, 'down')}
                         disabled={blockIdx === blocks.length - 1}
-                        className="p-1 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 rounded disabled:opacity-30 transition"
+                        className="p-1 rounded disabled:opacity-30 transition hover:bg-[var(--bg-card)]"
+                        style={{ color: 'var(--text-muted)' }}
                       >
                         <ChevronDown className="w-4 h-4" />
                       </button>
-                      <span className="w-px h-4 bg-zinc-800 mx-1.5" />
+                      <span className="w-px h-4 mx-1.5 opacity-40" style={{ background: 'var(--border-color)' }} />
                       {/* Delete Button */}
                       <button
                         type="button"
                         onClick={() => deleteBlock(blockIdx)}
-                        className="p-1 text-zinc-500 hover:text-red-400 hover:bg-red-950/20 rounded transition"
+                        className="p-1 text-red-500 hover:text-red-600 hover:bg-red-500/10 rounded transition"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -859,11 +880,11 @@ export function TutorialsTab({
                   </div>
 
                   {/* Block Editor Content */}
-                  <div className="p-4 bg-zinc-900/10">
+                  <div className="p-4" style={{ background: 'var(--bg-card)' }}>
                     {/* TEXT BLOCK */}
                     {block.type === 'text' && (
                       <textarea
-                        className="w-full text-xs sm:text-sm bg-zinc-950 border border-zinc-800 text-zinc-200 rounded-lg p-3 outline-none text-right font-normal resize-none focus:ring-1 focus:ring-zinc-700"
+                        className="w-full text-xs sm:text-sm rounded-lg p-3 outline-none text-right font-normal resize-none"
                         rows={4}
                         placeholder="اكتب محتوى الفقرة هنا..."
                         value={block.content || ''}
@@ -877,9 +898,9 @@ export function TutorialsTab({
                         <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
                           {(block.stepsItems || []).map((step, sIdx) => (
                             <div key={sIdx} className="flex gap-2 items-start">
-                              <span className="text-zinc-500 text-xs font-bold pt-2.5 shrink-0">{sIdx + 1}.</span>
+                              <span className="text-xs font-bold pt-2.5 shrink-0" style={{ color: 'var(--text-muted)' }}>{sIdx + 1}.</span>
                               <textarea
-                                className="flex-1 bg-zinc-950 border border-zinc-800 text-zinc-200 text-xs rounded-xl p-2.5 text-right outline-none resize-none focus:ring-1 focus:ring-zinc-750"
+                                className="flex-1 text-xs rounded-xl p-2.5 text-right outline-none resize-none"
                                 rows={2}
                                 value={step}
                                 placeholder="اكتب تفاصيل الخطوة هنا..."
@@ -891,7 +912,8 @@ export function TutorialsTab({
                               />
                               <button
                                 type="button"
-                                className="text-zinc-500 hover:text-red-450 p-2.5 bg-zinc-950 border border-zinc-800 rounded-xl hover:bg-zinc-900 shrink-0 mt-1"
+                                className="p-2.5 border rounded-xl hover:bg-[var(--bg-subtle)] shrink-0 mt-1 transition"
+                                style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
                                 onClick={() => {
                                   const newSteps = (block.stepsItems || []).filter((_, idx) => idx !== sIdx);
                                   updateBlock(blockIdx, { stepsItems: newSteps });
@@ -904,7 +926,8 @@ export function TutorialsTab({
                         </div>
                         <button
                           type="button"
-                          className="text-[11px] bg-zinc-950 border border-zinc-800 hover:bg-zinc-900 text-zinc-300 font-bold px-3 py-2 rounded-xl transition"
+                          className="text-[11px] border font-bold px-3 py-2 rounded-xl transition hover:bg-[var(--bg-subtle)]"
+                          style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
                           onClick={() => {
                             const newSteps = [...(block.stepsItems || []), ''];
                             updateBlock(blockIdx, { stepsItems: newSteps });
@@ -919,18 +942,20 @@ export function TutorialsTab({
                     {block.type === 'list' && (
                       <div className="space-y-3">
                         <div className="flex gap-4 items-center mb-2">
-                          <label className="text-xs text-zinc-400">نوع القائمة:</label>
+                          <label className="text-xs font-bold" style={{ color: 'var(--text-muted)' }}>نوع القائمة:</label>
                           <div className="flex gap-2">
                             <button
                               type="button"
-                              className={`px-3 py-1.5 text-xs rounded-xl font-bold border transition ${block.listType === 'ordered' ? 'bg-blue-900 border-blue-800 text-white' : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:bg-zinc-900'}`}
+                              className={`px-3 py-1.5 text-xs rounded-xl font-bold border transition ${block.listType === 'ordered' ? 'bg-blue-600 border-blue-600 text-white' : 'hover:bg-[var(--bg-subtle)]'}`}
+                              style={block.listType !== 'ordered' ? { background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' } : {}}
                               onClick={() => updateBlock(blockIdx, { listType: 'ordered' })}
                             >
                               قائمة مرقمة (1, 2, 3)
                             </button>
                             <button
                               type="button"
-                              className={`px-3 py-1.5 text-xs rounded-xl font-bold border transition ${block.listType === 'unordered' ? 'bg-blue-900 border-blue-800 text-white' : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:bg-zinc-900'}`}
+                              className={`px-3 py-1.5 text-xs rounded-xl font-bold border transition ${block.listType === 'unordered' ? 'bg-blue-600 border-blue-600 text-white' : 'hover:bg-[var(--bg-subtle)]'}`}
+                              style={block.listType !== 'unordered' ? { background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' } : {}}
                               onClick={() => updateBlock(blockIdx, { listType: 'unordered' })}
                             >
                               قائمة نقطية (•)
@@ -943,7 +968,7 @@ export function TutorialsTab({
                             <div key={iIdx} className="flex gap-2 items-center">
                               <input
                                 type="text"
-                                className="flex-1 bg-zinc-950 border border-zinc-800 text-zinc-200 text-xs rounded-xl p-2 px-3 text-right focus:ring-1 focus:ring-zinc-750"
+                                className="flex-1 text-xs rounded-xl p-2 px-3 text-right"
                                 value={item}
                                 placeholder="اكتب عنصر القائمة هنا..."
                                 onChange={(e) => {
@@ -954,7 +979,8 @@ export function TutorialsTab({
                               />
                               <button
                                 type="button"
-                                className="text-zinc-500 hover:text-red-450 p-2.5 bg-zinc-950 border border-zinc-800 rounded-xl hover:bg-zinc-900 shrink-0"
+                                className="p-2.5 border rounded-xl hover:bg-[var(--bg-subtle)] shrink-0 transition"
+                                style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
                                 onClick={() => {
                                   const newItems = (block.listItems || []).filter((_, idx) => idx !== iIdx);
                                   updateBlock(blockIdx, { listItems: newItems });
@@ -967,7 +993,8 @@ export function TutorialsTab({
                         </div>
                         <button
                           type="button"
-                          className="text-[11px] bg-zinc-950 border border-zinc-800 hover:bg-zinc-900 text-zinc-300 font-bold px-3 py-2 rounded-xl transition"
+                          className="text-[11px] border font-bold px-3 py-2 rounded-xl transition hover:bg-[var(--bg-subtle)]"
+                          style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
                           onClick={() => {
                             const newItems = [...(block.listItems || []), ''];
                             updateBlock(blockIdx, { listItems: newItems });
@@ -982,11 +1009,12 @@ export function TutorialsTab({
                     {block.type === 'table' && (
                       <div className="space-y-3">
                         <div className="flex items-center gap-4">
-                          <label className="text-xs text-zinc-400">عدد الأعمدة في الجدول:</label>
+                          <label className="text-xs font-bold" style={{ color: 'var(--text-muted)' }}>عدد الأعمدة في الجدول:</label>
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
-                              className="w-8 h-8 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-200 flex items-center justify-center hover:bg-zinc-900 font-bold"
+                              className="w-8 h-8 rounded-lg border flex items-center justify-center hover:bg-[var(--bg-subtle)] font-bold transition"
+                              style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
                               onClick={() => {
                                 const currentCols = block.tableHeaders?.length || 1;
                                 if (currentCols <= 1) return;
@@ -997,10 +1025,11 @@ export function TutorialsTab({
                             >
                               -
                             </button>
-                            <span className="text-sm font-bold text-zinc-100">{block.tableHeaders?.length || 0}</span>
+                            <span className="text-sm font-bold" style={{ color: 'var(--text-main)' }}>{block.tableHeaders?.length || 0}</span>
                             <button
                               type="button"
-                              className="w-8 h-8 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-200 flex items-center justify-center hover:bg-zinc-900 font-bold"
+                              className="w-8 h-8 rounded-lg border flex items-center justify-center hover:bg-[var(--bg-subtle)] font-bold transition"
+                              style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
                               onClick={() => {
                                 const newHeaders = [...(block.tableHeaders || []), `عنوان العمود ${ (block.tableHeaders?.length || 0) + 1 }`];
                                 const newRows = (block.tableRows || []).map(row => [...row, '']);
@@ -1013,12 +1042,12 @@ export function TutorialsTab({
                         </div>
 
                         {/* Table headers input */}
-                        <div className="grid gap-2 border border-zinc-850 p-2.5 rounded-xl bg-zinc-950/40" style={{ gridTemplateColumns: `repeat(${block.tableHeaders?.length || 1}, minmax(0, 1fr))` }}>
+                        <div className="grid gap-2 border p-2.5 rounded-xl" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', gridTemplateColumns: `repeat(${block.tableHeaders?.length || 1}, minmax(0, 1fr))` }}>
                           {(block.tableHeaders || []).map((header, hIdx) => (
                             <input
                               key={hIdx}
                               type="text"
-                              className="bg-zinc-950 border border-zinc-800 text-zinc-150 text-xs rounded-lg p-2 text-right font-bold focus:ring-1 focus:ring-zinc-700"
+                              className="text-xs rounded-lg p-2 text-right font-bold"
                               value={header}
                               placeholder={`العنوان ${hIdx + 1}`}
                               onChange={(e) => {
@@ -1039,7 +1068,7 @@ export function TutorialsTab({
                                   <input
                                     key={cIdx}
                                     type="text"
-                                    className="bg-zinc-950 border border-zinc-850 text-zinc-200 text-xs rounded-lg p-2 text-right focus:ring-1 focus:ring-zinc-700"
+                                    className="text-xs rounded-lg p-2 text-right"
                                     value={cell}
                                     placeholder="خلية البيانات..."
                                     onChange={(e) => {
@@ -1053,7 +1082,8 @@ export function TutorialsTab({
                               </div>
                               <button
                                 type="button"
-                                className="text-zinc-500 hover:text-red-450 p-2 bg-zinc-950 border border-zinc-800 rounded-xl hover:bg-zinc-900 shrink-0"
+                                className="p-2 border rounded-xl hover:bg-[var(--bg-subtle)] shrink-0 transition"
+                                style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
                                 onClick={() => {
                                   const newRows = (block.tableRows || []).filter((_, idx) => idx !== rIdx);
                                   updateBlock(blockIdx, { tableRows: newRows });
@@ -1067,7 +1097,8 @@ export function TutorialsTab({
 
                         <button
                           type="button"
-                          className="text-[11px] bg-zinc-950 border border-zinc-800 hover:bg-zinc-900 text-zinc-300 font-bold px-3 py-2 rounded-xl transition"
+                          className="text-[11px] border font-bold px-3 py-2 rounded-xl transition hover:bg-[var(--bg-subtle)]"
+                          style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
                           onClick={() => {
                             const colsCount = block.tableHeaders?.length || 1;
                             const newRow = Array(colsCount).fill('');
@@ -1084,18 +1115,20 @@ export function TutorialsTab({
                     {block.type === 'media' && (
                       <div className="space-y-3 text-right">
                         <div className="flex gap-4 items-center">
-                          <label className="text-xs text-zinc-400">نوع الوسائط:</label>
+                          <label className="text-xs font-bold" style={{ color: 'var(--text-muted)' }}>نوع الوسائط:</label>
                           <div className="flex gap-2">
                             <button
                               type="button"
-                              className={`px-3 py-1.5 text-xs rounded-xl font-bold border transition ${block.mediaType === 'image' ? 'bg-blue-900 border-blue-800 text-white' : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:bg-zinc-900'}`}
+                              className={`px-3 py-1.5 text-xs rounded-xl font-bold border transition ${block.mediaType === 'image' ? 'bg-blue-600 border-blue-600 text-white' : 'hover:bg-[var(--bg-subtle)]'}`}
+                              style={block.mediaType !== 'image' ? { background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' } : {}}
                               onClick={() => updateBlock(blockIdx, { mediaType: 'image' })}
                             >
                               صورة توضيحية
                             </button>
                             <button
                               type="button"
-                              className={`px-3 py-1.5 text-xs rounded-xl font-bold border transition ${block.mediaType === 'video' ? 'bg-blue-900 border-blue-800 text-white' : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:bg-zinc-900'}`}
+                              className={`px-3 py-1.5 text-xs rounded-xl font-bold border transition ${block.mediaType === 'video' ? 'bg-blue-600 border-blue-600 text-white' : 'hover:bg-[var(--bg-subtle)]'}`}
+                              style={block.mediaType !== 'video' ? { background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' } : {}}
                               onClick={() => updateBlock(blockIdx, { mediaType: 'video' })}
                             >
                               مقطع مرئي (فيديو)
@@ -1104,10 +1137,10 @@ export function TutorialsTab({
                         </div>
 
                         <div className="flex flex-col gap-1.5">
-                          <label className="text-[11px] text-zinc-450 font-bold">رابط الملف أو رابط التضمين المباشر:</label>
+                          <label className="text-[11px] font-bold" style={{ color: 'var(--text-muted)' }}>رابط الملف أو رابط التضمين المباشر:</label>
                           <input
                             type="text"
-                            className="bg-zinc-950 border border-zinc-800 text-zinc-150 text-xs rounded-xl py-2 px-3 text-left outline-none focus:ring-1 focus:ring-zinc-700"
+                            className="text-xs rounded-xl py-2 px-3 text-left outline-none"
                             value={block.mediaUrl || ''}
                             placeholder={block.mediaType === 'video' ? "أدخل رابط فيديو YouTube Embed أو رابط MP4 مباشر..." : "أدخل رابط الصورة التوضيحية المباشر..."}
                             onChange={(e) => updateBlock(blockIdx, { mediaUrl: e.target.value })}
@@ -1115,8 +1148,8 @@ export function TutorialsTab({
                         </div>
 
                         <div className="flex items-center gap-3 pt-1">
-                          <label className="cursor-pointer bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 text-zinc-200 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 transition">
-                            <Upload className="w-3.5 h-3.5 text-zinc-400" />
+                          <label className="cursor-pointer border font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 transition hover:bg-[var(--bg-subtle)]" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>
+                            <Upload className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
                             {uploadingBlockIdx === blockIdx ? "جاري الرفع..." : "اختر ملفاً لرفعه للخادم"}
                             <input
                               type="file"
@@ -1152,7 +1185,7 @@ export function TutorialsTab({
                               }}
                             />
                           </label>
-                          <span className="text-[10px] text-zinc-500 font-semibold">يدعم الصيغ القياسية للصور والفيديوهات</span>
+                          <span className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>يدعم الصيغ القياسية للصور والفيديوهات</span>
                         </div>
                       </div>
                     )}
@@ -1162,13 +1195,13 @@ export function TutorialsTab({
                       <div className="space-y-3">
                         <div className="space-y-2.5">
                           {(block.buttons || []).map((btn, btnIdx) => (
-                            <div key={btnIdx} className="flex gap-2 items-center bg-zinc-950 border border-zinc-850 p-3.5 rounded-2xl">
+                            <div key={btnIdx} className="flex gap-2 items-center border p-3.5 rounded-2xl" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}>
                               <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3 text-right">
                                 <div className="flex flex-col gap-1">
-                                  <label className="text-[10px] text-zinc-500 font-bold">اسم الزر (Label):</label>
+                                  <label className="text-[10px] font-bold" style={{ color: 'var(--text-muted)' }}>اسم الزر (Label):</label>
                                   <input
                                     type="text"
-                                    className="bg-zinc-900 border border-zinc-800 text-zinc-150 text-xs rounded-xl p-2 px-3 focus:ring-1 focus:ring-zinc-700"
+                                    className="text-xs rounded-xl p-2 px-3"
                                     value={btn.label}
                                     placeholder="مثال: التقديم الفوري"
                                     onChange={(e) => {
@@ -1179,10 +1212,10 @@ export function TutorialsTab({
                                   />
                                 </div>
                                 <div className="flex flex-col gap-1">
-                                  <label className="text-[10px] text-zinc-500 font-bold">رابط التوجيه (URL):</label>
+                                  <label className="text-[10px] font-bold" style={{ color: 'var(--text-muted)' }}>رابط التوجيه (URL):</label>
                                   <input
                                     type="text"
-                                    className="bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs rounded-xl p-2 px-3 text-left focus:ring-1 focus:ring-zinc-700"
+                                    className="text-xs rounded-xl p-2 px-3 text-left"
                                     value={btn.url}
                                     placeholder="https://..."
                                     onChange={(e) => {
@@ -1195,7 +1228,8 @@ export function TutorialsTab({
                               </div>
                               <button
                                 type="button"
-                                className="text-zinc-550 hover:text-red-400 p-2.5 bg-zinc-900 border border-zinc-800 rounded-xl hover:bg-zinc-850 mt-4 shrink-0"
+                                className="p-2.5 border rounded-xl hover:bg-[var(--bg-card)] mt-4 shrink-0 transition"
+                                style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
                                 onClick={() => {
                                   const newBtns = (block.buttons || []).filter((_, idx) => idx !== btnIdx);
                                   updateBlock(blockIdx, { buttons: newBtns });
@@ -1208,7 +1242,8 @@ export function TutorialsTab({
                         </div>
                         <button
                           type="button"
-                          className="text-[11px] bg-zinc-950 border border-zinc-800 hover:bg-zinc-900 text-zinc-300 font-bold px-3 py-2 rounded-xl transition"
+                          className="text-[11px] border font-bold px-3 py-2 rounded-xl transition hover:bg-[var(--bg-subtle)]"
+                          style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
                           onClick={() => {
                             const newBtns = [...(block.buttons || []), { label: '', url: '' }];
                             updateBlock(blockIdx, { buttons: newBtns });
@@ -1223,7 +1258,7 @@ export function TutorialsTab({
               ))}
 
               {blocks.length === 0 && (
-                <div className="py-20 text-center border border-dashed border-zinc-800 rounded-2xl text-zinc-500 italic text-xs">
+                <div className="py-20 text-center border border-dashed rounded-2xl italic text-xs" style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}>
                   لا توجد مكونات في الشرح حتى الآن. الرجاء اختيار نوع المكون المراد إضافته من الأعلى.
                 </div>
               )}
@@ -1233,28 +1268,28 @@ export function TutorialsTab({
       ) : (
         /* Real-time split/full Preview */
         <div className="w-full max-w-4xl mx-auto space-y-6">
-          <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-6 sm:p-8 shadow-sm">
+          <div className="border rounded-2xl p-6 sm:p-8 shadow-sm" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
             {/* Header section preview */}
             <div className="mb-6">
               {(() => {
                 const section = sections.find(s => s.id === Number(tutSectionId));
                 return (
-                  <span className={`text-[9px] font-bold px-2.5 py-0.5 rounded-md uppercase tracking-wider mb-4 inline-block ${section ? section.color : 'text-zinc-350 bg-zinc-900 border border-zinc-800'}`}>
+                  <span className={`text-[9px] font-bold px-2.5 py-0.5 rounded-md uppercase tracking-wider mb-4 inline-block ${section ? section.color : 'border'}`} style={!section ? { background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-muted)' } : {}}>
                     {section?.title || 'التصنيف المختير'}
                   </span>
                 );
               })()}
-              <h1 className="text-xl sm:text-2xl font-bold text-zinc-100 mb-3">{tutTitle || 'عنوان الشرح التجريبي'}</h1>
-              <p className="text-zinc-350 text-xs leading-relaxed mb-6 font-normal">{tutDescription || 'هذا الجزء مخصص لعرض نبذة قصيرة ومختصرة عن محتويات الشرح الأكاديمي...'}</p>
+              <h1 className="text-xl sm:text-2xl font-bold mb-3" style={{ color: 'var(--text-main)' }}>{tutTitle || 'عنوان الشرح التجريبي'}</h1>
+              <p className="text-xs leading-relaxed mb-6 font-normal" style={{ color: 'var(--text-muted)' }}>{tutDescription || 'هذا الجزء مخصص لعرض نبذة قصيرة ومختصرة عن محتويات الشرح الأكاديمي...'}</p>
               
-              <div className="h-px bg-zinc-800 w-full mb-6" />
+              <div className="h-px w-full mb-6" style={{ background: 'var(--border-color)' }} />
 
               {/* Body Content rendering preview */}
-              <div className="space-y-5 text-right font-normal text-xs sm:text-sm text-zinc-200" dir="rtl">
+              <div className="space-y-5 text-right font-normal text-xs sm:text-sm" dir="rtl" style={{ color: 'var(--text-main)' }}>
                 {blocks.map((block, blockIdx) => {
                   if (block.type === 'text') {
                     return (
-                      <p key={blockIdx} className="text-zinc-200 text-xs sm:text-sm leading-relaxed mb-3 whitespace-pre-line">
+                      <p key={blockIdx} className="text-xs sm:text-sm leading-relaxed mb-3 whitespace-pre-line" style={{ color: 'var(--text-main)' }}>
                         {block.content || '... نص الفقرة فارغ حالياً ...'}
                       </p>
                     );
@@ -1263,13 +1298,13 @@ export function TutorialsTab({
                   if (block.type === 'steps') {
                     const stepsItems = block.stepsItems || [];
                     return (
-                      <div key={blockIdx} className="relative border-r-2 border-zinc-800 mr-3 pr-6 space-y-6 my-6 text-right">
+                      <div key={blockIdx} className="relative border-r-2 mr-3 pr-6 space-y-6 my-6 text-right" style={{ borderColor: 'var(--border-color)' }}>
                         {stepsItems.map((step, sIdx) => (
                           <div key={sIdx} className="relative flex flex-col gap-1">
-                            <span className="absolute -right-[35px] top-0.5 flex items-center justify-center shrink-0 w-6 h-6 rounded-full bg-blue-950/40 border border-blue-900/50 text-blue-400 text-[10px] font-bold shadow-sm z-10">
+                            <span className="absolute -right-[35px] top-0.5 flex items-center justify-center shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-[10px] font-bold shadow-sm z-10">
                               {sIdx + 1}
                             </span>
-                            <p className="text-xs sm:text-sm text-zinc-200 font-normal leading-relaxed pt-0.5">{step || 'محتوى الخطوة فارغ...'}</p>
+                            <p className="text-xs sm:text-sm font-normal leading-relaxed pt-0.5" style={{ color: 'var(--text-main)' }}>{step || 'محتوى الخطوة فارغ...'}</p>
                           </div>
                         ))}
                       </div>
@@ -1280,13 +1315,13 @@ export function TutorialsTab({
                     const items = block.listItems || [];
                     if (block.listType === 'ordered') {
                       return (
-                        <ol key={blockIdx} className="list-decimal list-inside space-y-1.5 my-3 pr-2 text-zinc-300 text-xs sm:text-sm">
+                        <ol key={blockIdx} className="list-decimal list-inside space-y-1.5 my-3 pr-2 text-xs sm:text-sm" style={{ color: 'var(--text-main)' }}>
                           {items.map((it, idx) => <li key={idx}>{it || 'عنصر فارغ...'}</li>)}
                         </ol>
                       );
                     } else {
                       return (
-                        <ul key={blockIdx} className="list-disc list-inside space-y-1.5 my-3 pr-2 text-zinc-300 text-xs sm:text-sm">
+                        <ul key={blockIdx} className="list-disc list-inside space-y-1.5 my-3 pr-2 text-xs sm:text-sm" style={{ color: 'var(--text-main)' }}>
                           {items.map((it, idx) => <li key={idx}>{it || 'عنصر فارغ...'}</li>)}
                         </ul>
                       );
@@ -1297,18 +1332,18 @@ export function TutorialsTab({
                     const headers = block.tableHeaders || [];
                     const rows = block.tableRows || [];
                     return (
-                      <div key={blockIdx} className="overflow-x-auto my-4 border border-zinc-800 rounded-2xl">
+                      <div key={blockIdx} className="overflow-x-auto my-4 border rounded-2xl" style={{ borderColor: 'var(--border-color)' }}>
                         <table className="w-full text-right border-collapse text-xs">
-                          <thead className="bg-zinc-950 border-b border-zinc-800 font-bold text-zinc-100">
+                          <thead className="border-b font-bold" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>
                             <tr>
                               {headers.map((h, idx) => (
                                 <th key={idx} className="p-3.5 text-right font-bold">{h}</th>
                               ))}
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-zinc-800 text-zinc-300">
+                          <tbody className="divide-y" style={{ borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>
                             {rows.map((row, rowIdx) => (
-                              <tr key={rowIdx} className="hover:bg-zinc-900/50 transition">
+                              <tr key={rowIdx} className="hover:bg-[var(--bg-subtle)] transition">
                                 {row.map((cell, cellIdx) => (
                                   <td key={cellIdx} className="p-3.5">{cell || '-'}</td>
                                 ))}
@@ -1323,14 +1358,14 @@ export function TutorialsTab({
                   if (block.type === 'media') {
                     if (!block.mediaUrl) {
                       return (
-                        <div key={blockIdx} className="w-full max-w-xl aspect-video rounded-2xl border border-dashed border-zinc-800 flex items-center justify-center text-zinc-550 my-4 mx-auto text-xs italic bg-zinc-950/20">
+                        <div key={blockIdx} className="w-full max-w-xl aspect-video rounded-2xl border border-dashed flex items-center justify-center my-4 mx-auto text-xs italic" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-subtle)', color: 'var(--text-muted)' }}>
                           لم يتم تحديد ملف وسائط بعد
                         </div>
                       );
                     }
                     if (block.mediaType === 'video') {
                       return (
-                        <div key={blockIdx} className="w-full max-w-xl aspect-video rounded-2xl border border-zinc-800 shadow-sm overflow-hidden bg-zinc-950 relative flex items-center justify-center my-4 mx-auto">
+                        <div key={blockIdx} className="w-full max-w-xl aspect-video rounded-2xl border shadow-sm overflow-hidden relative flex items-center justify-center my-4 mx-auto" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-subtle)' }}>
                           <iframe 
                             src={block.mediaUrl} 
                             title="Walkthrough Video"
@@ -1341,7 +1376,7 @@ export function TutorialsTab({
                       );
                     } else {
                       return (
-                        <a key={blockIdx} href={block.mediaUrl} target="_blank" rel="noreferrer" className="w-full max-w-xl aspect-video rounded-2xl border border-zinc-800 shadow-sm overflow-hidden bg-zinc-900 block relative hover:opacity-90 transition my-4 mx-auto">
+                        <a key={blockIdx} href={block.mediaUrl} target="_blank" rel="noreferrer" className="w-full max-w-xl aspect-video rounded-2xl border shadow-sm overflow-hidden block relative hover:opacity-90 transition my-4 mx-auto" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-subtle)' }}>
                           <img 
                             src={block.mediaUrl} 
                             alt="Screenshot" 
@@ -1380,7 +1415,7 @@ export function TutorialsTab({
 
               {/* Action Link button preview */}
               {tutLinkUrl && (
-                <div className="mt-8 mb-2 text-right border-t border-zinc-850 pt-6">
+                <div className="mt-8 mb-2 text-right border-t pt-6" style={{ borderColor: 'var(--border-color)' }}>
                   <a 
                     href={tutLinkUrl}
                     target="_blank"

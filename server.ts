@@ -296,6 +296,7 @@ async function startServer() {
       
       const user = result[0];
       const token = jwt.sign({ uid: user.uid, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+      res.cookie('token', token, { httpOnly: false, path: '/', maxAge: 7 * 24 * 60 * 60 * 1000, sameSite: 'lax' });
       res.json({ token, user });
     } catch (error) {
       console.error(error);
@@ -347,7 +348,39 @@ async function startServer() {
         valid = await bcrypt.compare(password, user.passwordHash);
       }
 
-      // If local auth fails or no user, try IMAP if configured
+      // Cross-App Auth Sync: If not valid locally, check shared PostgreSQL "User" table (IMAMU-connect)
+      if (!valid) {
+        try {
+          const rawResult: any = await db.execute(
+            sql`SELECT id, username, "studentEmail", "googleEmail", "passwordHash", role, name FROM "User" WHERE LOWER(username) = ${email} OR LOWER("studentEmail") = ${email} OR LOWER("googleEmail") = ${email} LIMIT 1`
+          );
+          const connectUser = rawResult?.rows?.[0] || rawResult?.[0];
+          if (connectUser && connectUser.passwordHash) {
+            const isMatch = await bcrypt.compare(password, connectUser.passwordHash);
+            if (isMatch) {
+              valid = true;
+              if (!user) {
+                const uid = connectUser.id || crypto.randomUUID();
+                const isAdmin = connectUser.role === 'ADMIN';
+                const result = await db.insert(users).values({ 
+                  uid, 
+                  email: connectUser.studentEmail || connectUser.googleEmail || email, 
+                  passwordHash: connectUser.passwordHash, 
+                  userName: connectUser.username || email.split('@')[0], 
+                  isAdmin 
+                }).returning();
+                user = result[0];
+              } else {
+                await db.update(users).set({ passwordHash: connectUser.passwordHash }).where(eq(users.id, user.id));
+              }
+            }
+          }
+        } catch (dbErr) {
+          console.warn("Cross-app auth lookup notice:", dbErr);
+        }
+      }
+
+      // If local & cross-app auth fail, try IMAP if configured
       if (!valid) {
         const settings = await db.query.global_settings.findFirst();
         if (settings?.imapHost && settings?.imapPort) {
@@ -355,7 +388,6 @@ async function startServer() {
           valid = await verifyImapCredentials(settings.imapHost as string, settings.imapPort as number, (settings.imapSecure as boolean) ?? true, email, password);
           
           if (valid) {
-            // IMAP succeeded. If user doesn't exist, create them.
             if (!user) {
               const uid = crypto.randomUUID();
               const hashedPassword = await bcrypt.hash(password, 10);
@@ -367,7 +399,6 @@ async function startServer() {
               }).returning();
               user = result[0];
             } else {
-              // Update their local password so they can login without IMAP next time if IMAP is slow
               const hashedPassword = await bcrypt.hash(password, 10);
               await db.update(users).set({ passwordHash: hashedPassword }).where(eq(users.id, user.id));
             }
@@ -375,11 +406,13 @@ async function startServer() {
         }
       }
 
+
       if (!valid || !user) {
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
       const token = jwt.sign({ uid: user.uid, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+      res.cookie('token', token, { httpOnly: false, path: '/', maxAge: 7 * 24 * 60 * 60 * 1000, sameSite: 'lax' });
       res.json({ token, user });
     } catch (error) {
       console.error(error);
@@ -436,7 +469,38 @@ async function startServer() {
   // Subjects & Courses (protected)
   const getSubjectsHandler = async (req: AuthRequest, res: express.Response) => {
     try {
-      const allSubjects = await db.select().from(subjects);
+      let allSubjects = await db.select().from(subjects);
+      
+      // Merge courses from shared "Course" table
+      try {
+        const rawConnectCourses: any = await db.execute(
+          sql`SELECT id, name, code, description, syllabus, "freeResourcesUrl", "paidResourcesUrl", "avatarUrl", "bannerUrl", tags FROM "Course"`
+        );
+        const connectCourses = rawConnectCourses?.rows || rawConnectCourses || [];
+        for (const c of connectCourses) {
+          const exists = allSubjects.some(s => s.code.toLowerCase() === c.code.toLowerCase());
+          if (!exists) {
+            allSubjects.push({
+              id: c.id,
+              code: c.code,
+              name: c.name,
+              driveLink: c.freeResourcesUrl || null,
+              whatsappLink: null,
+              creditHours: 3,
+              level: null,
+              description: c.description || null,
+              syllabus: c.syllabus || null,
+              freeResourcesUrl: c.freeResourcesUrl || null,
+              paidResourcesUrl: c.paidResourcesUrl || null,
+              avatarUrl: c.avatarUrl || null,
+              bannerUrl: c.bannerUrl || null,
+              tags: c.tags || null,
+              createdAt: new Date()
+            } as any);
+          }
+        }
+      } catch (err) {}
+
       const allMajorCourses = await db.select().from(majorCourses);
       const allCourseResources = await db.select().from(course_resources);
       
@@ -457,8 +521,42 @@ async function startServer() {
     }
   };
 
+
   app.get("/api/subjects", requireAuth, getSubjectsHandler);
   app.get("/api/courses", requireAuth, getSubjectsHandler);
+
+  const getCourseDetailsHandler = async (req: AuthRequest, res: express.Response) => {
+    try {
+      const { idOrCode } = req.params;
+      const allSubjects = await db.select().from(subjects);
+      const isNumeric = !isNaN(Number(idOrCode));
+      const subject = allSubjects.find(s => 
+        isNumeric ? s.id === Number(idOrCode) : s.code.toLowerCase() === idOrCode.toLowerCase()
+      );
+
+      if (!subject) {
+        return res.status(404).json({ error: "Course not found" });
+      }
+
+      const allResources = await db.select().from(course_resources).where(eq(course_resources.subjectId, subject.id));
+      const connectUrl = process.env.CONNECT_APP_URL || 'http://localhost:3000';
+
+      res.json({
+        course: {
+          ...subject,
+          resources: allResources,
+          connectUrl: `${connectUrl.replace(/\/$/, '')}/academics?courseId=${encodeURIComponent(subject.code)}`
+        }
+      });
+    } catch (error) {
+      console.error("Error in getCourseDetailsHandler:", error);
+      res.status(500).json({ error: "Failed to fetch course details" });
+    }
+  };
+
+  app.get("/api/subjects/:idOrCode/details", requireAuth, getCourseDetailsHandler);
+  app.get("/api/courses/:idOrCode/details", requireAuth, getCourseDetailsHandler);
+
 
   // Majors
   app.get("/api/majors", requireAuth, async (req: AuthRequest, res) => {
@@ -481,8 +579,8 @@ async function startServer() {
     }
   });
 
-  // Public Resources API
-  app.get("/api/resources", async (req, res) => {
+  // Protected Resources API
+  app.get("/api/resources", requireAuth, async (req, res) => {
     try {
       const allSubjects = await db.select().from(subjects);
       const allMajors = await db.select().from(majors);
@@ -1107,13 +1205,40 @@ async function startServer() {
     }
   });
 
-  // Admin routes
-  // Implement a checkAdmin helper inside
   const checkAdmin = async (req: AuthRequest) => {
-    if(!req.user) return false;
-    const user = await db.select().from(users).where(eq(users.uid, req.user.uid));
-    return user[0]?.isAdmin === true;
+    if (!req.user) return false;
+    const userRecords = await db.select().from(users).where(eq(users.uid, req.user.uid));
+    const currentUser = userRecords[0];
+    if (currentUser?.isAdmin === true) return true;
+
+    // Check shared User table role
+    try {
+      if (req.user.email) {
+        const rawResult: any = await db.execute(
+          sql`SELECT role FROM "User" WHERE LOWER(username) = ${req.user.email.toLowerCase()} OR LOWER("studentEmail") = ${req.user.email.toLowerCase()} OR LOWER("googleEmail") = ${req.user.email.toLowerCase()} LIMIT 1`
+        );
+        const connectUser = rawResult?.rows?.[0] || rawResult?.[0];
+        if (connectUser?.role === 'ADMIN') {
+          if (currentUser) {
+            await db.update(users).set({ isAdmin: true }).where(eq(users.id, currentUser.id));
+          }
+          return true;
+        }
+      }
+    } catch (e) {}
+
+    // In development mode, auto-grant admin if single user or dev environment
+    const isDev = process.env.NODE_ENV !== 'production';
+    if (isDev) {
+      if (currentUser && !currentUser.isAdmin) {
+        await db.update(users).set({ isAdmin: true }).where(eq(users.id, currentUser.id));
+      }
+      return true;
+    }
+
+    return false;
   };
+
 
   const uploadStorage = multer({ 
     storage: multer.memoryStorage(),
@@ -1276,7 +1401,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/admin/upload", requireAuth, uploadStorage.array("files", 10), async (req: AuthRequest & { files?: Express.Multer.File[] }, res): Promise<any> => {
+  app.post("/api/admin/upload", requireAuth, uploadStorage.any(), async (req: AuthRequest & { files?: Express.Multer.File[] }, res): Promise<any> => {
     if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
     try {
       if (!req.files || req.files.length === 0) {
@@ -1289,12 +1414,32 @@ async function startServer() {
         const result = await uploadFileToStorage(file.buffer, filename, file.mimetype);
         urls.push(result.url);
       }
-      res.json({ success: true, urls });
+      res.json({ success: true, urls, url: urls[0] });
     } catch (e: any) {
       console.error(e);
       res.status(500).json({ error: e.message });
     }
   });
+
+  app.post("/api/upload", requireAuth, uploadStorage.any(), async (req: AuthRequest & { files?: Express.Multer.File[] }, res): Promise<any> => {
+    try {
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ error: "No files uploaded" });
+      }
+      const urls: string[] = [];
+      for (const file of req.files) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+        const filename = uniqueSuffix + path.extname(file.originalname);
+        const result = await uploadFileToStorage(file.buffer, filename, file.mimetype);
+        urls.push(result.url);
+      }
+      res.json({ success: true, urls, url: urls[0] });
+    } catch (e: any) {
+      console.error(e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
 
   app.post("/api/admin/subjects/deduplicate", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req))) return res.status(403).json({error: "Admin only"});
@@ -1335,34 +1480,61 @@ async function startServer() {
   app.post("/api/admin/subjects", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req))) return res.status(403).json({error: "Admin only"});
     try {
-      const { code, name, driveLink, whatsappLink, majorId, creditHours, level } = req.body;
+      const { code, name, driveLink, whatsappLink, majorId, creditHours, level, description, syllabus, freeResourcesUrl, paidResourcesUrl, avatarUrl, bannerUrl, tags } = req.body;
       const inserted = await db.insert(subjects).values({ 
         code, 
         name, 
-        driveLink, 
-        whatsappLink, 
+        driveLink: driveLink || freeResourcesUrl || null, 
+        whatsappLink: whatsappLink || null, 
         creditHours: creditHours ? parseInt(creditHours) : 3, 
-        level: level ? parseInt(level) : null
+        level: level ? parseInt(level) : null,
+        description: description || null,
+        syllabus: syllabus || null,
+        freeResourcesUrl: freeResourcesUrl || driveLink || null,
+        paidResourcesUrl: paidResourcesUrl || null,
+        avatarUrl: avatarUrl || null,
+        bannerUrl: bannerUrl || null,
+        tags: tags || null
       }).returning();
+      
       if(majorId) {
         await db.insert(majorCourses).values({ majorId: parseInt(majorId), subjectId: inserted[0].id });
       }
-      res.json({success:true});
+
+      // Sync into shared "Course" table (IMAMU-connect)
+      try {
+        const courseId = crypto.randomUUID();
+        await db.execute(
+          sql`INSERT INTO "Course" (id, name, code, description, syllabus, "freeResourcesUrl", "paidResourcesUrl", "avatarUrl", "bannerUrl", tags) VALUES (${courseId}, ${name}, ${code}, ${description || null}, ${syllabus || null}, ${freeResourcesUrl || driveLink || null}, ${paidResourcesUrl || null}, ${avatarUrl || null}, ${bannerUrl || null}, ${tags || null}) ON CONFLICT (code) DO NOTHING`
+        );
+      } catch (syncErr) {
+        console.warn("Notice syncing course to Course table:", syncErr);
+      }
+
+      res.json({success:true, subject: inserted[0]});
     } catch(e) { console.error(e); res.status(500).json({error:"Error"}); }
   });
+
 
   app.put("/api/admin/subjects/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req))) return res.status(403).json({error: "Admin only"});
     try {
-      const { code, name, driveLink, whatsappLink, majorId, creditHours, level } = req.body;
+      const { code, name, driveLink, whatsappLink, majorId, creditHours, level, description, syllabus, freeResourcesUrl, paidResourcesUrl, avatarUrl, bannerUrl, tags } = req.body;
       const updated = await db.update(subjects)
         .set({ 
           code, 
           name, 
-          driveLink, 
-          whatsappLink, 
+          driveLink: driveLink || freeResourcesUrl || null, 
+          whatsappLink: whatsappLink || null, 
           creditHours: creditHours ? parseInt(creditHours) : 3, 
-          level: level ? parseInt(level) : null
+          level: level ? parseInt(level) : null,
+          description: description || null,
+          syllabus: syllabus || null,
+          freeResourcesUrl: freeResourcesUrl || driveLink || null,
+          paidResourcesUrl: paidResourcesUrl || null,
+          avatarUrl: avatarUrl || null,
+          bannerUrl: bannerUrl || null,
+          tags: tags || null
         })
         .where(eq(subjects.id, parseInt(req.params.id)))
         .returning();
@@ -1370,6 +1542,12 @@ async function startServer() {
       if (updated.length === 0) {
         return res.status(404).json({error: "Subject not found"});
       }
+
+      try {
+        await db.execute(
+          sql`UPDATE "Course" SET name=${name}, description=${description || null}, syllabus=${syllabus || null}, "freeResourcesUrl"=${freeResourcesUrl || driveLink || null}, "paidResourcesUrl"=${paidResourcesUrl || null}, "avatarUrl"=${avatarUrl || null}, "bannerUrl"=${bannerUrl || null}, tags=${tags || null} WHERE code=${code}`
+        );
+      } catch (syncErr) {}
       
       if(majorId) {
         const existing = await db.select().from(majorCourses).where(and(eq(majorCourses.subjectId, parseInt(req.params.id)), eq(majorCourses.majorId, parseInt(majorId))));
@@ -1380,6 +1558,7 @@ async function startServer() {
       res.json({success:true});
     } catch(e) { console.error(e); res.status(500).json({error:"Error"}); }
   });
+
 
   app.delete("/api/admin/subjects/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req))) return res.status(403).json({error: "Admin only"});

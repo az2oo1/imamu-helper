@@ -58,6 +58,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       // Clear legacy raw email from localStorage if present
       localStorage.removeItem('user_email');
       if (savedToken && savedUid) {
+        document.cookie = `token=${savedToken}; path=/; max-age=604800; SameSite=Lax`;
         const u: NativeUser = {
           uid: savedUid,
           email: '',
@@ -67,6 +68,8 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
         };
         setUser(u);
         await fetchDbUser(u);
+      } else {
+        document.cookie = 'token=; path=/; max-age=0; SameSite=Lax';
       }
       setLoading(false);
     };
@@ -89,6 +92,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     localStorage.setItem('token', data.token);
     localStorage.removeItem('user_email');
     localStorage.setItem('user_uid', data.user.uid);
+    document.cookie = `token=${data.token}; path=/; max-age=604800; SameSite=Lax`;
     const u: NativeUser = {
       uid: data.user.uid,
       email: '',
@@ -116,6 +120,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     localStorage.setItem('token', data.token);
     localStorage.removeItem('user_email');
     localStorage.setItem('user_uid', data.user.uid);
+    document.cookie = `token=${data.token}; path=/; max-age=604800; SameSite=Lax`;
     const u: NativeUser = {
       uid: data.user.uid,
       email: '',
@@ -131,6 +136,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     localStorage.removeItem('token');
     localStorage.removeItem('user_email');
     localStorage.removeItem('user_uid');
+    document.cookie = 'token=; path=/; max-age=0; SameSite=Lax';
     setUser(null);
     setDbUser(null);
   };

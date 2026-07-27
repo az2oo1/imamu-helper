@@ -14,10 +14,14 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { TutorialsTab } from '../components/TutorialsTab';
+import ResourceLinksInput from '../components/ResourceLinksInput';
+import ImageUploadInput from '../components/ImageUploadInput';
+import CreateCourseModal from '../components/CreateCourseModal';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
+
 
 // ============================================================================
 // TYPES
@@ -224,6 +228,7 @@ export function AdminPage() {
   const [globalSettings, setGlobalSettings] = useState<any>({ fetchRangeDays: 30, autoDeleteDays: 30 });
 
   // Forms
+
   const [sourceForm, setSourceForm] = useState<{ id?: number; handle: string }>({ handle: '' });
   const [majorForm, setMajorForm] = useState<{
     id?: number; name: string; pdfUrl: string;
@@ -231,9 +236,43 @@ export function AdminPage() {
     batches: { name: string; reqCount: string }[]
   }>({ name: '', pdfUrl: '', courses: [], batches: [] });
   const [draggedSubjectId, setDraggedSubjectId] = useState<number | null>(null);
+  const [subjectForm, setSubjectForm] = useState<{ 
+    id?: number; 
+    code: string; 
+    name: string; 
+    creditHours: string; 
+    level: string; 
+    whatsappLink: string;
+    driveLink: string;
+    description: string; 
+    syllabus: string; 
+    freeResourcesUrl: string; 
+    paidResourcesUrl: string; 
+    avatarUrl: string; 
+    bannerUrl: string; 
+    tags: string; 
+  }>({ 
+    code: '', 
+    name: '', 
+    creditHours: '3', 
+    level: '', 
+    whatsappLink: '',
+    driveLink: '',
+    description: '', 
+    syllabus: '', 
+    freeResourcesUrl: '', 
+    paidResourcesUrl: '', 
+    avatarUrl: '', 
+    bannerUrl: '', 
+    tags: '' 
+  });
+
   const [eventForm, setEventForm] = useState<{ id?: number; title: string; date: string; description: string }>({ title: '', date: '', description: '' });
-  const [subjectForm, setSubjectForm] = useState<{ id?: number; code: string; name: string; driveLink: string; whatsappLink: string; creditHours: string; level: string }>({ code: '', name: '', driveLink: '', whatsappLink: '', creditHours: '3', level: '' });
   const [newbieLinkForm, setNewbieLinkForm] = useState<{ id?: number; title: string; url: string; description: string }>({ title: '', url: '', description: '' });
+  const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
+
+
+
 
   // Search & pagination
   const [subjectSearch, setSubjectSearch] = useState('');
@@ -321,6 +360,22 @@ export function AdminPage() {
   }, [user, dbUser]);
 
   const handlePostWithMethod = async (url: string, method: string, data: any, resetCb: () => void) => {
+    // Optimistic Update for Subjects/Courses
+    let prevSubjects = [...subjects];
+    if (url.includes('/api/admin/subjects') && method === 'POST') {
+      const optimisticSubject = {
+        id: Date.now(),
+        code: data.code,
+        name: data.name,
+        driveLink: data.driveLink || null,
+        whatsappLink: data.whatsappLink || null,
+        creditHours: data.creditHours ? Number(data.creditHours) : 3,
+        level: data.level ? Number(data.level) : null,
+        resources: []
+      };
+      setSubjects(prev => [optimisticSubject, ...prev]);
+    }
+
     try {
       const headers = await authHeaders();
       const res = await fetch(url, { method, headers, body: JSON.stringify(data) });
@@ -329,10 +384,15 @@ export function AdminPage() {
         fetchData();
         toast('success', 'Operation completed successfully');
       } else {
+        setSubjects(prevSubjects); // Rollback optimistic state if error
         const err = await res.json().catch(() => ({}));
         toast('error', err.message || err.error || 'Failed to save record');
       }
-    } catch (e) { console.error(e); toast('error', 'Network error'); }
+    } catch (e) { 
+      setSubjects(prevSubjects); // Rollback optimistic state
+      console.error(e); 
+      toast('error', 'Network error'); 
+    }
   };
 
   const handlePost = async (url: string, data: any, resetCb: () => void) => handlePostWithMethod(url, 'POST', data, resetCb);
@@ -343,14 +403,38 @@ export function AdminPage() {
 
   const confirmDelete = async () => {
     if (!deleteModal) return;
+    const targetUrl = deleteModal.url;
+
+    // Optimistic Deletion
+    let prevSubjects = [...subjects];
+    if (targetUrl.includes('/api/admin/subjects/')) {
+      const parts = targetUrl.split('/');
+      const subjId = Number(parts[parts.length - 1]);
+      if (subjId) {
+        setSubjects(prev => prev.filter(s => s.id !== subjId));
+      }
+    }
+
+    setDeleteModal(null);
+
     try {
       const t = await getToken();
-      const res = await fetch(deleteModal.url, { method: 'DELETE', headers: { Authorization: `Bearer ${t}` } });
-      if (res.ok) { fetchData(); fetchUsers(); toast('success', 'Deleted successfully'); }
-      else toast('error', 'Failed to delete');
-    } catch (e) { console.error(e); toast('error', 'Network error'); }
-    setDeleteModal(null);
+      const res = await fetch(targetUrl, { method: 'DELETE', headers: { Authorization: `Bearer ${t}` } });
+      if (res.ok) { 
+        fetchData(); 
+        fetchUsers(); 
+        toast('success', 'Deleted successfully'); 
+      } else {
+        setSubjects(prevSubjects); // Rollback
+        toast('error', 'Failed to delete'); 
+      }
+    } catch (e) { 
+      setSubjects(prevSubjects); // Rollback
+      console.error(e); 
+      toast('error', 'Network error'); 
+    }
   };
+
 
   const handleFetchPosts = async (handle: string, fetchAll: boolean = false) => {
     try {
@@ -1017,238 +1101,117 @@ export function AdminPage() {
   );
 
   // ============================================================================
-  // TAB: SUBJECTS / COURSES & RESOURCES
+  // TAB: SUBJECTS / COURSES
   // ============================================================================
   const renderSubjects = () => (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-2xl font-display font-bold" style={{ color: 'var(--text-main)' }}>Courses & Resources (المقررات والمصادر)</h3>
-        <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Manage university courses and attach multiple resources (Drive, WhatsApp, Exams, Summaries, PDFs)</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 className="text-2xl font-display font-bold" style={{ color: 'var(--text-main)' }}>Create & Manage Courses (المقررات والمواد)</h3>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Manage academic courses, syllabus details, and object storage resources</p>
+        </div>
+
+        <button
+          onClick={() => {
+            setSubjectForm({ 
+              id: undefined, code: '', name: '', creditHours: '3', level: '', whatsappLink: '', driveLink: '', description: '', syllabus: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', bannerUrl: '', tags: '' 
+            });
+            setIsCourseModalOpen(true);
+          }}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-semibold text-xs sm:text-sm rounded-xl transition shadow-sm border border-blue-500/30 shrink-0"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Create New Course</span>
+        </button>
+
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* Left Column: Add / Edit Course */}
-        <div className="space-y-4">
-          <div className="rounded-2xl p-5 border space-y-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-            <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>{subjectForm.id ? 'Edit Course' : 'Add New Course'}</h4>
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Course Code (رمز المادة)</label>
-                <input type="text" placeholder="e.g. CS101 or عال101" value={subjectForm.code} onChange={e => setSubjectForm(s => ({ ...s, code: e.target.value }))} className="py-2 px-3 rounded-xl text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Course Name (اسم المادة)</label>
-                <input type="text" placeholder="e.g. برمجة 1" value={subjectForm.name} onChange={e => setSubjectForm(s => ({ ...s, name: e.target.value }))} className="py-2 px-3 rounded-xl text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Credit Hours (الساعات)</label>
-                  <input type="number" placeholder="3" value={subjectForm.creditHours} onChange={e => setSubjectForm(s => ({ ...s, creditHours: e.target.value }))} className="py-2 px-3 rounded-xl text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Plan Level (المستوى)</label>
-                  <input type="number" placeholder="e.g. 1" value={subjectForm.level} onChange={e => setSubjectForm(s => ({ ...s, level: e.target.value }))} className="py-2 px-3 rounded-xl text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-                </div>
-              </div>
-              <div className="flex gap-2 pt-1">
-                <button
-                  onClick={() => {
-                    const url = subjectForm.id ? `/api/admin/subjects/${subjectForm.id}` : '/api/admin/subjects';
-                    const method = subjectForm.id ? 'PUT' : 'POST';
-                    handlePostWithMethod(url, method, subjectForm, () => setSubjectForm({ id: undefined, code: '', name: '', driveLink: '', whatsappLink: '', creditHours: '3', level: '' }));
-                  }}
-                  className="flex-1 bg-[var(--color-imamu-blue)] text-white py-2 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-blue-light)] transition"
-                >
-                  {subjectForm.id ? 'Update Course' : 'Add Course'}
-                </button>
-                {subjectForm.id && <button onClick={() => setSubjectForm({ id: undefined, code: '', name: '', driveLink: '', whatsappLink: '', creditHours: '3', level: '' })} className="px-3 py-2 border rounded-xl text-sm font-medium transition hover:bg-[var(--bg-subtle)]" style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}>Cancel</button>}
-              </div>
-            </div>
+      <div className="rounded-2xl border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+        <div className="px-5 py-4 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3" style={{ borderColor: 'var(--border-color)' }}>
+          <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>Current Courses ({subjects.length})</h4>
+          <div className="flex items-center gap-2">
+            <input type="text" placeholder="Search courses..." value={subjectSearch} onChange={e => setSubjectSearch(e.target.value)} className="flex-1 sm:w-64 py-1.5 px-3 rounded-xl text-xs border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+            <select value={subjectLimit} onChange={e => setSubjectLimit(Number(e.target.value))} className="py-1.5 px-2.5 rounded-xl text-xs border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>
+              <option value={10}>10</option><option value={20}>20</option><option value={50}>50</option><option value={1000}>All</option>
+            </select>
+            <button
+              onClick={() => { if (confirm('Deduplicate courses? Keeps only the best per course code.')) handlePost('/api/admin/subjects/deduplicate', {}, () => toast('success', 'Duplicates removed!')); }}
+              className="p-2 rounded-xl transition hover:bg-amber-500/10" title="Clean Duplicates"
+            >
+              <Zap className="w-4 h-4 text-amber-500" />
+            </button>
           </div>
         </div>
 
-        {/* Right Column: Courses & Resources List */}
-        <div className="lg:col-span-2">
-          <div className="rounded-2xl border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-            <div className="px-5 py-4 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3" style={{ borderColor: 'var(--border-color)' }}>
-              <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>Current Courses ({subjects.length})</h4>
-              <div className="flex items-center gap-2">
-                <input type="text" placeholder="Search courses..." value={subjectSearch} onChange={e => setSubjectSearch(e.target.value)} className="flex-1 sm:w-48 py-1.5 px-3 rounded-xl text-xs border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-                <select value={subjectLimit} onChange={e => setSubjectLimit(Number(e.target.value))} className="py-1.5 px-2.5 rounded-xl text-xs border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>
-                  <option value={10}>10</option><option value={20}>20</option><option value={50}>50</option><option value={100}>100</option><option value={1000}>All</option>
-                </select>
-                <button
-                  onClick={() => { if (confirm('Deduplicate courses? Keeps only the best per course code.')) handlePost('/api/admin/subjects/deduplicate', {}, () => toast('success', 'Duplicates removed!')); }}
-                  className="p-2 rounded-xl transition hover:bg-amber-500/10" title="Clean Duplicates"
-                >
-                  <Zap className="w-4 h-4 text-amber-500" />
-                </button>
-              </div>
-            </div>
-
-            <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
-              {subjects.filter(s => s.code?.toLowerCase().includes(subjectSearch.toLowerCase()) || s.name?.toLowerCase().includes(subjectSearch.toLowerCase())).slice(0, subjectLimit).map(s => {
-                const resList: any[] = s.resources || [];
-                const isExpanded = expandedCourseId === s.id;
-                return (
-                  <div key={s.id} className="transition" style={{ borderColor: 'var(--border-color)' }}>
-                    <div className="py-3 px-5 flex items-center justify-between group hover:bg-[var(--bg-subtle)]">
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="font-mono text-xs px-2 py-0.5 rounded-md self-start border font-semibold shrink-0" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>{s.code}</div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm truncate" style={{ color: 'var(--text-main)' }}>{s.name}</div>
-                          <div className="flex items-center gap-2 mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                            <span>{s.creditHours || 3} Hours</span>
-                            <span>•</span>
-                            <span>Level {s.level || 1}</span>
-                            <span className="font-semibold text-blue-500 bg-blue-500/10 px-2 py-0.2 rounded-full">
-                              {resList.length} {resList.length === 1 ? 'Resource' : 'Resources'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                          onClick={() => {
-                            setExpandedCourseId(isExpanded ? null : s.id);
-                            setResourceForm({ title: '', type: 'drive', url: '', description: '' });
-                          }}
-                          className={`px-3 py-1 rounded-xl text-xs font-semibold border transition flex items-center gap-1 ${isExpanded ? 'bg-blue-600 text-white border-blue-600' : 'hover:bg-[var(--bg-subtle)]'}`}
-                          style={!isExpanded ? { borderColor: 'var(--border-color)', color: 'var(--text-main)' } : undefined}
-                        >
-                          <Folder className="w-3.5 h-3.5" />
-                          <span>{isExpanded ? 'Close Resources' : 'Manage Resources'}</span>
-                        </button>
-                        <button onClick={() => setSubjectForm({ id: s.id, code: s.code || '', name: s.name || '', driveLink: s.driveLink || '', whatsappLink: s.whatsappLink || '', creditHours: s.creditHours?.toString() || '3', level: s.level?.toString() || '' })} className="px-2 py-1 rounded transition text-xs font-semibold hover:bg-[var(--bg-subtle)]" style={{ color: 'var(--text-muted)' }}>Edit</button>
-                        <button onClick={() => handleDelete(`/api/admin/subjects/${s.id}`, s.name)} className="p-1.5 rounded transition hover:bg-red-500/10"><Trash2 className="w-4 h-4 text-red-400" /></button>
-                      </div>
-                    </div>
-
-                    {/* Expandable Resources Drawer for this Course */}
-                    {isExpanded && (
-                      <div className="p-4 bg-[var(--bg-subtle)] border-t space-y-4" style={{ borderColor: 'var(--border-color)' }}>
-                        <div className="flex items-center justify-between">
-                          <h5 className="text-xs font-bold uppercase tracking-wider text-blue-500 flex items-center gap-1.5">
-                            <BookOpen className="w-4 h-4" /> Dedicated Resources for {s.code} ({resList.length})
-                          </h5>
-                          {resourceForm.id && (
-                            <button onClick={() => setResourceForm({ title: '', type: 'drive', url: '', description: '' })} className="text-xs text-amber-500 hover:underline font-medium">
-                              Cancel Edit
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Resource Creation/Edition Form */}
-                        <div className="p-3 rounded-xl border bg-[var(--bg-card)] space-y-3" style={{ borderColor: 'var(--border-color)' }}>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                            <input
-                              type="text"
-                              placeholder="Resource Title (e.g. مجلد التجميعات)"
-                              value={resourceForm.title}
-                              onChange={e => setResourceForm(f => ({ ...f, title: e.target.value }))}
-                              className="py-1.5 px-3 rounded-lg text-xs border"
-                              style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
-                            />
-                            <select
-                              value={resourceForm.type}
-                              onChange={e => setResourceForm(f => ({ ...f, type: e.target.value }))}
-                              className="py-1.5 px-3 rounded-lg text-xs border"
-                              style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
-                            >
-                              <option value="drive">Drive Folder (مجلد درايف)</option>
-                              <option value="whatsapp">WhatsApp Group (جروب واتساب)</option>
-                              <option value="telegram">Telegram Group (قناة تلجرام)</option>
-                              <option value="exam">Past Exam (اختبارات سابقة)</option>
-                              <option value="summary">Summary (ملخصات ودراسات)</option>
-                              <option value="pdf">PDF File (ملف)</option>
-                              <option value="link">Other Link (رابط خارجي)</option>
-                            </select>
-                            <input
-                              type="text"
-                              placeholder="URL (https://...)"
-                              value={resourceForm.url}
-                              onChange={e => setResourceForm(f => ({ ...f, url: e.target.value }))}
-                              className="py-1.5 px-3 rounded-lg text-xs border"
-                              style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
-                            />
-                          </div>
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              placeholder="Description (Optional)"
-                              value={resourceForm.description}
-                              onChange={e => setResourceForm(f => ({ ...f, description: e.target.value }))}
-                              className="flex-1 py-1.5 px-3 rounded-lg text-xs border"
-                              style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
-                            />
-                            <button
-                              onClick={() => {
-                                if (!resourceForm.title || !resourceForm.url) return toast('warning', 'Title & URL are required');
-                                const url = resourceForm.id ? `/api/admin/resources/${resourceForm.id}` : `/api/admin/courses/${s.id}/resources`;
-                                const method = resourceForm.id ? 'PUT' : 'POST';
-                                handlePostWithMethod(url, method, resourceForm, () => {
-                                  setResourceForm({ title: '', type: 'drive', url: '', description: '' });
-                                  toast('success', resourceForm.id ? 'Resource updated' : 'Resource added');
-                                });
-                              }}
-                              className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-xs font-semibold hover:bg-blue-700 transition"
-                            >
-                              {resourceForm.id ? 'Update Resource' : '+ Add Resource'}
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* List of Attached Resources */}
-                        <div className="space-y-2">
-                          {resList.map((res: any) => (
-                            <div key={res.id} className="p-2.5 rounded-xl border flex items-center justify-between gap-3 bg-[var(--bg-card)] text-xs" style={{ borderColor: 'var(--border-color)' }}>
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-semibold" style={{ color: 'var(--text-main)' }}>{res.title}</span>
-                                  <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">{res.type}</span>
-                                </div>
-                                <a href={res.url} target="_blank" rel="noreferrer" className="text-[11px] text-blue-400 hover:underline truncate block mt-0.5">
-                                  {res.url}
-                                </a>
-                                {res.description && <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{res.description}</p>}
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <button
-                                  onClick={() => setResourceForm({ id: res.id, subjectId: s.id, title: res.title || '', type: res.type || 'drive', url: res.url || '', description: res.description || '' })}
-                                  className="px-2 py-1 rounded text-[11px] font-medium hover:bg-[var(--bg-subtle)]"
-                                  style={{ color: 'var(--text-muted)' }}
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  onClick={() => handleDelete(`/api/admin/resources/${res.id}`, res.title)}
-                                  className="p-1 rounded text-red-400 hover:bg-red-500/10"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-
-                          {resList.length === 0 && (
-                            <div className="text-center py-4 text-xs italic" style={{ color: 'var(--text-muted)' }}>
-                              No resources added for this course yet. Use the form above to attach Drive links, WhatsApp groups, PDFs or exams.
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
+        <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
+          {subjects.filter(s => s.code?.toLowerCase().includes(subjectSearch.toLowerCase()) || s.name?.toLowerCase().includes(subjectSearch.toLowerCase())).slice(0, subjectLimit).map(s => (
+            <div key={s.id} className="py-3.5 px-5 flex items-center justify-between group hover:bg-[var(--bg-subtle)] transition">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="font-mono text-xs px-2.5 py-1 rounded-lg border font-bold shrink-0 bg-blue-500/10 text-blue-500 border-blue-500/20">{s.code}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-sm truncate" style={{ color: 'var(--text-main)' }}>{s.name}</div>
+                  <div className="flex items-center gap-2 mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                    <span>{s.creditHours || 3} Hours</span>
+                    {s.level && <span>• Level {s.level}</span>}
+                    {s.tags && <span className="text-slate-400">• Tags: {s.tags}</span>}
                   </div>
-                );
-              })}
-              {subjects.length === 0 && <div className="py-12 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No courses added yet.</div>}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button 
+                  onClick={() => {
+                    setSubjectForm({ 
+                      id: s.id, 
+                      code: s.code || '', 
+                      name: s.name || '', 
+                      creditHours: s.creditHours?.toString() || '3', 
+                      level: s.level?.toString() || '',
+                      whatsappLink: s.whatsappLink || '',
+                      driveLink: s.driveLink || '',
+                      description: s.description || '',
+                      syllabus: s.syllabus || '',
+                      freeResourcesUrl: s.freeResourcesUrl || s.driveLink || '',
+                      paidResourcesUrl: s.paidResourcesUrl || '',
+                      avatarUrl: s.avatarUrl || '',
+                      bannerUrl: s.bannerUrl || '',
+                      tags: s.tags || ''
+                    });
+                    setIsCourseModalOpen(true);
+                  }} 
+                  className="px-3 py-1.5 rounded-xl border text-xs font-bold transition hover:bg-blue-500/10 text-blue-500 border-blue-500/30"
+                >
+                  Edit Course
+                </button>
+
+                <button 
+                  onClick={() => handleDelete(`/api/admin/subjects/${s.id}`, s.name)} 
+                  className="p-2 rounded-xl transition hover:bg-red-500/10 text-red-400"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-          </div>
+          ))}
+          {subjects.length === 0 && <div className="py-12 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No courses added yet.</div>}
         </div>
       </div>
+
+      {/* Modal Dialog Popup for Create / Edit Course */}
+      <CreateCourseModal 
+        isOpen={isCourseModalOpen}
+        onClose={() => setIsCourseModalOpen(false)}
+        subjectForm={subjectForm}
+        setSubjectForm={setSubjectForm}
+        onSave={() => {
+          const url = subjectForm.id ? `/api/admin/subjects/${subjectForm.id}` : '/api/admin/subjects';
+          const method = subjectForm.id ? 'PUT' : 'POST';
+          handlePostWithMethod(url, method, subjectForm, () => {});
+        }}
+      />
     </div>
   );
+
 
   // ============================================================================
   // TAB: NEWBIE LINKS

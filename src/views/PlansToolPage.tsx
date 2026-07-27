@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../lib/AuthContext';
-import { FileText, ArrowLeft, BookOpen, GraduationCap, Clock, ExternalLink, Search } from 'lucide-react';
+import { FileText, ArrowLeft, BookOpen, GraduationCap, Clock, ExternalLink, Search, Info } from 'lucide-react';
 import Link from 'next/link';
+import { CourseDetailsModal } from '../components/CourseDetailsModal';
 
 export function PlansToolPage() {
   const { user } = useAuth();
@@ -11,6 +12,7 @@ export function PlansToolPage() {
   const [subjects, setSubjects] = useState<any[]>([]);
   const [selectedMajor, setSelectedMajor] = useState<any | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCourse, setSelectedCourse] = useState<string | number | null>(null);
 
   useEffect(() => {
     const headers = user ? { Authorization: `Bearer ${user.accessToken}` } : undefined;
@@ -27,6 +29,7 @@ export function PlansToolPage() {
   }, [user]);
 
   const filteredMajors = majors.filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()));
+
 
   const renderStudyPlan = () => {
     if (!selectedMajor) return null;
@@ -93,7 +96,11 @@ export function PlansToolPage() {
                     </div>
                     <div className="p-4 flex flex-col gap-3">
                       {group.courses.map((subj, idx) => (
-                        <div key={idx} className="group p-4 rounded-xl border border-slate-200/80 dark:border-zinc-800 bg-slate-50/60 dark:bg-zinc-950/60 hover:bg-white dark:hover:bg-zinc-900 hover:border-blue-400 dark:hover:border-zinc-700 transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div 
+                          key={idx} 
+                          onClick={() => setSelectedCourse(subj.id || subj.code)}
+                          className="group p-4 rounded-xl border border-slate-200/80 dark:border-zinc-800 bg-slate-50/60 dark:bg-zinc-950/60 hover:bg-white dark:hover:bg-zinc-900 hover:border-blue-400 dark:hover:border-zinc-700 transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer"
+                        >
                           <div>
                             <div className="flex flex-wrap items-center gap-2 mb-1">
                               <span className="text-xs font-bold font-mono text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900/50 px-2 py-0.5 rounded-md break-all leading-tight" dir="ltr">{subj.code}</span>
@@ -103,23 +110,31 @@ export function PlansToolPage() {
                             </div>
                             <h4 className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm line-clamp-2" title={subj.name}>{subj.name}</h4>
                           </div>
-                          {(subj.driveLink || subj.whatsappLink) && (
-                            <div className="flex items-center gap-3 sm:justify-end shrink-0 pt-2 sm:pt-0 border-t border-slate-200 dark:border-zinc-800 sm:border-0">
-                              {subj.driveLink && (
-                                <a href={subj.driveLink} target="_blank" rel="noreferrer" className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 flex items-center gap-1 transition bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 px-2.5 py-1.5 rounded-xl border border-blue-200 dark:border-blue-900/50">
-                                  Drive <ExternalLink className="w-3 h-3" />
-                                </a>
-                              )}
-                              {subj.whatsappLink && (
-                                <a href={subj.whatsappLink} target="_blank" rel="noreferrer" className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 flex items-center gap-1 transition bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 px-2.5 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-900/50">
-                                  واتساب <ExternalLink className="w-3 h-3" />
-                                </a>
-                              )}
-                            </div>
-                          )}
+                          
+                          <div className="flex items-center gap-2 sm:justify-end shrink-0 pt-2 sm:pt-0 border-t border-slate-200 dark:border-zinc-800 sm:border-0" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => setSelectedCourse(subj.id || subj.code)}
+                              className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 flex items-center gap-1 transition bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 px-3 py-1.5 rounded-xl border border-blue-200 dark:border-blue-900/50"
+                            >
+                              <Info className="w-3.5 h-3.5" />
+                              <span>تفاصيل المادة</span>
+                            </button>
+
+                            {subj.driveLink && (
+                              <a href={subj.driveLink} target="_blank" rel="noreferrer" className="text-xs font-bold text-slate-600 dark:text-zinc-400 hover:text-blue-600 flex items-center gap-1 transition bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-zinc-700">
+                                Drive <ExternalLink className="w-3 h-3" />
+                              </a>
+                            )}
+                            {subj.whatsappLink && (
+                              <a href={subj.whatsappLink} target="_blank" rel="noreferrer" className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 flex items-center gap-1 transition bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 px-2.5 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-900/50">
+                                واتساب <ExternalLink className="w-3 h-3" />
+                              </a>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
+
                   </div>
                 );
               })}
@@ -220,6 +235,13 @@ export function PlansToolPage() {
           )}
         </div>
       </div>
+
+      <CourseDetailsModal 
+        isOpen={!!selectedCourse} 
+        onClose={() => setSelectedCourse(null)} 
+        courseIdOrCode={selectedCourse} 
+      />
     </div>
   );
 }
+
