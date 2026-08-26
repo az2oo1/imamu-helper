@@ -445,6 +445,14 @@ export function ProfilePage() {
                       const userMajor = majors.find(m => m.name === profileForm.major);
                       const displayedSubjects = userMajor ? subjects.filter(s => userMajor.courseIds?.includes(s.id)) : subjects;
                       
+                      const extractPrereqCodes = (description?: string | null): string[] => {
+                        if (!description) return [];
+                        const match = description.match(/(?:المتطلبات السابقة:|prereq:?)\s*([A-Z0-9,\s\u0600-\u06FF]+)/i);
+                        if (!match) return [];
+                        const codes = match[1].match(/[A-Z]{2,4}\d{3,4}|عال\d{4}/g);
+                        return codes ? Array.from(new Set(codes)) : [];
+                      };
+
                       const groups = (Object.entries(
                         displayedSubjects.reduce((acc, s) => {
                           let g = 'المتطلبات العامة';
@@ -461,13 +469,23 @@ export function ProfilePage() {
                           return acc;
                         }, {} as Record<string, any[]>)
                       ) as [string, any[]][]).sort((a, b) => {
-                        if (a[0] === 'المتطلبات العامة') return -1;
-                        if (b[0] === 'المتطلبات العامة') return 1;
+                        const matchA = a[0].match(/المستوى\s+(\d+)/);
+                        const matchB = b[0].match(/المستوى\s+(\d+)/);
+                        if (matchA && matchB) return parseInt(matchA[1]) - parseInt(matchB[1]);
+                        if (matchA) return -1;
+                        if (matchB) return 1;
                         return a[0].localeCompare(b[0], 'ar');
                       });
 
                       let totalReq = 0;
                       let totalFinishedInReq = 0;
+                      let totalFinishedHours = 0;
+
+                      displayedSubjects.forEach(s => {
+                        if (profileForm.completedCourses.includes(s.code)) {
+                          totalFinishedHours += Number(s.creditHours || 3);
+                        }
+                      });
 
                       groups.forEach(([_, groupSubjects]) => {
                         const totalInGroup = groupSubjects.length;
@@ -483,19 +501,19 @@ export function ProfilePage() {
 
                       return (
                         <>
-                          <div className="mb-8">
-                            <div className="flex justify-between items-end mb-2">
+                          <div className="mb-8 bg-slate-50 dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 p-5 rounded-2xl">
+                            <div className="flex flex-col sm:flex-row justify-between sm:items-end gap-3 mb-3">
                               <div>
-                                <span className="text-gray-900 font-semibold block text-lg">نسبة الإنجاز</span>
-                                <span className="text-sm text-gray-500">
-                                  <AnimatedNumber value={totalFinishedInReq} /> من {totalReq} مقرر منجز
+                                <span className="text-gray-900 font-bold block text-lg">نسبة الإنجاز الخطة الأكاديمية</span>
+                                <span className="text-xs text-gray-500 font-medium">
+                                  <AnimatedNumber value={totalFinishedInReq} /> من {totalReq} مقرر (إجمالي <AnimatedNumber value={totalFinishedHours} /> ساعة معتمدة)
                                 </span>
                               </div>
-                              <span className="text-gray-900 font-bold text-xl"><AnimatedNumber value={percentFinished} />%</span>
+                              <span className="text-blue-600 dark:text-blue-400 font-black text-2xl"><AnimatedNumber value={percentFinished} />%</span>
                             </div>
-                            <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                            <div className="w-full bg-slate-200 dark:bg-zinc-800 rounded-full h-3.5 overflow-hidden p-0.5">
                               <motion.div 
-                                className="bg-[var(--color-imamu-blue)] h-3 rounded-full"
+                                className="bg-gradient-to-r from-blue-600 to-indigo-600 h-2.5 rounded-full shadow-sm"
                                 initial={{ width: 0 }}
                                 animate={{ width: `${percentFinished}%` }}
                                 transition={{ duration: 1, ease: "easeOut" }}
@@ -512,40 +530,84 @@ export function ProfilePage() {
                             const isGroupFull = selectedInGroup >= reqCount;
 
                             return (
-                              <div key={groupName} className={`border rounded-xl p-4 transition-colors duration-300 ${isGroupFull ? 'bg-emerald-50/50 border-emerald-200' : 'bg-gray-50 border-gray-200'}`}>
-                                <div className="flex justify-between items-center mb-3">
-                                  <h4 className={`font-semibold flex items-center gap-2 ${isGroupFull ? 'text-emerald-900' : 'text-gray-900'}`}>
+                              <div key={groupName} className={`border rounded-2xl p-5 transition-all duration-300 ${isGroupFull ? 'bg-emerald-50/40 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900/40' : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800'}`}>
+                                <div className="flex justify-between items-center mb-4">
+                                  <h4 className={`font-bold text-base flex items-center gap-2 ${isGroupFull ? 'text-emerald-800 dark:text-emerald-400' : 'text-slate-900 dark:text-white'}`}>
                                     {groupName}
-                                    {isGroupFull && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
+                                    {isGroupFull && <CheckCircle2 className="w-4.5 h-4.5 text-emerald-600 dark:text-emerald-400" />}
                                   </h4>
-                                  <span className={`text-xs font-medium px-2.5 py-1 rounded-md transition-colors ${isGroupFull ? 'bg-emerald-100 text-emerald-800' : 'bg-purple-100 text-purple-800'}`}>
+                                  <span className={`text-xs font-bold px-3 py-1 rounded-full border ${isGroupFull ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
                                     المنجز: {selectedInGroup} / {reqCount}
                                   </span>
                                 </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                   {groupSubjects.map(s => {
                                     const isChecked = profileForm.completedCourses.includes(s.code);
-                                    const isDisabled = !isChecked && isGroupFull;
+                                    const prereqCodes = extractPrereqCodes(s.description);
+                                    const unmetPrereqs = prereqCodes.filter(p => !profileForm.completedCourses.includes(p));
+                                    const isLocked = !isChecked && unmetPrereqs.length > 0;
+
                                     return (
-                                      <label key={s.id} className={`flex items-center gap-2 cursor-pointer p-2 rounded-lg transition ${isDisabled ? 'opacity-50 grayscale' : 'hover:bg-white bg-gray-50/50'}`}>
-                                        <input 
-                                          type="checkbox"
-                                          checked={isChecked}
-                                          disabled={isDisabled}
-                                          onChange={(e) => {
-                                            const checked = e.target.checked;
-                                            setProfileForm(p => ({
-                                              ...p,
-                                              completedCourses: checked 
-                                                ? [...p.completedCourses, s.code]
-                                                : p.completedCourses.filter(c => c !== s.code)
-                                            }));
-                                          }}
-                                          className="w-4 h-4 text-[var(--color-imamu-blue)] rounded border-gray-300 focus:ring-0 disabled:text-gray-400"
-                                        />
-                                        <span className="text-sm font-medium text-gray-700">{s.code}</span>
-                                        <span className="text-xs text-gray-500 truncate" title={s.name}>{s.name}</span>
-                                      </label>
+                                      <div 
+                                        key={s.id} 
+                                        className={`p-3.5 rounded-xl border transition flex flex-col justify-between gap-2 ${
+                                          isChecked 
+                                            ? 'bg-emerald-50/60 border-emerald-300 dark:bg-emerald-950/30 dark:border-emerald-800' 
+                                            : isLocked 
+                                              ? 'bg-slate-50/80 border-slate-200 dark:bg-zinc-950/50 dark:border-zinc-800' 
+                                              : 'bg-blue-50/40 border-blue-200 hover:border-blue-400 dark:bg-blue-950/20 dark:border-blue-900/50'
+                                        }`}
+                                      >
+                                        <div className="flex items-start gap-3">
+                                          <input 
+                                            type="checkbox"
+                                            checked={isChecked}
+                                            onChange={(e) => {
+                                              const checked = e.target.checked;
+                                              const updatedCourses = checked 
+                                                ? [...profileForm.completedCourses, s.code]
+                                                : profileForm.completedCourses.filter(c => c !== s.code);
+                                              
+                                              let newFinishedHours = 0;
+                                              displayedSubjects.forEach(subj => {
+                                                if (updatedCourses.includes(subj.code)) {
+                                                  newFinishedHours += Number(subj.creditHours || 3);
+                                                }
+                                              });
+
+                                              setProfileForm(p => ({
+                                                ...p,
+                                                completedCourses: updatedCourses,
+                                                finishedHours: newFinishedHours.toString()
+                                              }));
+                                            }}
+                                            className="mt-1 w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-0 cursor-pointer"
+                                          />
+                                          <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 mb-0.5">
+                                              <span className="font-mono text-xs font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-zinc-800 text-slate-800 dark:text-zinc-200">{s.code}</span>
+                                              <span className="text-[11px] font-semibold text-slate-500">{s.creditHours || 3} ساعات</span>
+                                            </div>
+                                            <h5 className="text-xs font-bold text-slate-900 dark:text-white line-clamp-1" title={s.name}>{s.name}</h5>
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-zinc-800/60 text-[11px]">
+                                          {isChecked ? (
+                                            <span className="inline-flex items-center gap-1 font-bold text-emerald-700 dark:text-emerald-400">
+                                              <CheckCircle2 className="w-3.5 h-3.5" /> تم الاجتياز
+                                            </span>
+                                          ) : isLocked ? (
+                                            <span className="inline-flex items-center gap-1 font-bold text-amber-700 dark:text-amber-400" title={`يتطلب اجتياز: ${unmetPrereqs.join(', ')}`}>
+                                              <span>🔒 يتطلب: {unmetPrereqs.join(', ')}</span>
+                                            </span>
+                                          ) : (
+                                            <span className="inline-flex items-center gap-1 font-bold text-blue-700 dark:text-blue-400">
+                                              <span>متاح للتسجيل</span>
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
                                     );
                                   })}
                                 </div>

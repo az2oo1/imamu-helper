@@ -50,7 +50,14 @@ export function PlansToolPage() {
       }
     });
 
-    const groupKeys = Object.keys(groups);
+    const groupKeys = Object.keys(groups).sort((a, b) => {
+      const matchA = a.match(/المستوى\s+(\d+)/);
+      const matchB = b.match(/المستوى\s+(\d+)/);
+      if (matchA && matchB) return parseInt(matchA[1]) - parseInt(matchB[1]);
+      if (matchA) return -1;
+      if (matchB) return 1;
+      return a.localeCompare(b, 'ar');
+    });
 
     return (
       <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/90 dark:border-zinc-800 shadow-sm overflow-hidden flex flex-col" dir="rtl">

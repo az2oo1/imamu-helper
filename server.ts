@@ -21,6 +21,7 @@ import AdmZip from 'adm-zip';
 import { uploadFileToStorage, getFileFromStorage, deleteFileFromStorage, isS3Configured } from "./src/lib/storage";
 
 import { GoogleGenAI, Type } from '@google/genai';
+import { importMsariData } from './scripts/import_msari';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -211,6 +212,21 @@ async function startServer() {
 
         console.log('[DB] Seeding completed.');
       }
+
+      // Automatic Msari Dataset Background Sync (Run on startup and every 12 hours)
+      console.log('[Msari Sync] Initiating automatic background sync from Msari...');
+      importMsariData()
+        .then(res => console.log('[Msari Sync] Startup sync completed:', res))
+        .catch(err => console.error('[Msari Sync] Startup sync notice:', err.message || err));
+
+      // Schedule periodic re-sync every 12 hours
+      setInterval(() => {
+        console.log('[Msari Sync] Running periodic background sync from Msari...');
+        importMsariData()
+          .then(res => console.log('[Msari Sync] Periodic sync completed:', res))
+          .catch(err => console.error('[Msari Sync] Periodic sync error:', err.message || err));
+      }, 12 * 60 * 60 * 1000);
+
     } catch (e) {
       console.error('[DB] Seeding failed, likely due to migration in progress:', e);
     }
@@ -1728,6 +1744,17 @@ async function startServer() {
       await db.delete(majors).where(eq(majors.id, parseInt(req.params.id)));
       res.json({success:true});
     } catch(e) { res.status(500).json({error:"Error"}); }
+  });
+
+  app.post("/api/admin/import-msari", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req))) return res.status(403).json({error: "Admin only"});
+    try {
+      const result = await importMsariData();
+      res.json(result);
+    } catch(e: any) {
+      console.error("Msari Import Error:", e);
+      res.status(500).json({error: e.message || "Failed to import Msari data"});
+    }
   });
   
   app.post("/api/admin/events", requireAuth, async (req: AuthRequest, res): Promise<any> => {

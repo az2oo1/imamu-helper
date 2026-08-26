@@ -113,20 +113,20 @@ export function AuthPage() {
   };
 
   return (
-    <div className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8" dir="rtl">
+    <div className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-slate-50/50 dark:bg-zinc-950/50 min-h-[calc(100vh-80px)]" dir="rtl">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="max-w-md w-full bg-white dark:bg-zinc-900 rounded-3xl p-8 border border-slate-100 dark:border-zinc-800 shadow-xl text-right"
+        className="max-w-md w-full bg-white dark:bg-zinc-900 rounded-3xl p-8 border border-slate-200/80 dark:border-zinc-800 shadow-xl dark:shadow-2xl text-right"
       >
-        <div className="text-center mb-10">
-          <div className="mx-auto h-16 w-16 bg-blue-50 dark:bg-blue-950/40 rounded-2xl flex items-center justify-center mb-4">
-            <Lock className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+        <div className="text-center mb-8">
+          <div className="mx-auto h-16 w-16 bg-blue-50 dark:bg-blue-950/60 rounded-2xl flex items-center justify-center mb-4 border border-blue-100 dark:border-blue-900/50 text-blue-600 dark:text-blue-400 shadow-2xs">
+            <Lock className="h-7 w-7 text-blue-600 dark:text-blue-400" />
           </div>
-          <h2 className="text-3xl font-display font-bold text-slate-900 dark:text-white">
+          <h2 className="text-2xl sm:text-3xl font-display font-bold text-slate-900 dark:text-white">
             {isForgotPassword ? 'إعادة ضبط كلمة المرور' : (isLogin ? 'مرحباً بعودتك' : 'إنشاء حساب جديد')}
           </h2>
-          <p className="mt-2 text-sm text-slate-500 dark:text-zinc-400">
+          <p className="mt-2 text-xs sm:text-sm text-slate-600 dark:text-zinc-400 leading-relaxed">
             {isForgotPassword ? 'أدخل بريدك الإلكتروني الجامعي لإعادة ضبط كلمة المرور' : (isLogin 
               ? 'سجّل الدخول باستخدام بياناتك الجامعية' 
               : 'سجّل باستخدام بريدك الإلكتروني الجامعي ورقم الجوال')}

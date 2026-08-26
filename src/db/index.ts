@@ -46,6 +46,13 @@ async function initializeDatabase() {
       await memClient.exec(`
         ALTER TABLE global_settings ADD COLUMN IF NOT EXISTS twitter_auth_token text;
         ALTER TABLE global_settings ADD COLUMN IF NOT EXISTS twitter_ct0 text;
+        ALTER TABLE subjects ADD COLUMN IF NOT EXISTS description text;
+        ALTER TABLE subjects ADD COLUMN IF NOT EXISTS syllabus text;
+        ALTER TABLE subjects ADD COLUMN IF NOT EXISTS free_resources_url text;
+        ALTER TABLE subjects ADD COLUMN IF NOT EXISTS paid_resources_url text;
+        ALTER TABLE subjects ADD COLUMN IF NOT EXISTS avatar_url text;
+        ALTER TABLE subjects ADD COLUMN IF NOT EXISTS banner_url text;
+        ALTER TABLE subjects ADD COLUMN IF NOT EXISTS tags text;
         CREATE TABLE IF NOT EXISTS "Course" (
           id text PRIMARY KEY,
           name text NOT NULL,

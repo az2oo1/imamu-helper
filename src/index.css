@@ -82,11 +82,13 @@ html.light input[type="text"],
 html.light input[type="number"],
 html.light input[type="email"],
 html.light input[type="password"],
+html.light input[type="tel"],
+html.light input[type="search"],
 html.light textarea,
 html.light select {
-  background-color: #ffffff !important;
-  color: #0f172a !important;
-  border: 1px solid #cbd5e1 !important;
+  background-color: #ffffff;
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
   border-radius: 0.75rem;
 }
 
@@ -94,11 +96,13 @@ html.dark input[type="text"],
 html.dark input[type="number"],
 html.dark input[type="email"],
 html.dark input[type="password"],
+html.dark input[type="tel"],
+html.dark input[type="search"],
 html.dark textarea,
 html.dark select {
-  background-color: #121218 !important;
-  color: #f4f4f5 !important;
-  border: 1px solid #27272a !important;
+  background-color: #121218;
+  color: #f4f4f5;
+  border: 1px solid #27272a;
   border-radius: 0.75rem;
 }
 

@@ -365,18 +365,18 @@ export function CalendarPage() {
                 key={day.toString()} 
                 className={`border-l border-b border-slate-200 dark:border-zinc-800/80 p-2 flex flex-col transition-colors duration-200 ${
                   !isCurrMonth && viewState === 'month' 
-                    ? 'bg-slate-50/70 dark:bg-zinc-950/80' 
-                    : 'bg-white dark:bg-zinc-900/30 hover:bg-blue-50/40 dark:hover:bg-zinc-900/60'
+                    ? 'bg-slate-50/70 dark:bg-zinc-950/90' 
+                    : 'bg-white dark:bg-zinc-900/40 hover:bg-blue-50/40 dark:hover:bg-zinc-900/80'
                 }`}
               >
                 <div className="flex justify-between items-start mb-2">
                   <span 
                     className={`inline-flex items-center justify-center w-7 h-7 rounded-xl text-xs font-bold ${
                       isDayToday 
-                        ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
+                        ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 font-black' 
                         : !isCurrMonth && viewState === 'month'
-                        ? 'text-slate-400 dark:text-zinc-600' 
-                        : 'text-slate-800 dark:text-zinc-200'
+                        ? 'text-slate-400 dark:text-zinc-500 font-semibold' 
+                        : 'text-slate-800 dark:text-zinc-200 font-bold'
                     }`}
                   >
                     {format(day, 'd')}
@@ -394,13 +394,13 @@ export function CalendarPage() {
                       className={`px-2.5 py-1.5 rounded-xl border transition-all duration-150 cursor-pointer text-right border-r-3 ${
                         selectedEvent && selectedEvent.title === ev.title && selectedEvent.date === ev.date
                           ? 'bg-blue-600 text-white border-transparent shadow-sm'
-                          : 'border-blue-200 dark:border-blue-900/50 border-r-blue-600 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/60 font-bold'
+                          : 'border-blue-200 dark:border-blue-900/60 border-r-blue-600 bg-blue-50/90 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/80 font-bold'
                       }`}
                       title="انقر لعرض تفاصيل الفعالية"
                     >
                       <div className="font-bold truncate text-[11px] leading-relaxed">{ev.title}</div>
-                      <div className="opacity-75 truncate text-[9px] flex items-center gap-1 mt-0.5">
-                        <Clock className="w-2.5 h-2.5 inline" />
+                      <div className="opacity-80 truncate text-[9px] flex items-center gap-1 mt-0.5">
+                        <Clock className="w-2.5 h-2.5 inline text-blue-500 dark:text-blue-400" />
                         {format(parseISO(ev.date), 'h:mm a', { locale: ar })}
                       </div>
                     </div>
