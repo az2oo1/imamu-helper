@@ -193,3 +193,17 @@ export const tutorial_comments = pgTable('tutorial_comments', {
   content: text('content').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+export const activity_logs = pgTable('activity_logs', {
+  id: serial('id').primaryKey(),
+  level: varchar('level', { length: 20 }).notNull().default('info'),
+  category: varchar('category', { length: 50 }).notNull().default('SYSTEM'),
+  action: text('action').notNull(),
+  message: text('message').notNull(),
+  userId: text('user_id'),
+  userEmail: text('user_email'),
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  metadata: text('metadata'),
+  createdAt: timestamp('created_at').defaultNow(),
+});

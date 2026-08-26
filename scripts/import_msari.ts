@@ -261,7 +261,7 @@ export async function importMsariData() {
   return { success: true, majorsCount: majorIdMap.size, subjectsCount: subjectIdMapByCode.size };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (typeof process !== 'undefined' && process.argv && process.argv[1] && (process.argv[1].includes('import_msari'))) {
   importMsariData()
     .then(res => {
       console.log('[Import Result]', res);

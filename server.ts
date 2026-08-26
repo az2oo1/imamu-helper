@@ -5,7 +5,7 @@ import path from "path";
 import fs from "fs";
 import next from "next";
 import { getDb } from "./src/db/index";
-import { users, majors, subjects, courses, course_resources, events, news, majorCourses, newsLikes, newsComments, news_sources, global_settings, verification_codes, tutorial_sections, tutorials, tutorial_feedback, feedback_comments, newbie_links, tutorial_comments } from "./src/db/schema";
+import { users, majors, subjects, courses, course_resources, events, news, majorCourses, newsLikes, newsComments, news_sources, global_settings, verification_codes, tutorial_sections, tutorials, tutorial_feedback, feedback_comments, newbie_links, tutorial_comments, activity_logs } from "./src/db/schema";
 import { eq, desc, and, sql, inArray, ilike } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "./src/middleware/auth";
 import { requestLogger, logger } from "./src/middleware/logger";
@@ -2666,6 +2666,68 @@ Formatting and parsing guidelines for this document:
     res.status(200).json({ success: false, error: "AI Parsing Failed", message: e.message });
   }
 });
+  // Admin Logs: Fetch Logs
+  app.get("/api/admin/logs", async (req: express.Request, res: express.Response) => {
+    try {
+      const { level, category, search, limit = "50", offset = "0" } = req.query;
+      const lim = Math.min(Number(limit) || 50, 200);
+      const off = Number(offset) || 0;
+
+      let conditions: any[] = [];
+      if (level && level !== 'all') conditions.push(eq(activity_logs.level, String(level)));
+      if (category && category !== 'all') conditions.push(eq(activity_logs.category, String(category)));
+      if (search) {
+        const q = `%${String(search).trim()}%`;
+        conditions.push(sql`(${activity_logs.action} ILIKE ${q} OR ${activity_logs.message} ILIKE ${q} OR ${activity_logs.userEmail} ILIKE ${q})`);
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const [logsList, totalResult] = await Promise.all([
+        db.select().from(activity_logs).where(whereClause).orderBy(desc(activity_logs.createdAt)).limit(lim).offset(off),
+        db.select({ count: sql<number>`count(*)` }).from(activity_logs).where(whereClause)
+      ]);
+
+      res.json({ logs: logsList, total: Number(totalResult[0]?.count || 0) });
+    } catch (err: any) {
+      console.error("[Admin Logs API Error]", err);
+      res.status(500).json({ error: "Failed to fetch activity logs" });
+    }
+  });
+
+  // Admin Logs: Stats Summary
+  app.get("/api/admin/logs/stats", async (req: express.Request, res: express.Response) => {
+    try {
+      const [totalRes, errorRes, authRes, adminRes, syncRes] = await Promise.all([
+        db.select({ count: sql<number>`count(*)` }).from(activity_logs),
+        db.select({ count: sql<number>`count(*)` }).from(activity_logs).where(eq(activity_logs.level, 'error')),
+        db.select({ count: sql<number>`count(*)` }).from(activity_logs).where(eq(activity_logs.category, 'AUTH')),
+        db.select({ count: sql<number>`count(*)` }).from(activity_logs).where(eq(activity_logs.category, 'ADMIN')),
+        db.select({ count: sql<number>`count(*)` }).from(activity_logs).where(eq(activity_logs.category, 'MSARI_SYNC'))
+      ]);
+
+      res.json({
+        total: Number(totalRes[0]?.count || 0),
+        errors: Number(errorRes[0]?.count || 0),
+        auth: Number(authRes[0]?.count || 0),
+        admin: Number(adminRes[0]?.count || 0),
+        sync: Number(syncRes[0]?.count || 0),
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to fetch log stats" });
+    }
+  });
+
+  // Admin Logs: Clear Logs
+  app.delete("/api/admin/logs/clear", async (req: express.Request, res: express.Response) => {
+    try {
+      await db.delete(activity_logs);
+      logger.admin("CLEAR_LOGS", "System activity logs cleared");
+      res.json({ success: true, message: "Logs cleared successfully" });
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to clear logs" });
+    }
+  });
 
 
 

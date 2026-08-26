@@ -213,14 +213,18 @@ async function initializeDatabase() {
             "bannerUrl" text,
             tags text
           );
-          CREATE TABLE IF NOT EXISTS "User" (
-            id text PRIMARY KEY,
-            username text UNIQUE,
-            "passwordHash" text,
-            "studentEmail" text UNIQUE,
-            "googleEmail" text UNIQUE,
-            name text,
-            role text DEFAULT 'USER'
+          CREATE TABLE IF NOT EXISTS activity_logs (
+            id serial PRIMARY KEY,
+            level varchar(20) DEFAULT 'info' NOT NULL,
+            category varchar(50) DEFAULT 'SYSTEM' NOT NULL,
+            action text NOT NULL,
+            message text NOT NULL,
+            user_id text,
+            user_email text,
+            ip_address text,
+            user_agent text,
+            metadata text,
+            created_at timestamp DEFAULT now()
           );
         `);
         console.log(`[DB] Schema column verifications applied to ${isCockroachDB ? 'CockroachDB' : 'PostgreSQL'}.`);
