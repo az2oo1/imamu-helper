@@ -6,7 +6,7 @@ import fs from "fs";
 import next from "next";
 import { getDb } from "./src/db/index";
 import { users, majors, subjects, courses, course_resources, events, news, majorCourses, newsLikes, newsComments, news_sources, global_settings, verification_codes, tutorial_sections, tutorials, tutorial_feedback, feedback_comments, newbie_links, tutorial_comments, activity_logs } from "./src/db/schema";
-import { eq, desc, and, sql, inArray, ilike } from "drizzle-orm";
+import { eq, desc, and, or, sql, inArray, ilike } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "./src/middleware/auth";
 import { requestLogger, logger } from "./src/middleware/logger";
 import jwt from 'jsonwebtoken';
@@ -45,7 +45,7 @@ async function startServer() {
   const app = express();
   app.use(requestLogger);
   app.use(compression());
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   // Make sure public/uploads folder exists for local fallback
   const uploadsDir = path.join(process.cwd(), 'public/uploads');
@@ -214,18 +214,20 @@ async function startServer() {
       }
 
       // Automatic Msari Dataset Background Sync (Run on startup and every 12 hours)
-      console.log('[Msari Sync] Initiating automatic background sync from Msari...');
-      importMsariData()
-        .then(res => console.log('[Msari Sync] Startup sync completed:', res))
-        .catch(err => console.error('[Msari Sync] Startup sync notice:', err.message || err));
-
-      // Schedule periodic re-sync every 12 hours
-      setInterval(() => {
-        console.log('[Msari Sync] Running periodic background sync from Msari...');
+      if (process.env.NODE_ENV !== 'test') {
+        console.log('[Msari Sync] Initiating automatic background sync from Msari...');
         importMsariData()
-          .then(res => console.log('[Msari Sync] Periodic sync completed:', res))
-          .catch(err => console.error('[Msari Sync] Periodic sync error:', err.message || err));
-      }, 12 * 60 * 60 * 1000);
+          .then(res => console.log('[Msari Sync] Startup sync completed:', res))
+          .catch(err => console.error('[Msari Sync] Startup sync notice:', err.message || err));
+
+        // Schedule periodic re-sync every 12 hours
+        setInterval(() => {
+          console.log('[Msari Sync] Running periodic background sync from Msari...');
+          importMsariData()
+            .then(res => console.log('[Msari Sync] Periodic sync completed:', res))
+            .catch(err => console.error('[Msari Sync] Periodic sync error:', err.message || err));
+        }, 12 * 60 * 60 * 1000);
+      }
 
     } catch (e) {
       console.error('[DB] Seeding failed, likely due to migration in progress:', e);
@@ -305,21 +307,44 @@ async function startServer() {
     }
   });
 
+  function sanitizeUser(user: any) {
+    if (!user) return user;
+    const { passwordHash, ...sanitized } = user;
+    return sanitized;
+  }
+
   // Auth: Register
   app.post("/api/auth/register", async (req, res) => {
     try {
-      const { email: rawEmail, password, phone, userName, code } = req.body;
+      const { email: rawEmail, password, phone, userName: rawUserName, studentEmail: rawStudentEmail, googleEmail: rawGoogleEmail, code } = req.body;
       const email = rawEmail?.toLowerCase().trim();
+      const userName = rawUserName?.trim();
+      let studentEmail = rawStudentEmail?.toLowerCase().trim() || null;
+      let googleEmail = rawGoogleEmail?.toLowerCase().trim() || null;
+
+      if (!studentEmail && (email?.endsWith('@imamu.edu.sa') || email?.includes('.imamu.edu.sa'))) {
+        studentEmail = email;
+      }
+      if (!googleEmail && email?.endsWith('@gmail.com')) {
+        googleEmail = email;
+      }
+
       if (!email || !password || !userName || !code) return res.status(400).json({ error: "Missing required fields" });
       
-      const existing = await db.select().from(users).where(eq(users.email, email));
-      if (existing.length > 0) return res.status(400).json({ error: "Email already registered" });
+      const existingEmail = await db.select().from(users).where(eq(users.email, email));
+      if (existingEmail.length > 0) return res.status(400).json({ error: "Email already registered" });
 
-      const codeRecords = await db.select().from(verification_codes).where(eq(verification_codes.email, email)).orderBy(desc(verification_codes.createdAt));
+      const existingUserName = await db.select().from(users).where(
+        sql`LOWER(${users.userName}) = LOWER(${userName})`
+      );
+      if (existingUserName.length > 0) return res.status(400).json({ error: "Username already taken" });
+
+      const codeRecords = await db.select().from(verification_codes).where(eq(verification_codes.email, email)).orderBy(desc(verification_codes.id));
       if (codeRecords.length === 0) return res.status(400).json({ error: "No verification code sent to this email" });
       
       const latestCode = codeRecords[0];
-      if (latestCode.code !== code) return res.status(400).json({ error: "Invalid verification code" });
+      console.log(`[REGISTER DEBUG] latestCode.code: '${latestCode.code}', received code: '${code}'`);
+      if (latestCode.code !== String(code)) return res.status(400).json({ error: "Invalid verification code" });
       if (latestCode.expiresAt < new Date()) return res.status(400).json({ error: "Verification code expired" });
 
       const hashedPassword = await bcrypt.hash(password, 10);
@@ -329,13 +354,15 @@ async function startServer() {
       const isAdmin = allUsers.length === 0;
 
       const result = await db.insert(users)
-        .values({ uid, email, passwordHash: hashedPassword, phone, userName, isAdmin })
+        .values({ uid, email, studentEmail, googleEmail, passwordHash: hashedPassword, phone, userName, isAdmin })
         .returning();
       
+      await db.delete(verification_codes).where(eq(verification_codes.email, email));
+
       const user = result[0];
       const token = jwt.sign({ uid: user.uid, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
       res.cookie('token', token, { httpOnly: false, path: '/', maxAge: 7 * 24 * 60 * 60 * 1000, sameSite: 'lax' });
-      res.json({ token, user });
+      res.json({ token, user: sanitizeUser(user) });
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: "Failed to register" });
@@ -374,11 +401,24 @@ async function startServer() {
   // Auth: Login
   app.post("/api/auth/login", async (req, res) => {
     try {
-      const { email: rawEmail, password } = req.body;
-      const email = rawEmail?.toLowerCase().trim();
-      if (!email || !password) return res.status(400).json({ error: "Missing email or password" });
+      const rawIdentifier = req.body.identifier || req.body.email || req.body.userName;
+      const identifier = rawIdentifier?.toLowerCase().trim();
+      const cleanedInput = identifier?.replace(/^@/, '');
+      const password = req.body.password;
 
-      let user = (await db.select().from(users).where(eq(users.email, email)))[0];
+      if (!identifier || !password) return res.status(400).json({ error: "يرجى إدخال اسم المستخدم/البريد وكلمة المرور" });
+
+      let user = (await db.select().from(users).where(
+        or(
+          eq(users.email, identifier),
+          eq(users.email, cleanedInput),
+          sql`LOWER(${users.userName}) = LOWER(${identifier})`,
+          sql`LOWER(${users.userName}) = LOWER(${cleanedInput})`,
+          sql`LOWER(${users.studentEmail}) = LOWER(${identifier})`,
+          sql`LOWER(${users.googleEmail}) = LOWER(${identifier})`,
+          eq(users.uid, identifier)
+        )
+      ))[0];
       let valid = false;
 
       // Try local auth first
@@ -390,7 +430,7 @@ async function startServer() {
       if (!valid) {
         try {
           const rawResult: any = await db.execute(
-            sql`SELECT id, username, "studentEmail", "googleEmail", "passwordHash", role, name FROM "User" WHERE LOWER(username) = ${email} OR LOWER("studentEmail") = ${email} OR LOWER("googleEmail") = ${email} LIMIT 1`
+            sql`SELECT id, username, "studentEmail", "googleEmail", "passwordHash", role, name FROM "User" WHERE LOWER(username) = ${cleanedInput} OR LOWER("studentEmail") = ${identifier} OR LOWER("googleEmail") = ${identifier} LIMIT 1`
           );
           const connectUser = rawResult?.rows?.[0] || rawResult?.[0];
           if (connectUser && connectUser.passwordHash) {
@@ -402,9 +442,11 @@ async function startServer() {
                 const isAdmin = connectUser.role === 'ADMIN';
                 const result = await db.insert(users).values({ 
                   uid, 
-                  email: connectUser.studentEmail || connectUser.googleEmail || email, 
+                  email: connectUser.studentEmail || connectUser.googleEmail || identifier, 
+                  studentEmail: connectUser.studentEmail || null,
+                  googleEmail: connectUser.googleEmail || null,
                   passwordHash: connectUser.passwordHash, 
-                  userName: connectUser.username || email.split('@')[0], 
+                  userName: connectUser.username || cleanedInput, 
                   isAdmin 
                 }).returning();
                 user = result[0];
@@ -423,7 +465,7 @@ async function startServer() {
         const settings = await db.query.global_settings.findFirst();
         if (settings?.imapHost && settings?.imapPort) {
           const { verifyImapCredentials } = await import('./src/lib/imap-auth');
-          valid = await verifyImapCredentials(settings.imapHost as string, settings.imapPort as number, (settings.imapSecure as boolean) ?? true, email, password);
+          valid = await verifyImapCredentials(settings.imapHost as string, settings.imapPort as number, (settings.imapSecure as boolean) ?? true, identifier, password);
           
           if (valid) {
             if (!user) {
@@ -433,7 +475,7 @@ async function startServer() {
               const isAdmin = allUsers.length === 0;
 
               const result = await db.insert(users).values({ 
-                uid, email, passwordHash: hashedPassword, userName: email.split('@')[0], isAdmin 
+                uid, email: identifier, passwordHash: hashedPassword, userName: cleanedInput, isAdmin 
               }).returning();
               user = result[0];
             } else {
@@ -444,14 +486,17 @@ async function startServer() {
         }
       }
 
+      if (!user) {
+        return res.status(401).json({ error: "حساب غير موجود. يرجى إنشاء حساب جديد أولاً." });
+      }
 
-      if (!valid || !user) {
-        return res.status(401).json({ error: "Invalid credentials" });
+      if (!valid) {
+        return res.status(401).json({ error: "كلمة المرور غير صحيحة. يرجى المحاولة مرة أخرى." });
       }
 
       const token = jwt.sign({ uid: user.uid, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
       res.cookie('token', token, { httpOnly: false, path: '/', maxAge: 7 * 24 * 60 * 60 * 1000, sameSite: 'lax' });
-      res.json({ token, user });
+      res.json({ token, user: sanitizeUser(user) });
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: "Failed to login" });
@@ -462,7 +507,7 @@ async function startServer() {
     try {
       if (!req.user) return res.status(401).json({ error: "No user" });
       const records = await db.select().from(users).where(eq(users.uid, req.user.uid));
-      res.json(records[0] || null);
+      res.json(sanitizeUser(records[0]) || null);
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: "Failed to fetch user" });
@@ -473,7 +518,9 @@ async function startServer() {
     try {
       const { username } = req.query;
       if (!username || typeof username !== 'string') return res.status(400).json({ error: "Invalid username" });
-      const records = await db.select().from(users).where(eq(users.userName, username));
+      const records = await db.select().from(users).where(
+        sql`LOWER(${users.userName}) = LOWER(${username})`
+      );
       // It's available if no records found, or the only record is the current user
       const isAvailable = records.length === 0 || (records.length === 1 && records[0].uid === req.user?.uid);
       res.json({ available: isAvailable });
@@ -489,7 +536,9 @@ async function startServer() {
       const { phone, major, currentGpa, finishedHours, completedCourses, profilePicUrl, userName } = req.body;
       
       if (userName) {
-        const records = await db.select().from(users).where(eq(users.userName, userName));
+        const records = await db.select().from(users).where(
+          sql`LOWER(${users.userName}) = LOWER(${userName})`
+        );
         const isAvailable = records.length === 0 || (records.length === 1 && records[0].uid === req.user.uid);
         if (!isAvailable) return res.status(400).json({ error: "Username already taken" });
       }
@@ -497,7 +546,7 @@ async function startServer() {
       const result = await db.update(users).set({
         phone, major, currentGpa, finishedHours, completedCourses: completedCourses ? JSON.stringify(completedCourses) : null, profilePicUrl, userName
       }).where(eq(users.uid, req.user.uid)).returning();
-      res.json(result[0]);
+      res.json(sanitizeUser(result[0]));
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: "Failed to update user" });
@@ -540,7 +589,10 @@ async function startServer() {
       } catch (err) {}
 
       const allMajorCourses = await db.select().from(majorCourses);
-      const allCourseResources = await db.select().from(course_resources);
+      let allCourseResources: any[] = [];
+      try {
+        allCourseResources = await db.select().from(course_resources);
+      } catch (crErr) {}
       
       const mapped = allSubjects.map(s => {
         const related = allMajorCourses.filter(mc => mc.subjectId === s.id);
@@ -560,10 +612,10 @@ async function startServer() {
   };
 
 
-  app.get("/api/subjects", requireAuth, getSubjectsHandler);
-  app.get("/api/courses", requireAuth, getSubjectsHandler);
+  app.get("/api/subjects", getSubjectsHandler);
+  app.get("/api/courses", getSubjectsHandler);
 
-  const getCourseDetailsHandler = async (req: AuthRequest, res: express.Response) => {
+  const getCourseDetailsHandler = async (req: express.Request, res: express.Response) => {
     try {
       const { idOrCode } = req.params;
       const allSubjects = await db.select().from(subjects);
@@ -579,10 +631,44 @@ async function startServer() {
       const allResources = await db.select().from(course_resources).where(eq(course_resources.subjectId, subject.id));
       const connectUrl = process.env.CONNECT_APP_URL || 'http://localhost:3000';
 
+      // Compute Prerequisite and Dependent Chains
+      const allMajorCourses = await db.select().from(majorCourses);
+      const subjectMajorLinks = allMajorCourses.filter(mc => mc.subjectId === subject.id);
+      
+      let prereqCodes: string[] = [];
+      subjectMajorLinks.forEach(link => {
+        if (link.prereq) {
+          const codes = link.prereq.split(/[,|\s\+/]+/).map(s => s.trim()).filter(Boolean);
+          prereqCodes.push(...codes);
+        }
+      });
+      if (prereqCodes.length === 0 && subject.description) {
+        const match = subject.description.match(/(?:المتطلبات السابقة:|prereq:?)\s*([A-Z0-9,\s\u0600-\u06FF]+)/i);
+        if (match) {
+          const codes = match[1].match(/[A-Z]{2,4}\d{3,4}|عال\d{4}/g);
+          if (codes) prereqCodes.push(...codes);
+        }
+      }
+      prereqCodes = Array.from(new Set(prereqCodes));
+
+      const prerequisites = allSubjects.filter(s => prereqCodes.some(code => code.toLowerCase() === s.code.toLowerCase()))
+        .map(s => ({ id: s.id, code: s.code, name: s.name }));
+
+      // Find subjects that require this course (Dependents)
+      const dependentSubjectIds = allMajorCourses.filter(mc => {
+        if (!mc.prereq) return false;
+        return mc.prereq.toLowerCase().includes(subject.code.toLowerCase());
+      }).map(mc => mc.subjectId);
+
+      const dependents = allSubjects.filter(s => dependentSubjectIds.includes(s.id))
+        .map(s => ({ id: s.id, code: s.code, name: s.name }));
+
       res.json({
         course: {
           ...subject,
           resources: allResources,
+          prerequisites,
+          dependents,
           connectUrl: `${connectUrl.replace(/\/$/, '')}/academics?courseId=${encodeURIComponent(subject.code)}`
         }
       });
@@ -592,18 +678,18 @@ async function startServer() {
     }
   };
 
-  app.get("/api/subjects/:idOrCode/details", requireAuth, getCourseDetailsHandler);
-  app.get("/api/courses/:idOrCode/details", requireAuth, getCourseDetailsHandler);
+  app.get("/api/subjects/:idOrCode/details", getCourseDetailsHandler);
+  app.get("/api/courses/:idOrCode/details", getCourseDetailsHandler);
 
 
   // Majors
-  app.get("/api/majors", requireAuth, async (req: AuthRequest, res) => {
+  app.get("/api/majors", async (req: express.Request, res: express.Response) => {
     try {
       const records = await db.select().from(majors);
       const allMajorCourses = await db.select().from(majorCourses);
       const mapped = records.map(m => {
          const courseIds = allMajorCourses.filter(mc => mc.majorId === m.id).map(mc => mc.subjectId);
-         const courses = allMajorCourses.filter(mc => mc.majorId === m.id).map(mc => ({ subjectId: mc.subjectId, optionalGroup: mc.optionalGroup, optionalGroupReqCount: mc.optionalGroupReqCount }));
+         const courses = allMajorCourses.filter(mc => mc.majorId === m.id).map(mc => ({ subjectId: mc.subjectId, optionalGroup: mc.optionalGroup, optionalGroupReqCount: mc.optionalGroupReqCount, prereq: mc.prereq }));
          return {
            ...m,
            courseIds,
@@ -2731,14 +2817,20 @@ Formatting and parsing guidelines for this document:
 
 
 
-  const dev = process.env.NODE_ENV !== "production";
-  const nextApp = next({ dev });
-  const handle = nextApp.getRequestHandler();
-  await nextApp.prepare();
+  if (process.env.NODE_ENV !== "test") {
+    const dev = process.env.NODE_ENV !== "production";
+    const nextApp = next({ dev });
+    const handle = nextApp.getRequestHandler();
+    await nextApp.prepare();
 
-  app.all('*', (req, res) => {
-    return handle(req, res);
-  });
+    app.all('*', (req, res) => {
+      return handle(req, res);
+    });
+  } else {
+    app.all('*', (req, res) => {
+      res.status(404).json({ error: "Not found" });
+    });
+  }
 
   // Error handling middleware
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

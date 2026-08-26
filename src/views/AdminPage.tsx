@@ -199,7 +199,7 @@ function StatCard({ label, value, icon, color, sub }: { label: string; value: nu
 // MAIN ADMIN PAGE
 // ============================================================================
 export function AdminPage() {
-  const { user, dbUser } = useAuth();
+  const { user, dbUser, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
@@ -453,6 +453,15 @@ export function AdminPage() {
   // ============================================================================
   // ACCESS CHECK
   // ============================================================================
+  if (authLoading || (user && dbUser === null)) {
+    return (
+      <div className="flex flex-col items-center justify-center py-32 text-center">
+        <RefreshCw className="w-10 h-10 text-blue-500 animate-spin mb-4" />
+        <p style={{ color: 'var(--text-muted)' }}>جاري التحقق من صلاحيات الدخول...</p>
+      </div>
+    );
+  }
+
   if (!user || !dbUser?.isAdmin) {
     return (
       <div className="flex flex-col items-center justify-center py-32 text-center">

@@ -1,4 +1,4 @@
-import { integer, pgTable, serial, text, timestamp, boolean, varchar, unique } from 'drizzle-orm/pg-core';
+import { integer, pgTable, serial, text, timestamp, boolean, varchar, unique, index } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 export const users = pgTable('users', {
@@ -6,6 +6,8 @@ export const users = pgTable('users', {
   uid: text('uid').notNull().unique(), // Firebase Auth UID or Custom UUID
   userName: text('user_name'),
   email: text('email').notNull().unique(), // SHA-256 hash of normalized user email
+  studentEmail: text('student_email'),
+  googleEmail: text('google_email'),
   passwordHash: text('password_hash'),
   phone: text('phone'),
   major: text('major'),
@@ -15,7 +17,9 @@ export const users = pgTable('users', {
   isAdmin: boolean('is_admin').default(false),
   profilePicUrl: text('profile_pic_url'),
   createdAt: timestamp('created_at').defaultNow(),
-});
+}, (table) => ({
+  idxUsersUserName: index('idx_users_user_name').on(table.userName),
+}));
 
 export const majors = pgTable('majors', {
   id: serial('id').primaryKey(),
@@ -61,6 +65,7 @@ export const majorCourses = pgTable('major_courses', {
   subjectId: integer('subject_id').references(() => subjects.id, { onDelete: 'cascade' }).notNull(),
   optionalGroup: text('optional_group'),
   optionalGroupReqCount: integer('optional_group_req_count'),
+  prereq: text('prereq'),
 });
 
 export const events = pgTable('events', {

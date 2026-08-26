@@ -202,6 +202,69 @@ export function CourseDetailsModal({ isOpen, onClose, courseIdOrCode }: CourseDe
                 {/* Tab 1: Overview */}
                 {activeTab === 'overview' && (
                   <div className="space-y-5 animate-in fade-in duration-200">
+                    {/* Prerequisite & Progression Chain Diagram */}
+                    <div className="bg-slate-50 dark:bg-zinc-800/50 rounded-2xl p-5 border border-slate-200/80 dark:border-zinc-800 flex flex-col gap-4">
+                      <h3 className="text-xs font-bold text-slate-400 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <Layers className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        سلسلة الاعتماديات والمتطلبات الشجرية
+                      </h3>
+
+                      <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-x-auto">
+                        {/* 1. Prerequisites Node */}
+                        <div className="flex-1 w-full text-center p-3 rounded-xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/80 dark:border-zinc-700">
+                          <span className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1.5">المتطلبات السابقة (قبل المادة)</span>
+                          {course.prerequisites && course.prerequisites.length > 0 ? (
+                            <div className="flex flex-wrap justify-center gap-1.5">
+                              {course.prerequisites.map((p: any) => (
+                                <span key={p.id} className="text-xs font-mono font-bold px-2.5 py-1 bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50 rounded-lg">
+                                  {p.code}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg inline-block">
+                              لا يوجد متطلب سابق
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Arrow */}
+                        <div className="text-slate-400 dark:text-zinc-600 font-bold shrink-0 text-sm hidden md:block">
+                          ←
+                        </div>
+
+                        {/* 2. Current Course Node */}
+                        <div className="flex-1 w-full text-center p-3 rounded-xl bg-blue-600 text-white font-bold shadow-md shadow-blue-600/20">
+                          <span className="text-[10px] uppercase font-bold text-blue-100 block mb-0.5">المادة الحالية</span>
+                          <span className="text-sm font-mono block">{course.code}</span>
+                          <span className="text-xs truncate block opacity-90">{course.name}</span>
+                        </div>
+
+                        {/* Arrow */}
+                        <div className="text-slate-400 dark:text-zinc-600 font-bold shrink-0 text-sm hidden md:block">
+                          ←
+                        </div>
+
+                        {/* 3. Dependents Node */}
+                        <div className="flex-1 w-full text-center p-3 rounded-xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/80 dark:border-zinc-700">
+                          <span className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1.5">المقررات المعتمدة عليها (تفتح مستقبلاً)</span>
+                          {course.dependents && course.dependents.length > 0 ? (
+                            <div className="flex flex-wrap justify-center gap-1.5">
+                              {course.dependents.map((d: any) => (
+                                <span key={d.id} className="text-xs font-mono font-bold px-2.5 py-1 bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-900/50 rounded-lg">
+                                  {d.code}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-xs font-semibold text-slate-500 dark:text-zinc-400">
+                              مادة نهائية في المسار
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="bg-slate-50 dark:bg-zinc-800/50 rounded-2xl p-5 border border-slate-200/80 dark:border-zinc-800">
                       <h3 className="text-xs font-bold text-slate-400 dark:text-zinc-400 uppercase tracking-wider mb-2">عن المادة</h3>
                       <p className="text-xs sm:text-sm text-slate-700 dark:text-zinc-300 leading-relaxed whitespace-pre-line">

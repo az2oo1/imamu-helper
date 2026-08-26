@@ -1,14 +1,20 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../lib/AuthContext';
 import { useRouter } from 'next/navigation';
-import { Lock, Mail, Phone, LockKeyhole, User } from 'lucide-react';
+import { Lock, Mail, Phone, LockKeyhole, User, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export function AuthPage() {
-  const { signUpWithEmail, signInWithEmail } = useAuth();
+  const { user, loading: authLoading, signUpWithEmail, signInWithEmail } = useAuth();
   const router = useRouter();
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.push('/profile');
+    }
+  }, [user, authLoading, router]);
   const [isLogin, setIsLogin] = useState(true);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [error, setError] = useState('');
@@ -28,8 +34,8 @@ export function AuthPage() {
     e.preventDefault();
     setError('');
 
-    if (!formData.email.includes('@')) {
-      return setError('يرجى إدخال بريد إلكتروني صحيح.');
+    if (!isLogin && !formData.email.includes('@')) {
+      return setError('يرجى إدخال بريد إلكتروني صحيح للإنشاء.');
     }
 
     try {

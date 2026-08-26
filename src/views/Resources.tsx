@@ -23,7 +23,7 @@ interface Resource {
 
 export function Resources() {
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, logout, signOut } = useAuth();
   const [resources, setResources] = useState<Resource[]>([]);
   const [majors, setMajors] = useState<string[]>([]);
   const [search, setSearch] = useState('');
@@ -34,7 +34,9 @@ export function Resources() {
 
 
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (authLoading) return;
+
+    if (!user) {
       router.push('/login');
       return;
     }
@@ -43,8 +45,15 @@ export function Resources() {
     fetch('/api/resources', {
       headers: token ? { 'Authorization': `Bearer ${token}` } : {}
     })
-      .then(res => {
+      .then(async res => {
         if (res.status === 401) {
+          if (logout) await logout();
+          else if (signOut) await signOut();
+          else {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user_uid');
+            localStorage.removeItem('user_email');
+          }
           router.push('/login');
           return [];
         }
@@ -67,7 +76,7 @@ export function Resources() {
         console.error('Failed to load resources:', err);
         setLoading(false);
       });
-  }, [authLoading, user, router]);
+  }, [authLoading, user, router, logout, signOut]);
 
   const filteredResources = resources.filter(r => {
     const matchesSearch = 

@@ -177,6 +177,7 @@ export async function importMsariData() {
     const localMajorId = majorIdMap.get(c.major_id);
     if (localMajorId) {
       const groupName = level ? `المستوى ${level}` : 'المتطلبات العامة';
+      const prereqStr = c.prereq ? (Array.isArray(c.prereq) ? c.prereq.join(', ') : String(c.prereq)) : null;
       const existingLink = (await db.select().from(majorCourses).where(
         and(eq(majorCourses.majorId, localMajorId), eq(majorCourses.subjectId, localSub.id))
       ))[0];
@@ -186,12 +187,14 @@ export async function importMsariData() {
           majorId: localMajorId,
           subjectId: localSub.id,
           optionalGroup: groupName,
-          optionalGroupReqCount: 1
+          optionalGroupReqCount: 1,
+          prereq: prereqStr
         });
       } else {
         await db.update(majorCourses).set({
           optionalGroup: groupName,
-          optionalGroupReqCount: 1
+          optionalGroupReqCount: 1,
+          prereq: prereqStr
         }).where(eq(majorCourses.id, existingLink.id));
       }
     }
@@ -235,6 +238,7 @@ export async function importMsariData() {
     const pkg = packageMap.get(nc.package_code);
     const groupName = pkg ? pkg.name : (nc.subgroup_ar || 'المقررات الاختيارية');
     const reqCount = pkg ? (pkg.required_units || 1) : 1;
+    const ncPrereqStr = nc.prereq ? (Array.isArray(nc.prereq) ? nc.prereq.join(', ') : String(nc.prereq)) : null;
 
     if (localMajorId) {
       const existingLink = (await db.select().from(majorCourses).where(
@@ -246,12 +250,14 @@ export async function importMsariData() {
           majorId: localMajorId,
           subjectId: localSub.id,
           optionalGroup: groupName,
-          optionalGroupReqCount: reqCount
+          optionalGroupReqCount: reqCount,
+          prereq: ncPrereqStr
         });
       } else {
         await db.update(majorCourses).set({
           optionalGroup: groupName,
-          optionalGroupReqCount: reqCount
+          optionalGroupReqCount: reqCount,
+          prereq: ncPrereqStr
         }).where(eq(majorCourses.id, existingLink.id));
       }
     }

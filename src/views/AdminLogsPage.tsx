@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useAuth } from '../lib/AuthContext';
 import { 
   ShieldAlert, Activity, Search, RefreshCw, Trash2, Download, 
   CheckCircle2, AlertTriangle, AlertCircle, Info, Lock, Server, 
@@ -31,6 +32,7 @@ interface LogStats {
 }
 
 export function AdminLogsPage() {
+  const { user, dbUser, loading: authLoading } = useAuth();
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [stats, setStats] = useState<LogStats>({ total: 0, errors: 0, auth: 0, admin: 0, sync: 0 });
   const [loading, setLoading] = useState(true);
@@ -49,9 +51,12 @@ export function AdminLogsPage() {
       if (search.trim()) params.append('search', search.trim());
       params.append('limit', '100');
 
+      const token = user ? await user.getIdToken() : (typeof window !== 'undefined' ? localStorage.getItem('token') : null);
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+
       const [logsRes, statsRes] = await Promise.all([
-        fetch(`/api/admin/logs?${params.toString()}`),
-        fetch('/api/admin/logs/stats')
+        fetch(`/api/admin/logs?${params.toString()}`, { headers }),
+        fetch('/api/admin/logs/stats', { headers })
       ]);
 
       if (logsRes.ok) {
@@ -70,21 +75,25 @@ export function AdminLogsPage() {
   };
 
   useEffect(() => {
-    fetchLogs();
-  }, [selectedLevel, selectedCategory]);
+    if (!authLoading && user && dbUser?.isAdmin) {
+      fetchLogs();
+    }
+  }, [selectedLevel, selectedCategory, authLoading, user, dbUser]);
 
   useEffect(() => {
-    if (!autoRefresh) return;
+    if (!autoRefresh || authLoading || !user || !dbUser?.isAdmin) return;
     const interval = setInterval(() => {
       fetchLogs();
     }, 10000); // Live refresh every 10s
     return () => clearInterval(interval);
-  }, [autoRefresh, selectedLevel, selectedCategory, search]);
+  }, [autoRefresh, selectedLevel, selectedCategory, search, authLoading, user, dbUser]);
 
   const handleClearLogs = async () => {
     if (!confirm('هل أنت تأكد من رغبتك في مسح كافة سجلات النظام؟')) return;
     try {
-      const res = await fetch('/api/admin/logs/clear', { method: 'DELETE' });
+      const token = user ? await user.getIdToken() : (typeof window !== 'undefined' ? localStorage.getItem('token') : null);
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch('/api/admin/logs/clear', { method: 'DELETE', headers });
       if (res.ok) {
         fetchLogs();
       }
@@ -138,6 +147,25 @@ export function AdminLogsPage() {
         );
     }
   };
+
+  if (authLoading || (user && dbUser === null)) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 flex flex-col items-center justify-center text-center p-4">
+        <RefreshCw className="w-10 h-10 text-blue-500 animate-spin mb-4" />
+        <p className="text-slate-600 dark:text-zinc-400 text-sm font-medium">جاري التحقق من صلاحيات الدخول...</p>
+      </div>
+    );
+  }
+
+  if (!user || !dbUser?.isAdmin) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 flex flex-col items-center justify-center text-center p-4">
+        <ShieldAlert className="w-20 h-20 text-red-500 mb-6" />
+        <h1 className="text-3xl font-display font-bold mb-2 text-slate-900 dark:text-white">Access Denied</h1>
+        <p className="text-slate-600 dark:text-zinc-400 text-sm">You must be an administrator to view this page.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 p-4 sm:p-8 text-right" dir="rtl">

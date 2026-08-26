@@ -15,18 +15,21 @@ export function PlansToolPage() {
   const [selectedCourse, setSelectedCourse] = useState<string | number | null>(null);
 
   useEffect(() => {
-    const headers = user ? { Authorization: `Bearer ${user.accessToken}` } : undefined;
-
     Promise.all([
-      fetch('/api/majors', { headers }).then(r => r.ok ? r.json() : []),
-      fetch('/api/subjects', { headers }).then(r => r.ok ? r.json() : [])
+      fetch('/api/majors').then(r => r.ok ? r.json() : []),
+      fetch('/api/subjects').then(r => r.ok ? r.json() : [])
     ]).then(([m, s]) => {
-      if (Array.isArray(m)) setMajors(m);
+      if (Array.isArray(m)) {
+        setMajors(m);
+        if (m.length > 0) {
+          setSelectedMajor(m[0]);
+        }
+      }
       if (Array.isArray(s)) setSubjects(s);
     }).catch(err => {
       console.error("Error fetching data:", err);
     });
-  }, [user]);
+  }, []);
 
   const filteredMajors = majors.filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
@@ -36,19 +39,39 @@ export function PlansToolPage() {
 
     const groups: Record<string, { reqCount: number, courses: any[] }> = {};
     
-    selectedMajor.courses?.forEach((c: any) => {
-      const groupName = c.optionalGroup || 'المتطلبات العامة';
-      if (!groups[groupName]) {
-        groups[groupName] = {
-          reqCount: c.optionalGroupReqCount || 1,
-          courses: []
-        };
-      }
-      const subjectDetail = subjects.find(s => s.id === c.subjectId);
-      if (subjectDetail) {
-        groups[groupName].courses.push(subjectDetail);
-      }
-    });
+    if (selectedMajor.courses && selectedMajor.courses.length > 0) {
+      selectedMajor.courses.forEach((c: any) => {
+        const groupName = c.optionalGroup || 'المتطلبات العامة';
+        if (!groups[groupName]) {
+          groups[groupName] = {
+            reqCount: c.optionalGroupReqCount || 1,
+            courses: []
+          };
+        }
+        const subjectDetail = subjects.find(s => String(s.id) === String(c.subjectId));
+        if (subjectDetail) {
+          const item = {
+            ...subjectDetail,
+            prereq: c.prereq || (subjectDetail.description ? subjectDetail.description.replace(/^المتطلبات السابقة:\s*/i, '') : null)
+          };
+          // Avoid duplicate courses in the same group
+          if (!groups[groupName].courses.some(existing => String(existing.id) === String(subjectDetail.id))) {
+            groups[groupName].courses.push(item);
+          }
+        }
+      });
+    }
+
+    // Fallback if no specific course mapping found for major: group all loaded subjects by level
+    if (Object.keys(groups).length === 0 && subjects.length > 0) {
+      subjects.forEach(s => {
+        const groupName = s.level ? `المستوى ${s.level}` : 'المتطلبات العامة';
+        if (!groups[groupName]) {
+          groups[groupName] = { reqCount: 1, courses: [] };
+        }
+        groups[groupName].courses.push(s);
+      });
+    }
 
     const groupKeys = Object.keys(groups).sort((a, b) => {
       const matchA = a.match(/المستوى\s+(\d+)/);
@@ -114,6 +137,15 @@ export function PlansToolPage() {
                               <span className="flex items-center gap-1 text-[11px] font-semibold text-slate-500 dark:text-zinc-400 bg-slate-100 dark:bg-zinc-800 px-2 py-0.5 rounded-md shrink-0">
                                 <Clock className="w-3 h-3" /> {subj.creditHours} ساعات
                               </span>
+                              {subj.prereq ? (
+                                <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-900/50 px-2 py-0.5 rounded-md shrink-0" dir="rtl">
+                                  المتطلب: {subj.prereq}
+                                </span>
+                              ) : (
+                                <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-900/50 px-2 py-0.5 rounded-md shrink-0">
+                                  بدون متطلب
+                                </span>
+                              )}
                             </div>
                             <h4 className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm line-clamp-2" title={subj.name}>{subj.name}</h4>
                           </div>
