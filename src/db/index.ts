@@ -189,6 +189,45 @@ async function initializeDatabase() {
         }
       }
 
+      // Ensure all dynamically added columns and tables exist on physical CockroachDB / PostgreSQL
+      try {
+        await connectedPool.query(`
+          ALTER TABLE global_settings ADD COLUMN IF NOT EXISTS twitter_auth_token text;
+          ALTER TABLE global_settings ADD COLUMN IF NOT EXISTS twitter_ct0 text;
+          ALTER TABLE subjects ADD COLUMN IF NOT EXISTS description text;
+          ALTER TABLE subjects ADD COLUMN IF NOT EXISTS syllabus text;
+          ALTER TABLE subjects ADD COLUMN IF NOT EXISTS free_resources_url text;
+          ALTER TABLE subjects ADD COLUMN IF NOT EXISTS paid_resources_url text;
+          ALTER TABLE subjects ADD COLUMN IF NOT EXISTS avatar_url text;
+          ALTER TABLE subjects ADD COLUMN IF NOT EXISTS banner_url text;
+          ALTER TABLE subjects ADD COLUMN IF NOT EXISTS tags text;
+          CREATE TABLE IF NOT EXISTS "Course" (
+            id text PRIMARY KEY,
+            name text NOT NULL,
+            code text UNIQUE NOT NULL,
+            description text,
+            syllabus text,
+            "freeResourcesUrl" text,
+            "paidResourcesUrl" text,
+            "avatarUrl" text,
+            "bannerUrl" text,
+            tags text
+          );
+          CREATE TABLE IF NOT EXISTS "User" (
+            id text PRIMARY KEY,
+            username text UNIQUE,
+            "passwordHash" text,
+            "studentEmail" text UNIQUE,
+            "googleEmail" text UNIQUE,
+            name text,
+            role text DEFAULT 'USER'
+          );
+        `);
+        console.log(`[DB] Schema column verifications applied to ${isCockroachDB ? 'CockroachDB' : 'PostgreSQL'}.`);
+      } catch (altErr: any) {
+        console.warn('[DB] Physical DB column verification notice:', altErr.message || altErr);
+      }
+
       // Swap activeDb to connected CockroachDB server
       activeDb = pgDb;
       console.log(`[DB] Swapped active DB reference to physical database.`);

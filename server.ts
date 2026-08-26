@@ -241,24 +241,34 @@ async function startServer() {
     try {
       const { email: rawEmail } = req.body;
       const email = rawEmail?.toLowerCase().trim();
-      if (!email) return res.status(400).json({ error: "Email required" });
+      if (!email) return res.status(400).json({ error: "البريد الإلكتروني مطلوب" });
       
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       const expiresAt = new Date(Date.now() + 10 * 60000); // 10 minutes
       
       await db.insert(verification_codes).values({ email, code, expiresAt });
       
-      const settings = await db.query.global_settings.findFirst();
+      let settings: any = null;
+      try {
+        settings = await db.query.global_settings.findFirst();
+      } catch (err: any) {
+        console.warn("[Send Code] Settings lookup warning (using env defaults):", err.message || err);
+      }
+
       const smtpHost = settings?.smtpHost || process.env.SMTP_HOST || 'smtp.gmail.com';
       const smtpPort = settings?.smtpPort || Number(process.env.SMTP_PORT) || 587;
       const smtpUser = settings?.smtpUser || process.env.SMTP_USER;
       const smtpPass = settings?.smtpPass || process.env.SMTP_PASS;
 
-      if (smtpUser) {
+      if (smtpUser && smtpPass) {
+        try {
           const dynamicTransporter = nodemailer.createTransport({
             host: smtpHost,
             port: smtpPort,
             secure: smtpPort === 465,
+            connectionTimeout: 5000,
+            greetingTimeout: 5000,
+            socketTimeout: 5000,
             auth: {
               user: smtpUser,
               pass: smtpPass,
@@ -268,18 +278,30 @@ async function startServer() {
           await dynamicTransporter.sendMail({
             from: `"IMAMU App" <${smtpUser}>`,
             to: email,
-            subject: "Your Verification Code",
+            subject: "Your Verification Code - رمز التحقق الخاص بك",
             text: `Your verification code is: ${code}`,
             html: `<b>Your verification code is: ${code}</b>`,
           });
-          res.json({ success: true });
+          return res.json({ success: true, message: "تم إرسال رمز التحقق إلى بريدك الإلكتروني" });
+        } catch (smtpErr: any) {
+          console.error("[SMTP Error] Failed to send email via SMTP:", smtpErr.message || smtpErr);
+          return res.json({
+            success: true,
+            devCode: code,
+            message: `تعذر الاتصال بخادم البريد (${smtpErr.message || 'Error'}). تم توفير الرمز المؤقت لمتابعة التسجيل.`
+          });
+        }
       } else {
-          console.log(`[DEV MODE] Verification code for ${email}: ${code}`);
-          res.json({ success: true, devCode: code, message: "SMTP not configured. Use this code to continue." });
+        console.log(`[DEV MODE] Verification code for ${email}: ${code}`);
+        return res.json({
+          success: true,
+          devCode: code,
+          message: "خادم البريد غير مهيأ. تم توفير الرمز المؤقت لمتابعة التسجيل."
+        });
       }
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Failed to send code" });
+    } catch (error: any) {
+      console.error("[Send Code Error]", error);
+      res.status(500).json({ error: error.message || "فشل توليد رمز التحقق" });
     }
   });
 
