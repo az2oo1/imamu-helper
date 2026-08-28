@@ -14,7 +14,9 @@
     "test:tier1": "tsx --test tests/auth_tier1.test.ts",
     "test:tier2": "tsx --test tests/auth_tier2.test.ts",
     "test:tier3": "tsx --test tests/auth_tier3.test.ts",
-    "test:tier4": "tsx --test tests/auth_tier4.test.ts"
+    "test:tier4": "tsx --test tests/auth_tier4.test.ts",
+    "wizard": "npx tsx scripts/setup-wizard.ts",
+    "create-user": "npx tsx scripts/setup-wizard.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1093.0",

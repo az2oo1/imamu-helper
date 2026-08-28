@@ -287,18 +287,20 @@ async function startServer() {
           return res.json({ success: true, message: "تم إرسال رمز التحقق إلى بريدك الإلكتروني" });
         } catch (smtpErr: any) {
           console.error("[SMTP Error] Failed to send email via SMTP:", smtpErr.message || smtpErr);
+          const isTest = process.env.NODE_ENV === 'test';
           return res.json({
             success: true,
-            devCode: code,
-            message: `تعذر الاتصال بخادم البريد (${smtpErr.message || 'Error'}). تم توفير الرمز المؤقت لمتابعة التسجيل.`
+            ...(isTest ? { devCode: code } : {}),
+            message: "تم إنشاء رمز التحقق بنجاح."
           });
         }
       } else {
-        console.log(`[DEV MODE] Verification code for ${email}: ${code}`);
+        console.log(`[AUTH LOG] Verification code generated for ${email}: ${code}`);
+        const isTest = process.env.NODE_ENV === 'test';
         return res.json({
           success: true,
-          devCode: code,
-          message: "خادم البريد غير مهيأ. تم توفير الرمز المؤقت لمتابعة التسجيل."
+          ...(isTest ? { devCode: code } : {}),
+          message: "تم إنشاء رمز التحقق بنجاح."
         });
       }
     } catch (error: any) {

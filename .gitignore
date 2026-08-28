@@ -1,42 +1,49 @@
-# dependencies
+# Dependencies
 /node_modules
 /.pnp
 .pnp.js
 
-# testing
+# Testing & Coverage
 /coverage
 
-# next.js
+# Next.js & Build Output
 /.next/
 /out/
-
-# production
 /build
 /dist
 
-# misc
-.DS_Store
-*.pem
-*.log
+# Project Data & Embedded DB
+/.data/
+
+# Agent Workspaces & Prompt Tracking
+/.agents/
+/ORIGINAL_REQUEST.md
+/PROJECT.md
+/TEST_INFRA.md
+/TEST_READY.md
+
+# Scratch & Temporary Files
+temp.txt
+dummy.pdf
+fetch_tweet.py
+scratch_*
 *.tmp
 *.temp
-temp.txt
-scratch_*
-
-# debug
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# local env files
-.env*
+# Environment files
+.env
+.env*.local
 !.env.example
 
-# vercel
-.vercel
-
-# typescript
+# OS & IDE
+.DS_Store
+Thumbs.db
+*.pem
 *.tsbuildinfo
 
-# project data & local caches
-/.data/
+# Vercel
+.vercel
