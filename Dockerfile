@@ -25,14 +25,15 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install chromium for puppeteer
+# Install chromium for puppeteer and bash for debugging
 RUN apk add --no-cache \
       chromium \
       nss \
       freetype \
       harfbuzz \
       ca-certificates \
-      ttf-freefont
+      ttf-freefont \
+      bash
 
 # Copy package files
 COPY package*.json ./
