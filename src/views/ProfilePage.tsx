@@ -564,162 +564,169 @@ export function ProfilePage() {
                             </div>
                           </div>
 
-                          {/* Groups / Batches Collapsible List (2 Batches Side-by-Side) */}
+                          {/* Groups / Batches Collapsible List (Dual Independent Column Stacks to eliminate empty grid gaps) */}
                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-                            {groups.map(([groupName, groupSubjects]: [string, any[]]) => {
-                              const totalInGroup = groupSubjects.length;
-                              const declaredReqCount = groupSubjects[0]?.reqCount || 0;
-                              const isLevelGroup = groupName.startsWith('المستوى');
-                              const reqCount = (declaredReqCount > 0 && !isLevelGroup) ? declaredReqCount : totalInGroup;
-                              
-                              const selectedInGroup = groupSubjects.filter(s => profileForm.completedCourses.includes(s.code)).length;
-                              const isGroupFull = selectedInGroup >= reqCount;
+                            {[
+                              groups.filter((_, idx) => idx % 2 === 0),
+                              groups.filter((_, idx) => idx % 2 === 1)
+                            ].map((columnGroups, colIdx) => (
+                              <div key={colIdx} className="flex flex-col gap-4 w-full">
+                                {columnGroups.map(([groupName, groupSubjects]: [string, any[]]) => {
+                                  const totalInGroup = groupSubjects.length;
+                                  const declaredReqCount = groupSubjects[0]?.reqCount || 0;
+                                  const isLevelGroup = groupName.startsWith('المستوى');
+                                  const reqCount = (declaredReqCount > 0 && !isLevelGroup) ? declaredReqCount : totalInGroup;
+                                  
+                                  const selectedInGroup = groupSubjects.filter(s => profileForm.completedCourses.includes(s.code)).length;
+                                  const isGroupFull = selectedInGroup >= reqCount;
 
-                              // Calculate if ALL courses in this batch are locked
-                              const allCoursesInGroupLocked = groupSubjects.length > 0 && groupSubjects.every(s => {
-                                if (profileForm.completedCourses.includes(s.code)) return false;
-                                const prereqs = extractPrereqCodes(s.description);
-                                return prereqs.length > 0 && prereqs.some(p => !profileForm.completedCourses.includes(p));
-                              });
+                                  // Calculate if ALL courses in this batch are locked
+                                  const allCoursesInGroupLocked = groupSubjects.length > 0 && groupSubjects.every(s => {
+                                    if (profileForm.completedCourses.includes(s.code)) return false;
+                                    const prereqs = extractPrereqCodes(s.description);
+                                    return prereqs.length > 0 && prereqs.some(p => !profileForm.completedCourses.includes(p));
+                                  });
 
-                              // Default minimised (collapsed) if full OR all courses locked
-                              const isCollapsed = collapsedGroups[groupName] ?? (isGroupFull || allCoursesInGroupLocked);
+                                  // Default minimised (collapsed) if full OR all courses locked
+                                  const isCollapsed = collapsedGroups[groupName] ?? (isGroupFull || allCoursesInGroupLocked);
 
-                              return (
-                                <div 
-                                  key={groupName} 
-                                  className={`border rounded-2xl overflow-hidden transition-all duration-300 h-fit ${
-                                    isGroupFull 
-                                      ? 'bg-emerald-50/30 border-emerald-200/80 dark:bg-emerald-950/15 dark:border-emerald-900/40' 
-                                      : allCoursesInGroupLocked
-                                        ? 'bg-slate-100/50 dark:bg-zinc-950/40 border-slate-200 dark:border-zinc-800/60 opacity-85'
-                                        : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800'
-                                  }`}
-                                >
-                                  {/* Collapsible Accordion Header */}
-                                  <div 
-                                    onClick={() => setCollapsedGroups(prev => ({ ...prev, [groupName]: !isCollapsed }))}
-                                    className="p-3.5 sm:p-4 flex items-center justify-between gap-3 cursor-pointer select-none hover:bg-slate-50/80 dark:hover:bg-zinc-800/40 transition"
-                                  >
-                                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                      <div className={`p-1 rounded-lg text-slate-400 dark:text-zinc-500 shrink-0 transition-transform duration-200 ${!isCollapsed ? 'rotate-180' : ''}`}>
-                                        <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500 dark:text-zinc-400" />
-                                      </div>
-                                      <h4 className={`font-bold text-xs sm:text-sm leading-snug truncate flex items-center gap-1.5 ${isGroupFull ? 'text-emerald-800 dark:text-emerald-400' : 'text-slate-900 dark:text-white'}`} title={groupName}>
-                                        <span className="truncate">{groupName}</span>
-                                        {isGroupFull && <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />}
-                                      </h4>
-                                    </div>
-
-                                    <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
-                                      {allCoursesInGroupLocked && !isGroupFull && (
-                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200/80 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border border-slate-300/60 dark:border-zinc-700 whitespace-nowrap flex items-center gap-1">
-                                          🔒 مغلقة
-                                        </span>
-                                      )}
-                                      <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap ${
+                                  return (
+                                    <div 
+                                      key={groupName} 
+                                      className={`border rounded-2xl overflow-hidden transition-all duration-300 h-fit ${
                                         isGroupFull 
-                                          ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' 
-                                          : 'bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-900/50'
-                                      }`}>
-                                        المنجز: {selectedInGroup} / {reqCount}
-                                      </span>
-                                    </div>
-                                  </div>
+                                          ? 'bg-emerald-50/30 border-emerald-200/80 dark:bg-emerald-950/15 dark:border-emerald-900/40' 
+                                          : allCoursesInGroupLocked
+                                            ? 'bg-slate-100/50 dark:bg-zinc-950/40 border-slate-200 dark:border-zinc-800/60 opacity-85'
+                                            : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800'
+                                      }`}
+                                    >
+                                      {/* Collapsible Accordion Header */}
+                                      <div 
+                                        onClick={() => setCollapsedGroups(prev => ({ ...prev, [groupName]: !isCollapsed }))}
+                                        className="p-3.5 sm:p-4 flex items-center justify-between gap-3 cursor-pointer select-none hover:bg-slate-50/80 dark:hover:bg-zinc-800/40 transition"
+                                      >
+                                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                          <div className={`p-1 rounded-lg text-slate-400 dark:text-zinc-500 shrink-0 transition-transform duration-200 ${!isCollapsed ? 'rotate-180' : ''}`}>
+                                            <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500 dark:text-zinc-400" />
+                                          </div>
+                                          <h4 className={`font-bold text-xs sm:text-sm leading-snug truncate flex items-center gap-1.5 ${isGroupFull ? 'text-emerald-800 dark:text-emerald-400' : 'text-slate-900 dark:text-white'}`} title={groupName}>
+                                            <span className="truncate">{groupName}</span>
+                                            {isGroupFull && <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />}
+                                          </h4>
+                                        </div>
 
-                                  {/* Accordion Body */}
-                                  {!isCollapsed && (
-                                    <div className="p-4 sm:p-5 pt-0 border-t border-slate-100 dark:border-zinc-800/80 mt-2">
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3">
-                                        {groupSubjects.map(s => {
-                                          const isChecked = profileForm.completedCourses.includes(s.code);
-                                          const prereqCodes = extractPrereqCodes(s.description);
-                                          const unmetPrereqs = prereqCodes.filter(p => !profileForm.completedCourses.includes(p));
-                                          const isLocked = !isChecked && unmetPrereqs.length > 0;
-
-                                          return (
-                                            <div 
-                                              key={s.id} 
-                                              onClick={() => {
-                                                if (isLocked) {
-                                                  setFeedback({
-                                                    type: 'error',
-                                                    message: `لا يمكن تحديد المادة (${s.code}) قبل اجتياز المتطلبات السابقة: ${unmetPrereqs.join(', ')}`
-                                                  });
-                                                }
-                                              }}
-                                              className={`p-3.5 rounded-xl border transition flex flex-col justify-between gap-2 ${
-                                                isChecked 
-                                                  ? 'bg-emerald-50/60 border-emerald-300 dark:bg-emerald-950/30 dark:border-emerald-800' 
-                                                  : isLocked 
-                                                    ? 'bg-slate-100/70 border-slate-200 dark:bg-zinc-950/70 dark:border-zinc-800/80 cursor-not-allowed opacity-75' 
-                                                    : 'bg-blue-50/40 border-blue-200 hover:border-blue-400 dark:bg-blue-950/20 dark:border-blue-900/50'
-                                              }`}
-                                            >
-                                              <div className="flex items-start gap-2.5">
-                                                <input 
-                                                  type="checkbox"
-                                                  checked={isChecked}
-                                                  disabled={isLocked}
-                                                  onChange={(e) => {
-                                                    if (isLocked) return;
-                                                    const checked = e.target.checked;
-                                                    const updatedCourses = checked 
-                                                      ? [...profileForm.completedCourses, s.code]
-                                                      : profileForm.completedCourses.filter(c => c !== s.code);
-                                                    
-                                                    let newFinishedHours = 0;
-                                                    displayedSubjects.forEach(subj => {
-                                                      if (updatedCourses.includes(subj.code)) {
-                                                        newFinishedHours += Number(subj.creditHours || 3);
-                                                      }
-                                                    });
-
-                                                    setProfileForm(p => ({
-                                                      ...p,
-                                                      completedCourses: updatedCourses,
-                                                      finishedHours: newFinishedHours.toString()
-                                                    }));
-                                                  }}
-                                                  className={`mt-1 w-4 h-4 rounded border-slate-300 dark:border-zinc-700 focus:ring-0 ${
-                                                    isLocked 
-                                                      ? 'cursor-not-allowed opacity-40 text-slate-400 dark:text-zinc-600 bg-slate-200 dark:bg-zinc-800' 
-                                                      : 'cursor-pointer text-blue-600 dark:text-blue-500 bg-white dark:bg-zinc-800'
-                                                  }`}
-                                                />
-                                                <div className="flex-1 min-w-0">
-                                                  <div className="flex items-center gap-1.5 mb-0.5">
-                                                    <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-zinc-800 text-slate-800 dark:text-zinc-200">{s.code}</span>
-                                                    <span className="text-[10px] font-semibold text-slate-500 dark:text-zinc-400">{s.creditHours || 3} س</span>
-                                                  </div>
-                                                  <h5 className="text-xs font-bold text-slate-900 dark:text-white line-clamp-1" title={s.name}>{s.name}</h5>
-                                                </div>
-                                              </div>
-
-                                              <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-zinc-800/60 text-[11px]">
-                                                {isChecked ? (
-                                                  <span className="inline-flex items-center gap-1 font-bold text-emerald-700 dark:text-emerald-400">
-                                                    <CheckCircle2 className="w-3.5 h-3.5" /> تم الاجتياز
-                                                  </span>
-                                                ) : isLocked ? (
-                                                  <span className="inline-flex items-center gap-1 font-bold text-amber-700 dark:text-amber-400 truncate" title={`يتطلب اجتياز: ${unmetPrereqs.join(', ')}`}>
-                                                    <span>🔒 يتطلب: {unmetPrereqs.join(', ')}</span>
-                                                  </span>
-                                                ) : (
-                                                  <span className="inline-flex items-center gap-1 font-bold text-blue-700 dark:text-blue-400">
-                                                    <span>متاح للتسجيل</span>
-                                                  </span>
-                                                )}
-                                              </div>
-                                            </div>
-                                          );
-                                        })}
+                                        <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
+                                          {allCoursesInGroupLocked && !isGroupFull && (
+                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200/80 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border border-slate-300/60 dark:border-zinc-700 whitespace-nowrap flex items-center gap-1">
+                                              🔒 مغلقة
+                                            </span>
+                                          )}
+                                          <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap ${
+                                            isGroupFull 
+                                              ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' 
+                                              : 'bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-900/50'
+                                          }`}>
+                                            المنجز: {selectedInGroup} / {reqCount}
+                                          </span>
+                                        </div>
                                       </div>
+
+                                      {/* Accordion Body */}
+                                      {!isCollapsed && (
+                                        <div className="p-4 sm:p-5 pt-0 border-t border-slate-100 dark:border-zinc-800/80 mt-2">
+                                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3">
+                                            {groupSubjects.map(s => {
+                                              const isChecked = profileForm.completedCourses.includes(s.code);
+                                              const prereqCodes = extractPrereqCodes(s.description);
+                                              const unmetPrereqs = prereqCodes.filter(p => !profileForm.completedCourses.includes(p));
+                                              const isLocked = !isChecked && unmetPrereqs.length > 0;
+
+                                              return (
+                                                <div 
+                                                  key={s.id} 
+                                                  onClick={() => {
+                                                    if (isLocked) {
+                                                      setFeedback({
+                                                        type: 'error',
+                                                        message: `لا يمكن تحديد المادة (${s.code}) قبل اجتياز المتطلبات السابقة: ${unmetPrereqs.join(', ')}`
+                                                      });
+                                                    }
+                                                  }}
+                                                  className={`p-3.5 rounded-xl border transition flex flex-col justify-between gap-2 ${
+                                                    isChecked 
+                                                      ? 'bg-emerald-50/60 border-emerald-300 dark:bg-emerald-950/30 dark:border-emerald-800' 
+                                                      : isLocked 
+                                                        ? 'bg-slate-100/70 border-slate-200 dark:bg-zinc-950/70 dark:border-zinc-800/80 cursor-not-allowed opacity-75' 
+                                                        : 'bg-blue-50/40 border-blue-200 hover:border-blue-400 dark:bg-blue-950/20 dark:border-blue-900/50'
+                                                  }`}
+                                                >
+                                                  <div className="flex items-start gap-2.5">
+                                                    <input 
+                                                      type="checkbox"
+                                                      checked={isChecked}
+                                                      disabled={isLocked}
+                                                      onChange={(e) => {
+                                                        if (isLocked) return;
+                                                        const checked = e.target.checked;
+                                                        const updatedCourses = checked 
+                                                          ? [...profileForm.completedCourses, s.code]
+                                                          : profileForm.completedCourses.filter(c => c !== s.code);
+                                                        
+                                                        let newFinishedHours = 0;
+                                                        displayedSubjects.forEach(subj => {
+                                                          if (updatedCourses.includes(subj.code)) {
+                                                            newFinishedHours += Number(subj.creditHours || 3);
+                                                          }
+                                                        });
+
+                                                        setProfileForm(p => ({
+                                                          ...p,
+                                                          completedCourses: updatedCourses,
+                                                          finishedHours: newFinishedHours.toString()
+                                                        }));
+                                                      }}
+                                                      className={`mt-1 w-4 h-4 rounded border-slate-300 dark:border-zinc-700 focus:ring-0 ${
+                                                        isLocked 
+                                                          ? 'cursor-not-allowed opacity-40 text-slate-400 dark:text-zinc-600 bg-slate-200 dark:bg-zinc-800' 
+                                                          : 'cursor-pointer text-blue-600 dark:text-blue-500 bg-white dark:bg-zinc-800'
+                                                      }`}
+                                                    />
+                                                    <div className="flex-1 min-w-0">
+                                                      <div className="flex items-center gap-1.5 mb-0.5">
+                                                        <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-zinc-800 text-slate-800 dark:text-zinc-200">{s.code}</span>
+                                                        <span className="text-[10px] font-semibold text-slate-500 dark:text-zinc-400">{s.creditHours || 3} س</span>
+                                                      </div>
+                                                      <h5 className="text-xs font-bold text-slate-900 dark:text-white line-clamp-1" title={s.name}>{s.name}</h5>
+                                                    </div>
+                                                  </div>
+
+                                                  <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-zinc-800/60 text-[11px]">
+                                                    {isChecked ? (
+                                                      <span className="inline-flex items-center gap-1 font-bold text-emerald-700 dark:text-emerald-400">
+                                                        <CheckCircle2 className="w-3.5 h-3.5" /> تم الاجتياز
+                                                      </span>
+                                                    ) : isLocked ? (
+                                                      <span className="inline-flex items-center gap-1 font-bold text-amber-700 dark:text-amber-400 truncate" title={`يتطلب اجتياز: ${unmetPrereqs.join(', ')}`}>
+                                                        <span>🔒 يتطلب: {unmetPrereqs.join(', ')}</span>
+                                                      </span>
+                                                    ) : (
+                                                      <span className="inline-flex items-center gap-1 font-bold text-blue-700 dark:text-blue-400">
+                                                        <span>متاح للتسجيل</span>
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        </div>
+                                      )}
                                     </div>
-                                  )}
-                                </div>
-                              );
-                            })}
+                                  );
+                                })}
+                              </div>
+                            ))}
                           </div>
                         </>
                       );
