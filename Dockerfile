@@ -25,15 +25,8 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install chromium for puppeteer and bash for debugging
-RUN apk add --no-cache \
-      chromium \
-      nss \
-      freetype \
-      harfbuzz \
-      ca-certificates \
-      ttf-freefont \
-      bash
+# Install bash for debugging
+RUN apk add --no-cache ca-certificates bash
 
 # Copy package files
 COPY package*.json ./
@@ -53,8 +46,6 @@ EXPOSE 3000
 # Set environment variables
 ENV PORT=3000
 ENV NODE_ENV=production
-# Tell Puppeteer to use the installed Chromium
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 # Start the application
 CMD ["npm", "start"]

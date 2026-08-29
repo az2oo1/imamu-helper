@@ -5,38 +5,7 @@ import { useAuth } from '../lib/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronDown, ChevronUp, UserCircle2, Mail, Phone, BookOpen, Calculator, Clock, CheckCircle2, AlertCircle, Loader2, Layers, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-
-function AnimatedNumber({ value }: { value: number }) {
-  const [displayValue, setDisplayValue] = useState(0);
-
-  useEffect(() => {
-    let start = 0;
-    const end = value;
-    if (start === end) {
-      setDisplayValue(end);
-      return;
-    }
-    
-    let totalDuration = 1000;
-    let startTime: number | null = null;
-    
-    const animate = (currentTime: number) => {
-      if (!startTime) startTime = currentTime;
-      const progress = Math.min((currentTime - startTime) / totalDuration, 1);
-      // Easing function: easeOutExpo (or just linear, let's use a simple linear/easeOut)
-      const easeOutQuart = 1 - Math.pow(1 - progress, 4);
-      setDisplayValue(Math.floor(easeOutQuart * (end - start) + start));
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      } else {
-        setDisplayValue(end);
-      }
-    };
-    requestAnimationFrame(animate);
-  }, [value]);
-
-  return <>{displayValue}</>;
-}
+import { AnimatedNumber } from '../components/ui';
 
 export function ProfilePage() {
   const { user, dbUser, signOut, refreshToken, loading: authLoading } = useAuth();

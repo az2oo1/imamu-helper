@@ -14,9 +14,8 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { TutorialsTab } from '../components/TutorialsTab';
-import ResourceLinksInput from '../components/ResourceLinksInput';
-import ImageUploadInput from '../components/ImageUploadInput';
 import CreateCourseModal from '../components/CreateCourseModal';
+import { AnimatedNumber } from '../components/ui';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area
@@ -147,26 +146,6 @@ function CommandPalette({ open, onClose, onSelect, tabs }: { open: boolean; onCl
       </div>
     </div>
   );
-}
-
-// ============================================================================
-// ANIMATED COUNTER
-// ============================================================================
-function AnimatedNumber({ value, duration = 800 }: { value: number; duration?: number }) {
-  const [display, setDisplay] = useState(0);
-  useEffect(() => {
-    let start = 0;
-    const startTime = Date.now();
-    const tick = () => {
-      const elapsed = Date.now() - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setDisplay(Math.round(eased * value));
-      if (progress < 1) requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  }, [value, duration]);
-  return <>{display.toLocaleString()}</>;
 }
 
 // ============================================================================
