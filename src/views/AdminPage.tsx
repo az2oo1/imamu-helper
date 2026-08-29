@@ -10,11 +10,12 @@ import {
   Shield, UserCheck, UserX, Eye, Sparkles, Command, Hash, Clock,
   CheckCircle2, AlertTriangle, Info, XCircle, RefreshCw, Zap, 
   LayoutDashboard, Newspaper, GraduationCap, BookMarked, Link2,
-  MoreHorizontal, ArrowUpRight, TrendingUp, Bell, Folder
+  MoreHorizontal, ArrowUpRight, TrendingUp, Bell, Folder, Terminal as TerminalIcon
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { TutorialsTab } from '../components/TutorialsTab';
 import CreateCourseModal from '../components/CreateCourseModal';
+import { AdminTerminalTab } from '../components/AdminTerminalTab';
 import { AnimatedNumber } from '../components/ui';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -25,7 +26,7 @@ import {
 // ============================================================================
 // TYPES
 // ============================================================================
-type Tab = 'dashboard' | 'users' | 'news_sources' | 'majors' | 'events' | 'subjects' | 'tutorials' | 'newbie_links' | 'settings';
+type Tab = 'dashboard' | 'users' | 'news_sources' | 'majors' | 'events' | 'subjects' | 'tutorials' | 'newbie_links' | 'settings' | 'terminal';
 
 interface Toast {
   id: string;
@@ -279,6 +280,7 @@ export function AdminPage() {
   // Tab definitions
   const tabDefs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
+    { id: 'terminal', label: 'Web Shell / Console', icon: <TerminalIcon className="w-5 h-5" /> },
     { id: 'users', label: 'User Management', icon: <Users className="w-5 h-5" /> },
     { id: 'news_sources', label: 'News Sources', icon: <Newspaper className="w-5 h-5" /> },
     { id: 'majors', label: 'Academic Majors', icon: <GraduationCap className="w-5 h-5" /> },
@@ -1452,6 +1454,7 @@ export function AdminPage() {
       case 'tutorials': return <TutorialsTab user={user} sections={tutorialSections} tutorials={tutorials} onRefresh={fetchData} />;
       case 'newbie_links': return renderNewbieLinks();
       case 'settings': return renderSettings();
+      case 'terminal': return <AdminTerminalTab />;
       default: return null;
     }
   };

@@ -2,6 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { exec } from 'child_process';
 import AdmZip from 'adm-zip';
 import { eq, desc, and, or, sql, inArray } from 'drizzle-orm';
 import { 
@@ -586,6 +587,41 @@ export function createAdminRouter(db: any) {
       res.json({ success: true, message: "Logs cleared successfully" });
     } catch (err: any) {
       res.status(500).json({ error: "Failed to clear logs" });
+    }
+  });
+
+  // Admin Terminal Exec Endpoint
+  router.post("/admin/terminal/exec", requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
+    if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
+    try {
+      const { command } = req.body;
+      if (!command || typeof command !== 'string') {
+        return res.status(400).json({ error: "Command string is required." });
+      }
+
+      const safeCommand = command.trim();
+      if (!safeCommand) {
+        return res.status(400).json({ error: "Empty command." });
+      }
+
+      const shellExec = process.platform === 'win32' ? undefined : '/bin/sh';
+
+      exec(safeCommand, {
+        cwd: process.cwd(),
+        timeout: 35000,
+        maxBuffer: 10 * 1024 * 1024,
+        shell: shellExec,
+      }, (error, stdout, stderr) => {
+        res.json({
+          success: !error,
+          exitCode: error ? (error.code || 1) : 0,
+          stdout: stdout || '',
+          stderr: stderr || (error ? error.message : ''),
+        });
+      });
+    } catch (err: any) {
+      console.error("[Terminal Exec Error]", err);
+      res.status(500).json({ error: err.message || "Execution error" });
     }
   });
 
