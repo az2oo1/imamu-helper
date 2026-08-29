@@ -3,7 +3,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Install build dependencies
-RUN apk add --no-cache python3 make g++
+RUN apk add --no-cache python3 make g++ bash
 
 # Copy package files
 COPY package*.json ./
@@ -25,8 +25,10 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install bash for debugging
-RUN apk add --no-cache ca-certificates bash
+# Install bash, ca-certificates, and create symlinks for all standard PATH locations
+RUN apk add --no-cache ca-certificates bash curl \
+    && ln -sf /bin/bash /usr/bin/bash \
+    && ln -sf /bin/bash /usr/local/bin/bash || true
 
 # Copy package files
 COPY package*.json ./

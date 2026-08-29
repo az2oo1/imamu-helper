@@ -59,14 +59,19 @@ npm run test:tier4   # Real-World Scenarios
 
 ---
 
-## 🐳 Docker Support
+## 🐳 Docker Deployment & Shell Access
 
-Run with Docker Compose:
+To build the Docker image with native `bash` shell support and exec into running containers:
 
 ```bash
-# Start container stack
+# Rebuild docker container image with bash support
+docker compose build --no-cache
+
+# Run container stack
 docker compose up -d
 
-# Execute commands inside container (using sh)
-docker compose exec app sh
+# Exec into container terminal via bash or sh
+docker exec -it imamu-helper bash
+# or
+docker compose exec app bash
 ```
