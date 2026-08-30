@@ -135,11 +135,6 @@ export async function seedDefaults(db: any) {
         ]);
       }
 
-      // Force update webmail url override
-      await db.update(newbie_links)
-        .set({ url: 'https://mail.imamu.edu.sa/imamowa/' })
-        .where(eq(newbie_links.title, 'بوابة البريد الإلكتروني الجامعي'));
-
       console.log('[DB] Seeding completed.');
     }
   } catch (e: any) {

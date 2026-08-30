@@ -19,6 +19,9 @@ export const users = pgTable('users', {
   createdAt: timestamp('created_at').defaultNow(),
 }, (table) => ({
   idxUsersUserName: index('idx_users_user_name').on(table.userName),
+  idxUsersEmail: index('idx_users_email').on(table.email),
+  idxUsersStudentEmail: index('idx_users_student_email').on(table.studentEmail),
+  idxUsersGoogleEmail: index('idx_users_google_email').on(table.googleEmail),
 }));
 
 export const majors = pgTable('majors', {
@@ -46,15 +49,19 @@ export const subjects = pgTable('subjects', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
-
-export const courses = subjects;
-
 export const course_resources = pgTable('course_resources', {
   id: serial('id').primaryKey(),
-  subjectId: integer('subject_id').references(() => subjects.id, { onDelete: 'cascade' }).notNull(),
+  subjectId: integer('subject_id').references(() => subjects.id, { onDelete: 'cascade' }),
   title: text('title').notNull(),
   type: text('type').notNull().default('drive'),
   url: text('url').notNull(),
+  driveLink: text('drive_link'),
+  boxLink: text('box_link'),
+  whatsappLink: text('whatsapp_link'),
+  freeResourcesUrl: text('free_resources_url'),
+  paidResourcesUrl: text('paid_resources_url'),
+  avatarUrl: text('avatar_url'),
+  bannerUrl: text('banner_url'),
   description: text('description'),
   createdAt: timestamp('created_at').defaultNow(),
 });
@@ -104,8 +111,6 @@ export const global_settings = pgTable('global_settings', {
   semesterStartDate: text('semester_start_date'),
   semesterEndDate: text('semester_end_date'),
   apiToken: text('api_token'),
-  twitterAuthToken: text('twitter_auth_token'),
-  twitterCt0: text('twitter_ct0'),
 });
 
 export const newsLikes = pgTable('news_likes', {
@@ -210,5 +215,15 @@ export const activity_logs = pgTable('activity_logs', {
   ipAddress: text('ip_address'),
   userAgent: text('user_agent'),
   metadata: text('metadata'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const tools = pgTable('tools', {
+  id: serial('id').primaryKey(),
+  title: text('title').notNull(),
+  description: text('description').notNull(),
+  link: text('link').notNull(),
+  icon: text('icon'),
+  category: text('category'),
   createdAt: timestamp('created_at').defaultNow(),
 });

@@ -821,18 +821,3 @@ function renderTutorialContent(text: string) {
   return <div className="space-y-1">{elements}</div>;
 }
 
-export function parseMediaUrls(fieldVal: string | null | undefined): string[] {
-  if (!fieldVal) return [];
-  const trimmed = fieldVal.trim();
-  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-    try {
-      return JSON.parse(trimmed);
-    } catch(e) {
-      // fallback
-    }
-  }
-  if (trimmed.includes(',')) {
-    return trimmed.split(',').map(u => u.trim()).filter(Boolean);
-  }
-  return [trimmed];
-}

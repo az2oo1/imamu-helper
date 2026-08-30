@@ -22,6 +22,91 @@ const dbReadyPromise = new Promise<void>((resolve) => {
 
 let resilientProxy: any = null;
 
+const SCHEMA_VERIFICATION_STATEMENTS = [
+  `CREATE TABLE IF NOT EXISTS users (
+    id serial PRIMARY KEY,
+    uid text NOT NULL UNIQUE,
+    user_name text,
+    email text NOT NULL UNIQUE,
+    student_email text,
+    google_email text,
+    password_hash text,
+    phone text,
+    major text,
+    current_gpa varchar(10),
+    finished_hours integer,
+    completed_courses text,
+    is_admin boolean DEFAULT false,
+    profile_pic_url text,
+    created_at timestamp DEFAULT now()
+  )`,
+  `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS description text`,
+  `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS syllabus text`,
+  `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS free_resources_url text`,
+  `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS paid_resources_url text`,
+  `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS avatar_url text`,
+  `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS banner_url text`,
+  `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS tags text`,
+  `ALTER TABLE major_courses ADD COLUMN IF NOT EXISTS prereq text`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS student_email text`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS google_email text`,
+  `CREATE INDEX IF NOT EXISTS idx_users_user_name ON users(user_name)`,
+  `ALTER TABLE course_resources ADD COLUMN IF NOT EXISTS drive_link text`,
+  `ALTER TABLE course_resources ADD COLUMN IF NOT EXISTS box_link text`,
+  `ALTER TABLE course_resources ADD COLUMN IF NOT EXISTS whatsapp_link text`,
+  `ALTER TABLE course_resources ADD COLUMN IF NOT EXISTS free_resources_url text`,
+  `ALTER TABLE course_resources ADD COLUMN IF NOT EXISTS paid_resources_url text`,
+  `ALTER TABLE course_resources ADD COLUMN IF NOT EXISTS avatar_url text`,
+  `ALTER TABLE course_resources ADD COLUMN IF NOT EXISTS banner_url text`,
+  `ALTER TABLE course_resources ALTER COLUMN subject_id DROP NOT NULL`,
+  `CREATE TABLE IF NOT EXISTS course_resources (
+    id serial PRIMARY KEY,
+    subject_id integer,
+    title text NOT NULL,
+    type text NOT NULL DEFAULT 'drive',
+    url text NOT NULL,
+    drive_link text,
+    box_link text,
+    whatsapp_link text,
+    free_resources_url text,
+    paid_resources_url text,
+    avatar_url text,
+    banner_url text,
+    description text,
+    created_at timestamp DEFAULT now()
+  )`,
+  `CREATE TABLE IF NOT EXISTS activity_logs (
+    id serial PRIMARY KEY,
+    level varchar(20) DEFAULT 'info' NOT NULL,
+    category varchar(50) DEFAULT 'SYSTEM' NOT NULL,
+    action text NOT NULL,
+    message text NOT NULL,
+    user_id text,
+    user_email text,
+    ip_address text,
+    user_agent text,
+    metadata text,
+    created_at timestamp DEFAULT now()
+  )`,
+  `CREATE TABLE IF NOT EXISTS tools (
+    id serial PRIMARY KEY,
+    title text NOT NULL,
+    description text NOT NULL,
+    link text NOT NULL,
+    icon text,
+    category text,
+    created_at timestamp DEFAULT now()
+  )`
+];
+
+async function applySchemaVerifications(runner: (sql: string) => Promise<any>) {
+  for (const stmt of SCHEMA_VERIFICATION_STATEMENTS) {
+    try {
+      await runner(stmt);
+    } catch (_e) {}
+  }
+}
+
 function createResilientProxy() {
   return new Proxy({}, {
     get(_target, prop: string | symbol) {
@@ -212,53 +297,9 @@ async function initializeDatabase() {
       await migratePglite(memDb, { migrationsFolder });
     }
     try {
-      await memClient.exec(`
-        ALTER TABLE global_settings ADD COLUMN IF NOT EXISTS twitter_auth_token text;
-        ALTER TABLE global_settings ADD COLUMN IF NOT EXISTS twitter_ct0 text;
-        ALTER TABLE subjects ADD COLUMN IF NOT EXISTS description text;
-        ALTER TABLE subjects ADD COLUMN IF NOT EXISTS syllabus text;
-        ALTER TABLE subjects ADD COLUMN IF NOT EXISTS free_resources_url text;
-        ALTER TABLE subjects ADD COLUMN IF NOT EXISTS paid_resources_url text;
-        ALTER TABLE subjects ADD COLUMN IF NOT EXISTS avatar_url text;
-        ALTER TABLE subjects ADD COLUMN IF NOT EXISTS banner_url text;
-        ALTER TABLE subjects ADD COLUMN IF NOT EXISTS tags text;
-        ALTER TABLE major_courses ADD COLUMN IF NOT EXISTS prereq text;
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS student_email text;
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS google_email text;
-        CREATE INDEX IF NOT EXISTS idx_users_user_name ON users(user_name);
-        CREATE TABLE IF NOT EXISTS "Course" (
-          id text PRIMARY KEY,
-          name text NOT NULL,
-          code text UNIQUE NOT NULL,
-          description text,
-          syllabus text,
-          "freeResourcesUrl" text,
-          "paidResourcesUrl" text,
-          "avatarUrl" text,
-          "bannerUrl" text,
-          tags text
-        );
-        CREATE TABLE IF NOT EXISTS course_resources (
-          id serial PRIMARY KEY,
-          subject_id integer NOT NULL,
-          title text NOT NULL,
-          type text NOT NULL DEFAULT 'drive',
-          url text NOT NULL,
-          description text,
-          created_at timestamp DEFAULT now()
-        );
-        CREATE TABLE IF NOT EXISTS "User" (
-          id text PRIMARY KEY,
-          username text UNIQUE,
-          "passwordHash" text,
-          "studentEmail" text UNIQUE,
-          "googleEmail" text UNIQUE,
-          name text,
-          role text DEFAULT 'USER'
-        );
-      `);
-    } catch(e) {}
-    console.log('[DB] Embedded database fallback is ready.');
+      await applySchemaVerifications((sql) => memClient.exec(sql));
+      console.log('[DB] Embedded database fallback is ready.');
+    } catch (e) {}
   } catch (err: any) {
     console.warn('[DB] Embedded database migration notice:', err.message || err);
   }
@@ -290,11 +331,11 @@ async function initializeDatabase() {
     if (dbUrl) {
       const poolConfig: PoolConfig = {
         connectionString: dbUrl,
-        connectionTimeoutMillis: 1500,
+        connectionTimeoutMillis: 3000,
       };
-      if (process.env.SQL_SSL === 'true' || process.env.COCKROACH_SSL === 'true' || dbUrl.includes('sslmode=')) {
+      if ((process.env.SQL_SSL === 'true' || process.env.COCKROACH_SSL === 'true' || dbUrl.includes('sslmode=require')) && !dbUrl.includes('sslmode=disable')) {
         poolConfig.ssl = {
-          rejectUnauthorized: process.env.SQL_SSL_REJECT_UNAUTHORIZED !== 'false',
+          rejectUnauthorized: process.env.SQL_SSL_REJECT_UNAUTHORIZED === 'true',
         };
       }
       const pool = new Pool(poolConfig);
@@ -329,10 +370,10 @@ async function initializeDatabase() {
           password: process.env.SQL_PASSWORD || process.env.COCKROACH_PASSWORD || '',
           database: process.env.SQL_DB_NAME || process.env.COCKROACH_DB_NAME || 'defaultdb',
           port,
-          connectionTimeoutMillis: 1500,
+          connectionTimeoutMillis: 3000,
         };
 
-        if (process.env.SQL_SSL === 'true' || process.env.COCKROACH_SSL === 'true' || isCockroach) {
+        if ((process.env.SQL_SSL === 'true' || process.env.COCKROACH_SSL === 'true') && process.env.SQL_SSL !== 'false') {
           poolConfig.ssl = {
             rejectUnauthorized: process.env.SQL_SSL_REJECT_UNAUTHORIZED === 'true',
           };
@@ -378,55 +419,7 @@ async function initializeDatabase() {
 
       // Ensure all dynamically added columns and tables exist on physical CockroachDB / PostgreSQL
       try {
-        await connectedPool.query(`
-          ALTER TABLE global_settings ADD COLUMN IF NOT EXISTS twitter_auth_token text;
-          ALTER TABLE global_settings ADD COLUMN IF NOT EXISTS twitter_ct0 text;
-          ALTER TABLE subjects ADD COLUMN IF NOT EXISTS description text;
-          ALTER TABLE subjects ADD COLUMN IF NOT EXISTS syllabus text;
-          ALTER TABLE subjects ADD COLUMN IF NOT EXISTS free_resources_url text;
-          ALTER TABLE subjects ADD COLUMN IF NOT EXISTS paid_resources_url text;
-          ALTER TABLE subjects ADD COLUMN IF NOT EXISTS avatar_url text;
-          ALTER TABLE subjects ADD COLUMN IF NOT EXISTS banner_url text;
-          ALTER TABLE subjects ADD COLUMN IF NOT EXISTS tags text;
-          ALTER TABLE major_courses ADD COLUMN IF NOT EXISTS prereq text;
-          ALTER TABLE users ADD COLUMN IF NOT EXISTS student_email text;
-          ALTER TABLE users ADD COLUMN IF NOT EXISTS google_email text;
-          CREATE INDEX IF NOT EXISTS idx_users_user_name ON users(user_name);
-          CREATE TABLE IF NOT EXISTS "Course" (
-            id text PRIMARY KEY,
-            name text NOT NULL,
-            code text UNIQUE NOT NULL,
-            description text,
-            syllabus text,
-            "freeResourcesUrl" text,
-            "paidResourcesUrl" text,
-            "avatarUrl" text,
-            "bannerUrl" text,
-            tags text
-          );
-          CREATE TABLE IF NOT EXISTS course_resources (
-            id serial PRIMARY KEY,
-            subject_id integer NOT NULL,
-            title text NOT NULL,
-            type text NOT NULL DEFAULT 'drive',
-            url text NOT NULL,
-            description text,
-            created_at timestamp DEFAULT now()
-          );
-          CREATE TABLE IF NOT EXISTS activity_logs (
-            id serial PRIMARY KEY,
-            level varchar(20) DEFAULT 'info' NOT NULL,
-            category varchar(50) DEFAULT 'SYSTEM' NOT NULL,
-            action text NOT NULL,
-            message text NOT NULL,
-            user_id text,
-            user_email text,
-            ip_address text,
-            user_agent text,
-            metadata text,
-            created_at timestamp DEFAULT now()
-          );
-        `);
+        await applySchemaVerifications((sql) => connectedPool.query(sql));
         console.log(`[DB] Schema column verifications applied to ${isCockroachDB ? 'CockroachDB' : 'PostgreSQL'}.`);
       } catch (altErr: any) {
         console.warn('[DB] Physical DB column verification notice:', altErr.message || altErr);

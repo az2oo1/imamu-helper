@@ -1,11 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { JWT_SECRET } from '../lib/config';
 
 export interface AuthRequest extends Request {
   user?: any;
 }
-
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_dev_only';
 
 export const requireAuth = async (
   req: AuthRequest,
@@ -39,3 +38,17 @@ export const requireAuth = async (
     return res.status(401).json({ error: 'Unauthorized: Invalid token' });
   }
 };
+
+export const requireAdmin = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<any> => {
+  return requireAuth(req, res, () => {
+    if (!req.user?.isAdmin && req.user?.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Forbidden - Admin access required' });
+    }
+    next();
+  });
+};
+

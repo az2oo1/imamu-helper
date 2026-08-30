@@ -1,5 +1,5 @@
 {
-  "name": "react-example",
+  "name": "imamu-helper",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -7,27 +7,23 @@
     "dev": "tsx server.ts",
     "build": "next build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
-    "clean": "rm -rf dist server.js",
+    "clean": "rm -rf dist .next",
     "lint": "tsc --noEmit",
     "migrate": "drizzle-kit push --config=src/db/drizzle.config.ts",
-    "test": "tsx --test --test-concurrency=1 tests/auth_tier1.test.ts tests/auth_tier2.test.ts tests/auth_tier3.test.ts tests/auth_tier4.test.ts tests/challenger2_stress.test.ts",
+    "test": "tsx --test --test-concurrency=1 tests/auth_tier1.test.ts tests/auth_tier2.test.ts tests/auth_tier3.test.ts tests/auth_tier4.test.ts tests/challenger2_stress.test.ts tests/admin_management.test.ts tests/m5_m6.test.ts tests/challenger_phase2_adversarial.test.ts",
     "test:tier1": "tsx --test tests/auth_tier1.test.ts",
     "test:tier2": "tsx --test tests/auth_tier2.test.ts",
     "test:tier3": "tsx --test tests/auth_tier3.test.ts",
     "test:tier4": "tsx --test tests/auth_tier4.test.ts",
-    "wizard": "npx -y tsx scripts/setup-wizard.ts",
-    "create-user": "npx -y tsx scripts/setup-wizard.ts"
+    "wizard": "tsx scripts/setup-wizard.ts",
+    "create-user": "tsx scripts/setup-wizard.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1093.0",
     "@electric-sql/pglite": "^0.5.3",
     "@google/genai": "^2.9.0",
-    "@tailwindcss/postcss": "^4.3.3",
-    "@types/compression": "^1.8.1",
-    "@types/nodemailer": "^8.0.1",
     "adm-zip": "^0.5.18",
     "bcryptjs": "^3.0.3",
-    "cheerio": "^1.2.0",
     "clsx": "^2.1.1",
     "compression": "^1.8.1",
     "date-fns": "^4.4.0",
@@ -42,25 +38,26 @@
     "next": "^15.1.0",
     "nodemailer": "^9.0.1",
     "pg": "^8.22.0",
-    "postcss": "^8.5.20",
     "react": "^19.0.1",
-    "react-confetti": "^6.4.0",
-    "react-dom": "^19.0.1",
-    "recharts": "^3.8.1",
-    "tsx": "^4.21.0",
-    "typescript": "~5.8.2"
+    "react-dom": "^19.0.1"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
     "@types/adm-zip": "^0.5.8",
     "@types/bcryptjs": "^2.4.6",
+    "@types/compression": "^1.8.1",
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.1.10",
     "@types/node": "^22.14.0",
+    "@types/nodemailer": "^8.0.1",
     "@types/pg": "^8.20.0",
     "@types/react": "19.2.17",
     "drizzle-kit": "^0.31.10",
     "esbuild": "^0.25.0",
-    "tailwindcss": "^4.1.14"
+    "postcss": "^8.5.20",
+    "tailwindcss": "^4.1.14",
+    "tsx": "^4.21.0",
+    "typescript": "~5.8.2"
   }
 }

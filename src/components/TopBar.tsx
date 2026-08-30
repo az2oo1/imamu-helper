@@ -11,6 +11,7 @@ import { motion, AnimatePresence, LayoutGroup } from 'motion/react';
 
 export function TopBar() {
   const { user, dbUser, signOut } = useAuth();
+  const isAdmin = !!(dbUser?.isAdmin || dbUser?.role === 'ADMIN');
   const { theme, toggleTheme } = useTheme();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -107,7 +108,7 @@ export function TopBar() {
               )}
             </button>
 
-            {dbUser?.isAdmin && (
+            {isAdmin && (
               <>
                 <Link 
                   href="/admin/logs" 
@@ -130,7 +131,8 @@ export function TopBar() {
               <div className="relative">
                 <button 
                   onClick={() => setProfileMenuOpen(!profileMenuOpen)}
-                  className="flex items-center gap-2 sm:pl-3 sm:pr-1 sm:py-1 rounded-full border border-slate-200/80 dark:border-zinc-800/80 bg-slate-50/80 dark:bg-zinc-900/80 hover:bg-slate-100 dark:hover:bg-zinc-800 transition active:scale-95 focus:outline-none"
+                  className="flex items-center justify-center p-1 rounded-full border border-slate-200/80 dark:border-zinc-800/80 bg-slate-50/80 dark:bg-zinc-900/80 hover:bg-slate-100 dark:hover:bg-zinc-800 transition active:scale-95 focus:outline-none cursor-pointer"
+                  title={dbUser?.userName || user.displayName || 'الحساب الشخصي'}
                 >
                   <div className="w-8.5 h-8.5 rounded-full overflow-hidden bg-slate-200 dark:bg-zinc-800 flex items-center justify-center border border-slate-300/80 dark:border-zinc-700/80 shrink-0">
                     {(dbUser as any)?.profilePicUrl ? (
@@ -138,9 +140,6 @@ export function TopBar() {
                     ) : (
                       <UserCircle2 className="w-6 h-6 text-slate-400 dark:text-zinc-400" />
                     )}
-                  </div>
-                  <div className="hidden sm:flex flex-col items-start pr-0.5 text-right">
-                    <span className="text-xs font-bold text-slate-900 dark:text-white leading-tight">@{dbUser?.userName || user.displayName || 'طالب'}</span>
                   </div>
                 </button>
 
@@ -171,7 +170,7 @@ export function TopBar() {
                           <Settings className="w-4 h-4 text-slate-400 dark:text-zinc-400" />
                           إعدادات الملف الشخصي
                         </Link>
-                        {dbUser?.isAdmin && (
+                        {isAdmin && (
                           <Link 
                             href="/admin/logs" 
                             onClick={() => setProfileMenuOpen(false)}

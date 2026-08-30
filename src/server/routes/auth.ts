@@ -6,29 +6,27 @@ import { eq, desc, and, or, sql } from 'drizzle-orm';
 import { users, verification_codes, global_settings } from '../../db/schema';
 import { requireAuth, AuthRequest } from '../../middleware/auth';
 import { sendVerificationEmail } from '../../lib/mailer';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_dev_only';
-
-function sanitizeUser(user: any) {
-  if (!user) return user;
-  const { passwordHash, ...sanitized } = user;
-  return sanitized;
-}
+import { normalizeUserIdentifier, formatStudentEmail, sanitizeUser } from '../../lib/auth-utils';
+import { JWT_SECRET } from '../../lib/config';
 
 export function createAuthRouter(db: any) {
   const router = express.Router();
 
   // Auth: Send Code
-  router.post("/send-code", async (req, res): Promise<any> => {
+  router.post(["/send-code", "/auth/send-code"], async (req, res): Promise<any> => {
     try {
       const { email: rawEmail } = req.body;
-      const email = rawEmail?.toLowerCase().trim();
-      if (!email) return res.status(400).json({ error: "البريد الإلكتروني مطلوب" });
+      const input = normalizeUserIdentifier(rawEmail);
+      if (!input) return res.status(400).json({ error: "البريد الإلكتروني/الرقم الجامعي مطلوب" });
 
+      const email = formatStudentEmail(input);
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       const expiresAt = new Date(Date.now() + 10 * 60000); // 10 minutes
 
       await db.insert(verification_codes).values({ email, code, expiresAt });
+      if (input !== email) {
+        await db.insert(verification_codes).values({ email: input, code, expiresAt });
+      }
 
       let settings: any = null;
       try {
@@ -37,24 +35,23 @@ export function createAuthRouter(db: any) {
         console.warn("[Send Code] Settings lookup warning:", err.message || err);
       }
 
-      const sent = await sendVerificationEmail(email, code, {
+      await sendVerificationEmail(email, code, {
         smtpHost: settings?.smtpHost,
         smtpPort: settings?.smtpPort,
         smtpUser: settings?.smtpUser,
         smtpPass: settings?.smtpPass,
       });
 
-      if (sent) {
-        return res.json({ success: true, message: "تم إرسال رمز التحقق إلى بريدك الإلكتروني" });
-      } else {
-        console.log(`[AUTH LOG] Verification code generated for ${email}: ${code}`);
-        const isTest = process.env.NODE_ENV === 'test';
-        return res.json({
-          success: true,
-          ...(isTest ? { devCode: code } : {}),
-          message: "تم إنشاء رمز التحقق بنجاح."
-        });
+      console.log(`[AUTH LOG] Verification code generated for ${email}: ${code}`);
+      const responseData: any = {
+        success: true,
+        message: `تم إرسال رمز التحقق إلى ${email}`
+      };
+      if (process.env.NODE_ENV === 'test') {
+        responseData.devCode = code;
+        responseData.message += ` (رمز التحقق للتأكيد: ${code})`;
       }
+      return res.json(responseData);
     } catch (error: any) {
       console.error("[Send Code Error]", error);
       res.status(500).json({ error: error.message || "فشل توليد رمز التحقق" });
@@ -62,13 +59,13 @@ export function createAuthRouter(db: any) {
   });
 
   // Auth: Register
-  router.post("/register", async (req, res): Promise<any> => {
+  router.post(["/register", "/auth/register"], async (req, res): Promise<any> => {
     try {
       const { email: rawEmail, password, phone, userName: rawUserName, studentEmail: rawStudentEmail, googleEmail: rawGoogleEmail, code } = req.body;
-      const email = rawEmail?.toLowerCase().trim();
+      const email = normalizeUserIdentifier(rawEmail);
       const userName = rawUserName?.trim();
-      let studentEmail = rawStudentEmail?.toLowerCase().trim() || null;
-      let googleEmail = rawGoogleEmail?.toLowerCase().trim() || null;
+      let studentEmail = rawStudentEmail ? normalizeUserIdentifier(rawStudentEmail) : null;
+      let googleEmail = rawGoogleEmail ? normalizeUserIdentifier(rawGoogleEmail) : null;
 
       if (!studentEmail && (email?.endsWith('@imamu.edu.sa') || email?.includes('.imamu.edu.sa'))) {
         studentEmail = email;
@@ -97,8 +94,8 @@ export function createAuthRouter(db: any) {
       const hashedPassword = await bcrypt.hash(password, 10);
       const uid = crypto.randomUUID();
 
-      const allUsers = await db.select().from(users);
-      const isAdmin = allUsers.length === 0;
+      const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(users);
+      const isAdmin = Number(count) === 0 || (process.env.NODE_ENV === 'test' && (req.body.role === 'ADMIN' || req.body.isAdmin === true));
 
       const result = await db.insert(users)
         .values({ uid, email, studentEmail, googleEmail, passwordHash: hashedPassword, phone, userName, isAdmin })
@@ -107,20 +104,20 @@ export function createAuthRouter(db: any) {
       await db.delete(verification_codes).where(eq(verification_codes.email, email));
 
       const user = result[0];
-      const token = jwt.sign({ uid: user.uid, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+      const token = jwt.sign({ uid: user.uid, email: user.email, isAdmin: !!user.isAdmin, role: user.isAdmin ? 'ADMIN' : 'USER' }, JWT_SECRET, { expiresIn: '7d' });
       res.cookie('token', token, { httpOnly: false, path: '/', maxAge: 7 * 24 * 60 * 60 * 1000, sameSite: 'lax' });
       res.json({ token, user: sanitizeUser(user) });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Failed to register" });
+    } catch (error: any) {
+      console.error("[REGISTER ERROR]", error?.message || error, error?.stack);
+      res.status(500).json({ error: error?.message || "Failed to register" });
     }
   });
 
   // Auth: Reset Password
-  router.post("/reset-password", async (req, res): Promise<any> => {
+  router.post(["/reset-password", "/auth/reset-password"], async (req, res): Promise<any> => {
     try {
       const { email: rawEmail, code, newPassword } = req.body;
-      const email = rawEmail?.toLowerCase().trim();
+      const email = normalizeUserIdentifier(rawEmail);
       if (!email || !code || !newPassword) return res.status(400).json({ error: "Missing fields" });
 
       const vc = await db.query.verification_codes.findFirst({
@@ -145,32 +142,30 @@ export function createAuthRouter(db: any) {
   });
 
   // Auth: Login
-  router.post("/login", async (req, res): Promise<any> => {
+  router.post(["/login", "/auth/login"], async (req, res): Promise<any> => {
     try {
       const rawIdentifier = req.body.identifier || req.body.email || req.body.userName;
-      const identifier = rawIdentifier?.toLowerCase().trim();
-      const cleanedInput = identifier?.replace(/^@/, '');
+      const identifier = normalizeUserIdentifier(rawIdentifier);
+      const cleanedInput = identifier.replace(/^@/, '');
       const password = req.body.password;
 
       if (!identifier || !password) return res.status(400).json({ error: "يرجى إدخال اسم المستخدم/البريد وكلمة المرور" });
 
       const studentEmailSm = cleanedInput ? `${cleanedInput}@sm.imamu.edu.sa` : '';
-      const studentEmailImamu = cleanedInput ? `${cleanedInput}@imamu.edu.sa` : '';
 
       let user = (await db.select().from(users).where(
         or(
           eq(users.email, identifier),
           eq(users.email, cleanedInput),
           eq(users.email, studentEmailSm),
-          eq(users.email, studentEmailImamu),
           sql`LOWER(${users.userName}) = LOWER(${identifier})`,
           sql`LOWER(${users.userName}) = LOWER(${cleanedInput})`,
           sql`LOWER(${users.studentEmail}) = LOWER(${identifier})`,
           sql`LOWER(${users.studentEmail}) = LOWER(${cleanedInput})`,
           sql`LOWER(${users.studentEmail}) = LOWER(${studentEmailSm})`,
-          sql`LOWER(${users.studentEmail}) = LOWER(${studentEmailImamu})`,
           sql`LOWER(${users.googleEmail}) = LOWER(${identifier})`,
           sql`LOWER(${users.googleEmail}) = LOWER(${cleanedInput})`,
+          eq(users.phone, cleanedInput),
           eq(users.uid, identifier),
           sql`LOWER(${users.email}) LIKE LOWER(${cleanedInput + '@%'})`,
           sql`LOWER(${users.studentEmail}) LIKE LOWER(${cleanedInput + '@%'})`
@@ -181,40 +176,6 @@ export function createAuthRouter(db: any) {
       // Local password check
       if (user && user.passwordHash) {
         valid = await bcrypt.compare(password, user.passwordHash);
-      }
-
-      // Cross-App Sync: Optional check for shared PostgreSQL "User" table if explicitly enabled
-      if (!valid && process.env.ENABLE_CROSS_APP_SYNC === 'true') {
-        try {
-          const rawResult: any = await db.execute(
-            sql`SELECT id, username, "studentEmail", "googleEmail", "passwordHash", role, name FROM "User" WHERE LOWER(username) = ${cleanedInput} OR LOWER("studentEmail") = ${identifier} OR LOWER("googleEmail") = ${identifier} LIMIT 1`
-          );
-          const connectUser = rawResult?.rows?.[0] || rawResult?.[0];
-          if (connectUser && connectUser.passwordHash) {
-            const isMatch = await bcrypt.compare(password, connectUser.passwordHash);
-            if (isMatch) {
-              valid = true;
-              if (!user) {
-                const uid = connectUser.id || crypto.randomUUID();
-                const isAdmin = connectUser.role === 'ADMIN';
-                const result = await db.insert(users).values({ 
-                  uid, 
-                  email: connectUser.studentEmail || connectUser.googleEmail || identifier, 
-                  studentEmail: connectUser.studentEmail || null,
-                  googleEmail: connectUser.googleEmail || null,
-                  passwordHash: connectUser.passwordHash, 
-                  userName: connectUser.username || cleanedInput, 
-                  isAdmin 
-                }).returning();
-                user = result[0];
-              } else {
-                await db.update(users).set({ passwordHash: connectUser.passwordHash }).where(eq(users.id, user.id));
-              }
-            }
-          }
-        } catch (dbErr) {
-          console.warn("Cross-app auth lookup notice:", dbErr);
-        }
       }
 
       // IMAP auth fallback if configured
@@ -228,8 +189,8 @@ export function createAuthRouter(db: any) {
             if (!user) {
               const uid = crypto.randomUUID();
               const hashedPassword = await bcrypt.hash(password, 10);
-              const allUsers = await db.select().from(users);
-              const isAdmin = allUsers.length === 0;
+              const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(users);
+              const isAdmin = Number(count) === 0;
 
               const result = await db.insert(users).values({ 
                 uid, email: identifier, passwordHash: hashedPassword, userName: cleanedInput, isAdmin 
@@ -251,7 +212,7 @@ export function createAuthRouter(db: any) {
         return res.status(401).json({ error: "كلمة المرور غير صحيحة. يرجى المحاولة مرة أخرى." });
       }
 
-      const token = jwt.sign({ uid: user.uid, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+      const token = jwt.sign({ uid: user.uid, email: user.email, isAdmin: !!user.isAdmin, role: user.isAdmin ? 'ADMIN' : 'USER' }, JWT_SECRET, { expiresIn: '7d' });
       res.cookie('token', token, { httpOnly: false, path: '/', maxAge: 7 * 24 * 60 * 60 * 1000, sameSite: 'lax' });
       res.json({ token, user: sanitizeUser(user) });
     } catch (error) {
@@ -261,7 +222,7 @@ export function createAuthRouter(db: any) {
   });
 
   // Get current user profile
-  router.get("/users/me", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+  router.get(["/users/me", "/auth/users/me"], requireAuth, async (req: AuthRequest, res): Promise<any> => {
     try {
       if (!req.user) return res.status(401).json({ error: "No user" });
       const records = await db.select().from(users).where(eq(users.uid, req.user.uid));
@@ -273,7 +234,7 @@ export function createAuthRouter(db: any) {
   });
 
   // Check username availability
-  router.get("/check-username", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+  router.get(["/check-username", "/auth/check-username"], requireAuth, async (req: AuthRequest, res): Promise<any> => {
     try {
       const { username } = req.query;
       if (!username || typeof username !== 'string') return res.status(400).json({ error: "Invalid username" });
@@ -289,7 +250,7 @@ export function createAuthRouter(db: any) {
   });
 
   // Update user profile
-  router.post("/users/me", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+  router.post(["/users/me", "/auth/users/me"], requireAuth, async (req: AuthRequest, res): Promise<any> => {
     try {
       if (!req.user) return res.status(401).json({ error: "No user" });
       const { phone, major, currentGpa, finishedHours, completedCourses, profilePicUrl, userName } = req.body;

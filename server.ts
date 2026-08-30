@@ -5,7 +5,6 @@ import path from "path";
 import fs from "fs";
 import next from "next";
 import { getDb } from "./src/db/index";
-import { requireAuth } from "./src/middleware/auth";
 import { requestLogger, logger } from "./src/middleware/logger";
 import { getFileFromStorage } from "./src/lib/storage";
 
@@ -61,7 +60,6 @@ async function startServer() {
   });
 
   // Mount Modular Express Routers under /api
-  app.use("/api/auth", createAuthRouter(db));
   app.use("/api", createAuthRouter(db));
   app.use("/api", createSubjectsRouter(db));
   app.use("/api", createNewsRouter(db));

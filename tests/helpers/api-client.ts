@@ -62,10 +62,19 @@ export class TestApiClient {
 
     const fullUrl = path.startsWith('http') ? path : `${this.baseUrl}${path.startsWith('/') ? '' : '/'}${path}`;
 
-    const response = await fetch(fullUrl, {
-      ...options,
-      headers,
-    });
+    let response: Response;
+    try {
+      response = await fetch(fullUrl, {
+        ...options,
+        headers,
+      });
+    } catch (_err) {
+      await new Promise((r) => setTimeout(r, 150));
+      response = await fetch(fullUrl, {
+        ...options,
+        headers,
+      });
+    }
 
     // Capture set-cookie headers
     if (typeof response.headers.getSetCookie === 'function') {
@@ -105,6 +114,20 @@ export class TestApiClient {
     const options: RequestInit = {
       method: 'GET',
       headers,
+    };
+    const res = await this.request(path, options);
+    const data = await res.json().catch(() => null);
+    return { status: res.status, ok: res.ok, data, headers: res.headers };
+  }
+
+  public async put(path: string, body?: any, headers?: Record<string, string>) {
+    const options: RequestInit = {
+      method: 'PUT',
+      body: body ? JSON.stringify(body) : undefined,
+      headers: {
+        'Content-Type': 'application/json',
+        ...headers,
+      },
     };
     const res = await this.request(path, options);
     const data = await res.json().catch(() => null);

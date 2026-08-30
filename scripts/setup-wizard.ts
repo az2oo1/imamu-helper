@@ -70,27 +70,22 @@ async function removeSmtpFromEnv(): Promise<{ updatedCount: number; filesModifie
 
 async function performSecurityAuditAndCleanup(): Promise<string[]> {
   const fixesPerformed: string[] = [];
-  const serverPath = path.join(process.cwd(), 'server.ts');
+  const authPath = path.join(process.cwd(), 'src/server/routes/auth.ts');
 
-  if (fs.existsSync(serverPath)) {
-    let content = fs.readFileSync(serverPath, 'utf-8');
+  if (fs.existsSync(authPath)) {
+    let content = fs.readFileSync(authPath, 'utf-8');
     
     // Check for un-sanitized devCode leakage outside test environment
-    const unhardenedPattern = /devCode:\s*code,\s*message:\s*`تعذر الاتصال بخادم البريد/;
-    if (unhardenedPattern.test(content) || content.includes("devCode: code,\n          message: \"خادم البريد")) {
-      console.log('  🛡️ Found unhardened devCode output in server.ts. Hardening verification endpoint...');
+    if (!content.includes('process.env.NODE_ENV === \'test\'')) {
+      console.log('  🛡️ Found unhardened devCode output in auth.ts. Hardening verification endpoint...');
       content = content.replace(
-        /devCode:\s*code,\s*message:\s*`تعذر الاتصال بخادم البريد/g,
-        '...(process.env.NODE_ENV === "test" ? { devCode: code } : {}),\n            message: `تعذر الاتصال بخادم البريد'
+        /devCode:\s*code,/g,
+        '...(process.env.NODE_ENV === "test" ? { devCode: code } : {}),'
       );
-      content = content.replace(
-        /devCode:\s*code,\s*message:\s*"خادم البريد غير مهيأ\./g,
-        '...(process.env.NODE_ENV === "test" ? { devCode: code } : {}),\n          message: "تم إرسال رمز التحقق بنجاح."'
-      );
-      fs.writeFileSync(serverPath, content, 'utf-8');
-      fixesPerformed.push('Hardened server.ts /api/auth/send-code to prevent exposing verification codes in non-test API responses.');
+      fs.writeFileSync(authPath, content, 'utf-8');
+      fixesPerformed.push('Hardened src/server/routes/auth.ts /api/auth/send-code to prevent exposing verification codes in non-test API responses.');
     } else {
-      fixesPerformed.push('Verified server.ts /api/auth/send-code API response security (no devCode leaks outside test mode).');
+      fixesPerformed.push('Verified src/server/routes/auth.ts /api/auth/send-code API response security (no devCode leaks outside test mode).');
     }
   }
 

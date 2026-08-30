@@ -33,6 +33,7 @@ interface LogStats {
 
 export function AdminLogsPage() {
   const { user, dbUser, loading: authLoading } = useAuth();
+  const isAdmin = !!(dbUser?.isAdmin || dbUser?.role === 'ADMIN');
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [stats, setStats] = useState<LogStats>({ total: 0, errors: 0, auth: 0, admin: 0, sync: 0 });
   const [loading, setLoading] = useState(true);
@@ -75,13 +76,13 @@ export function AdminLogsPage() {
   };
 
   useEffect(() => {
-    if (!authLoading && user && dbUser?.isAdmin) {
+    if (!authLoading && user && isAdmin) {
       fetchLogs();
     }
-  }, [selectedLevel, selectedCategory, authLoading, user, dbUser]);
+  }, [selectedLevel, selectedCategory, authLoading, user, dbUser, isAdmin]);
 
   useEffect(() => {
-    if (!autoRefresh || authLoading || !user || !dbUser?.isAdmin) return;
+    if (!autoRefresh || authLoading || !user || !isAdmin) return;
     const interval = setInterval(() => {
       fetchLogs();
     }, 10000); // Live refresh every 10s
@@ -157,7 +158,7 @@ export function AdminLogsPage() {
     );
   }
 
-  if (!user || !dbUser?.isAdmin) {
+  if (!user || !isAdmin) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 flex flex-col items-center justify-center text-center p-4">
         <ShieldAlert className="w-20 h-20 text-red-500 mb-6" />

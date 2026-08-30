@@ -3,9 +3,85 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../lib/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronDown, ChevronUp, UserCircle2, Mail, Phone, BookOpen, Calculator, Clock, CheckCircle2, AlertCircle, Loader2, Layers, Search, Camera, GraduationCap, Settings, Sparkles, ArrowUpRight } from 'lucide-react';
+import { ChevronDown, ChevronUp, UserCircle2, Mail, Phone, BookOpen, Calculator, Clock, CheckCircle2, AlertCircle, Loader2, Camera, GraduationCap, Settings, Sparkles, ArrowUpRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AnimatedNumber } from '../components/ui';
+
+function extractPrereqCodes(description?: string | null): string[] {
+  if (!description) return [];
+  const match = description.match(/(?:المتطلبات السابقة:|prereq:?)\s*([A-Z0-9,\s\u0600-\u06FF]+)/i);
+  if (!match) return [];
+  const codes = match[1].match(/[A-Z]{2,4}\d{3,4}|عال\d{4}/g);
+  return codes ? Array.from(new Set(codes)) : [];
+}
+
+function computeAcademicProgress(majors: any[], subjects: any[], majorName: string, completedCourses: string[]) {
+  const userMajor = majors.find(m => m.name === majorName || m.name?.trim() === majorName?.trim());
+  const displayedSubjects = userMajor && userMajor.courseIds && userMajor.courseIds.length > 0
+    ? subjects.filter(s => userMajor.courseIds.some((cid: any) => String(cid) === String(s.id)))
+    : subjects;
+
+  const groups = (Object.entries(
+    displayedSubjects.reduce((acc, s) => {
+      let g = s.level ? `المستوى ${s.level}` : 'المتطلبات العامة';
+      let reqCount = 0;
+      if (userMajor && userMajor.courses) {
+        const c = userMajor.courses.find((mc: any) => String(mc.subjectId) === String(s.id));
+        if (c && c.optionalGroup && c.optionalGroup !== 'المتطلبات العامة') {
+          g = c.optionalGroup;
+          reqCount = Number(c.optionalGroupReqCount) || 0;
+        } else if (c && c.optionalGroupReqCount) {
+          reqCount = Number(c.optionalGroupReqCount) || 0;
+        }
+      }
+      if (!acc[g]) acc[g] = [];
+      acc[g].push({...s, reqCount});
+      return acc;
+    }, {} as Record<string, any[]>)
+  ) as [string, any[]][]).sort((a, b) => {
+    const matchA = a[0].match(/المستوى\s+(\d+)/);
+    const matchB = b[0].match(/المستوى\s+(\d+)/);
+    if (matchA && matchB) return parseInt(matchA[1]) - parseInt(matchB[1]);
+    if (matchA) return -1;
+    if (matchB) return 1;
+    return a[0].localeCompare(b[0], 'ar');
+  });
+
+  let totalReq = 0;
+  let totalFinishedInReq = 0;
+  let totalFinishedHours = 0;
+
+  displayedSubjects.forEach(s => {
+    if (completedCourses.includes(s.code)) {
+      totalFinishedHours += Number(s.creditHours || 3);
+    }
+  });
+
+  groups.forEach(([groupName, groupSubjects]) => {
+    const totalInGroup = groupSubjects.length;
+    const declaredReqCount = Number(groupSubjects[0]?.reqCount) || 0;
+    const isLevelGroup = groupName.startsWith('المستوى');
+    const reqCount = (declaredReqCount > 0 && !isLevelGroup) ? declaredReqCount : totalInGroup;
+    const selectedInGroup = groupSubjects.filter(s => completedCourses.includes(s.code)).length;
+    
+    totalReq += Number(reqCount);
+    totalFinishedInReq += Math.min(selectedInGroup, Number(reqCount));
+  });
+
+  const percentFinished = totalReq > 0 ? Math.round((totalFinishedInReq / totalReq) * 100) : 0;
+  const allGroupNames = groups.map(g => g[0]);
+
+  return {
+    userMajor,
+    displayedSubjects,
+    groups,
+    totalReq,
+    totalFinishedInReq,
+    totalFinishedHours,
+    percentFinished,
+    allGroupNames
+  };
+}
 
 export function ProfilePage() {
   const { user, dbUser, signOut, refreshToken, loading: authLoading } = useAuth();
@@ -65,43 +141,15 @@ export function ProfilePage() {
   }, [profileForm.userName, dbUser?.userName, user]);
 
   useEffect(() => {
-    fetch('/api/majors', {
-      headers: user ? { Authorization: `Bearer ${user.accessToken}` } : {}
-    })
-    .then(r => {
-      if (!r.ok) {
-        throw new Error(`HTTP error! status: ${r.status}`);
-      }
-      const contentType = r.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        throw new TypeError("Received non-JSON response from server");
-      }
-      return r.json();
-    })
-    .then(data => {
-      if(Array.isArray(data)) setMajors(data);
-    }).catch(err => {
-      console.error("Error fetching majors in ProfilePage:", err);
-    });
-    
-    fetch('/api/subjects', {
-      headers: user ? { Authorization: `Bearer ${user.accessToken}` } : {}
-    })
-    .then(r => {
-      if (!r.ok) {
-        throw new Error(`HTTP error! status: ${r.status}`);
-      }
-      const contentType = r.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        throw new TypeError("Received non-JSON response from server");
-      }
-      return r.json();
-    })
-    .then(data => {
-      if(Array.isArray(data)) setSubjects(data);
-    }).catch(err => {
-      console.error("Error fetching subjects in ProfilePage:", err);
-    });
+    const authHeader: Record<string, string> = (user as any)?.accessToken ? { Authorization: `Bearer ${(user as any).accessToken}` } : {};
+
+    Promise.all([
+      fetch('/api/majors', { headers: authHeader }).then(r => r.ok && r.headers.get("content-type")?.includes("application/json") ? r.json() : []),
+      fetch('/api/subjects', { headers: authHeader }).then(r => r.ok && r.headers.get("content-type")?.includes("application/json") ? r.json() : [])
+    ]).then(([majorsData, subjectsData]) => {
+      if (Array.isArray(majorsData)) setMajors(majorsData);
+      if (Array.isArray(subjectsData)) setSubjects(subjectsData);
+    }).catch(err => console.error("Error fetching initial data in ProfilePage:", err));
 
     if (dbUser) {
       let parsedCourses: string[] = [];
@@ -173,6 +221,8 @@ export function ProfilePage() {
     }
   };
 
+
+  const progressData = computeAcademicProgress(majors, subjects, profileForm.major, profileForm.completedCourses);
 
   return (
     <div className="flex flex-col flex-1 max-w-6xl w-full mx-auto pb-24 px-4 sm:px-6" dir="rtl">
@@ -478,315 +528,243 @@ export function ProfilePage() {
                   </div>
                 ) : subjects.length > 0 ? (
                   <div className="space-y-6">
-                    {(() => {
-                      const userMajor = majors.find(m => m.name === profileForm.major || m.name?.trim() === profileForm.major?.trim());
-                      const displayedSubjects = userMajor && userMajor.courseIds && userMajor.courseIds.length > 0
-                        ? subjects.filter(s => userMajor.courseIds.some((cid: any) => String(cid) === String(s.id)))
-                        : subjects;
-                      
-                      const extractPrereqCodes = (description?: string | null): string[] => {
-                        if (!description) return [];
-                        const match = description.match(/(?:المتطلبات السابقة:|prereq:?)\s*([A-Z0-9,\s\u0600-\u06FF]+)/i);
-                        if (!match) return [];
-                        const codes = match[1].match(/[A-Z]{2,4}\d{3,4}|عال\d{4}/g);
-                        return codes ? Array.from(new Set(codes)) : [];
-                      };
+                    {/* Progress Header - Seamless Page Integration (No Box / Border / Gradient) */}
+                    <div className="mb-8 space-y-4">
+                      <div className="flex flex-col sm:flex-row justify-between sm:items-end gap-3">
+                        <div>
+                          <span className="text-slate-900 dark:text-white font-bold block text-base sm:text-lg">نسبة إنجاز الخطة الأكاديمية</span>
+                          <span className="text-xs text-slate-500 dark:text-zinc-400 font-medium">
+                            اجتزت <AnimatedNumber value={progressData.totalFinishedInReq} /> من {progressData.totalReq} مقرر (إجمالي <AnimatedNumber value={progressData.totalFinishedHours} /> ساعة معتمدة)
+                          </span>
+                        </div>
+                        <span className="text-blue-600 dark:text-blue-400 font-black text-2xl"><AnimatedNumber value={progressData.percentFinished} />%</span>
+                      </div>
 
-                      const groups = (Object.entries(
-                        displayedSubjects.reduce((acc, s) => {
-                          let g = s.level ? `المستوى ${s.level}` : 'المتطلبات العامة';
-                          let reqCount = 0;
-                          if (userMajor && userMajor.courses) {
-                            const c = userMajor.courses.find((mc:any) => String(mc.subjectId) === String(s.id));
-                            if (c && c.optionalGroup && c.optionalGroup !== 'المتطلبات العامة') {
-                              g = c.optionalGroup;
-                              reqCount = Number(c.optionalGroupReqCount) || 0;
-                            } else if (c && c.optionalGroupReqCount) {
-                              reqCount = Number(c.optionalGroupReqCount) || 0;
-                            }
-                          }
-                          if (!acc[g]) acc[g] = [];
-                          acc[g].push({...s, reqCount});
-                          return acc;
-                        }, {} as Record<string, any[]>)
-                      ) as [string, any[]][]).sort((a, b) => {
-                        const matchA = a[0].match(/المستوى\s+(\d+)/);
-                        const matchB = b[0].match(/المستوى\s+(\d+)/);
-                        if (matchA && matchB) return parseInt(matchA[1]) - parseInt(matchB[1]);
-                        if (matchA) return -1;
-                        if (matchB) return 1;
-                        return a[0].localeCompare(b[0], 'ar');
-                      });
+                      {/* Solid Color Progress Bar (No Gradient) */}
+                      <div className="w-full bg-slate-200/80 dark:bg-zinc-800 rounded-full h-3 overflow-hidden">
+                        <motion.div 
+                          className="bg-blue-600 dark:bg-blue-500 h-full rounded-full"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${progressData.percentFinished}%` }}
+                          transition={{ duration: 0.8, ease: "easeOut" }}
+                        />
+                      </div>
 
-                      let totalReq = 0;
-                      let totalFinishedInReq = 0;
-                      let totalFinishedHours = 0;
+                      {/* Global Accordion Toggle Bar with Msari Button */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 text-xs">
+                        <span className="text-slate-500 dark:text-zinc-400 font-medium">إجمالي {progressData.groups.length} حزمة ومستوى</span>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <a
+                            href="https://msari.vercel.app/index.html"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn-rise inline-flex items-center gap-2 text-xs font-bold text-white bg-[#0E352C] hover:bg-[#13493d] px-4 py-2 rounded-full border border-[#3DC9B0]/40 shadow-sm shadow-[#0E352C]/30 transition-all cursor-pointer shrink-0"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-[#3DC9B0] shrink-0" />
+                            <span>تعمّق مع مساري</span>
+                            <ArrowUpRight className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+                          </a>
 
-                      displayedSubjects.forEach(s => {
-                        if (profileForm.completedCourses.includes(s.code)) {
-                          totalFinishedHours += Number(s.creditHours || 3);
-                        }
-                      });
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const nextState: Record<string, boolean> = {};
+                              progressData.allGroupNames.forEach(n => { nextState[n] = false; });
+                              setCollapsedGroups(nextState);
+                            }}
+                            className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200/50 dark:border-blue-900/50 cursor-pointer"
+                          >
+                            توسيع الكل
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const nextState: Record<string, boolean> = {};
+                              progressData.allGroupNames.forEach(n => { nextState[n] = true; });
+                              setCollapsedGroups(nextState);
+                            }}
+                            className="text-xs font-bold text-slate-600 dark:text-zinc-400 hover:underline px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-800/80 border border-slate-200/80 dark:border-zinc-700/80 cursor-pointer"
+                          >
+                            طي الكل
+                          </button>
+                        </div>
+                      </div>
+                    </div>
 
-                      groups.forEach(([groupName, groupSubjects]) => {
-                        const totalInGroup = groupSubjects.length;
-                        const declaredReqCount = Number(groupSubjects[0]?.reqCount) || 0;
-                        const isLevelGroup = groupName.startsWith('المستوى');
-                        const reqCount = (declaredReqCount > 0 && !isLevelGroup) ? declaredReqCount : totalInGroup;
-                        const selectedInGroup = groupSubjects.filter(s => profileForm.completedCourses.includes(s.code)).length;
-                        
-                        totalReq += Number(reqCount);
-                        totalFinishedInReq += Math.min(selectedInGroup, Number(reqCount));
-                      });
+                    {/* Groups / Batches Collapsible List */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+                      {[
+                        progressData.groups.filter((_, idx) => idx % 2 === 0),
+                        progressData.groups.filter((_, idx) => idx % 2 === 1)
+                      ].map((columnGroups, colIdx) => (
+                        <div key={colIdx} className="flex flex-col gap-4 w-full">
+                          {columnGroups.map(([groupName, groupSubjects]: [string, any[]]) => {
+                            const totalInGroup = groupSubjects.length;
+                            const declaredReqCount = groupSubjects[0]?.reqCount || 0;
+                            const isLevelGroup = groupName.startsWith('المستوى');
+                            const reqCount = (declaredReqCount > 0 && !isLevelGroup) ? declaredReqCount : totalInGroup;
+                            
+                            const selectedInGroup = groupSubjects.filter(s => profileForm.completedCourses.includes(s.code)).length;
+                            const isGroupFull = selectedInGroup >= reqCount;
 
-                      const percentFinished = totalReq > 0 ? Math.round((totalFinishedInReq / totalReq) * 100) : 0;
-                      const allGroupNames = groups.map(g => g[0]);
+                            // Calculate if ALL courses in this batch are locked
+                            const allCoursesInGroupLocked = groupSubjects.length > 0 && groupSubjects.every(s => {
+                              if (profileForm.completedCourses.includes(s.code)) return false;
+                              const prereqs = extractPrereqCodes(s.description);
+                              return prereqs.length > 0 && prereqs.some(p => !profileForm.completedCourses.includes(p));
+                            });
 
-                      return (
-                        <>
-                          {/* Progress Header - Seamless Page Integration (No Box / Border / Gradient) */}
-                          <div className="mb-8 space-y-4">
-                            <div className="flex flex-col sm:flex-row justify-between sm:items-end gap-3">
-                              <div>
-                                <span className="text-slate-900 dark:text-white font-bold block text-base sm:text-lg">نسبة إنجاز الخطة الأكاديمية</span>
-                                <span className="text-xs text-slate-500 dark:text-zinc-400 font-medium">
-                                  اجتزت <AnimatedNumber value={totalFinishedInReq} /> من {totalReq} مقرر (إجمالي <AnimatedNumber value={totalFinishedHours} /> ساعة معتمدة)
-                                </span>
-                              </div>
-                              <span className="text-blue-600 dark:text-blue-400 font-black text-2xl"><AnimatedNumber value={percentFinished} />%</span>
-                            </div>
+                            // Calculate batch completion ratio
+                            const completionRatio = totalInGroup > 0 ? selectedInGroup / totalInGroup : 0;
+                            const isAtLeast33Percent = completionRatio >= 0.33;
 
-                            {/* Solid Color Progress Bar (No Gradient) */}
-                            <div className="w-full bg-slate-200/80 dark:bg-zinc-800 rounded-full h-3 overflow-hidden">
-                              <motion.div 
-                                className="bg-blue-600 dark:bg-blue-500 h-full rounded-full"
-                                initial={{ width: 0 }}
-                                animate={{ width: `${percentFinished}%` }}
-                                transition={{ duration: 0.8, ease: "easeOut" }}
-                              />
-                            </div>
+                            const defaultCollapsed = isGroupFull || allCoursesInGroupLocked || !isAtLeast33Percent;
 
-                            {/* Global Accordion Toggle Bar with Msari Button */}
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 text-xs">
-                              <span className="text-slate-500 dark:text-zinc-400 font-medium">إجمالي {groups.length} حزمة ومستوى</span>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <a
-                                  href="https://msari.vercel.app/index.html"
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="btn-rise inline-flex items-center gap-1.5 text-xs font-bold text-white bg-[#0E352C] px-3.5 py-1.5 rounded-xl border border-[#3DC9B0]/40 shadow-xs transition-all hover:scale-[1.03] active:scale-95 cursor-pointer"
+                            const isCollapsed = collapsedGroups[groupName] ?? defaultCollapsed;
+
+                            return (
+                              <div 
+                                key={groupName} 
+                                className={`border rounded-2xl overflow-hidden transition-all duration-300 h-fit ${
+                                  isGroupFull 
+                                    ? 'bg-emerald-50/30 border-emerald-200/80 dark:bg-emerald-950/15 dark:border-emerald-900/40' 
+                                    : allCoursesInGroupLocked
+                                      ? 'bg-slate-100/50 dark:bg-zinc-950/40 border-slate-200 dark:border-zinc-800/60 opacity-85'
+                                      : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800'
+                                }`}
+                              >
+                                {/* Collapsible Accordion Header */}
+                                <div 
+                                  onClick={() => setCollapsedGroups(prev => ({ ...prev, [groupName]: !isCollapsed }))}
+                                  className="p-3.5 sm:p-4 flex items-center justify-between gap-3 cursor-pointer select-none hover:bg-slate-50/80 dark:hover:bg-zinc-800/40 transition"
                                 >
-                                  <Sparkles className="w-3.5 h-3.5 text-[#3DC9B0]" />
-                                  <span>تعمّق مع مساري</span>
-                                  <ArrowUpRight className="w-3.5 h-3.5 opacity-80" />
-                                </a>
+                                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                    <div className={`p-1 rounded-lg text-slate-400 dark:text-zinc-500 shrink-0 transition-transform duration-200 ${!isCollapsed ? 'rotate-180' : ''}`}>
+                                      <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500 dark:text-zinc-400" />
+                                    </div>
+                                    <h4 className={`font-bold text-xs sm:text-sm leading-snug truncate flex items-center gap-1.5 ${isGroupFull ? 'text-emerald-800 dark:text-emerald-400' : 'text-slate-900 dark:text-white'}`} title={groupName}>
+                                      <span className="truncate">{groupName}</span>
+                                      {isGroupFull && <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />}
+                                    </h4>
+                                  </div>
 
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const nextState: Record<string, boolean> = {};
-                                    allGroupNames.forEach(n => { nextState[n] = false; });
-                                    setCollapsedGroups(nextState);
-                                  }}
-                                  className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200/50 dark:border-blue-900/50 cursor-pointer"
-                                >
-                                  توسيع الكل
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const nextState: Record<string, boolean> = {};
-                                    allGroupNames.forEach(n => { nextState[n] = true; });
-                                    setCollapsedGroups(nextState);
-                                  }}
-                                  className="text-xs font-bold text-slate-600 dark:text-zinc-400 hover:underline px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-800/80 border border-slate-200/80 dark:border-zinc-700/80 cursor-pointer"
-                                >
-                                  طي الكل
-                                </button>
-                              </div>
-                            </div>
-                          </div>
+                                  <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
+                                    {allCoursesInGroupLocked && !isGroupFull && (
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200/80 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border border-slate-300/60 dark:border-zinc-700 whitespace-nowrap flex items-center gap-1">
+                                        🔒 مغلقة
+                                      </span>
+                                    )}
+                                    <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap ${
+                                      isGroupFull 
+                                        ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' 
+                                        : 'bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-900/50'
+                                    }`}>
+                                      المنجز: {selectedInGroup} / {reqCount}
+                                    </span>
+                                  </div>
+                                </div>
 
-                          {/* Groups / Batches Collapsible List (Dual Independent Column Stacks to eliminate empty grid gaps) */}
-                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-                            {[
-                              groups.filter((_, idx) => idx % 2 === 0),
-                              groups.filter((_, idx) => idx % 2 === 1)
-                            ].map((columnGroups, colIdx) => (
-                              <div key={colIdx} className="flex flex-col gap-4 w-full">
-                                {columnGroups.map(([groupName, groupSubjects]: [string, any[]]) => {
-                                  const totalInGroup = groupSubjects.length;
-                                  const declaredReqCount = groupSubjects[0]?.reqCount || 0;
-                                  const isLevelGroup = groupName.startsWith('المستوى');
-                                  const reqCount = (declaredReqCount > 0 && !isLevelGroup) ? declaredReqCount : totalInGroup;
-                                  
-                                  const selectedInGroup = groupSubjects.filter(s => profileForm.completedCourses.includes(s.code)).length;
-                                  const isGroupFull = selectedInGroup >= reqCount;
-
-                                  // Calculate if ALL courses in this batch are locked
-                                  const allCoursesInGroupLocked = groupSubjects.length > 0 && groupSubjects.every(s => {
-                                    if (profileForm.completedCourses.includes(s.code)) return false;
-                                    const prereqs = extractPrereqCodes(s.description);
-                                    return prereqs.length > 0 && prereqs.some(p => !profileForm.completedCourses.includes(p));
-                                  });
-
-                                  // Calculate batch completion ratio (Strict 33% minimum rule)
-                                  const completionRatio = totalInGroup > 0 ? selectedInGroup / totalInGroup : 0;
-                                  const isAtLeast33Percent = completionRatio >= 0.33;
-
-                                  // Default collapsed state rules:
-                                  // 1. Close by default if batch is finished (isGroupFull)
-                                  // 2. Close by default if less than 33% completed (!isAtLeast33Percent)
-                                  // 3. Close by default if all courses in batch are locked
-                                  const defaultCollapsed = isGroupFull || allCoursesInGroupLocked || !isAtLeast33Percent;
-
-                                  const isCollapsed = collapsedGroups[groupName] ?? defaultCollapsed;
-
-                                  return (
-                                    <div 
-                                      key={groupName} 
-                                      className={`border rounded-2xl overflow-hidden transition-all duration-300 h-fit ${
-                                        isGroupFull 
-                                          ? 'bg-emerald-50/30 border-emerald-200/80 dark:bg-emerald-950/15 dark:border-emerald-900/40' 
-                                          : allCoursesInGroupLocked
-                                            ? 'bg-slate-100/50 dark:bg-zinc-950/40 border-slate-200 dark:border-zinc-800/60 opacity-85'
-                                            : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800'
-                                      }`}
+                                {/* Accordion Body */}
+                                <AnimatePresence initial={false}>
+                                  {!isCollapsed && (
+                                    <motion.div
+                                      key="accordion-body"
+                                      initial={{ height: 0, opacity: 0 }}
+                                      animate={{ height: 'auto', opacity: 1 }}
+                                      exit={{ height: 0, opacity: 0 }}
+                                      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                                      className="overflow-hidden"
                                     >
-                                      {/* Collapsible Accordion Header */}
-                                      <div 
-                                        onClick={() => setCollapsedGroups(prev => ({ ...prev, [groupName]: !isCollapsed }))}
-                                        className="p-3.5 sm:p-4 flex items-center justify-between gap-3 cursor-pointer select-none hover:bg-slate-50/80 dark:hover:bg-zinc-800/40 transition"
-                                      >
-                                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                          <div className={`p-1 rounded-lg text-slate-400 dark:text-zinc-500 shrink-0 transition-transform duration-200 ${!isCollapsed ? 'rotate-180' : ''}`}>
-                                            <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500 dark:text-zinc-400" />
-                                          </div>
-                                          <h4 className={`font-bold text-xs sm:text-sm leading-snug truncate flex items-center gap-1.5 ${isGroupFull ? 'text-emerald-800 dark:text-emerald-400' : 'text-slate-900 dark:text-white'}`} title={groupName}>
-                                            <span className="truncate">{groupName}</span>
-                                            {isGroupFull && <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />}
-                                          </h4>
-                                        </div>
+                                      <div className="p-4 sm:p-5 pt-0 border-t border-slate-100 dark:border-zinc-800/80 mt-2">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3">
+                                          {groupSubjects.map((s: any) => {
+                                            const isChecked = profileForm.completedCourses.includes(s.code);
+                                            const prereqCodes = extractPrereqCodes(s.description);
+                                            const unmetPrereqs = prereqCodes.filter(p => !profileForm.completedCourses.includes(p));
+                                            const isLocked = !isChecked && unmetPrereqs.length > 0;
 
-                                        <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
-                                          {allCoursesInGroupLocked && !isGroupFull && (
-                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200/80 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border border-slate-300/60 dark:border-zinc-700 whitespace-nowrap flex items-center gap-1">
-                                              🔒 مغلقة
-                                            </span>
-                                          )}
-                                          <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap ${
-                                            isGroupFull 
-                                              ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' 
-                                              : 'bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-900/50'
-                                          }`}>
-                                            المنجز: {selectedInGroup} / {reqCount}
-                                          </span>
-                                        </div>
-                                      </div>
-
-                                      {/* Accordion Body with Smooth Expanding & Minimizing Animation */}
-                                      <AnimatePresence initial={false}>
-                                        {!isCollapsed && (
-                                          <motion.div
-                                            key="accordion-body"
-                                            initial={{ height: 0, opacity: 0 }}
-                                            animate={{ height: 'auto', opacity: 1 }}
-                                            exit={{ height: 0, opacity: 0 }}
-                                            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                                            className="overflow-hidden"
-                                          >
-                                            <div className="p-4 sm:p-5 pt-0 border-t border-slate-100 dark:border-zinc-800/80 mt-2">
-                                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3">
-                                            {groupSubjects.map(s => {
-                                              const isChecked = profileForm.completedCourses.includes(s.code);
-                                              const prereqCodes = extractPrereqCodes(s.description);
-                                              const unmetPrereqs = prereqCodes.filter(p => !profileForm.completedCourses.includes(p));
-                                              const isLocked = !isChecked && unmetPrereqs.length > 0;
-
-                                              return (
-                                                <div 
-                                                  key={s.id} 
-                                                  onClick={() => {
-                                                    if (isLocked) {
-                                                      setFeedback({
-                                                        type: 'error',
-                                                        message: `لا يمكن تحديد المادة (${s.code}) قبل اجتياز المتطلبات السابقة: ${unmetPrereqs.join(', ')}`
-                                                      });
-                                                      return;
+                                            return (
+                                              <div 
+                                                key={s.id} 
+                                                onClick={() => {
+                                                  if (isLocked) {
+                                                    setFeedback({
+                                                      type: 'error',
+                                                      message: `لا يمكن تحديد المادة (${s.code}) قبل اجتياز المتطلبات السابقة: ${unmetPrereqs.join(', ')}`
+                                                    });
+                                                    return;
+                                                  }
+                                                  const checked = !isChecked;
+                                                  const updatedCourses = checked 
+                                                    ? [...profileForm.completedCourses, s.code]
+                                                    : profileForm.completedCourses.filter(c => c !== s.code);
+                                                  
+                                                  let newFinishedHours = 0;
+                                                  progressData.displayedSubjects.forEach((subj: any) => {
+                                                    if (updatedCourses.includes(subj.code)) {
+                                                      newFinishedHours += Number(subj.creditHours || 3);
                                                     }
-                                                    const checked = !isChecked;
-                                                    const updatedCourses = checked 
-                                                      ? [...profileForm.completedCourses, s.code]
-                                                      : profileForm.completedCourses.filter(c => c !== s.code);
-                                                    
-                                                    let newFinishedHours = 0;
-                                                    displayedSubjects.forEach(subj => {
-                                                      if (updatedCourses.includes(subj.code)) {
-                                                        newFinishedHours += Number(subj.creditHours || 3);
-                                                      }
-                                                    });
+                                                  });
 
-                                                    const newHoursStr = newFinishedHours.toString();
-                                                    setProfileForm(p => ({
-                                                      ...p,
-                                                      completedCourses: updatedCourses,
-                                                      finishedHours: newHoursStr
-                                                    }));
-                                                    saveProfile({
-                                                      completedCourses: updatedCourses,
-                                                      finishedHours: newHoursStr
-                                                    });
-                                                  }}
-                                                  className={`p-3.5 rounded-xl border transition-all duration-200 flex flex-col justify-between gap-2.5 select-none ${
-                                                    isChecked 
-                                                      ? 'bg-emerald-50/70 border-emerald-400 dark:bg-emerald-950/40 dark:border-emerald-700 shadow-xs cursor-pointer hover:bg-emerald-100/60 dark:hover:bg-emerald-900/50' 
-                                                      : isLocked 
-                                                        ? 'bg-slate-100/70 border-slate-200 dark:bg-zinc-950/70 dark:border-zinc-800/80 cursor-not-allowed opacity-75' 
-                                                        : 'bg-white border-slate-200/90 hover:border-blue-400 dark:bg-zinc-900 dark:border-zinc-800 dark:hover:border-zinc-700 cursor-pointer shadow-2xs hover:shadow-sm'
-                                                  }`}
-                                                >
-                                                  <div className="flex items-start gap-2.5">
-                                                    <div className="flex-1 min-w-0">
-                                                      <div className="flex items-center justify-between gap-1.5 mb-1">
-                                                        <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-zinc-800 text-slate-800 dark:text-zinc-200">{s.code}</span>
-                                                        <span className="text-[10px] font-semibold text-slate-500 dark:text-zinc-400">{s.creditHours || 3} س</span>
-                                                      </div>
-                                                      <h5 className="text-xs font-bold text-slate-900 dark:text-white line-clamp-1" title={s.name}>{s.name}</h5>
+                                                  const newHoursStr = newFinishedHours.toString();
+                                                  setProfileForm(p => ({
+                                                    ...p,
+                                                    completedCourses: updatedCourses,
+                                                    finishedHours: newHoursStr
+                                                  }));
+                                                  saveProfile({
+                                                    completedCourses: updatedCourses,
+                                                    finishedHours: newHoursStr
+                                                  });
+                                                }}
+                                                className={`p-3.5 rounded-xl border transition-all duration-200 flex flex-col justify-between gap-2.5 select-none ${
+                                                  isChecked 
+                                                    ? 'bg-emerald-50/70 border-emerald-400 dark:bg-emerald-950/40 dark:border-emerald-700 shadow-xs cursor-pointer hover:bg-emerald-100/60 dark:hover:bg-emerald-900/50' 
+                                                    : isLocked 
+                                                      ? 'bg-slate-100/70 border-slate-200 dark:bg-zinc-950/70 dark:border-zinc-800/80 cursor-not-allowed opacity-75' 
+                                                      : 'bg-white border-slate-200/90 hover:border-blue-400 dark:bg-zinc-900 dark:border-zinc-800 dark:hover:border-zinc-700 cursor-pointer shadow-2xs hover:shadow-sm'
+                                                }`}
+                                              >
+                                                <div className="flex items-start justify-between gap-2">
+                                                  <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-1.5 mb-1">
+                                                      <span className="font-mono text-[11px] font-bold text-blue-600 dark:text-blue-400">{s.code}</span>
+                                                      <span className="text-[10px] text-slate-400 dark:text-zinc-500">•</span>
+                                                      <span className="text-[10px] font-semibold text-slate-500 dark:text-zinc-400">{s.creditHours || 3} س</span>
                                                     </div>
-                                                  </div>
-
-                                                  <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-zinc-800/60 text-[11px]">
-                                                    {isChecked ? (
-                                                      <span className="inline-flex items-center gap-1 font-bold text-emerald-700 dark:text-emerald-400">
-                                                        <CheckCircle2 className="w-3.5 h-3.5" /> تم الاجتياز
-                                                      </span>
-                                                    ) : isLocked ? (
-                                                      <span className="inline-flex items-center gap-1 font-bold text-amber-700 dark:text-amber-400 truncate" title={`يتطلب اجتياز: ${unmetPrereqs.join(', ')}`}>
-                                                        <span>🔒 يتطلب: {unmetPrereqs.join(', ')}</span>
-                                                      </span>
-                                                    ) : (
-                                                      <span className="inline-flex items-center gap-1 font-bold text-slate-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400">
-                                                        <span>انقر لتحديد المادة</span>
-                                                      </span>
-                                                    )}
+                                                    <h5 className="text-xs font-bold text-slate-900 dark:text-white line-clamp-1" title={s.name}>{s.name}</h5>
                                                   </div>
                                                 </div>
-                                              );
-                                            })}
-                                          </div>
+
+                                                <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-zinc-800/60 text-[11px]">
+                                                  {isChecked ? (
+                                                    <span className="inline-flex items-center gap-1 font-bold text-emerald-700 dark:text-emerald-400">
+                                                      <CheckCircle2 className="w-3.5 h-3.5" /> تم الاجتياز
+                                                    </span>
+                                                  ) : isLocked ? (
+                                                    <span className="inline-flex items-center gap-1 font-bold text-amber-700 dark:text-amber-400 truncate" title={`يتطلب اجتياز: ${unmetPrereqs.join(', ')}`}>
+                                                      <span>🔒 يتطلب: {unmetPrereqs.join(', ')}</span>
+                                                    </span>
+                                                  ) : (
+                                                    <span className="inline-flex items-center gap-1 font-bold text-slate-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400">
+                                                      <span>انقر لتحديد المادة</span>
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
                                         </div>
-                                          </motion.div>
-                                        )}
-                                      </AnimatePresence>
-                                    </div>
-                                  );
-                                })}
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
                               </div>
-                            ))}
-                          </div>
-                        </>
-                      );
-                    })()}
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ) : (
                   <div className="text-center py-8 text-slate-500 dark:text-zinc-400 bg-slate-50 dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800 text-sm">

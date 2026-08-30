@@ -1,7 +1,7 @@
 import express from 'express';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import { tutorial_sections, tutorials, tutorial_feedback, feedback_comments, tutorial_comments, newbie_links, users } from '../../db/schema';
-import { requireAuth, AuthRequest } from '../../middleware/auth';
+import { requireAuth, requireAdmin, AuthRequest } from '../../middleware/auth';
 
 export function createTutorialsRouter(db: any) {
   const router = express.Router();
@@ -18,11 +18,8 @@ export function createTutorialsRouter(db: any) {
   });
 
   // Admin: Create newbie link
-  router.post("/admin/newbie/links", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+  router.post("/admin/newbie/links", requireAdmin, async (req: AuthRequest, res): Promise<any> => {
     try {
-      if (!req.user?.isAdmin) {
-        return res.status(403).json({ error: "Unauthorized" });
-      }
       const { title, url, description } = req.body;
       if (!title || !url) {
         return res.status(400).json({ error: "Missing required fields" });
@@ -36,11 +33,8 @@ export function createTutorialsRouter(db: any) {
   });
 
   // Admin: Update newbie link
-  router.put("/admin/newbie/links/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+  router.put("/admin/newbie/links/:id", requireAdmin, async (req: AuthRequest, res): Promise<any> => {
     try {
-      if (!req.user?.isAdmin) {
-        return res.status(403).json({ error: "Unauthorized" });
-      }
       const id = parseInt(req.params.id);
       const { title, url, description } = req.body;
       const [updated] = await db.update(newbie_links)
@@ -58,11 +52,8 @@ export function createTutorialsRouter(db: any) {
   });
 
   // Admin: Delete newbie link
-  router.delete("/admin/newbie/links/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+  router.delete("/admin/newbie/links/:id", requireAdmin, async (req: AuthRequest, res): Promise<any> => {
     try {
-      if (!req.user?.isAdmin) {
-        return res.status(403).json({ error: "Unauthorized" });
-      }
       const id = parseInt(req.params.id);
       await db.delete(newbie_links).where(eq(newbie_links.id, id));
       res.json({ success: true });
@@ -111,14 +102,18 @@ export function createTutorialsRouter(db: any) {
 
       const feedbackList = await db.select().from(tutorial_feedback).where(eq(tutorial_feedback.tutorialId, id));
 
-      const feedbackWithUser = await Promise.all(feedbackList.map(async (fb: any) => {
-        const [userRec] = await db.select().from(users).where(eq(users.uid, fb.userId));
+      const userIds: string[] = Array.from(new Set(feedbackList.map((fb: any) => String(fb.userId)).filter(Boolean)));
+      const userRecords = userIds.length > 0 ? await db.select().from(users).where(inArray(users.uid, userIds)) : [];
+      const userMap = new Map<string, any>(userRecords.map((u: any) => [u.uid, u]));
+
+      const feedbackWithUser = feedbackList.map((fb: any) => {
+        const userRec = userMap.get(fb.userId);
         return {
           ...fb,
           userName: userRec ? (userRec.userName || userRec.email?.split('@')[0]) : 'طالب',
           profilePicUrl: userRec?.profilePicUrl
         };
-      }));
+      });
 
       res.json({
         ...tutorial,
@@ -170,14 +165,18 @@ export function createTutorialsRouter(db: any) {
       const feedbackId = parseInt(req.params.id);
       const commentsList = await db.select().from(feedback_comments).where(eq(feedback_comments.feedbackId, feedbackId));
 
-      const enriched = await Promise.all(commentsList.map(async (c: any) => {
-        const [userRec] = await db.select().from(users).where(eq(users.uid, c.userId));
+      const userIds: string[] = Array.from(new Set(commentsList.map((c: any) => String(c.userId)).filter(Boolean)));
+      const userRecords = userIds.length > 0 ? await db.select().from(users).where(inArray(users.uid, userIds)) : [];
+      const userMap = new Map<string, any>(userRecords.map((u: any) => [u.uid, u]));
+
+      const enriched = commentsList.map((c: any) => {
+        const userRec = userMap.get(c.userId);
         return {
           ...c,
           userName: userRec ? (userRec.userName || userRec.email?.split('@')[0]) : (c.userName || 'طالب'),
           profilePicUrl: userRec?.profilePicUrl
         };
-      }));
+      });
 
       res.json(enriched);
     } catch (e) {
@@ -222,14 +221,18 @@ export function createTutorialsRouter(db: any) {
       const tutorialId = parseInt(req.params.id);
       const commentsList = await db.select().from(tutorial_comments).where(eq(tutorial_comments.tutorialId, tutorialId));
 
-      const enriched = await Promise.all(commentsList.map(async (c: any) => {
-        const [userRec] = await db.select().from(users).where(eq(users.uid, c.userId));
+      const userIds: string[] = Array.from(new Set(commentsList.map((c: any) => String(c.userId)).filter(Boolean)));
+      const userRecords = userIds.length > 0 ? await db.select().from(users).where(inArray(users.uid, userIds)) : [];
+      const userMap = new Map<string, any>(userRecords.map((u: any) => [u.uid, u]));
+
+      const enriched = commentsList.map((c: any) => {
+        const userRec = userMap.get(c.userId);
         return {
           ...c,
           userName: userRec ? (userRec.userName || userRec.email?.split('@')[0]) : (c.userName || 'طالب'),
           profilePicUrl: userRec?.profilePicUrl
         };
-      }));
+      });
 
       res.json(enriched);
     } catch (e) {

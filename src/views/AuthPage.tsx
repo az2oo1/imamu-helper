@@ -30,12 +30,23 @@ export function AuthPage() {
     userName: '',
   });
 
+  const resolveEmailOrStudentId = (input: string): string => {
+    let val = input.trim().toLowerCase();
+    val = val.replace(/^s(?=\d{7,10})/i, '');
+    if (/^\d{7,10}$/.test(val)) {
+      return `${val}@sm.imamu.edu.sa`;
+    }
+    return val;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!isLogin && !formData.email.includes('@')) {
-      return setError('يرجى إدخال بريد إلكتروني صحيح للإنشاء.');
+    const resolvedEmail = resolveEmailOrStudentId(formData.email);
+
+    if (!isLogin && !resolvedEmail.includes('@')) {
+      return setError('يرجى إدخال بريد إلكتروني أو رقم جامعي صحيح للإنشاء.');
     }
 
     try {
@@ -50,7 +61,7 @@ export function AuthPage() {
         const res = await fetch('/api/auth/reset-password', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: formData.email, code, newPassword: formData.password })
+          body: JSON.stringify({ email: resolvedEmail, code, newPassword: formData.password })
         });
         if (!res.ok) {
           const err = await res.json();
@@ -64,7 +75,7 @@ export function AuthPage() {
       }
 
       if (isLogin) {
-        await signInWithEmail(formData.email, formData.password);
+        await signInWithEmail(resolvedEmail, formData.password);
         router.push('/');
       } else {
         if (!codeSent) {
@@ -79,7 +90,7 @@ export function AuthPage() {
         if (!code) {
           return setError('رمز التحقق مطلوب.');
         }
-        await signUpWithEmail(formData.email, formData.password, formData.phone, formData.userName, code);
+        await signUpWithEmail(resolvedEmail, formData.password, formData.phone, formData.userName, code);
         router.push('/');
       }
     } catch (err: any) {
@@ -89,8 +100,9 @@ export function AuthPage() {
   };
 
   const handleSendCode = async () => {
-    if (!formData.email.includes('@')) {
-      return setError('يرجى إدخال بريد إلكتروني صحيح.');
+    const resolvedEmail = resolveEmailOrStudentId(formData.email);
+    if (!resolvedEmail.includes('@')) {
+      return setError('يرجى إدخال بريد إلكتروني أو رقم جامعي صحيح.');
     }
     setSendingCode(true);
     setError('');
@@ -98,7 +110,7 @@ export function AuthPage() {
       const res = await fetch('/api/auth/send-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: formData.email })
+        body: JSON.stringify({ email: resolvedEmail })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -106,9 +118,9 @@ export function AuthPage() {
       }
       setCodeSent(true);
       if (data.devCode) {
-        alert(data.message + "\n\nالرمز: " + data.devCode);
+        alert(data.message + "\n\nرمز التحقق الخاص بك هو: " + data.devCode);
         setCode(data.devCode);
-        setError('تم إنشاء رمز التحقق في وضع التطوير.');
+        setError('تم إرسال رمز التحقق بنجاح.');
       } else {
         setError('تم إرسال رمز التحقق إلى بريدك الإلكتروني.');
       }
@@ -148,7 +160,7 @@ export function AuthPage() {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1 text-right">
-              {isLogin ? 'البريد الإلكتروني / الرقم الجامعي / اسم المستخدم' : 'البريد الإلكتروني الجامعي'}
+              {isLogin ? 'البريد الإلكتروني الجامعي / الرقم الجامعي' : 'البريد الإلكتروني الجامعي'}
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
@@ -160,7 +172,7 @@ export function AuthPage() {
                 value={formData.email}
                 onChange={x => setFormData({ ...formData, email: x.target.value })}
                 className="w-full pr-11 pl-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-600 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
-                placeholder={isLogin ? "447013338 أو student@imamu.edu.sa" : "student@imamu.edu.sa"}
+                placeholder="44xxxxxxx@sm.imamu.edu.sa"
                 dir="ltr"
               />
             </div>

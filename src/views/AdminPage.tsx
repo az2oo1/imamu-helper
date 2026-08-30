@@ -10,22 +10,22 @@ import {
   Shield, UserCheck, UserX, Eye, Sparkles, Command, Hash, Clock,
   CheckCircle2, AlertTriangle, Info, XCircle, RefreshCw, Zap, 
   LayoutDashboard, Newspaper, GraduationCap, BookMarked, Link2,
-  MoreHorizontal, ArrowUpRight, TrendingUp, Bell, Folder
+  MoreHorizontal, ArrowUpRight, TrendingUp, Bell, Folder, Wrench, Edit3
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { TutorialsTab } from '../components/TutorialsTab';
 import CreateCourseModal from '../components/CreateCourseModal';
+import CreateResourceModal from '../components/CreateResourceModal';
+import AdminDashboardTab from './admin/AdminDashboardTab';
+import AdminUsersTab from './admin/AdminUsersTab';
 import { AnimatedNumber } from '../components/ui';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area
-} from 'recharts';
+
 
 
 // ============================================================================
 // TYPES
 // ============================================================================
-type Tab = 'dashboard' | 'users' | 'news_sources' | 'majors' | 'events' | 'subjects' | 'tutorials' | 'newbie_links' | 'settings';
+type Tab = 'dashboard' | 'users' | 'news_sources' | 'majors' | 'events' | 'subjects' | 'resources' | 'tutorials' | 'newbie_links' | 'settings';
 
 interface Toast {
   id: string;
@@ -50,11 +50,12 @@ interface Stats {
 
 interface HealthInfo {
   uptime: number;
-  memory: { rss: number; heapUsed: number; heapTotal: number };
-  dbStatus: string;
-  storageStatus: string;
-  nodeVersion: string;
-  platform: string;
+  memory?: { rss: number; heapUsed: number; heapTotal: number };
+  memoryUsage?: { rss: number; heapUsed: number; heapTotal: number };
+  dbStatus?: string;
+  storageStatus?: string;
+  nodeVersion?: string;
+  platform?: string;
 }
 
 // ============================================================================
@@ -179,6 +180,7 @@ function StatCard({ label, value, icon, color, sub }: { label: string; value: nu
 // ============================================================================
 export function AdminPage() {
   const { user, dbUser, loading: authLoading } = useAuth();
+  const isAdmin = !!(dbUser?.isAdmin || dbUser?.role === 'ADMIN');
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
@@ -204,9 +206,10 @@ export function AdminPage() {
   const [tutorialSections, setTutorialSections] = useState<any[]>([]);
   const [tutorials, setTutorials] = useState<any[]>([]);
   const [newbieLinks, setNewbieLinks] = useState<any[]>([]);
+  const [resourcesList, setResourcesList] = useState<any[]>([]);
+  const [resourceSearch, setResourceSearch] = useState('');
+  const [resourceFilterType, setResourceFilterType] = useState('ALL');
   const [globalSettings, setGlobalSettings] = useState<any>({ fetchRangeDays: 30, autoDeleteDays: 30 });
-
-  // Forms
 
   const [sourceForm, setSourceForm] = useState<{ id?: number; handle: string }>({ handle: '' });
   const [majorForm, setMajorForm] = useState<{
@@ -249,6 +252,7 @@ export function AdminPage() {
   const [eventForm, setEventForm] = useState<{ id?: number; title: string; date: string; description: string }>({ title: '', date: '', description: '' });
   const [newbieLinkForm, setNewbieLinkForm] = useState<{ id?: number; title: string; url: string; description: string }>({ title: '', url: '', description: '' });
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
+  const [isResourceModalOpen, setIsResourceModalOpen] = useState(false);
 
 
 
@@ -262,10 +266,35 @@ export function AdminPage() {
   const [eventLimit, setEventLimit] = useState(20);
   const [unassignedSearch, setUnassignedSearch] = useState('');
   const [expandedCourseId, setExpandedCourseId] = useState<number | null>(null);
-  const [resourceForm, setResourceForm] = useState<{ id?: number; subjectId?: number; title: string; type: string; url: string; description: string }>({ title: '', type: 'drive', url: '', description: '' });
+  const [resourceForm, setResourceForm] = useState<{
+    id?: number;
+    subjectId?: number;
+    title: string;
+    type: string;
+    url: string;
+    driveLink?: string;
+    boxLink?: string;
+    whatsappLink?: string;
+    freeResourcesUrl?: string;
+    paidResourcesUrl?: string;
+    avatarUrl?: string;
+    bannerUrl?: string;
+    description?: string;
+  }>({ title: '', type: 'course_hub', url: '', description: '', driveLink: '', boxLink: '', whatsappLink: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', bannerUrl: '' });
 
   // Modals
   const [deleteModal, setDeleteModal] = useState<{ url: string; message: string } | null>(null);
+
+  // Sync activeTab with URL search param on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab') as Tab;
+      if (tabParam && ['dashboard', 'users', 'news_sources', 'majors', 'events', 'subjects', 'resources', 'tutorials', 'newbie_links', 'settings'].includes(tabParam)) {
+        setActiveTab(tabParam);
+      }
+    }
+  }, []);
 
   // Keyboard shortcut
   useEffect(() => {
@@ -283,7 +312,8 @@ export function AdminPage() {
     { id: 'news_sources', label: 'News Sources', icon: <Newspaper className="w-5 h-5" /> },
     { id: 'majors', label: 'Academic Majors', icon: <GraduationCap className="w-5 h-5" /> },
     { id: 'events', label: 'Calendar Dates', icon: <Calendar className="w-5 h-5" /> },
-    { id: 'subjects', label: 'Courses & Resources', icon: <BookOpen className="w-5 h-5" /> },
+    { id: 'subjects', label: 'Academic Courses', icon: <BookOpen className="w-5 h-5" /> },
+    { id: 'resources', label: 'Course Resources', icon: <Folder className="w-5 h-5" /> },
     { id: 'tutorials', label: 'Tutorials Manager', icon: <HelpCircle className="w-5 h-5" /> },
     { id: 'newbie_links', label: 'Newbie Links', icon: <Link2 className="w-5 h-5" /> },
     { id: 'settings', label: 'Global Settings', icon: <Settings className="w-5 h-5" /> },
@@ -309,9 +339,10 @@ export function AdminPage() {
       fetch('/api/tutorials/sections', opts).then(r => r.ok && r.json()),
       fetch('/api/tutorials', opts).then(r => r.ok && r.json()),
       fetch('/api/newbie/links', opts).then(r => r.ok && r.json()),
+      fetch('/api/resources', opts).then(r => r.ok && r.json()),
       fetch('/api/admin/stats', opts).then(r => r.ok ? r.json() : null),
       fetch('/api/admin/health', opts).then(r => r.ok ? r.json() : null),
-    ]).then(([ns, m, e, s, gs, ts, tuts, nl, st, hl]) => {
+    ]).then(([ns, m, e, s, gs, ts, tuts, nl, resList, st, hl]) => {
       if (ns) setNewsSources(ns);
       if (m) setMajors(m);
       if (e) setEvents(e);
@@ -320,6 +351,7 @@ export function AdminPage() {
       if (ts) setTutorialSections(ts);
       if (tuts) setTutorials(tuts);
       if (nl) setNewbieLinks(nl);
+      if (resList) setResourcesList(resList);
       if (st) setStats(st);
       if (hl) setHealth(hl);
     }).catch(console.error);
@@ -332,11 +364,11 @@ export function AdminPage() {
   };
 
   useEffect(() => {
-    if (user && dbUser?.isAdmin) {
+    if (user && isAdmin) {
       fetchData();
       fetchUsers();
     }
-  }, [user, dbUser]);
+  }, [user, dbUser, isAdmin]);
 
   const handlePostWithMethod = async (url: string, method: string, data: any, resetCb: () => void) => {
     // Optimistic Update for Subjects/Courses
@@ -441,7 +473,7 @@ export function AdminPage() {
     );
   }
 
-  if (!user || !dbUser?.isAdmin) {
+  if (!user || !isAdmin) {
     return (
       <div className="flex flex-col items-center justify-center py-32 text-center">
         <ShieldAlert className="w-20 h-20 text-red-500 mb-6" />
@@ -455,234 +487,6 @@ export function AdminPage() {
   // CHART COLORS
   // ============================================================================
   const chartColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
-
-  // ============================================================================
-  // TAB: DASHBOARD
-  // ============================================================================
-  const renderDashboard = () => (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-2xl font-display font-bold" style={{ color: 'var(--text-main)' }}>Dashboard Overview</h3>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Real-time platform metrics and system status</p>
-        </div>
-        <button
-          onClick={() => fetchData()}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition hover:bg-[var(--bg-subtle)]"
-          style={{ borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
-        >
-          <RefreshCw className="w-4 h-4" /> Refresh
-        </button>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Total Users" value={stats?.users || 0} icon={<Users className="w-5 h-5" />} color="#3b82f6" sub={`+${stats?.recentUsers7d || 0} this week`} />
-        <StatCard label="News Items" value={stats?.news || 0} icon={<Newspaper className="w-5 h-5" />} color="#10b981" sub={`${stats?.newsSources || 0} sources`} />
-        <StatCard label="Events" value={stats?.events || 0} icon={<Calendar className="w-5 h-5" />} color="#f59e0b" />
-        <StatCard label="Courses" value={stats?.subjects || 0} icon={<BookOpen className="w-5 h-5" />} color="#8b5cf6" sub={`${stats?.majors || 0} majors`} />
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Tutorials" value={stats?.tutorials || 0} icon={<HelpCircle className="w-5 h-5" />} color="#ec4899" />
-        <StatCard label="Newbie Links" value={stats?.newbieLinks || 0} icon={<Link2 className="w-5 h-5" />} color="#06b6d4" />
-        <StatCard label="New (30d)" value={stats?.recentUsers30d || 0} icon={<TrendingUp className="w-5 h-5" />} color="#84cc16" />
-        <StatCard label="Academic Majors" value={stats?.majors || 0} icon={<GraduationCap className="w-5 h-5" />} color="#f97316" />
-      </div>
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* User Registrations Chart */}
-        <div className="rounded-2xl p-5 border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-          <h4 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-main)' }}>User Registrations (30 Days)</h4>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={stats?.usersByDay || []}>
-                <defs>
-                  <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-                <XAxis dataKey="day" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickFormatter={v => v?.slice(5) || ''} />
-                <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} />
-                <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '0.75rem', fontSize: 12 }} />
-                <Area type="monotone" dataKey="count" stroke="#3b82f6" fill="url(#colorUsers)" strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* News by Source Chart */}
-        <div className="rounded-2xl p-5 border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-          <h4 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-main)' }}>News Distribution by Source</h4>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={stats?.newsBySource || []}
-                  dataKey="count"
-                  nameKey="source"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={70}
-                  innerRadius={40}
-                  paddingAngle={2}
-                >
-                  {(stats?.newsBySource || []).map((_, i) => (
-                    <Cell key={i} fill={chartColors[i % chartColors.length]} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '0.75rem', fontSize: 12 }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex flex-wrap gap-2 mt-2">
-            {(stats?.newsBySource || []).map((s, i) => (
-              <span key={i} className="text-[10px] font-medium px-2 py-0.5 rounded-full border" style={{ borderColor: 'var(--border-color)', color: chartColors[i % chartColors.length] }}>
-                @{s.source || 'unknown'}: {s.count}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* System Health */}
-      {health && (
-        <div className="rounded-2xl p-5 border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-          <h4 className="text-sm font-semibold mb-4 flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
-            <Activity className="w-4 h-4 text-emerald-500" /> System Health
-          </h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="flex flex-col gap-1">
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Uptime</span>
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
-                {Math.floor(health.uptime / 3600)}h {Math.floor((health.uptime % 3600) / 60)}m
-              </span>
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Memory (Heap)</span>
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
-                {health.memory.heapUsed}MB / {health.memory.heapTotal}MB
-              </span>
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Database</span>
-              <span className={`text-sm font-semibold ${health.dbStatus === 'connected' ? 'text-emerald-500' : 'text-red-500'}`}>
-                {health.dbStatus === 'connected' ? '● Connected' : '● Error'}
-              </span>
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Storage</span>
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>{health.storageStatus}</span>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-  // ============================================================================
-  // TAB: USERS
-  // ============================================================================
-  const renderUsers = () => (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h3 className="text-2xl font-display font-bold" style={{ color: 'var(--text-main)' }}>User Management</h3>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>View, search, and manage platform users</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 opacity-40" />
-            <input
-              type="text"
-              placeholder="Search users..."
-              value={userSearch}
-              onChange={e => { setUserSearch(e.target.value); fetchUsers(e.target.value); }}
-              className="pl-9 pr-3 py-2 rounded-xl text-sm border w-64"
-              style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
-            />
-          </div>
-          <button onClick={() => fetchUsers(userSearch)} className="p-2 rounded-xl border transition hover:bg-[var(--bg-subtle)]" style={{ borderColor: 'var(--border-color)' }}>
-            <RefreshCw className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-          </button>
-        </div>
-      </div>
-
-      <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                <th className="text-start px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>User</th>
-                <th className="text-start px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Major</th>
-                <th className="text-start px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Phone</th>
-                <th className="text-start px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Role</th>
-                <th className="text-start px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Joined</th>
-                <th className="text-end px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
-              {adminUsers.map(u => (
-                <tr key={u.id} className="transition hover:bg-[var(--bg-subtle)]" style={{ borderColor: 'var(--border-color)' }}>
-                  <td className="px-4 py-3 text-start">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold overflow-hidden shrink-0" style={{ background: 'var(--bg-subtle)', color: 'var(--text-muted)' }}>
-                        {u.profilePicUrl ? <img src={u.profilePicUrl} className="w-full h-full object-cover" /> : (u.userName?.[0] || '?')}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="font-semibold text-sm truncate max-w-[180px]" style={{ color: 'var(--text-main)' }}>{u.userName || 'Unnamed'}</div>
-                        <div className="text-xs truncate max-w-[180px]" style={{ color: 'var(--text-muted)' }}>{u.email}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-start" style={{ color: 'var(--text-muted)' }}>{u.major || '—'}</td>
-                  <td className="px-4 py-3 text-xs font-mono text-start" style={{ color: 'var(--text-muted)' }}>{u.phone || '—'}</td>
-                  <td className="px-4 py-3 text-start">
-                    <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${u.isAdmin ? 'bg-amber-500/15 text-amber-500' : 'bg-blue-500/10 text-blue-500'}`}>
-                      {u.isAdmin ? 'Admin' : 'User'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-start" style={{ color: 'var(--text-muted)' }}>
-                    {u.createdAt ? format(new Date(u.createdAt), 'MMM dd, yyyy') : '—'}
-                  </td>
-                  <td className="px-4 py-3 text-end">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={async () => {
-                          const t = await getToken();
-                          const res = await fetch(`/api/admin/users/${u.id}/toggle-admin`, { method: 'PUT', headers: { Authorization: `Bearer ${t}` } });
-                          if (res.ok) { fetchUsers(userSearch); fetchData(); toast('success', `${u.userName || 'User'} admin status toggled`); }
-                          else { const err = await res.json().catch(() => ({})); toast('error', err.error || 'Failed'); }
-                        }}
-                        className="p-1.5 rounded-lg transition hover:bg-[var(--bg-subtle)]"
-                        title={u.isAdmin ? 'Demote to User' : 'Promote to Admin'}
-                      >
-                        {u.isAdmin ? <UserX className="w-4 h-4 text-amber-500" /> : <UserCheck className="w-4 h-4 text-blue-500" />}
-                      </button>
-                      <button
-                        onClick={() => handleDelete(`/api/admin/users/${u.id}`, u.userName || 'this user')}
-                        className="p-1.5 rounded-lg transition hover:bg-red-500/10"
-                      >
-                        <Trash2 className="w-4 h-4 text-red-400" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {adminUsers.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No users found.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
 
   // ============================================================================
   // TAB: NEWS SOURCES
@@ -1095,8 +899,8 @@ export function AdminPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h3 className="text-2xl font-display font-bold" style={{ color: 'var(--text-main)' }}>Create & Manage Courses (المقررات والمواد)</h3>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Manage academic courses, syllabus details, and object storage resources</p>
+          <h3 className="text-2xl font-display font-bold" style={{ color: 'var(--text-main)' }}>Academic Courses (المقررات والمواد)</h3>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Manage course metadata, credits, level, syllabus, and basic info</p>
         </div>
 
         <button
@@ -1420,15 +1224,21 @@ export function AdminPage() {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="flex flex-col gap-0.5">
                   <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Node Version</span>
-                  <span className="text-sm font-mono font-medium" style={{ color: 'var(--text-main)' }}>{health.nodeVersion}</span>
+                  <span className="text-sm font-mono font-medium" style={{ color: 'var(--text-main)' }}>{health.nodeVersion || 'N/A'}</span>
                 </div>
                 <div className="flex flex-col gap-0.5">
                   <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Platform</span>
-                  <span className="text-sm font-mono font-medium" style={{ color: 'var(--text-main)' }}>{health.platform}</span>
+                  <span className="text-sm font-mono font-medium" style={{ color: 'var(--text-main)' }}>{health.platform || 'N/A'}</span>
                 </div>
                 <div className="flex flex-col gap-0.5">
                   <span className="text-xs" style={{ color: 'var(--text-muted)' }}>RSS Memory</span>
-                  <span className="text-sm font-mono font-medium" style={{ color: 'var(--text-main)' }}>{health.memory.rss} MB</span>
+                  <span className="text-sm font-mono font-medium" style={{ color: 'var(--text-main)' }}>
+                    {health.memory?.rss !== undefined 
+                      ? `${health.memory.rss} MB` 
+                      : health.memoryUsage?.rss !== undefined 
+                      ? `${Math.round(health.memoryUsage.rss / (1024 * 1024))} MB` 
+                      : 'N/A'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -1439,16 +1249,215 @@ export function AdminPage() {
   );
 
   // ============================================================================
-  // TAB SWITCHER
+  // TAB: ACADEMIC RESOURCES (المصادر والمراجع الأكاديمية)
   // ============================================================================
+  const renderResources = () => (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 className="text-2xl font-display font-bold" style={{ color: 'var(--text-main)' }}>Course Resources (المصادر والمراجع الأكاديمية)</h3>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Manage academic drives, summaries, past exams, and study links via resource wizard</p>
+        </div>
+
+        <button
+          onClick={() => {
+            setResourceForm({ title: '', type: 'course_hub', url: '', description: '', driveLink: '', boxLink: '', whatsappLink: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', bannerUrl: '' });
+            setIsResourceModalOpen(true);
+          }}
+          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-semibold text-xs sm:text-sm rounded-xl transition shadow-sm border border-emerald-500/30 shrink-0"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Add New Resource</span>
+        </button>
+      </div>
+
+      <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+        <div className="px-5 py-4 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3" style={{ borderColor: 'var(--border-color)' }}>
+          <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>
+            Academic Resources ({resourcesList.length})
+          </h4>
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            <input
+              type="text"
+              placeholder="Search resources..."
+              value={resourceSearch}
+              onChange={e => setResourceSearch(e.target.value)}
+              className="py-1.5 px-3 rounded-xl text-xs border flex-1 sm:w-64"
+              style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
+            />
+            <select
+              value={resourceFilterType}
+              onChange={e => setResourceFilterType(e.target.value)}
+              className="py-1.5 px-2.5 rounded-xl text-xs border"
+              style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
+            >
+              <option value="ALL">All Types</option>
+              <option value="course_hub">Course Package</option>
+              <option value="box">Box Storage</option>
+              <option value="summary">Summary</option>
+              <option value="syllabus">Syllabus</option>
+              <option value="exam">Exams</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="telegram">Telegram</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
+          {resourcesList
+            .filter(r => {
+              const matchSearch = !resourceSearch || 
+                r.title?.toLowerCase().includes(resourceSearch.toLowerCase()) || 
+                r.courseCode?.toLowerCase().includes(resourceSearch.toLowerCase()) || 
+                r.courseName?.toLowerCase().includes(resourceSearch.toLowerCase());
+              const matchType = resourceFilterType === 'ALL' || r.type === resourceFilterType;
+              return matchSearch && matchType;
+            })
+            .map(r => (
+              <div key={r.id} className="p-4 flex items-center justify-between gap-4 transition hover:bg-[var(--bg-subtle)]">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {r.courseCode && (
+                      <span className="font-mono text-xs px-2.5 py-0.5 rounded-md font-bold bg-blue-500/10 text-blue-500 border border-blue-500/20">
+                        {r.courseCode}
+                      </span>
+                    )}
+                    <span className="font-bold text-sm" style={{ color: 'var(--text-main)' }}>{r.title}</span>
+                    <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
+                      {r.type || 'course_hub'}
+                    </span>
+                  </div>
+
+                  {r.description && <p className="text-xs mt-1 text-slate-400 line-clamp-2">{r.description}</p>}
+                  
+                  {/* Badges for attached links */}
+                  <div className="flex items-center gap-2 mt-2 flex-wrap text-[11px]">
+                    {(r.fileUrl || r.driveUrl || r.url) && (
+                      <a
+                        href={r.fileUrl || r.driveUrl || r.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-blue-400 hover:underline flex items-center gap-1 font-mono"
+                      >
+                        <ExternalLink className="w-3 h-3" /> Link
+                      </a>
+                    )}
+                    {r.boxLink && (
+                      <a
+                        href={r.boxLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sky-400 hover:underline flex items-center gap-1 font-mono"
+                      >
+                        <ExternalLink className="w-3 h-3" /> Box
+                      </a>
+                    )}
+                    {r.whatsappLink && (
+                      <a
+                        href={r.whatsappLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-emerald-400 hover:underline flex items-center gap-1 font-mono"
+                      >
+                        <ExternalLink className="w-3 h-3" /> WhatsApp
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => {
+                      setResourceForm({
+                        id: r.id,
+                        subjectId: r.subjectId,
+                        title: r.title || '',
+                        type: r.type || 'course_hub',
+                        url: r.fileUrl || r.driveUrl || r.url || '',
+                        driveLink: r.driveLink || '',
+                        boxLink: r.boxLink || '',
+                        whatsappLink: r.whatsappLink || '',
+                        freeResourcesUrl: r.freeResourcesUrl || '',
+                        paidResourcesUrl: r.paidResourcesUrl || '',
+                        avatarUrl: r.avatarUrl || '',
+                        bannerUrl: r.bannerUrl || '',
+                        description: r.description || ''
+                      });
+                      setIsResourceModalOpen(true);
+                    }}
+                    className="px-3 py-1.5 rounded-xl border text-xs font-bold transition hover:bg-emerald-500/10 text-emerald-500 border-emerald-500/30 flex items-center gap-1"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Edit</span>
+                  </button>
+                  <button
+                    onClick={() => handleDelete(`/api/admin/resources/${r.id}`, r.title)}
+                    className="p-2 rounded-xl transition hover:bg-red-500/10 text-red-400"
+                    title="Delete Resource"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          {resourcesList.length === 0 && (
+            <div className="py-12 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No academic resources added yet.</div>
+          )}
+        </div>
+      </div>
+
+      {/* Resource Creation Wizard Popup Modal */}
+      <CreateResourceModal
+        isOpen={isResourceModalOpen}
+        onClose={() => setIsResourceModalOpen(false)}
+        resourceForm={resourceForm}
+        setResourceForm={setResourceForm}
+        subjects={subjects}
+        onSave={async () => {
+          if (!resourceForm.subjectId && !resourceForm.title?.trim()) {
+            toast('error', 'Please select a course or enter a title');
+            return false;
+          }
+          const selectedSubj = subjects.find(s => s.id === resourceForm.subjectId);
+          const finalTitle = resourceForm.title?.trim() || (selectedSubj ? `مصادر مادة ${selectedSubj.code} - ${selectedSubj.name}` : 'باقة مصادر مادة');
+          const payload = { ...resourceForm, title: finalTitle };
+
+          const url = resourceForm.id ? `/api/admin/resources/${resourceForm.id}` : '/api/admin/resources';
+          const method = resourceForm.id ? 'PUT' : 'POST';
+
+          try {
+            const headers = await authHeaders();
+            const res = await fetch(url, { method, headers, body: JSON.stringify(payload) });
+            if (res.ok) {
+              setResourceForm({ title: '', type: 'course_hub', url: '', description: '', driveLink: '', boxLink: '', whatsappLink: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', bannerUrl: '' });
+              fetchData();
+              toast('success', 'Resource saved successfully');
+              setIsResourceModalOpen(false);
+              return true;
+            } else {
+              const err = await res.json().catch(() => ({}));
+              toast('error', err.message || err.error || 'Failed to save resource');
+              return false;
+            }
+          } catch (e) {
+            console.error(e);
+            toast('error', 'Network error');
+            return false;
+          }
+        }}
+      />
+    </div>
+  );
+
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'dashboard': return renderDashboard();
-      case 'users': return renderUsers();
+      case 'dashboard': return <AdminDashboardTab stats={stats} health={health} setSearchUser={setUserSearch} setActiveTab={setActiveTab} />;
+      case 'users': return <AdminUsersTab adminUsers={adminUsers} searchUser={userSearch} setSearchUser={setUserSearch} fetchUsers={fetchUsers} handleDelete={handleDelete} />;
       case 'news_sources': return renderNewsSources();
       case 'majors': return renderMajors();
       case 'events': return renderEvents();
       case 'subjects': return renderSubjects();
+      case 'resources': return renderResources();
       case 'tutorials': return <TutorialsTab user={user} sections={tutorialSections} tutorials={tutorials} onRefresh={fetchData} />;
       case 'newbie_links': return renderNewbieLinks();
       case 'settings': return renderSettings();

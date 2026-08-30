@@ -6,7 +6,7 @@ import { TestApiClient } from './helpers/api-client.js';
 describe('Tier 1: Feature Coverage Tests', () => {
   let baseUrl: string;
   let client: TestApiClient;
-  const suiteId = Date.now().toString().slice(-6);
+  const suiteId = Date.now().toString().slice(-4) + Math.random().toString(36).slice(2, 6);
   const studentEmail = `tier1_student_${suiteId}@imamu.edu.sa`;
   const userName = `tier1student_${suiteId}`;
   const googleEmail = `tier1_google_${suiteId}@gmail.com`;

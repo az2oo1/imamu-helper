@@ -2,190 +2,341 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../lib/AuthContext';
-import { FileText, ArrowLeft, BookOpen, GraduationCap, Clock, ExternalLink, Search, Info } from 'lucide-react';
+import { FileText, ArrowLeft, GraduationCap, ExternalLink, Search, ArrowUpRight, Plus, Trash2, Download, Eye, Layers, X, BookOpen, Clock, Sparkles, ChevronDown, Check } from 'lucide-react';
 import Link from 'next/link';
-import { CourseDetailsModal } from '../components/CourseDetailsModal';
+
+interface PdfFileItem {
+  id: string;
+  title: string;
+  url: string;
+}
+
+const DEFAULT_FALLBACK_MAJORS = [
+  {
+    id: 1,
+    name: 'علوم الحاسب',
+    pdfUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/examples/learning/helloworld.pdf',
+    courses: []
+  },
+  {
+    id: 2,
+    name: 'تقنية المعلومات',
+    pdfUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/examples/learning/helloworld.pdf',
+    courses: []
+  },
+  {
+    id: 3,
+    name: 'نظم المعلومات',
+    pdfUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/examples/learning/helloworld.pdf',
+    courses: []
+  }
+];
 
 export function PlansToolPage() {
-  const { user } = useAuth();
-  const [majors, setMajors] = useState<any[]>([]);
+  const { user, dbUser } = useAuth();
+  const isAdmin = !!(dbUser?.isAdmin || dbUser?.role === 'ADMIN');
+  const [majors, setMajors] = useState<any[]>(DEFAULT_FALLBACK_MAJORS);
   const [subjects, setSubjects] = useState<any[]>([]);
-  const [selectedMajor, setSelectedMajor] = useState<any | null>(null);
+  const [selectedMajor, setSelectedMajor] = useState<any | null>(DEFAULT_FALLBACK_MAJORS[0]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCourse, setSelectedCourse] = useState<string | number | null>(null);
+
+  // PDF Viewer & Files State
+  const [majorPdfs, setMajorPdfs] = useState<Record<string, PdfFileItem[]>>({});
+  const [openPdfIndex, setOpenPdfIndex] = useState<number | null>(0);
+  const [isAddPdfOpen, setIsAddPdfOpen] = useState(false);
+  const [newPdfTitle, setNewPdfTitle] = useState('');
+  const [newPdfUrl, setNewPdfUrl] = useState('');
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const handleDownloadPdf = (pdf: PdfFileItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const pdfIdKey = pdf.id || pdf.title;
+    setDownloadingId(pdfIdKey);
+
+    const link = document.createElement('a');
+    link.href = pdf.url;
+    link.download = `${pdf.title}.pdf`;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setTimeout(() => {
+      setDownloadingId(null);
+    }, 2500);
+  };
 
   useEffect(() => {
     Promise.all([
       fetch('/api/majors').then(r => r.ok ? r.json() : []),
       fetch('/api/subjects').then(r => r.ok ? r.json() : [])
     ]).then(([m, s]) => {
-      if (Array.isArray(m)) {
+      if (Array.isArray(m) && m.length > 0) {
         setMajors(m);
-        if (m.length > 0) {
-          setSelectedMajor(m[0]);
-        }
+        setSelectedMajor(m[0]);
+      } else {
+        setMajors(DEFAULT_FALLBACK_MAJORS);
+        setSelectedMajor(DEFAULT_FALLBACK_MAJORS[0]);
       }
       if (Array.isArray(s)) setSubjects(s);
     }).catch(err => {
       console.error("Error fetching data:", err);
+      setMajors(DEFAULT_FALLBACK_MAJORS);
+      setSelectedMajor(DEFAULT_FALLBACK_MAJORS[0]);
     });
   }, []);
 
+  // Initialize PDF list when selected major changes
+  useEffect(() => {
+    if (!selectedMajor) return;
+    const key = String(selectedMajor.id);
+    if (!majorPdfs[key]) {
+      const initialPdfs: PdfFileItem[] = [];
+      if (selectedMajor.pdfUrl) {
+        initialPdfs.push({
+          id: 'official-1',
+          title: selectedMajor.name,
+          url: selectedMajor.pdfUrl
+        });
+      }
+      if (initialPdfs.length === 0) {
+        initialPdfs.push({
+          id: 'default-1',
+          title: `خطة ${selectedMajor.name} (PDF)`,
+          url: 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/examples/learning/helloworld.pdf'
+        });
+      }
+      setMajorPdfs(prev => ({ ...prev, [key]: initialPdfs }));
+    }
+    setOpenPdfIndex(0);
+  }, [selectedMajor]);
+
+  const currentMajorPdfList = selectedMajor ? (majorPdfs[String(selectedMajor.id)] || []) : [];
+
+  // Calculate course count & total hours for selected major
+  const majorSubjectsList = React.useMemo(() => {
+    if (!selectedMajor) return [];
+    if (selectedMajor.courses && selectedMajor.courses.length > 0) {
+      return selectedMajor.courses
+        .map((c: any) => subjects.find(s => String(s.id) === String(c.subjectId) || (c.code && s.code.toLowerCase() === c.code.toLowerCase())))
+        .filter(Boolean);
+    }
+    return subjects;
+  }, [selectedMajor, subjects]);
+
+  const totalCoursesCount = majorSubjectsList.length || (selectedMajor?.courses?.length || 45);
+  const totalCreditHours = majorSubjectsList.reduce((acc: number, curr: any) => acc + (Number(curr.creditHours) || 0), 0) || 135;
+
+  const handleAddPdf = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isAdmin || !selectedMajor || !newPdfUrl.trim()) return;
+    const key = String(selectedMajor.id);
+    const newItem: PdfFileItem = {
+      id: Date.now().toString(),
+      title: newPdfTitle.trim() || `ملف خطة إضافي ${currentMajorPdfList.length + 1}`,
+      url: newPdfUrl.trim()
+    };
+    setMajorPdfs(prev => ({
+      ...prev,
+      [key]: [...(prev[key] || []), newItem]
+    }));
+    setOpenPdfIndex(currentMajorPdfList.length);
+    setNewPdfTitle('');
+    setNewPdfUrl('');
+    setIsAddPdfOpen(false);
+  };
+
+  const handleRemovePdf = (indexToRemove: number) => {
+    if (!isAdmin || !selectedMajor) return;
+    const key = String(selectedMajor.id);
+    const updated = currentMajorPdfList.filter((_, idx) => idx !== indexToRemove);
+    setMajorPdfs(prev => ({ ...prev, [key]: updated }));
+    setOpenPdfIndex(0);
+  };
+
   const filteredMajors = majors.filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
-
-  const renderStudyPlan = () => {
+  const renderPdfPlanViewer = () => {
     if (!selectedMajor) return null;
-
-    const groups: Record<string, { reqCount: number, courses: any[] }> = {};
-    
-    if (selectedMajor.courses && selectedMajor.courses.length > 0) {
-      selectedMajor.courses.forEach((c: any) => {
-        const subjectDetail = subjects.find(s => String(s.id) === String(c.subjectId) || (c.code && s.code.toLowerCase() === c.code.toLowerCase()));
-        let groupName = c.optionalGroup;
-        if ((!groupName || groupName === 'المتطلبات العامة') && subjectDetail && subjectDetail.level) {
-          groupName = `المستوى ${subjectDetail.level}`;
-        }
-        if (!groupName) groupName = 'المتطلبات العامة';
-        if (!groups[groupName]) {
-          groups[groupName] = {
-            reqCount: c.optionalGroupReqCount || 1,
-            courses: []
-          };
-        }
-        if (subjectDetail) {
-          const item = {
-            ...subjectDetail,
-            prereq: c.prereq || (subjectDetail.description ? subjectDetail.description.replace(/^المتطلبات السابقة:\s*/i, '') : null)
-          };
-          // Avoid duplicate courses in the same group
-          if (!groups[groupName].courses.some(existing => String(existing.id) === String(subjectDetail.id))) {
-            groups[groupName].courses.push(item);
-          }
-        }
-      });
-    }
-
-    // Fallback if no specific course mapping found for major: group all loaded subjects by level
-    if (Object.keys(groups).length === 0 && subjects.length > 0) {
-      subjects.forEach(s => {
-        const groupName = s.level ? `المستوى ${s.level}` : 'المتطلبات العامة';
-        if (!groups[groupName]) {
-          groups[groupName] = { reqCount: 1, courses: [] };
-        }
-        groups[groupName].courses.push(s);
-      });
-    }
-
-    const groupKeys = Object.keys(groups).sort((a, b) => {
-      const matchA = a.match(/المستوى\s+(\d+)/);
-      const matchB = b.match(/المستوى\s+(\d+)/);
-      if (matchA && matchB) return parseInt(matchA[1]) - parseInt(matchB[1]);
-      if (matchA) return -1;
-      if (matchB) return 1;
-      return a.localeCompare(b, 'ar');
-    });
 
     return (
       <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/90 dark:border-zinc-800 shadow-sm overflow-hidden flex flex-col" dir="rtl">
-        {/* Header */}
-        <div className="bg-gradient-to-br from-blue-50/80 via-white to-white dark:from-blue-950/30 dark:via-zinc-900 dark:to-zinc-900 p-6 md:p-8 border-b border-slate-200 dark:border-zinc-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 rounded-full text-xs font-bold mb-3">
-              <GraduationCap className="w-4 h-4" /> الخطة الرسمية
+        {/* Header Card with Masari Button & Tags */}
+        <div className="bg-gradient-to-br from-slate-50 via-white to-slate-50/50 dark:from-zinc-900/90 dark:via-zinc-900 dark:to-zinc-950 p-6 md:p-8 border-b border-slate-200 dark:border-zinc-800 flex flex-col gap-4">
+          {/* Top Row: Title & Description on Right, Masari Button on Left */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">{selectedMajor.name}</h2>
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 mt-1">استعرض ملفات الخطط الدراسية بجمالية عالية وقم بإضافة ملفات جديدة حسب الحاجة.</p>
             </div>
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">{selectedMajor.name}</h2>
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 mt-1">راجع هيكل المنهج والمواد المطلوبة لكافة المستويات.</p>
-          </div>
-          {selectedMajor.pdfUrl && (
+
+            {/* Masari Platform Button */}
             <a 
-              href={selectedMajor.pdfUrl} 
+              href="https://msari.vercel.app/index.html" 
               target="_blank" 
               rel="noreferrer" 
-              className="btn-rise shrink-0 bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 sm:px-5 py-2.5 rounded-xl shadow-md shadow-blue-600/20 transition flex items-center gap-2 text-xs sm:text-sm cursor-pointer"
+              className="btn-rise inline-flex items-center justify-center gap-2 text-xs sm:text-sm font-bold text-white bg-[#0E352C] hover:bg-[#13493d] px-4.5 py-2.5 rounded-full border border-[#3DC9B0]/40 shadow-sm shadow-[#0E352C]/30 transition-all cursor-pointer shrink-0 self-start sm:self-auto"
+              title="الانتقال إلى منصة مساري لتنظيم الخطة الأكاديمية"
             >
-              <FileText className="w-4.5 h-4.5" /> تحميل الخطة PDF
+              <Sparkles className="w-4 h-4 text-[#3DC9B0] shrink-0" />
+              <span>تعمّق مع مساري</span>
+              <ArrowUpRight className="w-4 h-4 text-slate-300 shrink-0" />
             </a>
-          )}
+          </div>
+
+          {/* Tags Section: Hours, Courses, PDF Files in a full line under description & masari button */}
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            {/* Total Hours Tag */}
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800/90 px-3 py-1.5 rounded-full border border-slate-200 dark:border-zinc-700/80">
+              <Clock className="w-3.5 h-3.5 text-emerald-500" />
+              <span>{totalCreditHours} ساعة معتمدة</span>
+            </span>
+
+            {/* Total Courses Tag */}
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800/90 px-3 py-1.5 rounded-full border border-slate-200 dark:border-zinc-700/80">
+              <BookOpen className="w-3.5 h-3.5 text-blue-500" />
+              <span>{totalCoursesCount} مادة دراسية</span>
+            </span>
+
+            {/* PDF Files Tag */}
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800/90 px-3 py-1.5 rounded-full border border-slate-200 dark:border-zinc-700/80">
+              <FileText className="w-3.5 h-3.5 text-amber-500" />
+              <span>{currentMajorPdfList.length} ملفات PDF</span>
+            </span>
+          </div>
         </div>
 
-        {/* Batches / Groups */}
-        <div className="p-6 md:p-8 flex-1 bg-slate-50/50 dark:bg-zinc-950/50">
-          {groupKeys.length > 0 ? (
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 md:gap-8 items-start">
-              {groupKeys.map(groupName => {
-                const group = groups[groupName];
-                return (
-                  <div key={groupName} className="bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-zinc-800 overflow-hidden shadow-2xs">
-                    <div className="bg-slate-50 dark:bg-zinc-950 px-5 py-4 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between">
-                      <h3 className="font-bold text-slate-900 dark:text-white text-base flex items-center gap-2">
-                        <BookOpen className="w-4.5 h-4.5 text-blue-600 dark:text-blue-400" />
-                        {groupName}
-                      </h3>
-                      {group.reqCount > 0 && (
-                        <span className="text-xs font-bold bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 px-3 py-1 rounded-full">
-                          مطلوب {group.reqCount}
-                        </span>
-                      )}
-                    </div>
-                    <div className="p-4 flex flex-col gap-3">
-                      {group.courses.map((subj, idx) => (
-                        <div 
-                          key={idx} 
-                          onClick={() => setSelectedCourse(subj.id || subj.code)}
-                          className="group p-4 rounded-xl border border-slate-200/80 dark:border-zinc-800 bg-slate-50/60 dark:bg-zinc-950/60 hover:bg-white dark:hover:bg-zinc-900 hover:border-blue-400 dark:hover:border-zinc-700 transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer"
-                        >
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2 mb-1">
-                              <span className="text-xs font-bold font-mono text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900/50 px-2 py-0.5 rounded-md break-all leading-tight" dir="ltr">{subj.code}</span>
-                              <span className="flex items-center gap-1 text-[11px] font-semibold text-slate-500 dark:text-zinc-400 bg-slate-100 dark:bg-zinc-800 px-2 py-0.5 rounded-md shrink-0">
-                                <Clock className="w-3 h-3" /> {subj.creditHours} ساعات
-                              </span>
-                              {subj.prereq ? (
-                                <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-900/50 px-2 py-0.5 rounded-md shrink-0" dir="rtl">
-                                  المتطلب: {subj.prereq}
-                                </span>
-                              ) : (
-                                <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-900/50 px-2 py-0.5 rounded-md shrink-0">
-                                  بدون متطلب
-                                </span>
-                              )}
-                            </div>
-                            <h4 className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm line-clamp-2" title={subj.name}>{subj.name}</h4>
-                          </div>
-                          
-                          <div className="flex items-center gap-2 sm:justify-end shrink-0 pt-2 sm:pt-0 border-t border-slate-200 dark:border-zinc-800 sm:border-0" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              onClick={() => setSelectedCourse(subj.id || subj.code)}
-                              className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 flex items-center gap-1 transition bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 px-3 py-1.5 rounded-xl border border-blue-200 dark:border-blue-900/50"
-                            >
-                              <Info className="w-3.5 h-3.5" />
-                              <span>تفاصيل المادة</span>
-                            </button>
+        {/* PDF Viewer Body - List of PDF Files */}
+        <div className="p-6 md:p-8 flex-1 bg-slate-50/50 dark:bg-zinc-950/50 flex flex-col gap-6">
+          {/* Header Bar: Section Title & Add File Button */}
+          <div className="flex items-center justify-between gap-3 bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-2xs">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-200/50 dark:border-blue-900/40 shrink-0">
+                <Layers className="w-4.5 h-4.5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white">قائمة ملفات الخطة الدراسية</h3>
+                <p className="text-[11px] text-slate-500 dark:text-zinc-400">إجمالي {currentMajorPdfList.length} ملف PDF متاح</p>
+              </div>
+            </div>
 
-                            {subj.driveLink && (
-                              <a href={subj.driveLink} target="_blank" rel="noreferrer" className="text-xs font-bold text-slate-600 dark:text-zinc-400 hover:text-blue-600 flex items-center gap-1 transition bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-zinc-700">
-                                Drive <ExternalLink className="w-3 h-3" />
-                              </a>
-                            )}
-                            {subj.whatsappLink && (
-                              <a href={subj.whatsappLink} target="_blank" rel="noreferrer" className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 flex items-center gap-1 transition bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 px-2.5 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-900/50">
-                                واتساب <ExternalLink className="w-3 h-3" />
-                              </a>
+            {/* Add New PDF File Button (Admin Only) */}
+            {isAdmin && (
+              <button
+                onClick={() => setIsAddPdfOpen(true)}
+                className="btn-rise flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-2xs cursor-pointer shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                <span>إضافة ملف PDF</span>
+              </button>
+            )}
+          </div>
+
+          {/* List of PDF File Cards */}
+          {currentMajorPdfList.length > 0 ? (
+            <div className="flex flex-col gap-4">
+              {currentMajorPdfList.map((pdf, idx) => {
+                const isOpen = openPdfIndex === idx;
+
+                return (
+                  <div 
+                    key={pdf.id || idx}
+                    className="bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-sm overflow-hidden transition-all duration-200"
+                  >
+                    {/* PDF Card Header */}
+                    <div 
+                      onClick={() => setOpenPdfIndex(isOpen ? null : idx)}
+                      className="bg-slate-50/80 dark:bg-zinc-950/80 px-5 py-4 flex items-center justify-between gap-4 cursor-pointer select-none hover:bg-slate-100/80 dark:hover:bg-zinc-900/90 transition border-b border-slate-100 dark:border-zinc-800/80"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className={`p-1 rounded-lg transition-transform duration-200 ${isOpen ? 'rotate-180 text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-zinc-500'}`}>
+                          <ChevronDown className="w-4.5 h-4.5" />
+                        </div>
+
+                        <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200/50 dark:border-blue-900/40 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+                          <FileText className="w-4 h-4" />
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white truncate" title={pdf.title}>
+                              {pdf.title}
+                            </h4>
+                            {idx === 0 && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/80 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 shrink-0">
+                                الخطة الرئيسية
+                              </span>
                             )}
                           </div>
                         </div>
-                      ))}
+                      </div>
+
+                      {/* Action Controls */}
+                      <div className="flex items-center gap-2 shrink-0" onClick={e => e.stopPropagation()}>
+                        <button
+                          onClick={(e) => handleDownloadPdf(pdf, e)}
+                          className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                            downloadingId === (pdf.id || pdf.title)
+                              ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 scale-105 shadow-2xs'
+                              : 'bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-900/50 hover:bg-blue-100 text-blue-700 dark:text-blue-400'
+                          }`}
+                          title="تحميل الملف"
+                        >
+                          {downloadingId === (pdf.id || pdf.title) ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 animate-bounce" />
+                              <span>تم بدء التحميل!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Download className="w-3.5 h-3.5" />
+                              <span className="hidden sm:inline">تحميل الخطة (PDF)</span>
+                              <span className="sm:hidden">تحميل</span>
+                            </>
+                          )}
+                        </button>
+                        {isAdmin && currentMajorPdfList.length > 1 && (
+                          <button
+                            onClick={() => handleRemovePdf(idx)}
+                            className="p-1.5 text-slate-400 hover:text-red-500 transition rounded-xl hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer"
+                            title="حذف هذا الملف"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
+                    {/* PDF iFrame Display (Rendered when open) */}
+                    {isOpen && (
+                      <div className="relative w-full h-[760px] bg-slate-100 dark:bg-zinc-950">
+                        <iframe
+                          src={
+                            pdf.url?.startsWith('blob:') || pdf.url?.startsWith('data:') || pdf.url?.startsWith('/')
+                              ? pdf.url
+                              : `https://docs.google.com/viewer?url=${encodeURIComponent(pdf.url)}&embedded=true`
+                          }
+                          className="w-full h-full border-0"
+                          title={pdf.title}
+                        />
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
           ) : (
-            <div className="text-center py-16 text-slate-400 dark:text-zinc-500 flex flex-col items-center gap-2">
-              <BookOpen className="w-10 h-10 text-slate-300 dark:text-zinc-600 mb-1" />
-              <p className="text-xs sm:text-sm font-bold">لا توجد مواد مضافة لهذا التخصص حالياً.</p>
+            <div className="text-center py-20 bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-zinc-800 text-slate-400">
+              <FileText className="w-12 h-12 mx-auto mb-2 text-slate-300 dark:text-zinc-600" />
+              <p className="font-bold text-sm">لا توجد ملفات PDF متوفرة لهذا التخصص حالياً.</p>
+              {isAdmin && (
+                <button
+                  onClick={() => setIsAddPdfOpen(true)}
+                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold cursor-pointer"
+                >
+                  إضافة ملف PDF الآن
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -210,7 +361,7 @@ export function PlansToolPage() {
         </span>
         <h1 className="text-3xl sm:text-4xl font-display font-bold tracking-tight text-slate-900 dark:text-white mb-2">الخطط الدراسية</h1>
         <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-xl">
-          تصفح التخصصات المتاحة لعرض الخطط الدراسية التفصيلية، متطلبات المواد، والمصادر المتوفرة لكل تخصص.
+          تصفح التخصصات المتاحة لعرض واستعراض الخطط الدراسية وملفات الـ PDF المعتمَدة لكل تخصص.
         </p>
       </div>
 
@@ -239,7 +390,7 @@ export function PlansToolPage() {
                     <button
                       key={m.id}
                       onClick={() => setSelectedMajor(m)}
-                      className={`text-right px-4 py-3 rounded-xl transition flex items-center justify-between group ${
+                      className={`text-right px-4 py-3 rounded-xl transition flex items-center justify-between group cursor-pointer ${
                         isSelected 
                           ? 'bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900/50 text-blue-700 dark:text-blue-400 font-bold' 
                           : 'hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300'
@@ -261,10 +412,10 @@ export function PlansToolPage() {
           </div>
         </div>
 
-        {/* Left Column: Study Plan Details */}
+        {/* Left Column: Study Plan PDF Viewer */}
         <div className="flex-1 w-full min-w-0">
           {selectedMajor ? (
-            renderStudyPlan()
+            renderPdfPlanViewer()
           ) : (
             <div className="h-full min-h-[380px] flex items-center justify-center bg-white dark:bg-zinc-900 rounded-3xl border border-dashed border-slate-300 dark:border-zinc-800 p-8 text-center">
               <div className="flex flex-col items-center max-w-sm">
@@ -272,19 +423,78 @@ export function PlansToolPage() {
                   <FileText className="w-7 h-7" />
                 </div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1.5">اختر تخصصاً لعرض الخطة</h3>
-                <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">حدد تخصصاً من القائمة الجانبية لمعاينة خطته الدراسية والمواد والمصادر المتاحة.</p>
+                <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">حدد تخصصاً من القائمة الجانبية لمعاينة خطته الدراسية وملفات الـ PDF المتاحة.</p>
               </div>
             </div>
           )}
         </div>
       </div>
 
-      <CourseDetailsModal 
-        isOpen={!!selectedCourse} 
-        onClose={() => setSelectedCourse(null)} 
-        courseIdOrCode={selectedCourse} 
-      />
+      {/* Add PDF Modal */}
+      {isAdmin && isAddPdfOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative text-right" dir="rtl">
+            <button
+              onClick={() => setIsAddPdfOpen(false)}
+              className="absolute left-5 top-5 text-slate-400 hover:text-slate-900 dark:hover:text-white p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-2xl bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 dark:text-white text-base">إضافة ملف PDF جديد</h3>
+                <p className="text-xs text-slate-500 dark:text-zinc-400">أضف رابط ملف PDF لخطة {selectedMajor?.name}</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleAddPdf} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">عنوان الملف</label>
+                <input
+                  type="text"
+                  placeholder="مثال: خطة 1446هـ"
+                  value={newPdfTitle}
+                  onChange={e => setNewPdfTitle(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs sm:text-sm outline-none focus:border-blue-500 text-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">رابط ملف الـ PDF (URL)</label>
+                <input
+                  type="url"
+                  required
+                  placeholder="https://example.com/plan.pdf"
+                  value={newPdfUrl}
+                  onChange={e => setNewPdfUrl(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs sm:text-sm outline-none focus:border-blue-500 text-slate-900 dark:text-white dir-ltr text-left"
+                  dir="ltr"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setIsAddPdfOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-800 text-xs font-bold text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-600/20 transition cursor-pointer"
+                >
+                  إضافة الملف
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-

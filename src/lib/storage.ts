@@ -99,41 +99,45 @@ export async function uploadFileToStorage(
   const client = getS3Client();
 
   if (client) {
-    await ensureBucketExists();
-    const bucketName = getS3BucketName();
-    const key = filename;
+    try {
+      await ensureBucketExists();
+      const bucketName = getS3BucketName();
+      const key = filename;
 
-    await client.send(
-      new PutObjectCommand({
-        Bucket: bucketName,
-        Key: key,
-        Body: fileBuffer,
-        ContentType: mimeType || 'application/octet-stream',
-      })
-    );
+      await client.send(
+        new PutObjectCommand({
+          Bucket: bucketName,
+          Key: key,
+          Body: fileBuffer,
+          ContentType: mimeType || 'application/octet-stream',
+        })
+      );
 
-    console.log(`[Storage] Uploaded "${key}" to RustFS S3 bucket "${bucketName}".`);
+      console.log(`[Storage] Uploaded "${key}" to RustFS S3 bucket "${bucketName}".`);
 
-    // If a custom public URL base is configured, use it. Otherwise use the standard app endpoint
-    if (process.env.S3_PUBLIC_URL) {
-      const publicBaseUrl = process.env.S3_PUBLIC_URL.replace(/\/$/, '');
-      return { url: `${publicBaseUrl}/${key}`, key };
+      // If a custom public URL base is configured, use it. Otherwise use the standard app endpoint
+      if (process.env.S3_PUBLIC_URL) {
+        const publicBaseUrl = process.env.S3_PUBLIC_URL.replace(/\/$/, '');
+        return { url: `${publicBaseUrl}/${key}`, key };
+      }
+
+      return { url: `/uploads/${key}`, key };
+    } catch (s3Err: any) {
+      console.warn(`[Storage] S3 upload failed, falling back to local disk storage:`, s3Err.message || s3Err);
     }
-
-    return { url: `/uploads/${key}`, key };
-  } else {
-    // Local disk fallback
-    const uploadsDir = path.join(process.cwd(), 'public/uploads');
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    }
-
-    const filePath = path.join(uploadsDir, filename);
-    fs.writeFileSync(filePath, fileBuffer);
-    console.log(`[Storage] Uploaded "${filename}" to local disk storage.`);
-
-    return { url: `/uploads/${filename}`, key: filename };
   }
+
+  // Local disk fallback
+  const uploadsDir = path.join(process.cwd(), 'public/uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+
+  const filePath = path.join(uploadsDir, filename);
+  fs.writeFileSync(filePath, fileBuffer);
+  console.log(`[Storage] Uploaded "${filename}" to local disk storage.`);
+
+  return { url: `/uploads/${filename}`, key: filename };
 }
 
 /**

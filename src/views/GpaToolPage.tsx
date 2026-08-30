@@ -10,7 +10,7 @@ export function GpaToolPage() {
     <div className="flex flex-col flex-1 max-w-4xl w-full mx-auto pb-24 px-4 sm:px-6 pt-8 text-right" dir="rtl">
       <Link 
         href="/tools" 
-        className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 mb-6 w-fit transition self-start" 
+        className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-700 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 mb-6 w-fit transition self-start bg-white dark:bg-zinc-900 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-2xs" 
         dir="rtl"
       >
         <ArrowLeft className="w-4 h-4 rotate-180 text-blue-600 dark:text-blue-400" />

@@ -46,14 +46,26 @@ export async function logEvent(options: LogOptions) {
 }
 
 export const logger = {
-  info: (category: LogCategory, action: string, message: string, extra?: Partial<LogOptions>) =>
-    logEvent({ level: 'info', category, action, message, ...extra }),
+  info: (categoryOrMsg: LogCategory | string, actionOrMsg?: string, message?: string, extra?: Partial<LogOptions>) => {
+    if (!actionOrMsg && !message) {
+      return logEvent({ level: 'info', category: 'SYSTEM', action: 'INFO', message: String(categoryOrMsg), ...extra });
+    }
+    return logEvent({ level: 'info', category: categoryOrMsg as LogCategory, action: actionOrMsg || 'INFO', message: message || '', ...extra });
+  },
 
-  warn: (category: LogCategory, action: string, message: string, extra?: Partial<LogOptions>) =>
-    logEvent({ level: 'warn', category, action, message, ...extra }),
+  warn: (categoryOrMsg: LogCategory | string, actionOrMsg?: string, message?: string, extra?: Partial<LogOptions>) => {
+    if (!actionOrMsg && !message) {
+      return logEvent({ level: 'warn', category: 'SYSTEM', action: 'WARN', message: String(categoryOrMsg), ...extra });
+    }
+    return logEvent({ level: 'warn', category: categoryOrMsg as LogCategory, action: actionOrMsg || 'WARN', message: message || '', ...extra });
+  },
 
-  error: (category: LogCategory, action: string, message: string, extra?: Partial<LogOptions>) =>
-    logEvent({ level: 'error', category, action, message, ...extra }),
+  error: (categoryOrMsg: LogCategory | string, actionOrMsg?: string, message?: string, extra?: Partial<LogOptions>) => {
+    if (!actionOrMsg && !message) {
+      return logEvent({ level: 'error', category: 'SYSTEM', action: 'ERROR', message: String(categoryOrMsg), ...extra });
+    }
+    return logEvent({ level: 'error', category: categoryOrMsg as LogCategory, action: actionOrMsg || 'ERROR', message: message || '', ...extra });
+  },
 
   auth: (action: string, message: string, extra?: Partial<LogOptions>) =>
     logEvent({ level: 'auth', category: 'AUTH', action, message, ...extra }),

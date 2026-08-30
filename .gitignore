@@ -15,12 +15,8 @@
 # Project Data & Embedded DB
 /.data/
 
-# Agent Workspaces & Prompt Tracking
+# Agent Workspaces
 /.agents/
-/ORIGINAL_REQUEST.md
-/PROJECT.md
-/TEST_INFRA.md
-/TEST_READY.md
 
 # Scratch & Temporary Files
 temp.txt

@@ -3,28 +3,36 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../lib/AuthContext';
-import { BookOpen, Search, Download, ExternalLink, Filter, Folder, FileText, CheckCircle2, MessageCircle, Info } from 'lucide-react';
+import { BookOpen, Search, ExternalLink, Folder, Plus, Trash2, Pencil, Info, MessageCircle } from 'lucide-react';
 import { InView, SpotlightCard } from '../components/ui';
 import { CourseDetailsModal } from '../components/CourseDetailsModal';
+import CreateResourceModal from '../components/CreateResourceModal';
 
 interface Resource {
   id: number;
+  subjectId?: number;
   title: string;
   courseCode: string;
   courseName: string;
   major: string;
   type: string;
-  fileUrl: string;
-  driveUrl?: string;
+  boxLink?: string;
   whatsappUrl?: string;
-  telegramUrl?: string;
+  whatsappLink?: string;
+  freeResourcesUrl?: string;
+  paidResourcesUrl?: string;
+  avatarUrl?: string;
+  bannerUrl?: string;
+  description?: string;
   createdAt: string;
 }
 
 export function Resources() {
   const router = useRouter();
-  const { user, loading: authLoading, logout, signOut } = useAuth();
+  const { user, dbUser, loading: authLoading, logout, signOut } = useAuth();
+  const isAdmin = !!(dbUser?.isAdmin || dbUser?.role === 'ADMIN');
   const [resources, setResources] = useState<Resource[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
   const [majors, setMajors] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [selectedMajor, setSelectedMajor] = useState('all');
@@ -32,6 +40,20 @@ export function Resources() {
   const [loading, setLoading] = useState(true);
   const [selectedCourse, setSelectedCourse] = useState<string | number | null>(null);
 
+  // Admin Resource Wizard Form State
+  const [isAddResourceOpen, setIsAddResourceOpen] = useState(false);
+  const [resourceForm, setResourceForm] = useState<any>({
+    title: '',
+    type: 'course_hub',
+    url: '',
+    boxLink: '',
+    whatsappLink: '',
+    freeResourcesUrl: '',
+    paidResourcesUrl: '',
+    avatarUrl: '',
+    bannerUrl: '',
+    description: ''
+  });
 
   useEffect(() => {
     if (authLoading) return;
@@ -42,10 +64,11 @@ export function Resources() {
     }
 
     const token = localStorage.getItem('token');
-    fetch('/api/resources', {
-      headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-    })
-      .then(async res => {
+    const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    Promise.all([
+      fetch('/api/subjects', { headers }).then(res => res.ok ? res.json() : []),
+      fetch('/api/resources', { headers }).then(async res => {
         if (res.status === 401) {
           if (logout) await logout();
           else if (signOut) await signOut();
@@ -64,19 +87,104 @@ export function Resources() {
         }
         return [];
       })
-      .then(data => {
-        if (Array.isArray(data)) {
-          setResources(data);
-          const uniqueMajors = Array.from(new Set(data.map((r: Resource) => r.major).filter(Boolean))) as string[];
-          setMajors(uniqueMajors);
-        }
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Failed to load resources:', err);
-        setLoading(false);
-      });
+    ]).then(([subData, resData]) => {
+      if (Array.isArray(subData)) setSubjects(subData);
+      if (Array.isArray(resData)) {
+        setResources(resData);
+        const uniqueMajors = Array.from(new Set(resData.map((r: Resource) => r.major).filter(Boolean))) as string[];
+        setMajors(uniqueMajors);
+      }
+      setLoading(false);
+    }).catch(err => {
+      console.error('Failed to load resources:', err);
+      setLoading(false);
+    });
   }, [authLoading, user, router, logout, signOut]);
+
+  const handleDeleteResource = async (id: number) => {
+    if (!isAdmin) return;
+    if (!window.confirm('هل أنت متأكد من حذف هذا المصدر؟')) return;
+    const token = user ? await user.getIdToken() : localStorage.getItem('token');
+    try {
+      const res = await fetch(`/api/admin/resources/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setResources(prev => prev.filter(r => r.id !== id));
+      }
+    } catch (err) {
+      console.error('Failed to delete resource', err);
+    }
+  };
+
+  const handleSaveResource = async () => {
+    if (!isAdmin) {
+      alert('إضافة وتعديل المصادر متاحة فقط لحسابات المدراء والأدمن');
+      return false;
+    }
+    if (!resourceForm.subjectId && !resourceForm.title?.trim()) {
+      alert('الرجاء اختيار المادة الأكاديمية أو إدخال عنوان المصدر');
+      return false;
+    }
+    const token = user ? await user.getIdToken() : localStorage.getItem('token');
+    const selectedSubj = subjects.find(s => s.id === resourceForm.subjectId);
+    const finalTitle = resourceForm.title?.trim() || (selectedSubj ? `مصادر مادة ${selectedSubj.code} - ${selectedSubj.name}` : 'باقة مصادر مادة');
+    const payload = { ...resourceForm, title: finalTitle };
+
+    const url = resourceForm.id ? `/api/admin/resources/${resourceForm.id}` : '/api/admin/resources';
+    const method = resourceForm.id ? 'PUT' : 'POST';
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        const fetchRes = await fetch('/api/resources', {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
+        if (fetchRes.ok) {
+          const data = await fetchRes.json();
+          if (Array.isArray(data)) setResources(data);
+        }
+        setIsAddResourceOpen(false);
+        setResourceForm({ title: '', type: 'course_hub', url: '', description: '', boxLink: '', whatsappLink: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', bannerUrl: '' });
+        return true;
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || err.message || 'فشل حفظ المصدر');
+        return false;
+      }
+    } catch (err) {
+      console.error('Failed to save resource', err);
+      alert('حدث خطأ في الاتصال أثناء حفظ المصدر');
+      return false;
+    }
+  };
+
+  const openEditModal = (r: Resource) => {
+    if (!isAdmin) return;
+    setResourceForm({
+      id: r.id,
+      subjectId: r.subjectId,
+      title: r.title || '',
+      type: r.type || 'course_hub',
+      url: r.boxLink || r.whatsappLink || r.whatsappUrl || '',
+      boxLink: r.boxLink || '',
+      whatsappLink: r.whatsappLink || r.whatsappUrl || '',
+      freeResourcesUrl: r.freeResourcesUrl || '',
+      paidResourcesUrl: r.paidResourcesUrl || '',
+      avatarUrl: r.avatarUrl || '',
+      bannerUrl: r.bannerUrl || '',
+      description: r.description || ''
+    });
+    setIsAddResourceOpen(true);
+  };
 
   const filteredResources = resources.filter(r => {
     const matchesSearch = 
@@ -94,14 +202,27 @@ export function Resources() {
     <div className="flex flex-col flex-1 w-full pb-24 px-4 sm:px-6 lg:px-8 pt-8 relative max-w-7xl mx-auto min-h-screen text-right" dir="rtl">
       
       {/* Header */}
-      <div className="mb-8 relative z-10">
-        <span className="text-xs sm:text-sm font-semibold tracking-widest text-blue-600 dark:text-blue-400 uppercase mb-2 block">
-          المكتبة الأكاديمية الرقمية
-        </span>
-        <h1 className="text-3xl sm:text-4xl font-display font-bold tracking-tight text-slate-900 dark:text-white mb-2">المصادر والتجميعات الطلابية</h1>
-        <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-xl">
-          اختبارات سابقة، ملخصات، وروابط المجموعات الطلابية مرتبة حسب المواد والتخصصات.
-        </p>
+      <div className="mb-8 relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <span className="text-xs sm:text-sm font-semibold tracking-widest text-blue-600 dark:text-blue-400 uppercase mb-2 block">
+            المكتبة الأكاديمية الرقمية
+          </span>
+          <h1 className="text-3xl sm:text-4xl font-display font-bold tracking-tight text-slate-900 dark:text-white mb-2">المصادر والتجميعات الطلابية</h1>
+          <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-xl">
+            اختبارات سابقة، ملخصات، وروابط المجموعات الطلابية مرتبة حسب المواد والتخصصات.
+          </p>
+        </div>
+
+        {/* Admin Add Resource Button */}
+        {isAdmin && (
+          <button
+            onClick={() => setIsAddResourceOpen(true)}
+            className="btn-rise flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-md shadow-blue-600/20 cursor-pointer shrink-0 self-start md:self-auto"
+          >
+            <Plus className="w-4 h-4" />
+            <span>إضافة مصدر جديد</span>
+          </button>
+        )}
       </div>
 
       {/* Filter and Search Bar */}
@@ -165,14 +286,34 @@ export function Resources() {
             {filteredResources.map((item) => (
               <SpotlightCard
                 key={item.id}
-                className="border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 flex flex-col justify-between"
+                className="border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 flex flex-col justify-between relative group"
               >
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50">
                       {item.courseCode}
                     </span>
-                    <span className="text-[11px] text-slate-500 dark:text-zinc-400 font-medium">{item.major}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-slate-500 dark:text-zinc-400 font-medium">{item.major}</span>
+                      {isAdmin && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => openEditModal(item)}
+                            className="p-1 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition cursor-pointer"
+                            title="تعديل هذا المصدر"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteResource(item.id)}
+                            className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition cursor-pointer"
+                            title="حذف هذا المصدر"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1.5 leading-snug">
@@ -194,15 +335,15 @@ export function Resources() {
                     <span>تفاصيل المادة</span>
                   </button>
 
-                  {item.driveUrl && (
+                  {item.boxLink && (
                     <a
-                      href={item.driveUrl}
+                      href={item.boxLink}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 text-xs font-bold transition"
                     >
                       <Folder className="w-3.5 h-3.5" />
-                      <span>Drive</span>
+                      <span>Box / Drive</span>
                     </a>
                   )}
 
@@ -229,7 +370,18 @@ export function Resources() {
         onClose={() => setSelectedCourse(null)} 
         courseIdOrCode={selectedCourse} 
       />
+
+      {/* Unified 4-Step Resource Package Wizard Modal */}
+      <CreateResourceModal
+        isOpen={isAddResourceOpen}
+        onClose={() => setIsAddResourceOpen(false)}
+        resourceForm={resourceForm}
+        setResourceForm={setResourceForm}
+        subjects={subjects}
+        onSave={handleSaveResource}
+      />
     </div>
   );
 }
+
 

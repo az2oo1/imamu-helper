@@ -3,8 +3,7 @@ import jwt from 'jsonwebtoken';
 import { eq, desc, and, inArray } from 'drizzle-orm';
 import { news, events, newsLikes, newsComments, news_sources, users } from '../../db/schema';
 import { requireAuth, AuthRequest } from '../../middleware/auth';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_dev_only';
+import { JWT_SECRET } from '../../lib/config';
 
 export function createNewsRouter(db: any) {
   const router = express.Router();
