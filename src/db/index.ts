@@ -2,7 +2,8 @@ import 'dotenv/config';
 import * as schema from './schema';
 import { drizzle as drizzlePg } from 'drizzle-orm/node-postgres';
 import { migrate as migratePg } from 'drizzle-orm/node-postgres/migrator';
-import { Pool, PoolConfig } from 'pg';
+import { Pool, PoolConfig, types } from 'pg';
+types.setTypeParser(20, (val: string) => val); // Force INT8 (64-bit int) to string to prevent JS float precision loss
 import { PGlite } from '@electric-sql/pglite';
 import { drizzle as drizzlePglite } from 'drizzle-orm/pglite';
 import { migrate as migratePglite } from 'drizzle-orm/pglite/migrator';
@@ -258,11 +259,8 @@ async function initializeDatabase() {
       `);
     } catch(e) {}
     console.log('[DB] Embedded database fallback is ready.');
-    resolveDbReady();
-
   } catch (err: any) {
     console.warn('[DB] Embedded database migration notice:', err.message || err);
-    resolveDbReady();
   }
 
   // 2. Check for CockroachDB / PostgreSQL connection configuration

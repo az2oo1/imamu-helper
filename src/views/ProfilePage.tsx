@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../lib/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronDown, ChevronUp, UserCircle2, Mail, Phone, BookOpen, Calculator, Clock, CheckCircle2, AlertCircle, Loader2, Layers, Search } from 'lucide-react';
+import { ChevronDown, ChevronUp, UserCircle2, Mail, Phone, BookOpen, Calculator, Clock, CheckCircle2, AlertCircle, Loader2, Layers, Search, Camera } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AnimatedNumber } from '../components/ui';
 
@@ -183,9 +183,9 @@ export function ProfilePage() {
 
       <div className="flex flex-col md:flex-row gap-6 lg:gap-8 items-start">
         {/* Left Side: Avatar & Basics */}
-        <div className="w-full md:w-72 lg:w-80 shrink-0 flex flex-col items-center md:items-start text-center md:text-left bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-xs h-fit">
-          <div className="relative mb-6 group cursor-pointer" onClick={() => document.getElementById('pfp-upload')?.click()}>
-            <div className="h-32 w-32 bg-slate-100 dark:bg-zinc-800 rounded-full flex items-center justify-center overflow-hidden border-4 border-white dark:border-zinc-900 shadow-md transition group-hover:opacity-80">
+        <div className="w-full md:w-72 shrink-0 flex flex-col items-center text-center py-2">
+          <div className="relative group cursor-pointer" onClick={() => document.getElementById('pfp-upload')?.click()}>
+            <div className="h-32 w-32 bg-slate-100 dark:bg-zinc-800 rounded-full flex items-center justify-center overflow-hidden border-4 border-white dark:border-zinc-800 shadow-md transition group-hover:opacity-90">
               {profileForm.profilePicUrl ? (
                 <img src={profileForm.profilePicUrl} alt="Profile" className="w-full h-full object-cover" />
               ) : (
@@ -193,7 +193,7 @@ export function ProfilePage() {
               )}
             </div>
             <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
-              <span className="text-white text-xs font-medium">تغيير</span>
+              <Camera className="w-6 h-6 text-white" />
             </div>
             <input 
               type="file" 
@@ -208,7 +208,7 @@ export function ProfilePage() {
                     const img = new Image();
                     img.onload = () => {
                       const canvas = document.createElement('canvas');
-                      const MAX_SIZE = 200;
+                      const MAX_SIZE = 250;
                       let width = img.width;
                       let height = img.height;
                       if (width > height) {
@@ -226,7 +226,7 @@ export function ProfilePage() {
                       canvas.height = height;
                       const ctx = canvas.getContext('2d');
                       ctx?.drawImage(img, 0, 0, width, height);
-                      const newPicUrl = canvas.toDataURL('image/jpeg', 0.8);
+                      const newPicUrl = canvas.toDataURL('image/jpeg', 0.85);
                       setProfileForm(p => ({ ...p, profilePicUrl: newPicUrl }));
                       saveProfile({ profilePicUrl: newPicUrl });
                     };
@@ -237,12 +237,24 @@ export function ProfilePage() {
               }}
             />
           </div>
-          <h2 className="text-xl font-display font-bold text-slate-900 dark:text-white truncate w-full" title={dbUser?.userName || user.email?.split('@')[0]}>
-            @{dbUser?.userName || user.email?.split('@')[0]}
-          </h2>
-          <p className="text-xs text-slate-500 dark:text-zinc-400 mb-8 flex items-center justify-center md:justify-start gap-2 truncate w-full">
-            {user.email}
-          </p>
+
+          <button 
+            type="button"
+            onClick={() => document.getElementById('pfp-upload')?.click()}
+            className="mt-3.5 inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 px-4 py-2 rounded-xl border border-blue-200 dark:border-blue-900/50 transition shadow-2xs cursor-pointer"
+          >
+            <Camera className="w-3.5 h-3.5" />
+            <span>تغيير الصورة الشخصية</span>
+          </button>
+
+          <div className="mt-4 flex flex-col items-center">
+            <h2 className="text-xl font-display font-bold text-slate-900 dark:text-white" dir="ltr">
+              @{dbUser?.userName || profileForm.userName || (user?.email ? user.email.split('@')[0] : 'user')}
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-zinc-400 font-mono mt-1" dir="ltr">
+              {user?.email || ''}
+            </p>
+          </div>
           
           <button 
             onClick={async () => {
@@ -251,7 +263,7 @@ export function ProfilePage() {
                 router.push('/login');
               }
             }}
-            className="w-full py-2.5 px-6 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/60 rounded-xl transition border border-red-200/50 dark:border-red-900/50"
+            className="mt-6 w-full max-w-[220px] py-2.5 px-6 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-xl transition border border-red-200/60 dark:border-red-900/40 cursor-pointer"
           >
             تسجيل الخروج
           </button>
@@ -295,54 +307,65 @@ export function ProfilePage() {
           <form className="space-y-6" onSubmit={e => { e.preventDefault(); saveProfile(); }}>
             {activeTab === 'profile' && (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                {/* Personal Details */}
-                <div>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500 mb-4">التفاصيل الشخصية</h3>
-                  <div className="space-y-4">
+                {/* Personal Details Section */}
+                <div className="bg-white dark:bg-zinc-900/40 border border-slate-200/80 dark:border-zinc-800/80 rounded-3xl p-6 sm:p-8 shadow-xs">
+                  <div className="flex items-center gap-2 mb-6 pb-3 border-b border-slate-100 dark:border-zinc-800/60">
+                    <UserCircle2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">التفاصيل الشخصية</h3>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    {/* Username */}
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">اسم المستخدم</label>
-                      <div className="relative">
-                        <div className="absolute right-3 top-3 w-5 h-5 text-slate-400 dark:text-zinc-500 font-medium select-none" dir="ltr">@</div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-2">اسم المستخدم</label>
+                      <div className="relative flex items-center">
+                        <span className="absolute right-3.5 text-slate-400 dark:text-zinc-500 text-sm font-mono select-none" dir="ltr">@</span>
                         <input 
                           type="text"
                           placeholder="username"
                           value={profileForm.userName}
-                          onChange={e => setProfileForm(p => ({...p, userName: e.target.value.replace(/[^a-zA-Z0-9_]/g, '')}))}
-                          className="w-full pl-10 pr-10 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-zinc-900 transition text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500"
+                          onChange={e => {
+                            const val = e.target.value.replace(/[^a-zA-Z0-9_]/g, '');
+                            setProfileForm(p => ({...p, userName: val}));
+                          }}
+                          onBlur={() => saveProfile()}
+                          className="w-full pr-9 pl-10 py-3 bg-slate-50/80 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-600"
                           dir="ltr"
                         />
-                        <div className="absolute left-3 top-3 flex items-center">
-                          {usernameStatus === 'checking' && <div className="w-4 h-4 border-2 border-slate-400 dark:border-zinc-500 border-t-transparent rounded-full animate-spin" />}
-                          {usernameStatus === 'available' && <CheckCircle2 className="w-5 h-5 text-emerald-500" />}
+                        <div className="absolute left-3.5 flex items-center">
+                          {usernameStatus === 'checking' && <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />}
+                          {usernameStatus === 'available' && <CheckCircle2 className="w-4.5 h-4.5 text-emerald-500" />}
                           {usernameStatus === 'taken' && (
                             <span title="اسم المستخدم مستخدم مسبقاً">
-                              <AlertCircle className="w-5 h-5 text-red-500" />
+                              <AlertCircle className="w-4.5 h-4.5 text-red-500" />
                             </span>
                           )}
                         </div>
                       </div>
-                      {usernameStatus === 'taken' && <p className="text-xs text-red-500 mt-1">اسم المستخدم هذا مستخدم بالفعل.</p>}
-                      {usernameStatus === 'available' && <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">اسم المستخدم متاح!</p>}
+                      {usernameStatus === 'taken' && <p className="text-[11px] font-semibold text-red-500 mt-1.5">اسم المستخدم هذا مستخدم بالفعل.</p>}
+                      {usernameStatus === 'available' && <p className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mt-1.5">اسم المستخدم متاح!</p>}
                     </div>
 
+                    {/* Phone Number */}
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5 flex justify-between items-center">
-                        <span>رقم الجوال</span>
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="text-xs font-bold text-slate-700 dark:text-zinc-300">رقم الجوال</label>
                         {!phoneEditable && (
-                          <button type="button" onClick={() => setPhoneEditable(true)} className="text-blue-600 dark:text-blue-400 hover:underline text-xs font-bold">
+                          <button type="button" onClick={() => setPhoneEditable(true)} className="text-blue-600 dark:text-blue-400 hover:underline text-xs font-bold transition">
                             تعديل
                           </button>
                         )}
-                      </label>
-                      <div className="relative">
-                        <Phone className="absolute right-3 top-3 w-5 h-5 text-slate-400 dark:text-zinc-500" />
+                      </div>
+                      <div className="relative flex items-center">
+                        <Phone className="absolute right-3.5 w-4.5 h-4.5 text-slate-400 dark:text-zinc-500" />
                         <input 
                           type="tel"
                           placeholder="05XXXXXXXX"
                           value={profileForm.phone}
                           disabled={!phoneEditable}
                           onChange={e => setProfileForm(p => ({...p, phone: e.target.value}))}
-                          className={`w-full pr-10 pl-4 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-zinc-900 transition text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 ${!phoneEditable ? 'opacity-70 cursor-not-allowed' : ''}`}
+                          onBlur={() => saveProfile()}
+                          className={`w-full pr-10 pl-4 py-3 bg-slate-50/80 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-600 ${!phoneEditable ? 'opacity-65 cursor-not-allowed bg-slate-100/60 dark:bg-zinc-900/40' : ''}`}
                           dir="ltr"
                         />
                       </div>
@@ -350,63 +373,91 @@ export function ProfilePage() {
                   </div>
                 </div>
 
-                <hr className="border-slate-200 dark:border-zinc-800" />
+                {/* Academic Status Section */}
+                <div className="bg-white dark:bg-zinc-900/40 border border-slate-200/80 dark:border-zinc-800/80 rounded-3xl p-6 sm:p-8 shadow-xs">
+                  <div className="flex items-center gap-2 mb-6 pb-3 border-b border-slate-100 dark:border-zinc-800/60">
+                    <BookOpen className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">الحالة الأكاديمية</h3>
+                  </div>
 
-                {/* Academic Status */}
-                <div>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500 mb-4">الحالة الأكاديمية</h3>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">التخصص</label>
-                        <div className="relative">
-                          <BookOpen className="absolute right-3 top-3 w-5 h-5 text-slate-400 dark:text-zinc-500" />
-                          <select 
-                            value={profileForm.major} 
-                            onChange={e => setProfileForm(p => ({...p, major: e.target.value}))}
-                            className="w-full pr-10 pl-10 py-2.5 appearance-none bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-zinc-900 transition text-sm text-slate-900 dark:text-white"
-                          >
-                            <option value="" className="dark:bg-zinc-900">اختر التخصص...</option>
-                            {majors.map(m => (
-                              <option key={m.id} value={m.name} className="dark:bg-zinc-900">{m.name}</option>
-                            ))}
-                          </select>
-                          <ChevronDown className="absolute left-3 top-3.5 w-5 h-5 text-slate-400 dark:text-zinc-500 pointer-events-none" />
-                        </div>
+                  <div className="grid grid-cols-1 gap-5">
+                    {/* Major Select */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-2">التخصص الأكاديمي</label>
+                      <div className="relative flex items-center">
+                        <BookOpen className="absolute right-3.5 w-4.5 h-4.5 text-slate-400 dark:text-zinc-500 pointer-events-none" />
+                        <select 
+                          value={profileForm.major} 
+                          onChange={e => {
+                            const newMajor = e.target.value;
+                            setProfileForm(p => ({...p, major: newMajor}));
+                            saveProfile({ major: newMajor });
+                          }}
+                          className="w-full pr-10 pl-10 py-3 appearance-none bg-slate-50/80 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition text-sm text-slate-900 dark:text-white cursor-pointer"
+                        >
+                          <option value="" className="dark:bg-zinc-900">اختر التخصص...</option>
+                          {majors.map(m => (
+                            <option key={m.id} value={m.name} className="dark:bg-zinc-900">{m.name}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className="absolute left-3.5 w-4.5 h-4.5 text-slate-400 dark:text-zinc-500 pointer-events-none" />
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      {/* GPA */}
                       <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">المعدل التراكمي</label>
-                        <div className="relative">
-                          <Calculator className="absolute right-3 top-3 w-5 h-5 text-slate-400 dark:text-zinc-500" />
+                        <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-2">المعدل التراكمي (GPA)</label>
+                        <div className="relative flex items-center">
+                          <Calculator className="absolute right-3.5 w-4.5 h-4.5 text-slate-400 dark:text-zinc-500" />
                           <input 
                             type="number" step="0.01" min="0" max="5.0"
                             placeholder="مثال 4.5"
                             value={profileForm.currentGpa}
                             onChange={e => setProfileForm(p => ({...p, currentGpa: e.target.value}))}
-                            className="w-full pr-10 pl-4 py-2.5 font-mono bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-zinc-900 transition text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500"
+                            onBlur={() => saveProfile()}
+                            className="w-full pr-10 pl-4 py-3 font-mono bg-slate-50/80 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-600"
                             dir="ltr"
                           />
                         </div>
                       </div>
+
+                      {/* Finished Hours */}
                       <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">الساعات المكتسبة</label>
-                        <div className="relative">
-                          <Clock className="absolute right-3 top-3 w-5 h-5 text-slate-400 dark:text-zinc-500" />
+                        <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-2">الساعات المكتسبة</label>
+                        <div className="relative flex items-center">
+                          <Clock className="absolute right-3.5 w-4.5 h-4.5 text-slate-400 dark:text-zinc-500" />
                           <input 
                             type="number" min="0"
                             placeholder="110"
                             value={profileForm.finishedHours}
                             onChange={e => setProfileForm(p => ({...p, finishedHours: e.target.value}))}
-                            className="w-full pr-10 pl-4 py-2.5 font-mono bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-zinc-900 transition text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500"
+                            onBlur={() => saveProfile()}
+                            className="w-full pr-10 pl-4 py-3 font-mono bg-slate-50/80 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-600"
                             dir="ltr"
                           />
                         </div>
                       </div>
                     </div>
                   </div>
+                </div>
+
+                {/* Save Button Bar */}
+                <div className="flex items-center justify-end pt-2">
+                  <button
+                    type="submit"
+                    disabled={isSaving || usernameStatus === 'checking' || usernameStatus === 'taken'}
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold px-8 py-3 rounded-2xl shadow-lg shadow-blue-600/25 hover:shadow-blue-600/35 transition-all duration-200 flex items-center gap-2 text-sm disabled:opacity-50 cursor-pointer"
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>جاري الحفظ...</span>
+                      </>
+                    ) : (
+                      <span>حفظ التغييرات</span>
+                    )}
+                  </button>
                 </div>
               </div>
             )}
@@ -436,13 +487,15 @@ export function ProfilePage() {
 
                       const groups = (Object.entries(
                         displayedSubjects.reduce((acc, s) => {
-                          let g = 'المتطلبات العامة';
+                          let g = s.level ? `المستوى ${s.level}` : 'المتطلبات العامة';
                           let reqCount = 0;
                           if (userMajor && userMajor.courses) {
-                            const c = userMajor.courses.find((mc:any) => mc.subjectId === s.id);
-                            if (c && c.optionalGroup) {
+                            const c = userMajor.courses.find((mc:any) => String(mc.subjectId) === String(s.id));
+                            if (c && c.optionalGroup && c.optionalGroup !== 'المتطلبات العامة') {
                               g = c.optionalGroup;
-                              reqCount = c.optionalGroupReqCount || 0;
+                              reqCount = Number(c.optionalGroupReqCount) || 0;
+                            } else if (c && c.optionalGroupReqCount) {
+                              reqCount = Number(c.optionalGroupReqCount) || 0;
                             }
                           }
                           if (!acc[g]) acc[g] = [];
@@ -468,14 +521,15 @@ export function ProfilePage() {
                         }
                       });
 
-                      groups.forEach(([_, groupSubjects]) => {
+                      groups.forEach(([groupName, groupSubjects]) => {
                         const totalInGroup = groupSubjects.length;
-                        const declaredReqCount = groupSubjects[0]?.reqCount || 0;
-                        const reqCount = declaredReqCount > 0 ? declaredReqCount : totalInGroup;
+                        const declaredReqCount = Number(groupSubjects[0]?.reqCount) || 0;
+                        const isLevelGroup = groupName.startsWith('المستوى');
+                        const reqCount = (declaredReqCount > 0 && !isLevelGroup) ? declaredReqCount : totalInGroup;
                         const selectedInGroup = groupSubjects.filter(s => profileForm.completedCourses.includes(s.code)).length;
                         
-                        totalReq += reqCount;
-                        totalFinishedInReq += Math.min(selectedInGroup, reqCount);
+                        totalReq += Number(reqCount);
+                        totalFinishedInReq += Math.min(selectedInGroup, Number(reqCount));
                       });
 
                       const percentFinished = totalReq > 0 ? Math.round((totalFinishedInReq / totalReq) * 100) : 0;
@@ -620,50 +674,43 @@ export function ProfilePage() {
                                                         type: 'error',
                                                         message: `لا يمكن تحديد المادة (${s.code}) قبل اجتياز المتطلبات السابقة: ${unmetPrereqs.join(', ')}`
                                                       });
+                                                      return;
                                                     }
+                                                    const checked = !isChecked;
+                                                    const updatedCourses = checked 
+                                                      ? [...profileForm.completedCourses, s.code]
+                                                      : profileForm.completedCourses.filter(c => c !== s.code);
+                                                    
+                                                    let newFinishedHours = 0;
+                                                    displayedSubjects.forEach(subj => {
+                                                      if (updatedCourses.includes(subj.code)) {
+                                                        newFinishedHours += Number(subj.creditHours || 3);
+                                                      }
+                                                    });
+
+                                                    const newHoursStr = newFinishedHours.toString();
+                                                    setProfileForm(p => ({
+                                                      ...p,
+                                                      completedCourses: updatedCourses,
+                                                      finishedHours: newHoursStr
+                                                    }));
+                                                    saveProfile({
+                                                      completedCourses: updatedCourses,
+                                                      finishedHours: newHoursStr
+                                                    });
                                                   }}
-                                                  className={`p-3.5 rounded-xl border transition flex flex-col justify-between gap-2 ${
+                                                  className={`p-3.5 rounded-xl border transition-all duration-200 flex flex-col justify-between gap-2.5 select-none ${
                                                     isChecked 
-                                                      ? 'bg-emerald-50/60 border-emerald-300 dark:bg-emerald-950/30 dark:border-emerald-800' 
+                                                      ? 'bg-emerald-50/70 border-emerald-400 dark:bg-emerald-950/40 dark:border-emerald-700 shadow-xs cursor-pointer hover:bg-emerald-100/60 dark:hover:bg-emerald-900/50' 
                                                       : isLocked 
                                                         ? 'bg-slate-100/70 border-slate-200 dark:bg-zinc-950/70 dark:border-zinc-800/80 cursor-not-allowed opacity-75' 
-                                                        : 'bg-blue-50/40 border-blue-200 hover:border-blue-400 dark:bg-blue-950/20 dark:border-blue-900/50'
+                                                        : 'bg-white border-slate-200/90 hover:border-blue-400 dark:bg-zinc-900 dark:border-zinc-800 dark:hover:border-zinc-700 cursor-pointer shadow-2xs hover:shadow-sm'
                                                   }`}
                                                 >
                                                   <div className="flex items-start gap-2.5">
-                                                    <input 
-                                                      type="checkbox"
-                                                      checked={isChecked}
-                                                      disabled={isLocked}
-                                                      onChange={(e) => {
-                                                        if (isLocked) return;
-                                                        const checked = e.target.checked;
-                                                        const updatedCourses = checked 
-                                                          ? [...profileForm.completedCourses, s.code]
-                                                          : profileForm.completedCourses.filter(c => c !== s.code);
-                                                        
-                                                        let newFinishedHours = 0;
-                                                        displayedSubjects.forEach(subj => {
-                                                          if (updatedCourses.includes(subj.code)) {
-                                                            newFinishedHours += Number(subj.creditHours || 3);
-                                                          }
-                                                        });
-
-                                                        setProfileForm(p => ({
-                                                          ...p,
-                                                          completedCourses: updatedCourses,
-                                                          finishedHours: newFinishedHours.toString()
-                                                        }));
-                                                      }}
-                                                      className={`mt-1 w-4 h-4 rounded border-slate-300 dark:border-zinc-700 focus:ring-0 ${
-                                                        isLocked 
-                                                          ? 'cursor-not-allowed opacity-40 text-slate-400 dark:text-zinc-600 bg-slate-200 dark:bg-zinc-800' 
-                                                          : 'cursor-pointer text-blue-600 dark:text-blue-500 bg-white dark:bg-zinc-800'
-                                                      }`}
-                                                    />
                                                     <div className="flex-1 min-w-0">
-                                                      <div className="flex items-center gap-1.5 mb-0.5">
-                                                        <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-zinc-800 text-slate-800 dark:text-zinc-200">{s.code}</span>
+                                                      <div className="flex items-center justify-between gap-1.5 mb-1">
+                                                        <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-zinc-800 text-slate-800 dark:text-zinc-200">{s.code}</span>
                                                         <span className="text-[10px] font-semibold text-slate-500 dark:text-zinc-400">{s.creditHours || 3} س</span>
                                                       </div>
                                                       <h5 className="text-xs font-bold text-slate-900 dark:text-white line-clamp-1" title={s.name}>{s.name}</h5>
@@ -680,8 +727,8 @@ export function ProfilePage() {
                                                         <span>🔒 يتطلب: {unmetPrereqs.join(', ')}</span>
                                                       </span>
                                                     ) : (
-                                                      <span className="inline-flex items-center gap-1 font-bold text-blue-700 dark:text-blue-400">
-                                                        <span>متاح للتسجيل</span>
+                                                      <span className="inline-flex items-center gap-1 font-bold text-slate-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400">
+                                                        <span>انقر لتحديد المادة</span>
                                                       </span>
                                                     )}
                                                   </div>

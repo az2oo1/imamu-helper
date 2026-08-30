@@ -154,15 +154,26 @@ export function createAuthRouter(db: any) {
 
       if (!identifier || !password) return res.status(400).json({ error: "يرجى إدخال اسم المستخدم/البريد وكلمة المرور" });
 
+      const studentEmailSm = cleanedInput ? `${cleanedInput}@sm.imamu.edu.sa` : '';
+      const studentEmailImamu = cleanedInput ? `${cleanedInput}@imamu.edu.sa` : '';
+
       let user = (await db.select().from(users).where(
         or(
           eq(users.email, identifier),
           eq(users.email, cleanedInput),
+          eq(users.email, studentEmailSm),
+          eq(users.email, studentEmailImamu),
           sql`LOWER(${users.userName}) = LOWER(${identifier})`,
           sql`LOWER(${users.userName}) = LOWER(${cleanedInput})`,
           sql`LOWER(${users.studentEmail}) = LOWER(${identifier})`,
+          sql`LOWER(${users.studentEmail}) = LOWER(${cleanedInput})`,
+          sql`LOWER(${users.studentEmail}) = LOWER(${studentEmailSm})`,
+          sql`LOWER(${users.studentEmail}) = LOWER(${studentEmailImamu})`,
           sql`LOWER(${users.googleEmail}) = LOWER(${identifier})`,
-          eq(users.uid, identifier)
+          sql`LOWER(${users.googleEmail}) = LOWER(${cleanedInput})`,
+          eq(users.uid, identifier),
+          sql`LOWER(${users.email}) LIKE LOWER(${cleanedInput + '@%'})`,
+          sql`LOWER(${users.studentEmail}) LIKE LOWER(${cleanedInput + '@%'})`
         )
       ))[0];
       let valid = false;

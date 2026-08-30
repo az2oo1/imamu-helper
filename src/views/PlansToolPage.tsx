@@ -41,14 +41,18 @@ export function PlansToolPage() {
     
     if (selectedMajor.courses && selectedMajor.courses.length > 0) {
       selectedMajor.courses.forEach((c: any) => {
-        const groupName = c.optionalGroup || 'المتطلبات العامة';
+        const subjectDetail = subjects.find(s => String(s.id) === String(c.subjectId) || (c.code && s.code.toLowerCase() === c.code.toLowerCase()));
+        let groupName = c.optionalGroup;
+        if ((!groupName || groupName === 'المتطلبات العامة') && subjectDetail && subjectDetail.level) {
+          groupName = `المستوى ${subjectDetail.level}`;
+        }
+        if (!groupName) groupName = 'المتطلبات العامة';
         if (!groups[groupName]) {
           groups[groupName] = {
             reqCount: c.optionalGroupReqCount || 1,
             courses: []
           };
         }
-        const subjectDetail = subjects.find(s => String(s.id) === String(c.subjectId));
         if (subjectDetail) {
           const item = {
             ...subjectDetail,

@@ -154,11 +154,13 @@ export function createSubjectsRouter(db: any) {
   router.get("/majors", async (req: express.Request, res: express.Response) => {
     try {
       const records = await db.select().from(majors);
-      const allMajorCourses = await db.select().from(majorCourses);
+      const rawMajorCourses: any = await db.execute(sql`SELECT CAST(id AS text) as id, CAST(major_id AS text) as "majorId", CAST(subject_id AS text) as "subjectId", optional_group as "optionalGroup", optional_group_req_count as "optionalGroupReqCount", prereq FROM major_courses`);
+      const allMajorCourses = rawMajorCourses.rows || rawMajorCourses || [];
+
       const mapped = records.map((m: any) => {
-        const courseIds = allMajorCourses.filter((mc: any) => mc.majorId === m.id).map((mc: any) => mc.subjectId);
-        const courses = allMajorCourses.filter((mc: any) => mc.majorId === m.id).map((mc: any) => ({
-          subjectId: mc.subjectId, optionalGroup: mc.optionalGroup, optionalGroupReqCount: mc.optionalGroupReqCount, prereq: mc.prereq
+        const courseIds = allMajorCourses.filter((mc: any) => String(mc.majorId) === String(m.id)).map((mc: any) => String(mc.subjectId));
+        const courses = allMajorCourses.filter((mc: any) => String(mc.majorId) === String(m.id)).map((mc: any) => ({
+          subjectId: String(mc.subjectId), optionalGroup: mc.optionalGroup, optionalGroupReqCount: mc.optionalGroupReqCount, prereq: mc.prereq
         }));
         return {
           ...m,

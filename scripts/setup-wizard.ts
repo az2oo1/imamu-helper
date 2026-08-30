@@ -225,6 +225,9 @@ async function createUserWizard(rl: readline.Interface) {
 }
 
 async function main() {
+  console.log('⏳ Connecting to database, please wait...');
+  await getDb();
+
   printHeader('🎓 IMAMU HELPER - CLI SETUP & MANAGEMENT WIZARD');
   console.log('  Welcome! Select an operation to perform:\n');
   console.log('  1) 👤 Create New User / Admin (Bypass Verification)');

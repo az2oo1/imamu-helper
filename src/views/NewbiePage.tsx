@@ -328,22 +328,22 @@ export function NewbiePage() {
 
               <div className="flex flex-col gap-3 mt-4">
                 {checklistItems.map(item => (
-                  <label 
+                  <div 
                     key={item.key}
+                    onClick={() => toggleChecklistItem(item.key)}
                     className={`flex items-start gap-3 p-3.5 rounded-xl border transition cursor-pointer select-none ${
                       checklist[item.key]
                         ? 'bg-emerald-50/80 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/50 text-emerald-800 dark:text-emerald-400 shadow-xs'
                         : 'bg-slate-50/70 dark:bg-zinc-950/40 border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800/30'
                     }`}
                   >
-                    <input 
-                      type="checkbox"
-                      checked={checklist[item.key]}
-                      onChange={() => toggleChecklistItem(item.key)}
-                      className="mt-0.5 rounded border-slate-300 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-blue-600 focus:ring-blue-500 w-4 h-4"
-                    />
+                    <span className={`w-4 h-4 rounded-md flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
+                      checklist[item.key] ? 'bg-emerald-600 text-white' : 'border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-900'
+                    }`}>
+                      {checklist[item.key] && <span className="text-[10px] font-bold">✓</span>}
+                    </span>
                     <span className={`text-xs sm:text-sm font-semibold leading-relaxed ${checklist[item.key] ? 'line-through text-slate-400 dark:text-zinc-500 font-medium' : ''}`}>{item.label}</span>
-                  </label>
+                  </div>
                 ))}
               </div>
             </motion.div>
