@@ -452,6 +452,50 @@ export function createAdminRouter(db: any) {
     }
   });
 
+  router.put("/admin/global_settings", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
+    try {
+      const { 
+        fetchRangeDays, autoDeleteDays, 
+        smtpHost, smtpPort, smtpUser, smtpPass, 
+        imapHost, imapPort, imapSecure, 
+        semesterStartDate, semesterEndDate, apiToken, 
+        twitterAuthToken, twitterCt0 
+      } = req.body;
+
+      const existing = await db.query.global_settings.findFirst();
+
+      const updateData = {
+        fetchRangeDays: fetchRangeDays !== undefined ? Number(fetchRangeDays) : (existing?.fetchRangeDays ?? 30),
+        autoDeleteDays: autoDeleteDays !== undefined ? Number(autoDeleteDays) : (existing?.autoDeleteDays ?? 30),
+        smtpHost: smtpHost !== undefined ? (smtpHost || null) : (existing?.smtpHost ?? null),
+        smtpPort: smtpPort ? Number(smtpPort) : (existing?.smtpPort ?? null),
+        smtpUser: smtpUser !== undefined ? (smtpUser || null) : (existing?.smtpUser ?? null),
+        smtpPass: smtpPass !== undefined ? (smtpPass || null) : (existing?.smtpPass ?? null),
+        imapHost: imapHost !== undefined ? (imapHost || null) : (existing?.imapHost ?? null),
+        imapPort: imapPort ? Number(imapPort) : (existing?.imapPort ?? null),
+        imapSecure: imapSecure !== undefined ? Boolean(imapSecure) : (existing?.imapSecure ?? true),
+        semesterStartDate: semesterStartDate !== undefined ? (semesterStartDate || null) : (existing?.semesterStartDate ?? null),
+        semesterEndDate: semesterEndDate !== undefined ? (semesterEndDate || null) : (existing?.semesterEndDate ?? null),
+        apiToken: apiToken !== undefined ? (apiToken || null) : (existing?.apiToken ?? null),
+        twitterAuthToken: twitterAuthToken !== undefined ? (twitterAuthToken || null) : (existing?.twitterAuthToken ?? null),
+        twitterCt0: twitterCt0 !== undefined ? (twitterCt0 || null) : (existing?.twitterCt0 ?? null),
+      };
+
+      let result;
+      if (existing) {
+        [result] = await db.update(global_settings).set(updateData).where(eq(global_settings.id, existing.id)).returning();
+      } else {
+        [result] = await db.insert(global_settings).values(updateData).returning();
+      }
+
+      res.json({ success: true, settings: result });
+    } catch (e: any) {
+      console.error("[Global Settings Save Error]", e);
+      res.status(500).json({ error: e.message || "Failed to update global settings" });
+    }
+  });
+
   // Export DB Backup Zip
   router.get("/admin/export-db", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });

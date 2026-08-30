@@ -527,7 +527,7 @@ export function TutorialsTab({
                 <button
                   type="submit"
                   disabled={!secTitle.trim()}
-                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:pointer-events-none text-white rounded-xl text-xs font-bold transition shadow-md"
+                  className="btn-rise px-6 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:pointer-events-none text-white rounded-xl text-xs font-bold transition shadow-md cursor-pointer"
                 >
                   {editingSection ? 'حفظ التعديلات' : 'إنشاء التصنيف'}
                 </button>
@@ -682,7 +682,7 @@ export function TutorialsTab({
 
           <button
             onClick={handleSaveTutorial}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2 rounded-xl text-xs font-bold transition shadow-md"
+            className="btn-rise bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2 rounded-xl text-xs font-bold transition shadow-md cursor-pointer"
           >
             حفظ الشرح
           </button>

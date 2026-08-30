@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../lib/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronDown, ChevronUp, UserCircle2, Mail, Phone, BookOpen, Calculator, Clock, CheckCircle2, AlertCircle, Loader2, Layers, Search, Camera } from 'lucide-react';
+import { ChevronDown, ChevronUp, UserCircle2, Mail, Phone, BookOpen, Calculator, Clock, CheckCircle2, AlertCircle, Loader2, Layers, Search, Camera, GraduationCap, Settings, Sparkles, ArrowUpRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AnimatedNumber } from '../components/ui';
 
@@ -271,18 +271,46 @@ export function ProfilePage() {
 
         {/* Right Side: Form & Progress */}
         <div className="w-full flex-1 min-w-0">
-          <div className="flex gap-4 border-b border-slate-200 dark:border-zinc-800 mb-8">
+          {/* Animated Tab Bar with Icons & Sliding Indicator */}
+          <div className="relative flex items-center gap-1 border-b border-slate-200 dark:border-zinc-800/80 mb-8 pb-0" dir="rtl">
             <button 
-              onClick={() => setActiveTab('profile')} 
-              className={`pb-3 font-bold transition text-sm ${activeTab === 'profile' ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400' : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'}`}
-            >
-              إعدادات الحساب
-            </button>
-            <button 
+              type="button"
               onClick={() => setActiveTab('progress')} 
-              className={`pb-3 font-bold transition text-sm ${activeTab === 'progress' ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400' : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'}`}
+              className={`relative pb-3.5 px-4 font-bold transition-colors duration-200 text-sm flex items-center gap-2 select-none cursor-pointer ${
+                activeTab === 'progress' 
+                  ? 'text-blue-600 dark:text-blue-400' 
+                  : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
+              }`}
             >
-              التقدم والمقررات
+              <GraduationCap className={`w-4.5 h-4.5 transition-colors ${activeTab === 'progress' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-zinc-500'}`} />
+              <span>التقدم والمقررات</span>
+              {activeTab === 'progress' && (
+                <motion.div
+                  layoutId="activeTabUnderline"
+                  className="absolute bottom-0 right-0 left-0 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full shadow-xs shadow-blue-500/50"
+                  transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                />
+              )}
+            </button>
+
+            <button 
+              type="button"
+              onClick={() => setActiveTab('profile')} 
+              className={`relative pb-3.5 px-4 font-bold transition-colors duration-200 text-sm flex items-center gap-2 select-none cursor-pointer ${
+                activeTab === 'profile' 
+                  ? 'text-blue-600 dark:text-blue-400' 
+                  : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
+              }`}
+            >
+              <Settings className={`w-4.5 h-4.5 transition-colors ${activeTab === 'profile' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-zinc-500'}`} />
+              <span>إعدادات الحساب</span>
+              {activeTab === 'profile' && (
+                <motion.div
+                  layoutId="activeTabUnderline"
+                  className="absolute bottom-0 right-0 left-0 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full shadow-xs shadow-blue-500/50"
+                  transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                />
+              )}
             </button>
           </div>
 
@@ -306,44 +334,42 @@ export function ProfilePage() {
 
           <form className="space-y-6" onSubmit={e => { e.preventDefault(); saveProfile(); }}>
             {activeTab === 'profile' && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                {/* Personal Details Section */}
-                <div className="bg-white dark:bg-zinc-900/40 border border-slate-200/80 dark:border-zinc-800/80 rounded-3xl p-6 sm:p-8 shadow-xs">
-                  <div className="flex items-center gap-2 mb-6 pb-3 border-b border-slate-100 dark:border-zinc-800/60">
+              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                {/* Personal Details Section (No Card Box) */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b border-slate-200/60 dark:border-zinc-800/60">
                     <UserCircle2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white">التفاصيل الشخصية</h3>
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    {/* Username */}
+                    {/* Name */}
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-2">اسم المستخدم</label>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-2">الاسم</label>
                       <div className="relative flex items-center">
-                        <span className="absolute right-3.5 text-slate-400 dark:text-zinc-500 text-sm font-mono select-none" dir="ltr">@</span>
+                        <UserCircle2 className="absolute right-3.5 w-4.5 h-4.5 text-slate-400 dark:text-zinc-500 pointer-events-none" />
                         <input 
                           type="text"
-                          placeholder="username"
+                          placeholder="الاسم"
                           value={profileForm.userName}
                           onChange={e => {
-                            const val = e.target.value.replace(/[^a-zA-Z0-9_]/g, '');
+                            const val = e.target.value;
                             setProfileForm(p => ({...p, userName: val}));
                           }}
                           onBlur={() => saveProfile()}
-                          className="w-full pr-9 pl-10 py-3 bg-slate-50/80 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-600"
-                          dir="ltr"
+                          className="w-full pr-10 pl-10 py-3 bg-slate-50/80 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-600"
                         />
                         <div className="absolute left-3.5 flex items-center">
                           {usernameStatus === 'checking' && <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />}
                           {usernameStatus === 'available' && <CheckCircle2 className="w-4.5 h-4.5 text-emerald-500" />}
                           {usernameStatus === 'taken' && (
-                            <span title="اسم المستخدم مستخدم مسبقاً">
+                            <span title="الاسم مستخدم مسبقاً">
                               <AlertCircle className="w-4.5 h-4.5 text-red-500" />
                             </span>
                           )}
                         </div>
                       </div>
-                      {usernameStatus === 'taken' && <p className="text-[11px] font-semibold text-red-500 mt-1.5">اسم المستخدم هذا مستخدم بالفعل.</p>}
-                      {usernameStatus === 'available' && <p className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mt-1.5">اسم المستخدم متاح!</p>}
+                      {usernameStatus === 'taken' && <p className="text-[11px] font-semibold text-red-500 mt-1.5">هذا الاسم مستخدم بالفعل.</p>}
                     </div>
 
                     {/* Phone Number */}
@@ -373,10 +399,10 @@ export function ProfilePage() {
                   </div>
                 </div>
 
-                {/* Academic Status Section */}
-                <div className="bg-white dark:bg-zinc-900/40 border border-slate-200/80 dark:border-zinc-800/80 rounded-3xl p-6 sm:p-8 shadow-xs">
-                  <div className="flex items-center gap-2 mb-6 pb-3 border-b border-slate-100 dark:border-zinc-800/60">
-                    <BookOpen className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                {/* Academic Status Section (No Card Box) */}
+                <div className="space-y-4 pt-4 border-t border-slate-200/60 dark:border-zinc-800/60">
+                  <div className="flex items-center gap-2 pb-2 border-b border-slate-200/60 dark:border-zinc-800/60">
+                    <BookOpen className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white">الحالة الأكاديمية</h3>
                   </div>
 
@@ -441,30 +467,11 @@ export function ProfilePage() {
                     </div>
                   </div>
                 </div>
-
-                {/* Save Button Bar */}
-                <div className="flex items-center justify-end pt-2">
-                  <button
-                    type="submit"
-                    disabled={isSaving || usernameStatus === 'checking' || usernameStatus === 'taken'}
-                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold px-8 py-3 rounded-2xl shadow-lg shadow-blue-600/25 hover:shadow-blue-600/35 transition-all duration-200 flex items-center gap-2 text-sm disabled:opacity-50 cursor-pointer"
-                  >
-                    {isSaving ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>جاري الحفظ...</span>
-                      </>
-                    ) : (
-                      <span>حفظ التغييرات</span>
-                    )}
-                  </button>
-                </div>
               </div>
             )}
 
             {activeTab === 'progress' && (
               <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500 mb-4">الخطة الدراسية وتتبع التقدم</h3>
                 {!profileForm.major ? (
                   <div className="bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-8 text-center">
                     <p className="text-slate-600 dark:text-zinc-400 text-sm font-medium">يرجى اختيار التخصص في تبويب الإعدادات أولاً.</p>
@@ -537,9 +544,9 @@ export function ProfilePage() {
 
                       return (
                         <>
-                          {/* Progress Header Card */}
-                          <div className="mb-6 bg-slate-50 dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 p-5 rounded-3xl shadow-2xs">
-                            <div className="flex flex-col sm:flex-row justify-between sm:items-end gap-3 mb-3">
+                          {/* Progress Header - Seamless Page Integration (No Box / Border / Gradient) */}
+                          <div className="mb-8 space-y-4">
+                            <div className="flex flex-col sm:flex-row justify-between sm:items-end gap-3">
                               <div>
                                 <span className="text-slate-900 dark:text-white font-bold block text-base sm:text-lg">نسبة إنجاز الخطة الأكاديمية</span>
                                 <span className="text-xs text-slate-500 dark:text-zinc-400 font-medium">
@@ -548,19 +555,32 @@ export function ProfilePage() {
                               </div>
                               <span className="text-blue-600 dark:text-blue-400 font-black text-2xl"><AnimatedNumber value={percentFinished} />%</span>
                             </div>
-                            <div className="w-full bg-slate-200 dark:bg-zinc-800 rounded-full h-3.5 overflow-hidden p-0.5 mb-4">
+
+                            {/* Solid Color Progress Bar (No Gradient) */}
+                            <div className="w-full bg-slate-200/80 dark:bg-zinc-800 rounded-full h-3 overflow-hidden">
                               <motion.div 
-                                className="bg-gradient-to-r from-blue-600 to-indigo-600 h-2.5 rounded-full shadow-xs"
+                                className="bg-blue-600 dark:bg-blue-500 h-full rounded-full"
                                 initial={{ width: 0 }}
                                 animate={{ width: `${percentFinished}%` }}
-                                transition={{ duration: 1, ease: "easeOut" }}
+                                transition={{ duration: 0.8, ease: "easeOut" }}
                               />
                             </div>
 
-                            {/* Global Accordion Toggle Bar */}
-                            <div className="flex items-center justify-between pt-3 border-t border-slate-200/60 dark:border-zinc-800/60 text-xs">
+                            {/* Global Accordion Toggle Bar with Msari Button */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 text-xs">
                               <span className="text-slate-500 dark:text-zinc-400 font-medium">إجمالي {groups.length} حزمة ومستوى</span>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <a
+                                  href="https://msari.vercel.app/index.html"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="btn-rise inline-flex items-center gap-1.5 text-xs font-bold text-white bg-[#0E352C] px-3.5 py-1.5 rounded-xl border border-[#3DC9B0]/40 shadow-xs transition-all hover:scale-[1.03] active:scale-95 cursor-pointer"
+                                >
+                                  <Sparkles className="w-3.5 h-3.5 text-[#3DC9B0]" />
+                                  <span>تعمّق مع مساري</span>
+                                  <ArrowUpRight className="w-3.5 h-3.5 opacity-80" />
+                                </a>
+
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -568,7 +588,7 @@ export function ProfilePage() {
                                     allGroupNames.forEach(n => { nextState[n] = false; });
                                     setCollapsedGroups(nextState);
                                   }}
-                                  className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200/50 dark:border-blue-900/50"
+                                  className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200/50 dark:border-blue-900/50 cursor-pointer"
                                 >
                                   توسيع الكل
                                 </button>
@@ -579,7 +599,7 @@ export function ProfilePage() {
                                     allGroupNames.forEach(n => { nextState[n] = true; });
                                     setCollapsedGroups(nextState);
                                   }}
-                                  className="text-xs font-bold text-slate-600 dark:text-zinc-400 hover:underline px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700"
+                                  className="text-xs font-bold text-slate-600 dark:text-zinc-400 hover:underline px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-800/80 border border-slate-200/80 dark:border-zinc-700/80 cursor-pointer"
                                 >
                                   طي الكل
                                 </button>
@@ -610,8 +630,17 @@ export function ProfilePage() {
                                     return prereqs.length > 0 && prereqs.some(p => !profileForm.completedCourses.includes(p));
                                   });
 
-                                  // Default minimised (collapsed) if full OR all courses locked
-                                  const isCollapsed = collapsedGroups[groupName] ?? (isGroupFull || allCoursesInGroupLocked);
+                                  // Calculate batch completion ratio (Strict 33% minimum rule)
+                                  const completionRatio = totalInGroup > 0 ? selectedInGroup / totalInGroup : 0;
+                                  const isAtLeast33Percent = completionRatio >= 0.33;
+
+                                  // Default collapsed state rules:
+                                  // 1. Close by default if batch is finished (isGroupFull)
+                                  // 2. Close by default if less than 33% completed (!isAtLeast33Percent)
+                                  // 3. Close by default if all courses in batch are locked
+                                  const defaultCollapsed = isGroupFull || allCoursesInGroupLocked || !isAtLeast33Percent;
+
+                                  const isCollapsed = collapsedGroups[groupName] ?? defaultCollapsed;
 
                                   return (
                                     <div 
@@ -655,9 +684,18 @@ export function ProfilePage() {
                                         </div>
                                       </div>
 
-                                      {/* Accordion Body */}
-                                      {!isCollapsed && (
-                                        <div className="p-4 sm:p-5 pt-0 border-t border-slate-100 dark:border-zinc-800/80 mt-2">
+                                      {/* Accordion Body with Smooth Expanding & Minimizing Animation */}
+                                      <AnimatePresence initial={false}>
+                                        {!isCollapsed && (
+                                          <motion.div
+                                            key="accordion-body"
+                                            initial={{ height: 0, opacity: 0 }}
+                                            animate={{ height: 'auto', opacity: 1 }}
+                                            exit={{ height: 0, opacity: 0 }}
+                                            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                                            className="overflow-hidden"
+                                          >
+                                            <div className="p-4 sm:p-5 pt-0 border-t border-slate-100 dark:border-zinc-800/80 mt-2">
                                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3">
                                             {groupSubjects.map(s => {
                                               const isChecked = profileForm.completedCourses.includes(s.code);
@@ -737,7 +775,9 @@ export function ProfilePage() {
                                             })}
                                           </div>
                                         </div>
-                                      )}
+                                          </motion.div>
+                                        )}
+                                      </AnimatePresence>
                                     </div>
                                   );
                                 })}
@@ -760,7 +800,7 @@ export function ProfilePage() {
               <button 
                 type="submit"
                 disabled={isSaving || usernameStatus === 'taken' || usernameStatus === 'checking'}
-                className="flex items-center justify-center gap-2 bg-[var(--color-imamu-blue)] text-white font-medium py-3 px-8 rounded-xl hover:bg-[var(--color-imamu-blue-light)] transition disabled:opacity-70 disabled:cursor-not-allowed shadow-sm min-w-[140px]"
+                className="btn-rise flex items-center justify-center gap-2 bg-[var(--color-imamu-blue)] text-white font-medium py-3 px-8 rounded-xl hover:bg-[var(--color-imamu-blue-light)] transition disabled:opacity-70 disabled:cursor-not-allowed shadow-sm min-w-[140px] cursor-pointer"
               >
                 {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'حفظ التغييرات'}
               </button>

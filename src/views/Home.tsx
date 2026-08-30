@@ -278,7 +278,26 @@ function CountdownsSection() {
           </span>
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4" dir="rtl">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" dir="rtl">
+          {/* Msari */}
+          <a 
+            href="https://msari.vercel.app/index.html" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="btn-rise group flex items-center justify-between gap-3 p-4 bg-[#0E352C] border border-[#3DC9B0]/40 rounded-2xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg shadow-[#0E352C]/20 active:translate-y-0 active:scale-[0.98] text-right w-full text-white"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-11 h-11 rounded-xl bg-[#3DC9B0]/20 border border-[#3DC9B0]/40 flex items-center justify-center shrink-0 p-2 shadow-2xs group-hover:scale-105 transition-transform overflow-hidden text-[#3DC9B0] font-black text-xs">
+                مساري
+              </div>
+              <div className="text-right min-w-0">
+                <h5 className="font-bold text-xs text-white">منصة مساري</h5>
+                <p className="text-[11px] text-emerald-100/70 mt-0.5 truncate">خارطة رحلتك الأكاديمية</p>
+              </div>
+            </div>
+            <ArrowUpRight className="w-4 h-4 text-[#3DC9B0] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all shrink-0" />
+          </a>
+
           {/* Qeeem */}
           <a 
             href="https://qeeem.com/" 

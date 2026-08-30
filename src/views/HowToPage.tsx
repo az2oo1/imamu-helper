@@ -306,7 +306,7 @@ export function HowToPage() {
                         router.push(selectedTutorial.linkUrl!);
                       }
                     }}
-                    className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-5 rounded-xl text-xs shadow-md shadow-blue-600/20 w-full sm:w-auto justify-center"
+                    className="btn-rise inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-5 rounded-xl text-xs shadow-md shadow-blue-600/20 w-full sm:w-auto justify-center cursor-pointer"
                   >
                     <ExternalLink className="w-4 h-4 shrink-0" /> {selectedTutorial.linkTitle || 'الانتقال للرابط المذكور'}
                   </a>
@@ -392,7 +392,7 @@ export function HowToPage() {
                       <button
                         onClick={submitTutorialComment}
                         disabled={!tutorialCommentInput.trim()}
-                        className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-md shadow-blue-600/20 disabled:opacity-50"
+                        className="btn-rise bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-md shadow-blue-600/20 disabled:opacity-50 cursor-pointer"
                       >
                         إرسال التعليق
                       </button>

@@ -117,3 +117,27 @@ input:focus, textarea:focus, select:focus {
   background: rgba(37, 99, 235, 0.2);
   color: inherit;
 }
+
+/* Tactile Rising Button Micro-Interaction */
+.btn-rise,
+button[type="submit"],
+.btn-primary,
+.btn-action {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease;
+}
+
+.btn-rise:hover,
+button[type="submit"]:not(:disabled):hover,
+.btn-primary:not(:disabled):hover,
+.btn-action:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.btn-rise:active,
+button[type="submit"]:not(:disabled):active,
+.btn-primary:not(:disabled):active,
+.btn-action:not(:disabled):active {
+  transform: translateY(0px) scale(0.97);
+  box-shadow: none;
+}

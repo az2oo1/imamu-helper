@@ -162,14 +162,14 @@ export function CalendarPage() {
               href={googleCalendarUrl}
               target="_blank" 
               rel="noopener noreferrer" 
-              className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2.5 rounded-xl font-bold inline-flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+              className="btn-rise text-xs bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2.5 rounded-xl font-bold inline-flex items-center justify-center gap-1.5 transition-all duration-200 shadow-sm cursor-pointer"
               title="مزامنة التقويم بالكامل مع تقويم Google"
             >
               <CalendarPlus className="w-4 h-4" /> ربط بـ تقويم Google
             </a>
             <a 
               href={webcalUrl}
-              className="text-xs bg-slate-100 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700/60 text-slate-800 dark:text-zinc-200 px-3.5 py-2.5 rounded-xl font-bold inline-flex items-center justify-center gap-1.5 hover:bg-slate-200 dark:hover:bg-zinc-700 transition-colors shadow-2xs"
+              className="btn-rise text-xs bg-slate-100 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700/60 text-slate-800 dark:text-zinc-200 px-3.5 py-2.5 rounded-xl font-bold inline-flex items-center justify-center gap-1.5 hover:bg-slate-200 dark:hover:bg-zinc-700 transition-all duration-200 shadow-2xs cursor-pointer"
               title="الاشتراك التلقائي في التقويم على أجهزة Apple"
             >
               <CalendarIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> الاشتراك في تقويم Apple

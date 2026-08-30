@@ -102,7 +102,7 @@ export function PlansToolPage() {
               href={selectedMajor.pdfUrl} 
               target="_blank" 
               rel="noreferrer" 
-              className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 sm:px-5 py-2.5 rounded-xl shadow-md shadow-blue-600/20 transition flex items-center gap-2 text-xs sm:text-sm"
+              className="btn-rise shrink-0 bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 sm:px-5 py-2.5 rounded-xl shadow-md shadow-blue-600/20 transition flex items-center gap-2 text-xs sm:text-sm cursor-pointer"
             >
               <FileText className="w-4.5 h-4.5" /> تحميل الخطة PDF
             </a>

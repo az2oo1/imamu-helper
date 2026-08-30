@@ -148,19 +148,19 @@ export function AuthPage() {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1 text-right">
-              البريد الإلكتروني الجامعي
+              {isLogin ? 'البريد الإلكتروني / الرقم الجامعي / اسم المستخدم' : 'البريد الإلكتروني الجامعي'}
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
                 <Mail className="h-5 w-5 text-slate-400 dark:text-zinc-500" />
               </div>
               <input
-                type="email"
+                type={isLogin ? "text" : "email"}
                 required
                 value={formData.email}
                 onChange={x => setFormData({ ...formData, email: x.target.value })}
                 className="w-full pr-11 pl-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-600 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
-                placeholder="student@imamu.edu.sa"
+                placeholder={isLogin ? "447013338 أو student@imamu.edu.sa" : "student@imamu.edu.sa"}
                 dir="ltr"
               />
             </div>
@@ -322,7 +322,7 @@ export function AuthPage() {
           <button
             type="submit"
             disabled={sendingCode}
-            className="w-full flex justify-center py-3.5 px-4 rounded-xl text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 shadow-sm font-bold transition disabled:opacity-50"
+            className="btn-rise w-full flex justify-center py-3.5 px-4 rounded-xl text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 shadow-sm font-bold transition disabled:opacity-50 cursor-pointer"
           >
             {isForgotPassword 
               ? (codeSent ? 'إعادة ضبط كلمة المرور' : (sendingCode ? 'جاري إرسال الرمز...' : 'إرسال رمز التحقق'))

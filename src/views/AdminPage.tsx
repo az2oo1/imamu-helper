@@ -1403,7 +1403,7 @@ export function AdminPage() {
 
             <div className="pt-4 border-t flex justify-end" style={{ borderColor: 'var(--border-color)' }}>
               <button
-                className="bg-[var(--color-imamu-blue)] text-white px-5 py-2 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-blue-light)] transition"
+                className="btn-rise bg-[var(--color-imamu-blue)] text-white px-5 py-2 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-blue-light)] transition cursor-pointer"
                 onClick={() => handlePostWithMethod('/api/admin/global_settings', 'PUT', globalSettings, () => toast('success', 'Settings saved!'))}
               >
                 Save All Settings
