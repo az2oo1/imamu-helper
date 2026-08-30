@@ -284,18 +284,18 @@ function CountdownsSection() {
             href="https://msari.vercel.app/index.html" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="btn-rise group flex items-center justify-between gap-3 p-4 bg-[#0E352C] border border-[#3DC9B0]/40 rounded-2xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg shadow-[#0E352C]/20 active:translate-y-0 active:scale-[0.98] text-right w-full text-white"
+            className="group flex items-center justify-between gap-3 p-4 bg-slate-50/80 dark:bg-zinc-950/80 border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl hover:border-blue-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 text-right w-full"
           >
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-11 h-11 rounded-xl bg-[#3DC9B0]/20 border border-[#3DC9B0]/40 flex items-center justify-center shrink-0 p-2 shadow-2xs group-hover:scale-105 transition-transform overflow-hidden text-[#3DC9B0] font-black text-xs">
+              <div className="w-11 h-11 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0 p-2 shadow-2xs group-hover:border-emerald-500/50 transition-colors text-emerald-600 dark:text-emerald-400 font-black text-xs">
                 مساري
               </div>
               <div className="text-right min-w-0">
-                <h5 className="font-bold text-xs text-white">منصة مساري</h5>
-                <p className="text-[11px] text-emerald-100/70 mt-0.5 truncate">خارطة رحلتك الأكاديمية</p>
+                <h5 className="font-bold text-xs text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">منصة مساري</h5>
+                <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5 truncate">خارطة رحلتك الأكاديمية</p>
               </div>
             </div>
-            <ArrowUpRight className="w-4 h-4 text-[#3DC9B0] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all shrink-0" />
+            <ArrowUpRight className="w-4 h-4 text-slate-400 dark:text-zinc-500 group-hover:text-blue-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all shrink-0" />
           </a>
 
           {/* Qeeem */}
