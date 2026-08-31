@@ -431,19 +431,19 @@ export function AdminPage() {
     const prevNewsSources = [...newsSources];
 
     if (targetUrl.includes('/api/admin/subjects/')) {
-      if (numId) setSubjects(prev => prev.filter(s => s.id !== numId));
+      setSubjects(prev => prev.filter(s => String(s.id) !== rawId));
     } else if (targetUrl.includes('/api/admin/users/')) {
       setAdminUsers(prev => prev.filter(u => String(u.id) !== rawId && u.uid !== rawId));
     } else if (targetUrl.includes('/api/admin/resources/')) {
-      if (numId) setResourcesList(prev => prev.filter(r => r.id !== numId));
+      setResourcesList(prev => prev.filter(r => String(r.id) !== rawId));
     } else if (targetUrl.includes('/api/admin/events/')) {
-      if (numId) setEvents(prev => prev.filter(e => e.id !== numId));
+      setEvents(prev => prev.filter(e => String(e.id) !== rawId));
     } else if (targetUrl.includes('/api/admin/majors/')) {
-      if (numId) setMajors(prev => prev.filter(m => m.id !== numId));
+      setMajors(prev => prev.filter(m => String(m.id) !== rawId));
     } else if (targetUrl.includes('/api/admin/tutorials/')) {
-      if (numId) setTutorials(prev => prev.filter(t => t.id !== numId));
+      setTutorials(prev => prev.filter(t => String(t.id) !== rawId));
     } else if (targetUrl.includes('/api/admin/newbie/links/')) {
-      if (numId) setNewbieLinks(prev => prev.filter(l => l.id !== numId));
+      setNewbieLinks(prev => prev.filter(l => String(l.id) !== rawId));
     } else if (targetUrl.includes('/api/admin/news_sources/')) {
       setNewsSources(prev => prev.filter(ns => String(ns.id) !== rawId && ns.handle !== rawId));
     }

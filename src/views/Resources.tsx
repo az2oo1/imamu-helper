@@ -238,16 +238,16 @@ export function Resources() {
     });
   }, [authLoading, user, router, logout, signOut]);
 
-  const handleDeleteResource = async (id: number) => {
+  const handleDeleteResource = async (id: number | string) => {
     if (!isAdmin) return;
     if (!window.confirm('هل أنت متأكد من حذف هذا المصدر؟')) return;
 
     const prevResources = [...resources];
-    setResources(prev => prev.filter(r => r.id !== id));
+    setResources(prev => prev.filter(r => String(r.id) !== String(id)));
 
     const token = user ? await user.getIdToken() : localStorage.getItem('token');
     try {
-      const res = await fetch(`/api/admin/resources/${id}`, {
+      const res = await fetch(`/api/admin/resources/${encodeURIComponent(String(id))}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -255,6 +255,12 @@ export function Resources() {
         setResources(prevResources);
         const err = await res.json().catch(() => ({}));
         alert(err.error || err.message || 'فشل حذف المصدر من الخادم');
+      } else {
+        const data = await res.json().catch(() => ({}));
+        if (data.deletedCount === 0 && !data.syntheticDeleted) {
+          setResources(prevResources);
+          alert('لم يتم العثور على المصدر في قاعدة البيانات أو تعذر حذفه');
+        }
       }
     } catch (err) {
       setResources(prevResources);
@@ -451,14 +457,20 @@ export function Resources() {
                       {isAdmin && (
                         <div className="flex items-center gap-1">
                           <button
-                            onClick={() => openEditModal(item)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditModal(item);
+                            }}
                             className="p-1 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition cursor-pointer"
                             title="تعديل هذا المصدر"
                           >
                             <Pencil className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={() => handleDeleteResource(item.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteResource(item.id);
+                            }}
                             className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition cursor-pointer"
                             title="حذف هذا المصدر"
                           >

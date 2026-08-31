@@ -293,7 +293,7 @@ function cleanCourseName(name: string): string {
           const majorStr = majorNames.length > 0 ? majorNames.join(' / ') : 'جميع التخصصات';
           const cleanName = cleanCourseName(s.name);
           resourcesList.push({
-            id: s.id * 10000,
+            id: `syn_${s.id}`,
             subjectId: s.id,
             title: `مصادر مادة ${s.code} - ${cleanName}`,
             courseCode: s.code,
