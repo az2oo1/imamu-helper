@@ -3,6 +3,20 @@ import { eq, and, inArray } from 'drizzle-orm';
 import { tutorial_sections, tutorials, tutorial_feedback, feedback_comments, tutorial_comments, newbie_links, users } from '../../db/schema';
 import { requireAuth, requireAdmin, AuthRequest } from '../../middleware/auth';
 
+function parseSteps(steps: any): any[] {
+  if (!steps) return [];
+  if (Array.isArray(steps)) return steps;
+  if (typeof steps === 'string') {
+    try {
+      const parsed = JSON.parse(steps);
+      return Array.isArray(parsed) ? parsed : [steps];
+    } catch (_e) {
+      return [steps];
+    }
+  }
+  return [];
+}
+
 export function createTutorialsRouter(db: any) {
   const router = express.Router();
 
@@ -85,7 +99,7 @@ export function createTutorialsRouter(db: any) {
       const list = await query;
       res.json(list.map((t: any) => ({
         ...t,
-        steps: JSON.parse(t.steps)
+        steps: parseSteps(t.steps)
       })));
     } catch (e) {
       console.error(e);
@@ -117,7 +131,7 @@ export function createTutorialsRouter(db: any) {
 
       res.json({
         ...tutorial,
-        steps: JSON.parse(tutorial.steps),
+        steps: parseSteps(tutorial.steps),
         feedback: feedbackWithUser
       });
     } catch (e) {

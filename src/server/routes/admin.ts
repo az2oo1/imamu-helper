@@ -129,11 +129,13 @@ export function createAdminRouter(db: any) {
     if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
     try {
       const { sectionId, title, description, text, steps, videoUrl, imageUrl, linkUrl, linkTitle } = req.body;
-      const stepsJson = Array.isArray(steps) ? JSON.stringify(steps) : steps;
+      const stepsJson = Array.isArray(steps) ? JSON.stringify(steps) : (steps ? String(steps) : '[]');
       const [tut] = await db.insert(tutorials).values({
-        sectionId, title, description, text, steps: stepsJson, videoUrl, imageUrl, linkUrl, linkTitle
+        sectionId, title, description, text: text || '', steps: stepsJson, videoUrl, imageUrl, linkUrl, linkTitle
       }).returning();
-      res.json({ ...tut, steps: JSON.parse(tut.steps) });
+      let parsedSteps: any[] = [];
+      try { parsedSteps = JSON.parse(tut.steps || '[]'); } catch(_e) { parsedSteps = []; }
+      res.json({ ...tut, steps: parsedSteps });
     } catch (e) {
       console.error(e);
       res.status(500).json({ error: "Server error" });
@@ -146,11 +148,13 @@ export function createAdminRouter(db: any) {
     try {
       const id = parseInt(req.params.id);
       const { sectionId, title, description, text, steps, videoUrl, imageUrl, linkUrl, linkTitle } = req.body;
-      const stepsJson = Array.isArray(steps) ? JSON.stringify(steps) : steps;
+      const stepsJson = Array.isArray(steps) ? JSON.stringify(steps) : (steps ? String(steps) : '[]');
       const [tut] = await db.update(tutorials).set({
-        sectionId, title, description, text, steps: stepsJson, videoUrl, imageUrl, linkUrl, linkTitle
+        sectionId, title, description, text: text || '', steps: stepsJson, videoUrl, imageUrl, linkUrl, linkTitle
       }).where(eq(tutorials.id, id)).returning();
-      res.json({ ...tut, steps: JSON.parse(tut.steps) });
+      let parsedSteps: any[] = [];
+      try { parsedSteps = JSON.parse(tut.steps || '[]'); } catch(_e) { parsedSteps = []; }
+      res.json({ ...tut, steps: parsedSteps });
     } catch (e) {
       console.error(e);
       res.status(500).json({ error: "Server error" });

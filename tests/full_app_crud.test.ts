@@ -233,6 +233,29 @@ describe('Exhaustive Full Application Endpoints & CRUD Operations Test Suite', (
       assert.equal(res.data.title, 'ملخص معدل للمادة');
     });
 
+    it('POST /api/admin/resources - creates a standalone resource without a course/subject and verifies it is returned in GET /api/resources', async () => {
+      const res = await adminClient.post('/api/admin/resources', {
+        title: 'باقة مصادر عامة بدون مادة',
+        type: 'drive',
+        url: 'https://drive.google.com/standalone-resource',
+        description: 'مصادر تخصصية عامة'
+      });
+      assert.equal(res.status, 200);
+      assert.ok(res.data.id);
+      const standaloneId = res.data.id;
+
+      // Verify GET /api/resources returns the standalone resource
+      const listRes = await userClient.get('/api/resources');
+      assert.equal(listRes.status, 200);
+      assert.ok(Array.isArray(listRes.data));
+      const found = listRes.data.find((r: any) => String(r.id) === String(standaloneId));
+      assert.ok(found, 'Standalone resource without a course must be returned in GET /api/resources');
+      assert.equal(found.title, 'باقة مصادر عامة بدون مادة');
+
+      // Cleanup
+      await adminClient.delete(`/api/admin/resources/${standaloneId}`);
+    });
+
     it('DELETE /api/admin/resources/:id - deletes course resource (Admin)', async () => {
       const res = await adminClient.delete(`/api/admin/resources/${testResourceId}`);
       assert.equal(res.status, 200);

@@ -141,9 +141,9 @@ export function createNewsRouter(db: any) {
         id: newComment.id,
         content: newComment.content,
         createdAt: newComment.createdAt,
-        userId: userRec[0].uid,
-        userName: userRec[0].userName || userRec[0].email?.split('@')[0],
-        profilePic: userRec[0].profilePicUrl
+        userId: userRec[0]?.uid || userId,
+        userName: userRec[0] ? (userRec[0].userName || userRec[0].email?.split('@')[0]) : 'طالب',
+        profilePic: userRec[0]?.profilePicUrl || null
       });
     } catch (e) {
       res.status(500).json({ error: "Server error" });

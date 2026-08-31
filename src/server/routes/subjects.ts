@@ -172,23 +172,30 @@ export function createSubjectsRouter(db: any) {
       const subjectsWithResources = new Set<number>();
 
       for (const cr of allCourseResources) {
-        const s = subjectMap.get(cr.subjectId);
-        if (!s) continue;
-        subjectsWithResources.add(s.id);
-        const mc = majorCourseMap.get(s.id);
+        const s = cr.subjectId ? subjectMap.get(cr.subjectId) : null;
+        if (s) {
+          subjectsWithResources.add(s.id);
+        }
+        const mc = cr.subjectId ? majorCourseMap.get(cr.subjectId) : null;
         const major = mc ? majorMap.get(mc.majorId) : null;
 
         resourcesList.push({
           id: cr.id,
-          subjectId: s.id,
-          title: cr.title || s.name,
-          courseCode: s.code,
-          courseName: s.name,
+          subjectId: cr.subjectId || null,
+          title: cr.title || s?.name || 'مصدر عام',
+          courseCode: s?.code || 'عام',
+          courseName: s?.name || 'مصدر عام غير مخصص لمادة',
           major: major?.name || 'عام',
           type: cr.type || 'drive',
           fileUrl: cr.url,
-          driveUrl: (cr.type === 'drive' || cr.type === 'summary') ? cr.url : undefined,
-          whatsappUrl: (cr.type === 'whatsapp' || cr.type === 'group') ? cr.url : undefined,
+          driveUrl: (cr.type === 'drive' || cr.type === 'summary') ? cr.url : (cr.driveLink || undefined),
+          boxLink: cr.boxLink || undefined,
+          whatsappUrl: (cr.type === 'whatsapp' || cr.type === 'group') ? cr.url : (cr.whatsappLink || undefined),
+          whatsappLink: cr.whatsappLink || undefined,
+          freeResourcesUrl: cr.freeResourcesUrl || undefined,
+          paidResourcesUrl: cr.paidResourcesUrl || undefined,
+          avatarUrl: cr.avatarUrl || undefined,
+          bannerUrl: cr.bannerUrl || undefined,
           telegramUrl: cr.type === 'telegram' ? cr.url : undefined,
           description: cr.description,
           createdAt: cr.createdAt ? new Date(cr.createdAt).toISOString() : new Date().toISOString()
