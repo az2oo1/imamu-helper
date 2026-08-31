@@ -52,15 +52,52 @@ export function createSubjectsRouter(db: any) {
     try {
       const { idOrCode } = req.params;
       const isNumeric = !isNaN(Number(idOrCode)) && idOrCode.trim() !== '';
-      const subjectList = await db.select().from(subjects).where(
+      const cleanSearchCode = idOrCode.trim().toLowerCase().replace(/[\s\-]/g, '');
+
+      let subjectList = await db.select().from(subjects).where(
         isNumeric 
           ? eq(subjects.id, Number(idOrCode)) 
-          : sql`LOWER(${subjects.code}) = LOWER(${idOrCode})`
+          : sql`REPLACE(REPLACE(LOWER(${subjects.code}), ' ', ''), '-', '') = ${cleanSearchCode}`
       );
+      if (subjectList.length === 0 && !isNumeric) {
+        subjectList = await db.select().from(subjects).where(
+          sql`LOWER(${subjects.name}) LIKE LOWER(${'%' + idOrCode + '%'}) OR LOWER(${subjects.code}) LIKE LOWER(${'%' + idOrCode + '%'})`
+        );
+      }
       const subject = subjectList[0];
 
       if (!subject) {
-        return res.status(404).json({ error: "Course not found" });
+        const connectUrl = process.env.CONNECT_APP_URL || 'http://localhost:3000';
+        let matchingResources: any[] = [];
+
+        if (isNumeric) {
+          matchingResources = await db.select().from(course_resources).where(eq(course_resources.id, Number(idOrCode)));
+        } else {
+          matchingResources = await db.select().from(course_resources).where(
+            sql`LOWER(${course_resources.title}) LIKE LOWER(${'%' + idOrCode + '%'})`
+          );
+        }
+
+        const firstRes = matchingResources[0];
+        const fallbackCode = isNumeric 
+          ? (firstRes?.title?.match(/[A-Z]{2,4}\d{3,4}|عال\d{4}/i)?.[0] || 'مادة') 
+          : idOrCode.toUpperCase();
+        const fallbackName = firstRes?.title || `مادة ${fallbackCode}`;
+
+        return res.json({
+          course: {
+            id: isNumeric ? Number(idOrCode) : 0,
+            code: fallbackCode,
+            name: fallbackName,
+            creditHours: 3,
+            level: null,
+            description: firstRes?.description || `تفاصيل ومعلومات مادة ${fallbackCode}`,
+            resources: matchingResources,
+            prerequisites: [],
+            dependents: [],
+            connectUrl: `${connectUrl.replace(/\/$/, '')}/academics?courseId=${encodeURIComponent(fallbackCode)}`
+          }
+        });
       }
 
       const allResources = await db.select().from(course_resources).where(eq(course_resources.subjectId, subject.id));
@@ -157,6 +194,25 @@ export function createSubjectsRouter(db: any) {
     }
   });
 
+function cleanCourseName(name: string): string {
+  if (!name) return '';
+  let cleaned = name.replace(/\s*\(([^)]+)\)/g, (match, p1) => {
+    const mainText = name.replace(/\s*\([^)]*\)/g, '').trim().toLowerCase();
+    const innerText = p1.trim().toLowerCase();
+    if (mainText === innerText || mainText.includes(innerText) || innerText.includes(mainText)) {
+      return '';
+    }
+    const mainWords = mainText.split(/\s+/).filter(w => w.length > 2);
+    const innerWords = innerText.split(/\s+/).filter(w => w.length > 2);
+    const common = innerWords.filter(w => mainWords.some(mw => mw.includes(w) || w.includes(mw)));
+    if (common.length >= Math.min(2, innerWords.length)) {
+      return '';
+    }
+    return match;
+  }).trim();
+  return cleaned || name;
+}
+
   router.get("/resources", requireAuth, async (req: express.Request, res: express.Response) => {
     try {
       const allSubjects = await db.select().from(subjects);
@@ -166,7 +222,20 @@ export function createSubjectsRouter(db: any) {
 
       const subjectMap = new Map<number, any>(allSubjects.map((s: any) => [s.id, s]));
       const majorMap = new Map<number, any>(allMajors.map((m: any) => [m.id, m]));
-      const majorCourseMap = new Map<number, any>(allMajorCourses.map((mc: any) => [mc.subjectId, mc]));
+      
+      const subjectMajorsMap = new Map<number, string[]>();
+      for (const mc of allMajorCourses) {
+        const majorObj = majorMap.get(mc.majorId);
+        if (majorObj?.name) {
+          if (!subjectMajorsMap.has(mc.subjectId)) {
+            subjectMajorsMap.set(mc.subjectId, []);
+          }
+          const list = subjectMajorsMap.get(mc.subjectId)!;
+          if (!list.includes(majorObj.name)) {
+            list.push(majorObj.name);
+          }
+        }
+      }
 
       const resourcesList: any[] = [];
       const subjectsWithResources = new Set<number>();
@@ -176,16 +245,18 @@ export function createSubjectsRouter(db: any) {
         if (s) {
           subjectsWithResources.add(s.id);
         }
-        const mc = cr.subjectId ? majorCourseMap.get(cr.subjectId) : null;
-        const major = mc ? majorMap.get(mc.majorId) : null;
+        const majorNames = cr.subjectId ? (subjectMajorsMap.get(cr.subjectId) || []) : [];
+        const majorStr = majorNames.length > 0 ? majorNames.join(' / ') : 'جميع التخصصات';
+        const cleanName = s ? cleanCourseName(s.name) : '';
 
         resourcesList.push({
           id: cr.id,
           subjectId: cr.subjectId || null,
-          title: cr.title || s?.name || 'مصدر عام',
-          courseCode: s?.code || 'عام',
-          courseName: s?.name || 'مصدر عام غير مخصص لمادة',
-          major: major?.name || 'عام',
+          title: cr.title || (s ? `مصادر مادة ${s.code} - ${cleanName}` : 'باقة مصادر مادة'),
+          courseCode: s?.code || (cr.title ? cr.title.split('-')[0].trim() : 'مادة'),
+          courseName: s ? cleanName : (cr.description || cr.title || 'مصادر أكاديمية'),
+          major: majorStr,
+          majors: majorNames,
           type: cr.type || 'drive',
           fileUrl: cr.url,
           driveUrl: (cr.type === 'drive' || cr.type === 'summary') ? cr.url : (cr.driveLink || undefined),
@@ -204,15 +275,17 @@ export function createSubjectsRouter(db: any) {
 
       for (const s of allSubjects) {
         if (!subjectsWithResources.has(s.id) && (s.driveLink || s.whatsappLink)) {
-          const mc = majorCourseMap.get(s.id);
-          const major = mc ? majorMap.get(mc.majorId) : null;
+          const majorNames = subjectMajorsMap.get(s.id) || [];
+          const majorStr = majorNames.length > 0 ? majorNames.join(' / ') : 'جميع التخصصات';
+          const cleanName = cleanCourseName(s.name);
           resourcesList.push({
             id: s.id * 10000,
             subjectId: s.id,
-            title: s.name,
+            title: `مصادر مادة ${s.code} - ${cleanName}`,
             courseCode: s.code,
-            courseName: s.name,
-            major: major?.name || 'عام',
+            courseName: cleanName,
+            major: majorStr,
+            majors: majorNames,
             type: s.driveLink ? 'summary' : s.whatsappLink ? 'group' : 'exam',
             fileUrl: s.driveLink || '',
             driveUrl: s.driveLink || undefined,

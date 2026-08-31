@@ -129,7 +129,12 @@ export function Resources() {
     }
     const token = user ? await user.getIdToken() : localStorage.getItem('token');
     const selectedSubj = subjects.find(s => s.id === resourceForm.subjectId);
-    const finalTitle = resourceForm.title?.trim() || (selectedSubj ? `مصادر مادة ${selectedSubj.code} - ${selectedSubj.name}` : 'باقة مصادر مادة');
+    const cleanName = selectedSubj ? selectedSubj.name.replace(/\s*\(([^)]+)\)/g, (match: string, p1: string) => {
+      const mainText = selectedSubj.name.replace(/\s*\([^)]*\)/g, '').trim().toLowerCase();
+      const innerText = p1.trim().toLowerCase();
+      return (mainText.includes(innerText) || innerText.includes(mainText)) ? '' : match;
+    }).trim() : '';
+    const finalTitle = resourceForm.title?.trim() || (selectedSubj ? `مصادر مادة ${selectedSubj.code} - ${cleanName || selectedSubj.name}` : 'باقة مصادر مادة');
     const payload = { ...resourceForm, title: finalTitle };
 
     const url = resourceForm.id ? `/api/admin/resources/${resourceForm.id}` : '/api/admin/resources';
@@ -192,7 +197,10 @@ export function Resources() {
       r.courseCode.toLowerCase().includes(search.toLowerCase()) ||
       r.courseName.toLowerCase().includes(search.toLowerCase());
     
-    const matchesMajor = selectedMajor === 'all' || r.major === selectedMajor;
+    const matchesMajor = selectedMajor === 'all' || 
+      r.major === selectedMajor || 
+      (r.major && r.major.includes(selectedMajor)) ||
+      (Array.isArray((r as any).majors) && (r as any).majors.includes(selectedMajor));
     const matchesType = selectedType === 'all' || r.type === selectedType;
 
     return matchesSearch && matchesMajor && matchesType;
@@ -327,17 +335,13 @@ export function Resources() {
 
                 {/* Resource Links */}
                 <div className="flex flex-wrap gap-2 border-t border-slate-100 dark:border-zinc-800 pt-4 mt-auto">
-                  {item.subjectId ? (
-                    <button
-                      onClick={() => setSelectedCourse(item.courseCode || item.subjectId || null)}
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 text-xs font-bold transition"
-                    >
-                      <Info className="w-3.5 h-3.5" />
-                      <span>تفاصيل المادة</span>
-                    </button>
-                  ) : (
-                    <span className="flex-1 text-[11px] text-slate-400 self-center font-medium">مصدر عام</span>
-                  )}
+                  <button
+                    onClick={() => setSelectedCourse(item.subjectId || item.courseCode || item.id)}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 text-xs font-bold transition"
+                  >
+                    <Info className="w-3.5 h-3.5" />
+                    <span>تفاصيل المادة</span>
+                  </button>
 
                   {item.boxLink && (
                     <a

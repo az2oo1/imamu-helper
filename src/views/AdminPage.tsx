@@ -1419,7 +1419,12 @@ export function AdminPage() {
             return false;
           }
           const selectedSubj = subjects.find(s => s.id === resourceForm.subjectId);
-          const finalTitle = resourceForm.title?.trim() || (selectedSubj ? `مصادر مادة ${selectedSubj.code} - ${selectedSubj.name}` : 'باقة مصادر مادة');
+          const cleanName = selectedSubj ? selectedSubj.name.replace(/\s*\(([^)]+)\)/g, (match: string, p1: string) => {
+            const mainText = selectedSubj.name.replace(/\s*\([^)]*\)/g, '').trim().toLowerCase();
+            const innerText = p1.trim().toLowerCase();
+            return (mainText.includes(innerText) || innerText.includes(mainText)) ? '' : match;
+          }).trim() : '';
+          const finalTitle = resourceForm.title?.trim() || (selectedSubj ? `مصادر مادة ${selectedSubj.code} - ${cleanName || selectedSubj.name}` : 'باقة مصادر مادة');
           const payload = { ...resourceForm, title: finalTitle };
 
           const url = resourceForm.id ? `/api/admin/resources/${resourceForm.id}` : '/api/admin/resources';

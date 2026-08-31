@@ -26,6 +26,25 @@ interface CreateResourceModalProps {
   onSave: () => void | Promise<any>;
 }
 
+function cleanCourseName(name: string): string {
+  if (!name) return '';
+  let cleaned = name.replace(/\s*\(([^)]+)\)/g, (match, p1) => {
+    const mainText = name.replace(/\s*\([^)]*\)/g, '').trim().toLowerCase();
+    const innerText = p1.trim().toLowerCase();
+    if (mainText === innerText || mainText.includes(innerText) || innerText.includes(mainText)) {
+      return '';
+    }
+    const mainWords = mainText.split(/\s+/).filter(w => w.length > 2);
+    const innerWords = innerText.split(/\s+/).filter(w => w.length > 2);
+    const common = innerWords.filter(w => mainWords.some(mw => mw.includes(w) || w.includes(mw)));
+    if (common.length >= Math.min(2, innerWords.length)) {
+      return '';
+    }
+    return match;
+  }).trim();
+  return cleaned || name;
+}
+
 export default function CreateResourceModal({
   isOpen,
   onClose,
@@ -247,7 +266,7 @@ export default function CreateResourceModal({
                               key={subj.id}
                               type="button"
                               onClick={() => {
-                                const defaultTitle = `مصادر مادة ${subj.code} - ${subj.name}`;
+                                const defaultTitle = `مصادر مادة ${subj.code} - ${cleanCourseName(subj.name)}`;
                                 setResourceForm((s: any) => ({ 
                                   ...s, 
                                   subjectId: subj.id,
