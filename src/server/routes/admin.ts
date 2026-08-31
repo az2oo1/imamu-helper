@@ -101,9 +101,9 @@ export function createAdminRouter(db: any) {
   router.put("/admin/tutorials/sections/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
     try {
-      const id = parseInt(req.params.id);
+      const idRaw = req.params.id;
       const { title, icon, color } = req.body;
-      const [sec] = await db.update(tutorial_sections).set({ title, icon, color }).where(eq(tutorial_sections.id, id)).returning();
+      const [sec] = await db.update(tutorial_sections).set({ title, icon, color }).where(sql`${tutorial_sections.id}::text = ${idRaw}`).returning();
       res.json(sec);
     } catch (e) {
       console.error(e);
@@ -115,8 +115,8 @@ export function createAdminRouter(db: any) {
   router.delete("/admin/tutorials/sections/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
     try {
-      const id = parseInt(req.params.id);
-      await db.delete(tutorial_sections).where(eq(tutorial_sections.id, id));
+      const idRaw = req.params.id;
+      await db.delete(tutorial_sections).where(sql`${tutorial_sections.id}::text = ${idRaw}`);
       res.json({ success: true });
     } catch (e) {
       console.error(e);
@@ -146,12 +146,12 @@ export function createAdminRouter(db: any) {
   router.put("/admin/tutorials/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
     try {
-      const id = parseInt(req.params.id);
+      const idRaw = req.params.id;
       const { sectionId, title, description, text, steps, videoUrl, imageUrl, linkUrl, linkTitle } = req.body;
       const stepsJson = Array.isArray(steps) ? JSON.stringify(steps) : (steps ? String(steps) : '[]');
       const [tut] = await db.update(tutorials).set({
         sectionId, title, description, text: text || '', steps: stepsJson, videoUrl, imageUrl, linkUrl, linkTitle
-      }).where(eq(tutorials.id, id)).returning();
+      }).where(sql`${tutorials.id}::text = ${idRaw}`).returning();
       let parsedSteps: any[] = [];
       try { parsedSteps = JSON.parse(tut.steps || '[]'); } catch(_e) { parsedSteps = []; }
       res.json({ ...tut, steps: parsedSteps });
@@ -165,8 +165,8 @@ export function createAdminRouter(db: any) {
   router.delete("/admin/tutorials/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
     try {
-      const id = parseInt(req.params.id);
-      await db.delete(tutorials).where(eq(tutorials.id, id));
+      const idRaw = req.params.id;
+      await db.delete(tutorials).where(sql`${tutorials.id}::text = ${idRaw}`);
       res.json({ success: true });
     } catch (e) {
       console.error(e);
@@ -269,9 +269,11 @@ export function createAdminRouter(db: any) {
     if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Admin only" });
     try {
       const idParam = req.params.id;
-      const numId = Number(idParam);
-
-      const condition = !isNaN(numId) ? eq(users.id, numId) : eq(users.uid, idParam);
+      const condition = or(
+        sql`${users.id}::text = ${idParam}`,
+        eq(users.uid, idParam),
+        eq(users.email, idParam)
+      );
       const userList = await db.select().from(users).where(condition);
       const targetUser = userList[0];
 
@@ -299,9 +301,11 @@ export function createAdminRouter(db: any) {
     if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Admin only" });
     try {
       const idParam = req.params.id;
-      const numId = Number(idParam);
-
-      const condition = !isNaN(numId) ? eq(users.id, numId) : eq(users.uid, idParam);
+      const condition = or(
+        sql`${users.id}::text = ${idParam}`,
+        eq(users.uid, idParam),
+        eq(users.email, idParam)
+      );
       const userList = await db.select().from(users).where(condition);
       const targetUser = userList[0];
 
@@ -327,8 +331,11 @@ export function createAdminRouter(db: any) {
     if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Admin only" });
     try {
       const idParam = req.params.id;
-      const numId = Number(idParam);
-      const condition = !isNaN(numId) ? eq(users.id, numId) : eq(users.uid, idParam);
+      const condition = or(
+        sql`${users.id}::text = ${idParam}`,
+        eq(users.uid, idParam),
+        eq(users.email, idParam)
+      );
 
       const { userName, email, phone, major, isAdmin, currentGpa, finishedHours } = req.body;
       const updateData: any = {};
@@ -514,7 +521,7 @@ export function createAdminRouter(db: any) {
   router.put("/admin/resources/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
     try {
-      const id = parseInt(req.params.id);
+      const idRaw = req.params.id;
       const { 
         title, type, url, description, subjectId, courseCode,
         driveLink, boxLink, whatsappLink, freeResourcesUrl, paidResourcesUrl, avatarUrl, bannerUrl 
@@ -542,7 +549,7 @@ export function createAdminRouter(db: any) {
 
       const [updated] = await db.update(course_resources)
         .set(updateData)
-        .where(eq(course_resources.id, id))
+        .where(sql`${course_resources.id}::text = ${idRaw}`)
         .returning();
 
       if (!updated) {
@@ -561,30 +568,26 @@ export function createAdminRouter(db: any) {
     if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
     try {
       const idRaw = req.params.id;
-      const numericId = parseInt(idRaw);
 
-      if (isNaN(numericId)) {
-        return res.status(400).json({ error: "Invalid resource ID" });
-      }
-
-      // 1. First attempt direct deletion from course_resources by primary key
-      const deleted = await db.delete(course_resources).where(eq(course_resources.id, numericId)).returning();
+      // 1. First attempt direct deletion from course_resources by primary key using string/sql casting
+      const deleted = await db.delete(course_resources).where(sql`${course_resources.id}::text = ${idRaw}`).returning();
       if (deleted.length > 0) {
         return res.json({ success: true, deletedCount: deleted.length });
       }
 
       // 2. If no course_resource row was deleted AND numericId >= 10000, check if it's a synthetic subject resource
-      if (numericId >= 10000) {
+      const numericId = Number(idRaw);
+      if (!isNaN(numericId) && numericId >= 10000) {
         const subjectId = Math.floor(numericId / 10000);
-        const [targetSubj] = await db.select().from(subjects).where(eq(subjects.id, subjectId));
+        const [targetSubj] = await db.select().from(subjects).where(sql`${subjects.id}::text = ${String(subjectId)}`);
         if (targetSubj) {
-          await db.update(subjects).set({ driveLink: null, whatsappLink: null }).where(eq(subjects.id, subjectId));
-          await db.delete(course_resources).where(eq(course_resources.subjectId, subjectId));
+          await db.update(subjects).set({ driveLink: null, whatsappLink: null }).where(sql`${subjects.id}::text = ${String(subjectId)}`);
+          await db.delete(course_resources).where(sql`${course_resources.subjectId}::text = ${String(subjectId)}`);
           return res.json({ success: true, syntheticDeleted: true });
         }
       }
 
-      res.json({ success: true });
+      res.json({ success: true, deletedCount: 0 });
     } catch (e: any) {
       console.error("[Admin Resource Delete Error]", e);
       res.status(500).json({ error: "Server error" });
@@ -595,11 +598,10 @@ export function createAdminRouter(db: any) {
   router.delete("/admin/subjects/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
     try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ error: "Invalid subject ID" });
-      await db.delete(majorCourses).where(eq(majorCourses.subjectId, id));
-      await db.delete(course_resources).where(eq(course_resources.subjectId, id));
-      await db.delete(subjects).where(eq(subjects.id, id));
+      const idRaw = req.params.id;
+      await db.delete(majorCourses).where(sql`${majorCourses.subjectId}::text = ${idRaw}`);
+      await db.delete(course_resources).where(sql`${course_resources.subjectId}::text = ${idRaw}`);
+      await db.delete(subjects).where(sql`${subjects.id}::text = ${idRaw}`);
       res.json({ success: true });
     } catch (e: any) {
       console.error("[Admin Subject Delete Error]", e);
@@ -611,10 +613,9 @@ export function createAdminRouter(db: any) {
   router.delete("/admin/majors/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
     try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ error: "Invalid major ID" });
-      await db.delete(majorCourses).where(eq(majorCourses.majorId, id));
-      await db.delete(majors).where(eq(majors.id, id));
+      const idRaw = req.params.id;
+      await db.delete(majorCourses).where(sql`${majorCourses.majorId}::text = ${idRaw}`);
+      await db.delete(majors).where(sql`${majors.id}::text = ${idRaw}`);
       res.json({ success: true });
     } catch (e: any) {
       console.error("[Admin Major Delete Error]", e);
@@ -626,11 +627,10 @@ export function createAdminRouter(db: any) {
   router.delete("/admin/news/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
     try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ error: "Invalid news ID" });
-      await db.delete(newsLikes).where(eq(newsLikes.newsId, id));
-      await db.delete(newsComments).where(eq(newsComments.newsId, id));
-      await db.delete(news).where(eq(news.id, id));
+      const idRaw = req.params.id;
+      await db.delete(newsLikes).where(sql`${newsLikes.newsId}::text = ${idRaw}`);
+      await db.delete(newsComments).where(sql`${newsComments.newsId}::text = ${idRaw}`);
+      await db.delete(news).where(sql`${news.id}::text = ${idRaw}`);
       res.json({ success: true });
     } catch (e: any) {
       console.error("[Admin News Delete Error]", e);
@@ -642,9 +642,8 @@ export function createAdminRouter(db: any) {
   router.delete("/admin/events/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
     try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ error: "Invalid event ID" });
-      await db.delete(events).where(eq(events.id, id));
+      const idRaw = req.params.id;
+      await db.delete(events).where(sql`${events.id}::text = ${idRaw}`);
       res.json({ success: true });
     } catch (e: any) {
       console.error("[Admin Event Delete Error]", e);
@@ -656,9 +655,8 @@ export function createAdminRouter(db: any) {
   router.delete("/admin/news_sources/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
     try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ error: "Invalid news source ID" });
-      await db.delete(news_sources).where(eq(news_sources.id, id));
+      const idRaw = req.params.id;
+      await db.delete(news_sources).where(or(sql`${news_sources.id}::text = ${idRaw}`, eq(news_sources.handle, idRaw)));
       res.json({ success: true });
     } catch (e: any) {
       console.error("[Admin News Source Delete Error]", e);
@@ -1012,8 +1010,7 @@ export function createAdminRouter(db: any) {
   const updateToolHandler = async (req: AuthRequest, res: express.Response) => {
     if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Admin only" });
     try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ error: "Invalid tool ID" });
+      const idRaw = req.params.id;
       const { title, name, description, link, icon, category } = req.body;
       const toolTitle = title || name;
       const updateData: any = {};
@@ -1023,7 +1020,7 @@ export function createAdminRouter(db: any) {
       if (icon !== undefined) updateData.icon = icon;
       if (category !== undefined) updateData.category = category;
 
-      const [updatedTool] = await db.update(tools).set(updateData).where(eq(tools.id, id)).returning();
+      const [updatedTool] = await db.update(tools).set(updateData).where(sql`${tools.id}::text = ${idRaw}`).returning();
       if (!updatedTool) return res.status(404).json({ error: "Tool not found" });
       res.json(updatedTool);
     } catch (e) {
@@ -1036,9 +1033,8 @@ export function createAdminRouter(db: any) {
   const deleteToolHandler = async (req: AuthRequest, res: express.Response) => {
     if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Admin only" });
     try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ error: "Invalid tool ID" });
-      await db.delete(tools).where(eq(tools.id, id));
+      const idRaw = req.params.id;
+      await db.delete(tools).where(sql`${tools.id}::text = ${idRaw}`);
       res.json({ success: true });
     } catch (e) {
       console.error(e);

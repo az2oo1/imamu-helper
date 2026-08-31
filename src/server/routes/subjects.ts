@@ -56,7 +56,7 @@ export function createSubjectsRouter(db: any) {
 
       let subjectList = await db.select().from(subjects).where(
         isNumeric 
-          ? eq(subjects.id, Number(idOrCode)) 
+          ? sql`${subjects.id}::text = ${idOrCode.trim()}`
           : sql`REPLACE(REPLACE(LOWER(${subjects.code}), ' ', ''), '-', '') = ${cleanSearchCode}`
       );
       if (subjectList.length === 0 && !isNumeric) {
@@ -70,7 +70,7 @@ export function createSubjectsRouter(db: any) {
       if (!subject) {
         let matchingResources: any[] = [];
         if (isNumeric) {
-          matchingResources = await db.select().from(course_resources).where(eq(course_resources.id, Number(idOrCode)));
+          matchingResources = await db.select().from(course_resources).where(sql`${course_resources.id}::text = ${idOrCode.trim()}`);
         }
         if (matchingResources.length === 0) {
           matchingResources = await db.select().from(course_resources).where(
@@ -81,7 +81,7 @@ export function createSubjectsRouter(db: any) {
         const firstRes = matchingResources[0];
         // If resource is linked to a subjectId, resolve the parent subject!
         if (firstRes && firstRes.subjectId) {
-          const linkedSubj = (await db.select().from(subjects).where(eq(subjects.id, firstRes.subjectId)))[0];
+          const linkedSubj = (await db.select().from(subjects).where(sql`${subjects.id}::text = ${String(firstRes.subjectId)}`))[0];
           if (linkedSubj) {
             subject = linkedSubj;
           }
@@ -95,7 +95,7 @@ export function createSubjectsRouter(db: any) {
 
           return res.json({
             course: {
-              id: isNumeric ? Number(idOrCode) : 0,
+              id: idOrCode,
               code: fallbackCode,
               name: fallbackName,
               creditHours: 3,
@@ -110,10 +110,10 @@ export function createSubjectsRouter(db: any) {
         }
       }
 
-      const allResources = await db.select().from(course_resources).where(eq(course_resources.subjectId, subject.id));
+      const allResources = await db.select().from(course_resources).where(sql`${course_resources.subjectId}::text = ${String(subject.id)}`);
       const connectUrl = process.env.CONNECT_APP_URL || 'http://localhost:3000';
 
-      const subjectMajorLinks = await db.select().from(majorCourses).where(eq(majorCourses.subjectId, subject.id));
+      const subjectMajorLinks = await db.select().from(majorCourses).where(sql`${majorCourses.subjectId}::text = ${String(subject.id)}`);
       const allMajorCourses = await db.select().from(majorCourses);
 
       let prereqCodes: string[] = [];
