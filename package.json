@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "next build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "build": "mkdir -p dist public && next build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist .next",
     "lint": "tsc --noEmit",
@@ -40,6 +40,7 @@
     "nodemailer": "^9.0.1",
     "pg": "^8.22.0",
     "react": "^19.0.1",
+    "react-confetti": "^6.2.0",
     "react-dom": "^19.0.1"
   },
   "devDependencies": {
