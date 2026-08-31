@@ -72,15 +72,12 @@ export function parseDriveLinks(rawVal?: string | null): DriveLinkItem[] {
   return [{ title: 'Box / Drive', url: text }];
 }
 
-function DriveLinkButton({ boxLink, freeResourcesUrl }: { boxLink?: string; freeResourcesUrl?: string }) {
+function DriveLinkButton({ boxLink }: { boxLink?: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   const links = React.useMemo(() => {
-    const combined = [
-      ...parseDriveLinks(boxLink),
-      ...parseDriveLinks(freeResourcesUrl)
-    ];
+    const combined = parseDriveLinks(boxLink);
     const uniqueMap = new Map<string, DriveLinkItem>();
     combined.forEach(l => {
       if (l.url && !uniqueMap.has(l.url)) {
@@ -88,7 +85,7 @@ function DriveLinkButton({ boxLink, freeResourcesUrl }: { boxLink?: string; free
       }
     });
     return Array.from(uniqueMap.values());
-  }, [boxLink, freeResourcesUrl]);
+  }, [boxLink]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -111,7 +108,7 @@ function DriveLinkButton({ boxLink, freeResourcesUrl }: { boxLink?: string; free
         href={links[0].url}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 text-xs font-bold transition"
+        className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 text-xs font-bold transition shrink-0 whitespace-nowrap"
       >
         <Folder className="w-3.5 h-3.5 text-blue-500" />
         <span>{links[0].title || 'Box / Drive'}</span>
@@ -121,11 +118,11 @@ function DriveLinkButton({ boxLink, freeResourcesUrl }: { boxLink?: string; free
 
   // Multiple links -> dropdown popup menu
   return (
-    <div className="relative inline-block text-right" ref={dropdownRef}>
+    <div className="relative inline-block text-right shrink-0" ref={dropdownRef}>
       <button
         type="button"
         onClick={() => setIsOpen(prev => !prev)}
-        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white border border-blue-500 text-xs font-bold transition cursor-pointer shadow-sm"
+        className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white border border-blue-500 text-xs font-bold transition cursor-pointer shadow-sm whitespace-nowrap"
       >
         <Folder className="w-3.5 h-3.5" />
         <span>روابط درايف ({links.length})</span>
@@ -450,7 +447,7 @@ export function Resources() {
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50">
-                      {item.courseCode ? (item.courseCode.startsWith('مادة') || item.courseCode.includes('قروب') || item.courseCode.length > 8 ? item.courseCode : `مادة ${item.courseCode}`) : 'مصدر أكاديمي'}
+                      {item.courseCode ? item.courseCode.replace(/^مادة\s*/i, '').trim() : 'مصدر أكاديمي'}
                     </span>
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] text-slate-500 dark:text-zinc-400 font-medium">{item.major}</span>
@@ -499,23 +496,23 @@ export function Resources() {
                 </div>
 
                 {/* Resource Links */}
-                <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 dark:border-zinc-800/80 pt-3.5 mt-auto w-full">
+                <div className="flex items-center gap-1.5 border-t border-slate-100 dark:border-zinc-800/80 pt-3.5 mt-auto w-full overflow-x-auto no-scrollbar">
                   <button
                     onClick={() => setSelectedCourse(item.subjectId || item.courseCode || item.id)}
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 text-xs font-bold transition shrink-0 cursor-pointer"
+                    className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 text-xs font-bold transition shrink-0 cursor-pointer whitespace-nowrap"
                   >
                     <Info className="w-3.5 h-3.5" />
                     <span>تفاصيل المادة</span>
                   </button>
 
-                  <DriveLinkButton boxLink={item.boxLink} freeResourcesUrl={item.freeResourcesUrl} />
+                  <DriveLinkButton boxLink={item.boxLink} />
 
                   {item.whatsappUrl && (
                     <a
                       href={item.whatsappUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 text-xs font-bold transition shrink-0"
+                      className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 text-xs font-bold transition shrink-0 whitespace-nowrap"
                     >
                       <MessageCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                       <span>واتساب</span>

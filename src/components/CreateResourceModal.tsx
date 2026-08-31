@@ -73,7 +73,11 @@ export default function CreateResourceModal({
   if (!isOpen) return null;
 
   const isEditing = !!resourceForm.id;
-  const selectedCourse = subjects.find(s => s.id === resourceForm.subjectId);
+  const selectedCourse = subjects.find(s => 
+    resourceForm.subjectId !== undefined && resourceForm.subjectId !== null && String(s.id) === String(resourceForm.subjectId)
+  ) || (resourceForm.title ? subjects.find(s => 
+    s.code && resourceForm.title.toLowerCase().includes(s.code.toLowerCase())
+  ) : undefined);
 
   const filteredSubjects = subjects.filter(s => 
     !courseSearch || 
@@ -83,7 +87,7 @@ export default function CreateResourceModal({
 
   const handleNext = () => {
     if (activeStep === 1) {
-      if (!resourceForm.subjectId && !resourceForm.title?.trim()) {
+      if (!resourceForm.subjectId && !selectedCourse && !resourceForm.title?.trim()) {
         alert('Please select a course or enter a resource title');
         return;
       }
@@ -99,7 +103,7 @@ export default function CreateResourceModal({
     }
   };
 
-  const canAdvance = !!(resourceForm.subjectId || resourceForm.title?.trim());
+  const canAdvance = !!(resourceForm.subjectId || selectedCourse || resourceForm.title?.trim());
 
   const handleSaveSubmit = async () => {
     if (!canAdvance) {
@@ -133,7 +137,7 @@ export default function CreateResourceModal({
             </div>
             <div>
               <h3 className="font-bold text-lg leading-tight">
-                {isEditing ? `Edit Resource: ${resourceForm.title}` : 'Resource Package Wizard (إضافة باقة مصادر جديدة)'}
+                {isEditing ? `Edit Resource: ${resourceForm.title || selectedCourse?.name}` : 'Resource Package Wizard (إضافة باقة مصادر جديدة)'}
               </h3>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                 Multi-step wizard to attach Box, WhatsApp, Free/Paid links, media & overview
@@ -278,7 +282,7 @@ export default function CreateResourceModal({
                               className="w-full text-left px-4 py-2.5 flex items-center justify-between hover:bg-[var(--bg-subtle)] transition"
                             >
                               <div className="flex items-center gap-2.5">
-                                <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                                <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-200 dark:border-blue-500/20">
                                   {subj.code}
                                 </span>
                                 <span className="text-sm font-medium" style={{ color: 'var(--text-main)' }}>{subj.name}</span>
@@ -299,22 +303,20 @@ export default function CreateResourceModal({
                 )}
               </div>
 
-              {/* Show Resource Package Title Input ONLY IF NO COURSE IS SELECTED */}
-              {!selectedCourse && (
-                <div className="flex flex-col gap-1 animate-fadeIn">
-                  <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-                    Resource Package Title (عنوان باقة المصدر) *
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. باقة مصادر عامة / تجميعات تخصص"
-                    value={resourceForm.title || ''}
-                    onChange={e => setResourceForm((s: any) => ({ ...s, title: e.target.value }))}
-                    className="w-full py-2.5 px-3 rounded-xl text-sm border outline-none"
-                    style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
-                  />
-                </div>
-              )}
+              {/* Resource Package Title Input */}
+              <div className="flex flex-col gap-1 animate-fadeIn">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+                  Resource Package Title (عنوان باقة المصدر) *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. باقة مصادر عامة / تجميعات تخصص"
+                  value={resourceForm.title || ''}
+                  onChange={e => setResourceForm((s: any) => ({ ...s, title: e.target.value }))}
+                  className="w-full py-2.5 px-3 rounded-xl text-sm border outline-none"
+                  style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
+                />
+              </div>
             </div>
           )}
 

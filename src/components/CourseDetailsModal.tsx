@@ -103,15 +103,17 @@ export function CourseDetailsModal({ isOpen, onClose, courseIdOrCode }: CourseDe
           ) : (
             <>
               {/* Header / Banner */}
-              <div className="relative h-44 bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 shrink-0 overflow-hidden">
-                {course.bannerUrl ? (
-                  <img src={course.bannerUrl} alt="Banner" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="absolute inset-0 opacity-30 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:16px_16px]" />
-                )}
+              <div className="relative h-36 bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 shrink-0">
+                <div className="absolute inset-0 overflow-hidden">
+                  {course.bannerUrl ? (
+                    <img src={course.bannerUrl} alt="Banner" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="absolute inset-0 opacity-30 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:16px_16px]" />
+                  )}
+                </div>
                 
                 {/* Course Avatar */}
-                <div className="absolute -bottom-10 right-6">
+                <div className="absolute -bottom-8 right-6 z-20">
                   <div className="w-20 h-20 rounded-2xl bg-white dark:bg-zinc-900 border-4 border-white dark:border-zinc-900 overflow-hidden shadow-xl flex items-center justify-center text-blue-600 dark:text-blue-400">
                     {course.avatarUrl ? (
                       <img src={course.avatarUrl} alt={course.name} className="w-full h-full object-cover" />
@@ -123,13 +125,13 @@ export function CourseDetailsModal({ isOpen, onClose, courseIdOrCode }: CourseDe
               </div>
 
               {/* Content Body */}
-              <div className="pt-12 px-6 pb-6 overflow-y-auto flex-1 custom-scrollbar">
+              <div className="pt-10 px-6 pb-6 overflow-y-auto flex-1 custom-scrollbar">
                 {/* Header Information */}
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6 pb-4 border-b border-slate-100 dark:border-zinc-800/80">
                   <div>
                     <div className="flex flex-wrap items-center gap-2 mb-2">
                       <span className="px-2.5 py-1 bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 text-xs font-mono font-bold rounded-lg" dir="ltr">
-                        {course.code}
+                        {course.code ? course.code.replace(/^مادة\s*/i, '').trim() : ''}
                       </span>
                       {course.creditHours && (
                         <span className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 text-xs font-semibold rounded-lg">
@@ -144,19 +146,6 @@ export function CourseDetailsModal({ isOpen, onClose, courseIdOrCode }: CourseDe
                     </div>
                     <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white leading-snug">{course.name}</h2>
                   </div>
-
-                  {/* IMAMU Connect Action Link */}
-                  {course.connectUrl && (
-                    <a
-                      href={course.connectUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 shrink-0"
-                    >
-                      <span>فتح في IMAMU Connect</span>
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
-                  )}
                 </div>
 
                 {/* Tabs Header */}
@@ -267,7 +256,18 @@ export function CourseDetailsModal({ isOpen, onClose, courseIdOrCode }: CourseDe
                     <div className="bg-slate-50 dark:bg-zinc-800/50 rounded-2xl p-5 border border-slate-200/80 dark:border-zinc-800">
                       <h3 className="text-xs font-bold text-slate-400 dark:text-zinc-400 uppercase tracking-wider mb-2">عن المادة</h3>
                       <p className="text-xs sm:text-sm text-slate-700 dark:text-zinc-300 leading-relaxed whitespace-pre-line">
-                        {course.description || "لا يوجد وصف مختصر متاح لهذه المادة حالياً. يمكنك تصفح المصادر أو توصيف المقرر لمزيد من التفاصيل."}
+                        {(() => {
+                          const desc = course.description?.trim();
+                          const isGeneric = !desc ||
+                            desc === course.name?.trim() ||
+                            desc === course.code?.trim() ||
+                            /^مصادر مادة/i.test(desc) ||
+                            /^تفاصيل ومعلومات مادة/i.test(desc) ||
+                            /^باقة مصادر/i.test(desc);
+                          return isGeneric
+                            ? "لا يوجد وصف مختصر متاح لهذه المادة حالياً. يمكنك تصفح المصادر والروابط أو توصيف المقرر لمزيد من التفاصيل."
+                            : desc;
+                        })()}
                       </p>
                     </div>
 
@@ -308,41 +308,132 @@ export function CourseDetailsModal({ isOpen, onClose, courseIdOrCode }: CourseDe
                 {/* Tab 2: Resources & Links */}
                 {activeTab === 'resources' && (
                   <div className="space-y-4 animate-in fade-in duration-200">
+                    {/* Direct Links Section: Free, Paid, Drive, & WhatsApp */}
+                    {(course.freeResourcesUrl || course.paidResourcesUrl || course.driveLink || course.whatsappLink) && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
+                        {course.freeResourcesUrl && (
+                          <a
+                            href={course.freeResourcesUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center justify-between p-3.5 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-900/50 rounded-xl text-emerald-700 dark:text-emerald-300 transition shadow-xs"
+                          >
+                            <div className="flex items-center gap-2">
+                              <FolderGit2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                              <span className="text-xs font-bold">المصادر المجانية</span>
+                            </div>
+                            <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+                          </a>
+                        )}
+                        {course.paidResourcesUrl && (
+                          <a
+                            href={course.paidResourcesUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center justify-between p-3.5 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/40 border border-amber-200 dark:border-amber-900/50 rounded-xl text-amber-700 dark:text-amber-300 transition shadow-xs"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                              <span className="text-xs font-bold">المصادر والشروحات المدفوعة</span>
+                            </div>
+                            <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+                          </a>
+                        )}
+                        {course.driveLink && (
+                          <a
+                            href={course.driveLink}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center justify-between p-3.5 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/40 border border-blue-200 dark:border-blue-900/50 rounded-xl text-blue-700 dark:text-blue-300 transition shadow-xs"
+                          >
+                            <div className="flex items-center gap-2">
+                              <FolderGit2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                              <span className="text-xs font-bold">ملفات درايف / Box</span>
+                            </div>
+                            <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+                          </a>
+                        )}
+                        {course.whatsappLink && (
+                          <a
+                            href={course.whatsappLink}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center justify-between p-3.5 bg-teal-50 dark:bg-teal-950/40 hover:bg-teal-100 dark:hover:bg-teal-900/40 border border-teal-200 dark:border-teal-900/50 rounded-xl text-teal-700 dark:text-teal-300 transition shadow-xs"
+                          >
+                            <div className="flex items-center gap-2">
+                              <MessageCircle className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                              <span className="text-xs font-bold">مجموعة الواتساب</span>
+                            </div>
+                            <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+                          </a>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Course Resources items list */}
                     {course.resources && course.resources.length > 0 ? (
                       <div className="space-y-2.5">
                         {course.resources.map((res: any, idx: number) => (
-                          <a
-                            key={idx}
-                            href={res.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex items-center justify-between p-4 bg-slate-50 dark:bg-zinc-800/60 hover:bg-white dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-800 rounded-2xl transition group"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-950/80 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-                                {res.type === 'whatsapp' || res.type === 'group' ? (
-                                  <MessageCircle className="w-4 h-4" />
-                                ) : (
-                                  <FolderGit2 className="w-4 h-4" />
+                          <div key={idx} className="p-4 bg-slate-50 dark:bg-zinc-800/60 border border-slate-200 dark:border-zinc-800 rounded-2xl space-y-2.5">
+                            <a
+                              href={res.url || res.boxLink || res.driveLink || '#'}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center justify-between group"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-950/80 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                                  {res.type === 'whatsapp' || res.type === 'group' ? (
+                                    <MessageCircle className="w-4 h-4" />
+                                  ) : (
+                                    <FolderGit2 className="w-4 h-4" />
+                                  )}
+                                </div>
+                                <div>
+                                  <h4 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-zinc-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">{res.title}</h4>
+                                  {res.description && (
+                                    <p className="text-[11px] text-slate-500 dark:text-zinc-400">{res.description}</p>
+                                  )}
+                                </div>
+                              </div>
+                              <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition" />
+                            </a>
+
+                            {(res.freeResourcesUrl || res.paidResourcesUrl) && (
+                              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200/60 dark:border-zinc-700/60">
+                                {res.freeResourcesUrl && (
+                                  <a
+                                    href={res.freeResourcesUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 text-xs font-bold hover:bg-emerald-100 transition"
+                                  >
+                                    <FolderGit2 className="w-3.5 h-3.5" />
+                                    <span>المصادر المجانية</span>
+                                  </a>
+                                )}
+                                {res.paidResourcesUrl && (
+                                  <a
+                                    href={res.paidResourcesUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50 text-xs font-bold hover:bg-amber-100 transition"
+                                  >
+                                    <Sparkles className="w-3.5 h-3.5" />
+                                    <span>المصادر والشروحات المدفوعة</span>
+                                  </a>
                                 )}
                               </div>
-                              <div>
-                                <h4 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-zinc-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">{res.title}</h4>
-                                {res.description && (
-                                  <p className="text-[11px] text-slate-500 dark:text-zinc-400">{res.description}</p>
-                                )}
-                              </div>
-                            </div>
-                            <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition" />
-                          </a>
+                            )}
+                          </div>
                         ))}
                       </div>
-                    ) : (
+                    ) : !(course.freeResourcesUrl || course.paidResourcesUrl || course.driveLink || course.whatsappLink) ? (
                       <div className="p-8 text-center bg-slate-50 dark:bg-zinc-800/40 rounded-2xl border border-slate-200 dark:border-zinc-800 text-slate-500 dark:text-zinc-400">
                         <Sparkles className="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-zinc-600" />
                         <p className="text-xs sm:text-sm font-semibold">لم يتم إضافة مصادر إضافية للمادة بعد.</p>
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 )}
 
