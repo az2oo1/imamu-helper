@@ -28,3 +28,18 @@ export function sanitizeUser(user: any) {
   const { passwordHash, ...sanitized } = user;
   return sanitized;
 }
+
+import { or, eq, sql } from 'drizzle-orm';
+
+/**
+ * Robust ID matcher that works for both standard JS integers (e.g. SQLite/PGlite unit tests)
+ * and 64-bit BigInt IDs (e.g. CockroachDB production database) without floating-point precision loss.
+ */
+export function matchId(column: any, idRaw: string | number) {
+  const strId = String(idRaw ?? '').trim();
+  const numId = Number(strId);
+  if (!isNaN(numId) && Number.isSafeInteger(numId)) {
+    return or(eq(column, numId), sql`CAST(${column} AS TEXT) = ${strId}`);
+  }
+  return sql`CAST(${column} AS TEXT) = ${strId}`;
+}

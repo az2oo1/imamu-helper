@@ -2,6 +2,7 @@ import express from 'express';
 import { eq, sql, inArray } from 'drizzle-orm';
 import { subjects, majors, majorCourses, course_resources } from '../../db/schema';
 import { requireAuth } from '../../middleware/auth';
+import { matchId } from '../../lib/auth-utils';
 
 export function createSubjectsRouter(db: any) {
   const router = express.Router();
@@ -17,25 +18,27 @@ export function createSubjectsRouter(db: any) {
         allCourseResources = await db.select().from(course_resources);
       } catch (crErr) {}
 
-      const majorMap = new Map<number, number>();
+      const majorMap = new Map<string, number>();
       for (const mc of allMajorCourses) {
-        if (!majorMap.has(mc.subjectId)) {
-          majorMap.set(mc.subjectId, mc.majorId);
+        const key = String(mc.subjectId);
+        if (!majorMap.has(key)) {
+          majorMap.set(key, mc.majorId);
         }
       }
 
-      const resourceMap = new Map<number, any[]>();
+      const resourceMap = new Map<string, any[]>();
       for (const cr of allCourseResources) {
-        if (!resourceMap.has(cr.subjectId)) {
-          resourceMap.set(cr.subjectId, []);
+        const key = String(cr.subjectId);
+        if (!resourceMap.has(key)) {
+          resourceMap.set(key, []);
         }
-        resourceMap.get(cr.subjectId)!.push(cr);
+        resourceMap.get(key)!.push(cr);
       }
 
       const mapped = allSubjects.map((s: any) => ({
         ...s,
-        majorId: majorMap.get(s.id) || null,
-        resources: resourceMap.get(s.id) || []
+        majorId: majorMap.get(String(s.id)) || null,
+        resources: resourceMap.get(String(s.id)) || []
       }));
 
       res.json(mapped);
@@ -48,6 +51,7 @@ export function createSubjectsRouter(db: any) {
   router.get("/subjects", getSubjectsHandler);
   router.get("/courses", getSubjectsHandler);
 
+  // Get course/subject details by code or ID
   const getCourseDetailsHandler = async (req: express.Request, res: express.Response): Promise<any> => {
     try {
       const { idOrCode } = req.params;
@@ -56,7 +60,7 @@ export function createSubjectsRouter(db: any) {
 
       let subjectList = await db.select().from(subjects).where(
         isNumeric 
-          ? sql`${subjects.id}::text = ${idOrCode.trim()}`
+          ? matchId(subjects.id, idOrCode.trim())
           : sql`REPLACE(REPLACE(LOWER(${subjects.code}), ' ', ''), '-', '') = ${cleanSearchCode}`
       );
       if (subjectList.length === 0 && !isNumeric) {
@@ -70,7 +74,7 @@ export function createSubjectsRouter(db: any) {
       if (!subject) {
         let matchingResources: any[] = [];
         if (isNumeric) {
-          matchingResources = await db.select().from(course_resources).where(sql`${course_resources.id}::text = ${idOrCode.trim()}`);
+          matchingResources = await db.select().from(course_resources).where(matchId(course_resources.id, idOrCode.trim()));
         }
         if (matchingResources.length === 0) {
           matchingResources = await db.select().from(course_resources).where(
@@ -81,7 +85,7 @@ export function createSubjectsRouter(db: any) {
         const firstRes = matchingResources[0];
         // If resource is linked to a subjectId, resolve the parent subject!
         if (firstRes && firstRes.subjectId) {
-          const linkedSubj = (await db.select().from(subjects).where(sql`${subjects.id}::text = ${String(firstRes.subjectId)}`))[0];
+          const linkedSubj = (await db.select().from(subjects).where(matchId(subjects.id, firstRes.subjectId)))[0];
           if (linkedSubj) {
             subject = linkedSubj;
           }
@@ -110,10 +114,10 @@ export function createSubjectsRouter(db: any) {
         }
       }
 
-      const allResources = await db.select().from(course_resources).where(sql`${course_resources.subjectId}::text = ${String(subject.id)}`);
+      const allResources = await db.select().from(course_resources).where(matchId(course_resources.subjectId, subject.id));
       const connectUrl = process.env.CONNECT_APP_URL || 'http://localhost:3000';
 
-      const subjectMajorLinks = await db.select().from(majorCourses).where(sql`${majorCourses.subjectId}::text = ${String(subject.id)}`);
+      const subjectMajorLinks = await db.select().from(majorCourses).where(matchId(majorCourses.subjectId, subject.id));
       const allMajorCourses = await db.select().from(majorCourses);
 
       let prereqCodes: string[] = [];
@@ -135,19 +139,19 @@ export function createSubjectsRouter(db: any) {
       let prerequisites: { id: number; code: string; name: string }[] = [];
       if (prereqCodes.length > 0) {
         const allSimpleSubjects = await db.select({ id: subjects.id, code: subjects.code, name: subjects.name }).from(subjects);
-        prerequisites = allSimpleSubjects.filter((s: any) => prereqCodes.some(code => code.toLowerCase() === s.code.toLowerCase()));
+        prerequisites = allSimpleSubjects.filter((s: any) => prereqCodes.some(code => code && s.code && code.toLowerCase() === s.code.toLowerCase()));
       }
 
       const dependentSubjectIds = allMajorCourses.filter((mc: any) => {
-        if (!mc.prereq) return false;
+        if (!mc.prereq || !subject?.code) return false;
         return mc.prereq.toLowerCase().includes(subject.code.toLowerCase());
       }).map((mc: any) => mc.subjectId);
 
-      let dependents: { id: number; code: string; name: string }[] = [];
+      let dependents: { id: any; code: string; name: string }[] = [];
       if (dependentSubjectIds.length > 0) {
-        dependents = await db.select({ id: subjects.id, code: subjects.code, name: subjects.name })
-          .from(subjects)
-          .where(inArray(subjects.id, dependentSubjectIds));
+        const depSet = new Set(dependentSubjectIds.map((id: any) => String(id)));
+        const allSubjectsList = await db.select({ id: subjects.id, code: subjects.code, name: subjects.name }).from(subjects);
+        dependents = allSubjectsList.filter((s: any) => depSet.has(String(s.id)));
       }
 
       res.json({

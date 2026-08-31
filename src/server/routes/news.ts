@@ -1,9 +1,10 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
-import { eq, desc, and, inArray } from 'drizzle-orm';
+import { eq, desc, and, inArray, sql } from 'drizzle-orm';
 import { news, events, newsLikes, newsComments, news_sources, users } from '../../db/schema';
 import { requireAuth, AuthRequest } from '../../middleware/auth';
 import { JWT_SECRET } from '../../lib/config';
+import { matchId } from '../../lib/auth-utils';
 
 export function createNewsRouter(db: any) {
   const router = express.Router();
@@ -65,8 +66,8 @@ export function createNewsRouter(db: any) {
       }
 
       const mapped = records.map((record: any) => {
-        const likes = allLikes.filter((l: any) => l.newsId === record.id);
-        const comments = allComments.filter((c: any) => c.newsId === record.id);
+        const likes = allLikes.filter((l: any) => String(l.newsId) === String(record.id));
+        const comments = allComments.filter((c: any) => String(c.newsId) === String(record.id));
         const userLiked = currentUserId ? likes.some((l: any) => l.userId === currentUserId) : false;
 
         return {
@@ -90,9 +91,9 @@ export function createNewsRouter(db: any) {
       const idRaw = req.params.id;
       const userId = req.user.uid;
 
-      const existing = await db.select().from(newsLikes).where(and(eq(newsLikes.userId, userId), sql`${newsLikes.newsId}::text = ${idRaw}`));
+      const existing = await db.select().from(newsLikes).where(and(eq(newsLikes.userId, userId), matchId(newsLikes.newsId, idRaw)));
       if (existing.length > 0) {
-        await db.delete(newsLikes).where(sql`${newsLikes.id}::text = ${String(existing[0].id)}`);
+        await db.delete(newsLikes).where(matchId(newsLikes.id, existing[0].id));
         return res.json({ liked: false });
       } else {
         await db.insert(newsLikes).values({ userId, newsId: idRaw as any });
@@ -117,8 +118,8 @@ export function createNewsRouter(db: any) {
           profilePic: users.profilePicUrl
         })
         .from(newsComments)
-        .where(sql`${newsComments.newsId}::text = ${idRaw}`)
-        .leftJoin(users, eq(newsComments.userId, users.uid))
+        .where(matchId(newsComments.newsId, idRaw))
+        .leftJoin(users, eq(users.uid, newsComments.userId))
         .orderBy(desc(newsComments.createdAt));
       res.json(comments);
     } catch (e) {

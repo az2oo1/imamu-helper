@@ -1,7 +1,8 @@
 import express from 'express';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, sql } from 'drizzle-orm';
 import { tutorial_sections, tutorials, tutorial_feedback, feedback_comments, tutorial_comments, newbie_links, users } from '../../db/schema';
 import { requireAuth, requireAdmin, AuthRequest } from '../../middleware/auth';
+import { matchId } from '../../lib/auth-utils';
 
 function parseSteps(steps: any): any[] {
   if (!steps) return [];
@@ -53,7 +54,7 @@ export function createTutorialsRouter(db: any) {
       const { title, url, description } = req.body;
       const [updated] = await db.update(newbie_links)
         .set({ title, url, description })
-        .where(sql`${newbie_links.id}::text = ${idRaw}`)
+        .where(matchId(newbie_links.id, idRaw))
         .returning();
       if (!updated) {
         return res.status(404).json({ error: "Link not found" });
@@ -69,7 +70,7 @@ export function createTutorialsRouter(db: any) {
   router.delete("/admin/newbie/links/:id", requireAdmin, async (req: AuthRequest, res): Promise<any> => {
     try {
       const idRaw = req.params.id;
-      await db.delete(newbie_links).where(sql`${newbie_links.id}::text = ${idRaw}`);
+      await db.delete(newbie_links).where(matchId(newbie_links.id, idRaw));
       res.json({ success: true });
     } catch (e) {
       console.error(e);
@@ -94,7 +95,7 @@ export function createTutorialsRouter(db: any) {
       const { sectionId } = req.query;
       let query = db.select().from(tutorials).$dynamic();
       if (sectionId) {
-        query = query.where(sql`${tutorials.sectionId}::text = ${String(sectionId)}`);
+        query = query.where(matchId(tutorials.sectionId, sectionId as string));
       }
       const list = await query;
       res.json(list.map((t: any) => ({
@@ -111,10 +112,10 @@ export function createTutorialsRouter(db: any) {
   router.get("/tutorials/:id", async (req, res): Promise<any> => {
     try {
       const idRaw = req.params.id;
-      const [tutorial] = await db.select().from(tutorials).where(sql`${tutorials.id}::text = ${idRaw}`);
+      const [tutorial] = await db.select().from(tutorials).where(matchId(tutorials.id, idRaw));
       if (!tutorial) return res.status(404).json({ error: "Tutorial not found" });
 
-      const feedbackList = await db.select().from(tutorial_feedback).where(sql`${tutorial_feedback.tutorialId}::text = ${idRaw}`);
+      const feedbackList = await db.select().from(tutorial_feedback).where(matchId(tutorial_feedback.tutorialId, idRaw));
 
       const userIds: string[] = Array.from(new Set(feedbackList.map((fb: any) => String(fb.userId)).filter(Boolean)));
       const userRecords = userIds.length > 0 ? await db.select().from(users).where(inArray(users.uid, userIds)) : [];
@@ -149,7 +150,7 @@ export function createTutorialsRouter(db: any) {
 
       const existing = await db.select().from(tutorial_feedback).where(
         and(
-          sql`${tutorial_feedback.tutorialId}::text = ${idRaw}`,
+          matchId(tutorial_feedback.tutorialId, idRaw),
           eq(tutorial_feedback.userId, userId)
         )
       );
@@ -158,7 +159,7 @@ export function createTutorialsRouter(db: any) {
       if (existing.length > 0) {
         [feedbackRecord] = await db.update(tutorial_feedback)
           .set({ isHelpful, comment: comment || null })
-          .where(eq(tutorial_feedback.id, existing[0].id))
+          .where(matchId(tutorial_feedback.id, existing[0].id))
           .returning();
       } else {
         [feedbackRecord] = await db.insert(tutorial_feedback)
@@ -177,7 +178,7 @@ export function createTutorialsRouter(db: any) {
   router.get("/feedback/:id/comments", async (req, res) => {
     try {
       const idRaw = req.params.id;
-      const commentsList = await db.select().from(feedback_comments).where(sql`${feedback_comments.feedbackId}::text = ${idRaw}`);
+      const commentsList = await db.select().from(feedback_comments).where(matchId(feedback_comments.feedbackId, idRaw));
 
       const userIds: string[] = Array.from(new Set(commentsList.map((c: any) => String(c.userId)).filter(Boolean)));
       const userRecords = userIds.length > 0 ? await db.select().from(users).where(inArray(users.uid, userIds)) : [];
@@ -233,7 +234,7 @@ export function createTutorialsRouter(db: any) {
   router.get("/tutorials/:id/comments", async (req, res) => {
     try {
       const idRaw = req.params.id;
-      const commentsList = await db.select().from(tutorial_comments).where(sql`${tutorial_comments.tutorialId}::text = ${idRaw}`);
+      const commentsList = await db.select().from(tutorial_comments).where(matchId(tutorial_comments.tutorialId, idRaw));
 
       const userIds: string[] = Array.from(new Set(commentsList.map((c: any) => String(c.userId)).filter(Boolean)));
       const userRecords = userIds.length > 0 ? await db.select().from(users).where(inArray(users.uid, userIds)) : [];

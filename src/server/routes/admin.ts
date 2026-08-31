@@ -10,6 +10,7 @@ import {
   feedback_comments, activity_logs, newbie_links, tools, newsLikes, newsComments
 } from '../../db/schema';
 import { requireAuth, AuthRequest } from '../../middleware/auth';
+import { matchId } from '../../lib/auth-utils';
 import { logger } from '../../middleware/logger';
 import { uploadFileToStorage, getFileFromStorage, deleteFileFromStorage, isS3Configured } from '../../lib/storage';
 import { GoogleGenAI, Type } from '@google/genai';
@@ -103,7 +104,7 @@ export function createAdminRouter(db: any) {
     try {
       const idRaw = req.params.id;
       const { title, icon, color } = req.body;
-      const [sec] = await db.update(tutorial_sections).set({ title, icon, color }).where(sql`${tutorial_sections.id}::text = ${idRaw}`).returning();
+      const [sec] = await db.update(tutorial_sections).set({ title, icon, color }).where(matchId(tutorial_sections.id, idRaw)).returning();
       res.json(sec);
     } catch (e) {
       console.error(e);
@@ -116,7 +117,7 @@ export function createAdminRouter(db: any) {
     if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
     try {
       const idRaw = req.params.id;
-      await db.delete(tutorial_sections).where(sql`${tutorial_sections.id}::text = ${idRaw}`);
+      await db.delete(tutorial_sections).where(matchId(tutorial_sections.id, idRaw));
       res.json({ success: true });
     } catch (e) {
       console.error(e);
@@ -151,7 +152,7 @@ export function createAdminRouter(db: any) {
       const stepsJson = Array.isArray(steps) ? JSON.stringify(steps) : (steps ? String(steps) : '[]');
       const [tut] = await db.update(tutorials).set({
         sectionId, title, description, text: text || '', steps: stepsJson, videoUrl, imageUrl, linkUrl, linkTitle
-      }).where(sql`${tutorials.id}::text = ${idRaw}`).returning();
+      }).where(matchId(tutorials.id, idRaw)).returning();
       let parsedSteps: any[] = [];
       try { parsedSteps = JSON.parse(tut.steps || '[]'); } catch(_e) { parsedSteps = []; }
       res.json({ ...tut, steps: parsedSteps });
@@ -166,7 +167,7 @@ export function createAdminRouter(db: any) {
     if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
     try {
       const idRaw = req.params.id;
-      await db.delete(tutorials).where(sql`${tutorials.id}::text = ${idRaw}`);
+      await db.delete(tutorials).where(matchId(tutorials.id, idRaw));
       res.json({ success: true });
     } catch (e) {
       console.error(e);
@@ -549,7 +550,7 @@ export function createAdminRouter(db: any) {
 
       const [updated] = await db.update(course_resources)
         .set(updateData)
-        .where(sql`${course_resources.id}::text = ${idRaw}`)
+        .where(matchId(course_resources.id, idRaw))
         .returning();
 
       if (!updated) {
@@ -570,7 +571,7 @@ export function createAdminRouter(db: any) {
       const idRaw = String(req.params.id || '').trim();
 
       // 1. First attempt direct deletion from course_resources by primary key using string/sql casting
-      const deleted = await db.delete(course_resources).where(sql`${course_resources.id}::text = ${idRaw}`).returning();
+      const deleted = await db.delete(course_resources).where(matchId(course_resources.id, idRaw)).returning();
       if (deleted.length > 0) {
         return res.json({ success: true, deletedCount: deleted.length });
       }
@@ -587,10 +588,10 @@ export function createAdminRouter(db: any) {
       }
 
       if (subjectIdToClear) {
-        const [targetSubj] = await db.select().from(subjects).where(sql`${subjects.id}::text = ${subjectIdToClear}`);
+        const [targetSubj] = await db.select().from(subjects).where(matchId(subjects.id, subjectIdToClear));
         if (targetSubj) {
-          await db.update(subjects).set({ driveLink: null, whatsappLink: null }).where(sql`${subjects.id}::text = ${subjectIdToClear}`);
-          await db.delete(course_resources).where(sql`${course_resources.subjectId}::text = ${subjectIdToClear}`);
+          await db.update(subjects).set({ driveLink: null, whatsappLink: null }).where(matchId(subjects.id, subjectIdToClear));
+          await db.delete(course_resources).where(matchId(course_resources.subjectId, subjectIdToClear));
           return res.json({ success: true, syntheticDeleted: true });
         }
       }
@@ -607,9 +608,9 @@ export function createAdminRouter(db: any) {
     if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
     try {
       const idRaw = req.params.id;
-      await db.delete(majorCourses).where(sql`${majorCourses.subjectId}::text = ${idRaw}`);
-      await db.delete(course_resources).where(sql`${course_resources.subjectId}::text = ${idRaw}`);
-      await db.delete(subjects).where(sql`${subjects.id}::text = ${idRaw}`);
+      await db.delete(majorCourses).where(matchId(majorCourses.subjectId, idRaw));
+      await db.delete(course_resources).where(matchId(course_resources.subjectId, idRaw));
+      await db.delete(subjects).where(matchId(subjects.id, idRaw));
       res.json({ success: true });
     } catch (e: any) {
       console.error("[Admin Subject Delete Error]", e);
@@ -622,8 +623,8 @@ export function createAdminRouter(db: any) {
     if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
     try {
       const idRaw = req.params.id;
-      await db.delete(majorCourses).where(sql`${majorCourses.majorId}::text = ${idRaw}`);
-      await db.delete(majors).where(sql`${majors.id}::text = ${idRaw}`);
+      await db.delete(majorCourses).where(matchId(majorCourses.majorId, idRaw));
+      await db.delete(majors).where(matchId(majors.id, idRaw));
       res.json({ success: true });
     } catch (e: any) {
       console.error("[Admin Major Delete Error]", e);
@@ -636,9 +637,9 @@ export function createAdminRouter(db: any) {
     if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
     try {
       const idRaw = req.params.id;
-      await db.delete(newsLikes).where(sql`${newsLikes.newsId}::text = ${idRaw}`);
-      await db.delete(newsComments).where(sql`${newsComments.newsId}::text = ${idRaw}`);
-      await db.delete(news).where(sql`${news.id}::text = ${idRaw}`);
+      await db.delete(newsLikes).where(matchId(newsLikes.newsId, idRaw));
+      await db.delete(newsComments).where(matchId(newsComments.newsId, idRaw));
+      await db.delete(news).where(matchId(news.id, idRaw));
       res.json({ success: true });
     } catch (e: any) {
       console.error("[Admin News Delete Error]", e);
@@ -651,7 +652,7 @@ export function createAdminRouter(db: any) {
     if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
     try {
       const idRaw = req.params.id;
-      await db.delete(events).where(sql`${events.id}::text = ${idRaw}`);
+      await db.delete(events).where(matchId(events.id, idRaw));
       res.json({ success: true });
     } catch (e: any) {
       console.error("[Admin Event Delete Error]", e);
@@ -664,7 +665,7 @@ export function createAdminRouter(db: any) {
     if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
     try {
       const idRaw = req.params.id;
-      await db.delete(news_sources).where(or(sql`${news_sources.id}::text = ${idRaw}`, eq(news_sources.handle, idRaw)));
+      await db.delete(news_sources).where(or(matchId(news_sources.id, idRaw), eq(news_sources.handle, idRaw)));
       res.json({ success: true });
     } catch (e: any) {
       console.error("[Admin News Source Delete Error]", e);
@@ -1031,7 +1032,7 @@ export function createAdminRouter(db: any) {
       if (icon !== undefined) updateData.icon = icon;
       if (category !== undefined) updateData.category = category;
 
-      const [updatedTool] = await db.update(tools).set(updateData).where(sql`${tools.id}::text = ${idRaw}`).returning();
+      const [updatedTool] = await db.update(tools).set(updateData).where(matchId(tools.id, idRaw)).returning();
       if (!updatedTool) return res.status(404).json({ error: "Tool not found" });
       res.json(updatedTool);
     } catch (e) {
@@ -1048,7 +1049,7 @@ export function createAdminRouter(db: any) {
       if (!idRaw || isNaN(Number(idRaw))) {
         return res.status(400).json({ error: "Invalid tool ID" });
       }
-      await db.delete(tools).where(sql`${tools.id}::text = ${idRaw}`);
+      await db.delete(tools).where(matchId(tools.id, idRaw));
       res.json({ success: true });
     } catch (e) {
       console.error(e);
