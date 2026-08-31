@@ -15,6 +15,7 @@
     "test:tier2": "tsx --test tests/auth_tier2.test.ts",
     "test:tier3": "tsx --test tests/auth_tier3.test.ts",
     "test:tier4": "tsx --test tests/auth_tier4.test.ts",
+    "test:full": "tsx --test tests/full_app_crud.test.ts",
     "wizard": "tsx scripts/setup-wizard.ts",
     "create-user": "tsx scripts/setup-wizard.ts"
   },
