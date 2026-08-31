@@ -241,17 +241,25 @@ export function Resources() {
   const handleDeleteResource = async (id: number) => {
     if (!isAdmin) return;
     if (!window.confirm('هل أنت متأكد من حذف هذا المصدر؟')) return;
+
+    const prevResources = [...resources];
+    setResources(prev => prev.filter(r => r.id !== id));
+
     const token = user ? await user.getIdToken() : localStorage.getItem('token');
     try {
       const res = await fetch(`/api/admin/resources/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (res.ok) {
-        setResources(prev => prev.filter(r => r.id !== id));
+      if (!res.ok) {
+        setResources(prevResources);
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || err.message || 'فشل حذف المصدر من الخادم');
       }
     } catch (err) {
+      setResources(prevResources);
       console.error('Failed to delete resource', err);
+      alert('حدث خطأ أثناء الاتصال بالخادم لحذف المصدر');
     }
   };
 

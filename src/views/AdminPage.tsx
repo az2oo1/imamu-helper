@@ -417,13 +417,35 @@ export function AdminPage() {
     const targetUrl = deleteModal.url;
 
     // Optimistic Deletion
-    let prevSubjects = [...subjects];
+    const parts = targetUrl.split('/');
+    const rawId = parts[parts.length - 1];
+    const numId = Number(rawId);
+
+    const prevSubjects = [...subjects];
+    const prevAdminUsers = [...adminUsers];
+    const prevResources = [...resourcesList];
+    const prevEvents = [...events];
+    const prevMajors = [...majors];
+    const prevTutorials = [...tutorials];
+    const prevNewbieLinks = [...newbieLinks];
+    const prevNewsSources = [...newsSources];
+
     if (targetUrl.includes('/api/admin/subjects/')) {
-      const parts = targetUrl.split('/');
-      const subjId = Number(parts[parts.length - 1]);
-      if (subjId) {
-        setSubjects(prev => prev.filter(s => s.id !== subjId));
-      }
+      if (numId) setSubjects(prev => prev.filter(s => s.id !== numId));
+    } else if (targetUrl.includes('/api/admin/users/')) {
+      setAdminUsers(prev => prev.filter(u => String(u.id) !== rawId && u.uid !== rawId));
+    } else if (targetUrl.includes('/api/admin/resources/')) {
+      if (numId) setResourcesList(prev => prev.filter(r => r.id !== numId));
+    } else if (targetUrl.includes('/api/admin/events/')) {
+      if (numId) setEvents(prev => prev.filter(e => e.id !== numId));
+    } else if (targetUrl.includes('/api/admin/majors/')) {
+      if (numId) setMajors(prev => prev.filter(m => m.id !== numId));
+    } else if (targetUrl.includes('/api/admin/tutorials/')) {
+      if (numId) setTutorials(prev => prev.filter(t => t.id !== numId));
+    } else if (targetUrl.includes('/api/admin/newbie/links/')) {
+      if (numId) setNewbieLinks(prev => prev.filter(l => l.id !== numId));
+    } else if (targetUrl.includes('/api/admin/news_sources/')) {
+      setNewsSources(prev => prev.filter(ns => String(ns.id) !== rawId && ns.handle !== rawId));
     }
 
     setDeleteModal(null);
@@ -433,14 +455,31 @@ export function AdminPage() {
       const res = await fetch(targetUrl, { method: 'DELETE', headers: { Authorization: `Bearer ${t}` } });
       if (res.ok) { 
         fetchData(); 
-        fetchUsers(); 
+        fetchUsers(userSearch); 
         toast('success', 'Deleted successfully'); 
       } else {
-        setSubjects(prevSubjects); // Rollback
-        toast('error', 'Failed to delete'); 
+        // Rollback optimistic state
+        setSubjects(prevSubjects);
+        setAdminUsers(prevAdminUsers);
+        setResourcesList(prevResources);
+        setEvents(prevEvents);
+        setMajors(prevMajors);
+        setTutorials(prevTutorials);
+        setNewbieLinks(prevNewbieLinks);
+        setNewsSources(prevNewsSources);
+        const err = await res.json().catch(() => ({}));
+        toast('error', err.error || err.message || 'Failed to delete'); 
       }
     } catch (e) { 
-      setSubjects(prevSubjects); // Rollback
+      // Rollback optimistic state
+      setSubjects(prevSubjects);
+      setAdminUsers(prevAdminUsers);
+      setResourcesList(prevResources);
+      setEvents(prevEvents);
+      setMajors(prevMajors);
+      setTutorials(prevTutorials);
+      setNewbieLinks(prevNewbieLinks);
+      setNewsSources(prevNewsSources);
       console.error(e); 
       toast('error', 'Network error'); 
     }
