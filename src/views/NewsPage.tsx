@@ -74,7 +74,9 @@ export function NewsPage() {
   const handleLike = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      const res = await fetch(`/api/news/${id}/like`, { method: 'POST' });
+      const token = user ? await user.getIdToken() : localStorage.getItem('token');
+      const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
+      const res = await fetch(`/api/news/${id}/like`, { method: 'POST', headers });
       if (res.ok) {
         setNews(news.map(item => {
           if (item.id === id) {

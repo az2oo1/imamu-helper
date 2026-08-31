@@ -321,17 +321,11 @@ export default function CreateResourceModal({
           {/* STEP 2: Storage & Group Links */}
           {activeStep === 2 && (
             <div className="space-y-4 animate-fadeIn">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Box Storage Link (مجلد Box / Cloud Storage)</label>
-                <input
-                  type="text"
-                  placeholder="https://app.box.com/s/..."
-                  value={resourceForm.boxLink || ''}
-                  onChange={e => setResourceForm((s: any) => ({ ...s, boxLink: e.target.value }))}
-                  className="w-full py-2.5 px-3 rounded-xl text-sm border outline-none font-mono"
-                  style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
-                />
-              </div>
+              <ResourceLinksInput 
+                label="Box & Drive Storage Links (مجلدات درايف و Box - متعدد)" 
+                value={resourceForm.boxLink || ''} 
+                onChange={val => setResourceForm((s: any) => ({ ...s, boxLink: val }))} 
+              />
 
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>WhatsApp Group Link (رابط جروب الواتساب)</label>

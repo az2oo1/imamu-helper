@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../lib/AuthContext';
-import { BookOpen, Search, ExternalLink, Folder, Plus, Trash2, Pencil, Info, MessageCircle } from 'lucide-react';
+import { BookOpen, Search, ExternalLink, Folder, Plus, Trash2, Pencil, Info, MessageCircle, ChevronDown } from 'lucide-react';
 import { InView, SpotlightCard } from '../components/ui';
 import { CourseDetailsModal } from '../components/CourseDetailsModal';
 import CreateResourceModal from '../components/CreateResourceModal';
@@ -25,6 +25,143 @@ interface Resource {
   bannerUrl?: string;
   description?: string;
   createdAt: string;
+}
+
+interface DriveLinkItem {
+  title: string;
+  url: string;
+}
+
+export function parseDriveLinks(rawVal?: string | null): DriveLinkItem[] {
+  if (!rawVal || !rawVal.trim()) return [];
+  const text = rawVal.trim();
+
+  // Try JSON Array Format
+  if (text.startsWith('[') && text.endsWith(']')) {
+    try {
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((item: any, idx: number) => ({
+            title: item.title || item.name || `رابط مصادر ${idx + 1}`,
+            url: item.url || item.link || ''
+          }))
+          .filter(item => Boolean(item.url));
+      }
+    } catch (_e) {}
+  }
+
+  // Try Markdown Format [title](url)
+  const links: DriveLinkItem[] = [];
+  const mdRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+  let match;
+  while ((match = mdRegex.exec(text)) !== null) {
+    links.push({ title: match[1], url: match[2] });
+  }
+  if (links.length > 0) return links;
+
+  // Split plain URLs by newline or comma
+  const plainUrls = text.split(/[\n,;]+/).map(s => s.trim()).filter(s => s.startsWith('http'));
+  if (plainUrls.length > 0) {
+    return plainUrls.map((url, i) => ({
+      title: plainUrls.length === 1 ? 'Box / Drive' : `رابط درايف ${i + 1}`,
+      url
+    }));
+  }
+
+  return [{ title: 'Box / Drive', url: text }];
+}
+
+function DriveLinkButton({ boxLink, freeResourcesUrl }: { boxLink?: string; freeResourcesUrl?: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  const links = React.useMemo(() => {
+    const combined = [
+      ...parseDriveLinks(boxLink),
+      ...parseDriveLinks(freeResourcesUrl)
+    ];
+    const uniqueMap = new Map<string, DriveLinkItem>();
+    combined.forEach(l => {
+      if (l.url && !uniqueMap.has(l.url)) {
+        uniqueMap.set(l.url, l);
+      }
+    });
+    return Array.from(uniqueMap.values());
+  }, [boxLink, freeResourcesUrl]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  if (links.length === 0) return null;
+
+  // Single link -> direct click opens URL
+  if (links.length === 1) {
+    return (
+      <a
+        href={links[0].url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 text-xs font-bold transition"
+      >
+        <Folder className="w-3.5 h-3.5 text-blue-500" />
+        <span>{links[0].title || 'Box / Drive'}</span>
+      </a>
+    );
+  }
+
+  // Multiple links -> dropdown popup menu
+  return (
+    <div className="relative inline-block text-right" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(prev => !prev)}
+        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white border border-blue-500 text-xs font-bold transition cursor-pointer shadow-sm"
+      >
+        <Folder className="w-3.5 h-3.5" />
+        <span>روابط درايف ({links.length})</span>
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div 
+          className="absolute right-0 bottom-full mb-2 w-56 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150 py-1.5"
+          dir="rtl"
+        >
+          <div className="px-3 py-1.5 border-b border-slate-100 dark:border-zinc-800 text-[11px] font-bold text-slate-400 dark:text-zinc-500">
+            اختر رابط المصدر ({links.length}):
+          </div>
+          <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 dark:divide-zinc-800/50">
+            {links.map((link, idx) => (
+              <a
+                key={idx}
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center justify-between px-3.5 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-950/50 text-xs font-semibold text-slate-800 dark:text-zinc-200 hover:text-blue-600 dark:hover:text-blue-400 transition"
+              >
+                <div className="flex items-center gap-2 truncate">
+                  <Folder className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                  <span className="truncate">{link.title}</span>
+                </div>
+                <ExternalLink className="w-3 h-3 text-slate-400 shrink-0 opacity-70" />
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function Resources() {
@@ -343,17 +480,7 @@ export function Resources() {
                     <span>تفاصيل المادة</span>
                   </button>
 
-                  {item.boxLink && (
-                    <a
-                      href={item.boxLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 text-xs font-bold transition"
-                    >
-                      <Folder className="w-3.5 h-3.5" />
-                      <span>Box / Drive</span>
-                    </a>
-                  )}
+                  <DriveLinkButton boxLink={item.boxLink} freeResourcesUrl={item.freeResourcesUrl} />
 
                   {item.whatsappUrl && (
                     <a

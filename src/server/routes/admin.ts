@@ -7,7 +7,7 @@ import { eq, desc, and, or, sql, inArray } from 'drizzle-orm';
 import { 
   users, majors, subjects, course_resources, events, news, majorCourses, 
   news_sources, global_settings, tutorial_sections, tutorials, tutorial_feedback, 
-  feedback_comments, activity_logs, newbie_links, tools
+  feedback_comments, activity_logs, newbie_links, tools, newsLikes, newsComments
 } from '../../db/schema';
 import { requireAuth, AuthRequest } from '../../middleware/auth';
 import { logger } from '../../middleware/logger';
@@ -556,15 +556,99 @@ export function createAdminRouter(db: any) {
     }
   });
 
-  // Admin Delete Resource
+  // Admin Delete Resource (supports synthetic IDs >= 10000)
   router.delete("/admin/resources/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
     try {
       const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid resource ID" });
+
+      if (id >= 10000) {
+        const subjectId = Math.floor(id / 10000);
+        await db.update(subjects).set({ driveLink: null, whatsappLink: null }).where(eq(subjects.id, subjectId));
+        await db.delete(course_resources).where(eq(course_resources.subjectId, subjectId));
+        return res.json({ success: true });
+      }
+
       await db.delete(course_resources).where(eq(course_resources.id, id));
       res.json({ success: true });
     } catch (e: any) {
       console.error("[Admin Resource Delete Error]", e);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Admin Delete Subject
+  router.delete("/admin/subjects/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid subject ID" });
+      await db.delete(majorCourses).where(eq(majorCourses.subjectId, id));
+      await db.delete(course_resources).where(eq(course_resources.subjectId, id));
+      await db.delete(subjects).where(eq(subjects.id, id));
+      res.json({ success: true });
+    } catch (e: any) {
+      console.error("[Admin Subject Delete Error]", e);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Admin Delete Major
+  router.delete("/admin/majors/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid major ID" });
+      await db.delete(majorCourses).where(eq(majorCourses.majorId, id));
+      await db.delete(majors).where(eq(majors.id, id));
+      res.json({ success: true });
+    } catch (e: any) {
+      console.error("[Admin Major Delete Error]", e);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Admin Delete News Post
+  router.delete("/admin/news/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid news ID" });
+      await db.delete(newsLikes).where(eq(newsLikes.newsId, id));
+      await db.delete(newsComments).where(eq(newsComments.newsId, id));
+      await db.delete(news).where(eq(news.id, id));
+      res.json({ success: true });
+    } catch (e: any) {
+      console.error("[Admin News Delete Error]", e);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Admin Delete Calendar Event
+  router.delete("/admin/events/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid event ID" });
+      await db.delete(events).where(eq(events.id, id));
+      res.json({ success: true });
+    } catch (e: any) {
+      console.error("[Admin Event Delete Error]", e);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Admin Delete News Source
+  router.delete("/admin/news_sources/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid news source ID" });
+      await db.delete(news_sources).where(eq(news_sources.id, id));
+      res.json({ success: true });
+    } catch (e: any) {
+      console.error("[Admin News Source Delete Error]", e);
       res.status(500).json({ error: "Server error" });
     }
   });

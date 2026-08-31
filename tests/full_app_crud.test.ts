@@ -261,6 +261,13 @@ describe('Exhaustive Full Application Endpoints & CRUD Operations Test Suite', (
       assert.equal(res.status, 200);
       assert.equal(res.data.success, true);
     });
+
+    it('DELETE /api/admin/resources/:id - deletes synthetic subject resource >= 10000 (Admin)', async () => {
+      const synthId = testSubjectId * 10000;
+      const res = await adminClient.delete(`/api/admin/resources/${synthId}`);
+      assert.equal(res.status, 200);
+      assert.equal(res.data.success, true);
+    });
   });
 
   // 5. News, Likes, Comments & Events CRUD
@@ -343,6 +350,40 @@ describe('Exhaustive Full Application Endpoints & CRUD Operations Test Suite', (
       const res = await unauthClient.get('/api/events');
       assert.equal(res.status, 200);
       assert.ok(Array.isArray(res.data));
+    });
+
+    it('DELETE /api/admin/news/:id - deletes news item (Admin)', async () => {
+      const res = await adminClient.delete(`/api/admin/news/${testNewsId}`);
+      assert.equal(res.status, 200);
+      assert.equal(res.data.success, true);
+    });
+
+    it('DELETE /api/admin/events/:id - deletes calendar event (Admin)', async () => {
+      const res = await adminClient.delete(`/api/admin/events/${testEventId}`);
+      assert.equal(res.status, 200);
+      assert.equal(res.data.success, true);
+    });
+
+    it('DELETE /api/admin/news_sources/:id - deletes news source (Admin)', async () => {
+      const listRes = await adminClient.get('/api/admin/news_sources');
+      const found = listRes.data.find((s: any) => s.handle === testNewsSourceHandle);
+      if (found) {
+        const res = await adminClient.delete(`/api/admin/news_sources/${found.id}`);
+        assert.equal(res.status, 200);
+        assert.equal(res.data.success, true);
+      }
+    });
+
+    it('DELETE /api/admin/subjects/:id - deletes subject/course (Admin)', async () => {
+      const res = await adminClient.delete(`/api/admin/subjects/${testSubjectId}`);
+      assert.equal(res.status, 200);
+      assert.equal(res.data.success, true);
+    });
+
+    it('DELETE /api/admin/majors/:id - deletes major (Admin)', async () => {
+      const res = await adminClient.delete(`/api/admin/majors/${testMajorId}`);
+      assert.equal(res.status, 200);
+      assert.equal(res.data.success, true);
     });
   });
 
