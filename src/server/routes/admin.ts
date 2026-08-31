@@ -556,21 +556,34 @@ export function createAdminRouter(db: any) {
     }
   });
 
-  // Admin Delete Resource (supports synthetic IDs >= 10000)
+  // Admin Delete Resource (supports BigInt/integer PKs and synthetic IDs >= 10000)
   router.delete("/admin/resources/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
     try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ error: "Invalid resource ID" });
+      const idRaw = req.params.id;
+      const numericId = parseInt(idRaw);
 
-      if (id >= 10000) {
-        const subjectId = Math.floor(id / 10000);
-        await db.update(subjects).set({ driveLink: null, whatsappLink: null }).where(eq(subjects.id, subjectId));
-        await db.delete(course_resources).where(eq(course_resources.subjectId, subjectId));
-        return res.json({ success: true });
+      if (isNaN(numericId)) {
+        return res.status(400).json({ error: "Invalid resource ID" });
       }
 
-      await db.delete(course_resources).where(eq(course_resources.id, id));
+      // 1. First attempt direct deletion from course_resources by primary key
+      const deleted = await db.delete(course_resources).where(eq(course_resources.id, numericId)).returning();
+      if (deleted.length > 0) {
+        return res.json({ success: true, deletedCount: deleted.length });
+      }
+
+      // 2. If no course_resource row was deleted AND numericId >= 10000, check if it's a synthetic subject resource
+      if (numericId >= 10000) {
+        const subjectId = Math.floor(numericId / 10000);
+        const [targetSubj] = await db.select().from(subjects).where(eq(subjects.id, subjectId));
+        if (targetSubj) {
+          await db.update(subjects).set({ driveLink: null, whatsappLink: null }).where(eq(subjects.id, subjectId));
+          await db.delete(course_resources).where(eq(course_resources.subjectId, subjectId));
+          return res.json({ success: true, syntheticDeleted: true });
+        }
+      }
+
       res.json({ success: true });
     } catch (e: any) {
       console.error("[Admin Resource Delete Error]", e);

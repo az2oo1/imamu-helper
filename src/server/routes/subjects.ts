@@ -64,40 +64,50 @@ export function createSubjectsRouter(db: any) {
           sql`LOWER(${subjects.name}) LIKE LOWER(${'%' + idOrCode + '%'}) OR LOWER(${subjects.code}) LIKE LOWER(${'%' + idOrCode + '%'})`
         );
       }
-      const subject = subjectList[0];
+      let subject = subjectList[0];
 
+      // If subject was not found directly, check if idOrCode matches a course_resource
       if (!subject) {
-        const connectUrl = process.env.CONNECT_APP_URL || 'http://localhost:3000';
         let matchingResources: any[] = [];
-
         if (isNumeric) {
           matchingResources = await db.select().from(course_resources).where(eq(course_resources.id, Number(idOrCode)));
-        } else {
+        }
+        if (matchingResources.length === 0) {
           matchingResources = await db.select().from(course_resources).where(
-            sql`LOWER(${course_resources.title}) LIKE LOWER(${'%' + idOrCode + '%'})`
+            sql`LOWER(${course_resources.title}) LIKE LOWER(${'%' + idOrCode + '%'}) OR LOWER(${course_resources.description}) LIKE LOWER(${'%' + idOrCode + '%'})`
           );
         }
 
         const firstRes = matchingResources[0];
-        const fallbackCode = isNumeric 
-          ? (firstRes?.title?.match(/[A-Z]{2,4}\d{3,4}|عال\d{4}/i)?.[0] || 'مادة') 
-          : idOrCode.toUpperCase();
-        const fallbackName = firstRes?.title || `مادة ${fallbackCode}`;
-
-        return res.json({
-          course: {
-            id: isNumeric ? Number(idOrCode) : 0,
-            code: fallbackCode,
-            name: fallbackName,
-            creditHours: 3,
-            level: null,
-            description: firstRes?.description || `تفاصيل ومعلومات مادة ${fallbackCode}`,
-            resources: matchingResources,
-            prerequisites: [],
-            dependents: [],
-            connectUrl: `${connectUrl.replace(/\/$/, '')}/academics?courseId=${encodeURIComponent(fallbackCode)}`
+        // If resource is linked to a subjectId, resolve the parent subject!
+        if (firstRes && firstRes.subjectId) {
+          const linkedSubj = (await db.select().from(subjects).where(eq(subjects.id, firstRes.subjectId)))[0];
+          if (linkedSubj) {
+            subject = linkedSubj;
           }
-        });
+        }
+
+        // If still no subject exists in catalog, return rich fallback course object
+        if (!subject) {
+          const connectUrl = process.env.CONNECT_APP_URL || 'http://localhost:3000';
+          const fallbackCode = firstRes?.title?.match(/[A-Z]{2,4}\d{3,4}|عال\d{4}/i)?.[0] || (isNumeric ? 'مادة' : idOrCode.toUpperCase());
+          const fallbackName = cleanCourseName(firstRes?.title || firstRes?.description || `مصادر مادة ${fallbackCode}`);
+
+          return res.json({
+            course: {
+              id: isNumeric ? Number(idOrCode) : 0,
+              code: fallbackCode,
+              name: fallbackName,
+              creditHours: 3,
+              level: null,
+              description: firstRes?.description || `تفاصيل ومعلومات مادة ${fallbackCode}`,
+              resources: matchingResources,
+              prerequisites: [],
+              dependents: [],
+              connectUrl: `${connectUrl.replace(/\/$/, '')}/academics?courseId=${encodeURIComponent(fallbackCode)}`
+            }
+          });
+        }
       }
 
       const allResources = await db.select().from(course_resources).where(eq(course_resources.subjectId, subject.id));
@@ -249,12 +259,16 @@ function cleanCourseName(name: string): string {
         const majorStr = majorNames.length > 0 ? majorNames.join(' / ') : 'جميع التخصصات';
         const cleanName = s ? cleanCourseName(s.name) : '';
 
+        const rawTitle = cr.title || (s ? `مصادر مادة ${s.code} - ${cleanName}` : 'باقة مصادر مادة');
+        const cleanTitle = cleanCourseName(rawTitle);
+        const extractedCode = s?.code || (rawTitle ? (rawTitle.split('-')[0].replace(/^مصادر مادة\s*/i, '').trim()) : 'مادة');
+
         resourcesList.push({
           id: cr.id,
           subjectId: cr.subjectId || null,
-          title: cr.title || (s ? `مصادر مادة ${s.code} - ${cleanName}` : 'باقة مصادر مادة'),
-          courseCode: s?.code || (cr.title ? cr.title.split('-')[0].trim() : 'مادة'),
-          courseName: s ? cleanName : (cr.description || cr.title || 'مصادر أكاديمية'),
+          title: cleanTitle,
+          courseCode: extractedCode,
+          courseName: s ? cleanName : cleanCourseName(cr.description || cr.title || 'مصادر أكاديمية'),
           major: majorStr,
           majors: majorNames,
           type: cr.type || 'drive',

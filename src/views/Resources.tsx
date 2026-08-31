@@ -436,7 +436,7 @@ export function Resources() {
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50">
-                      {item.courseCode}
+                      {item.courseCode ? (item.courseCode.startsWith('مادة') || item.courseCode.includes('قروب') || item.courseCode.length > 8 ? item.courseCode : `مادة ${item.courseCode}`) : 'مصدر أكاديمي'}
                     </span>
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] text-slate-500 dark:text-zinc-400 font-medium">{item.major}</span>
@@ -465,16 +465,24 @@ export function Resources() {
                     {item.title}
                   </h3>
                   
-                  <p className="text-xs text-slate-500 dark:text-zinc-400 mb-6 line-clamp-2 leading-relaxed">
-                    {item.courseName}
-                  </p>
+                  {item.description && item.description.trim() !== item.title.trim() ? (
+                    <p className="text-xs text-slate-500 dark:text-zinc-400 line-clamp-2 leading-relaxed mb-4">
+                      {item.description}
+                    </p>
+                  ) : item.courseName && item.courseName.trim() !== item.title.trim() ? (
+                    <p className="text-xs text-slate-500 dark:text-zinc-400 line-clamp-2 leading-relaxed mb-4">
+                      {item.courseName}
+                    </p>
+                  ) : (
+                    <div className="mb-4" />
+                  )}
                 </div>
 
                 {/* Resource Links */}
-                <div className="flex flex-wrap gap-2 border-t border-slate-100 dark:border-zinc-800 pt-4 mt-auto">
+                <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 dark:border-zinc-800/80 pt-3.5 mt-auto w-full">
                   <button
                     onClick={() => setSelectedCourse(item.subjectId || item.courseCode || item.id)}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 text-xs font-bold transition"
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 text-xs font-bold transition shrink-0 cursor-pointer"
                   >
                     <Info className="w-3.5 h-3.5" />
                     <span>تفاصيل المادة</span>
@@ -487,7 +495,7 @@ export function Resources() {
                       href={item.whatsappUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 text-xs font-bold transition"
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 text-xs font-bold transition shrink-0"
                     >
                       <MessageCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                       <span>واتساب</span>
