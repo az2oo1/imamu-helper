@@ -178,31 +178,7 @@ export function createAuthRouter(db: any) {
         valid = await bcrypt.compare(password, user.passwordHash);
       }
 
-      // IMAP auth fallback if configured
-      if (!valid) {
-        const settings = await db.query.global_settings.findFirst();
-        if (settings?.imapHost && settings?.imapPort) {
-          const { verifyImapCredentials } = await import('../../lib/imap-auth');
-          valid = await verifyImapCredentials(settings.imapHost as string, settings.imapPort as number, (settings.imapSecure as boolean) ?? true, identifier, password);
 
-          if (valid) {
-            if (!user) {
-              const uid = crypto.randomUUID();
-              const hashedPassword = await bcrypt.hash(password, 10);
-              const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(users);
-              const isAdmin = Number(count) === 0;
-
-              const result = await db.insert(users).values({ 
-                uid, email: identifier, passwordHash: hashedPassword, userName: cleanedInput, isAdmin 
-              }).returning();
-              user = result[0];
-            } else {
-              const hashedPassword = await bcrypt.hash(password, 10);
-              await db.update(users).set({ passwordHash: hashedPassword }).where(eq(users.id, user.id));
-            }
-          }
-        }
-      }
 
       if (!user) {
         return res.status(401).json({ error: "حساب غير موجود. يرجى إنشاء حساب جديد أولاً." });

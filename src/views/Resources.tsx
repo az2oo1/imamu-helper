@@ -7,6 +7,20 @@ import { BookOpen, Search, ExternalLink, Folder, Plus, Trash2, Pencil, Info, Mes
 import { InView, SpotlightCard } from '../components/ui';
 import { CourseDetailsModal } from '../components/CourseDetailsModal';
 import CreateResourceModal from '../components/CreateResourceModal';
+import { cleanCourseName, cleanUrlProtocol, parseResourceUrl, isWhatsappUrl } from '../lib/url-utils';
+
+function matchSubjectIds(id1: any, id2: any): boolean {
+  if (id1 == null || id2 == null || id1 === '' || id2 === '') return false;
+  const s1 = String(id1).trim();
+  const s2 = String(id2).trim();
+  if (s1 === s2) return true;
+  const n1 = Number(s1);
+  const n2 = Number(s2);
+  if (!isNaN(n1) && !isNaN(n2)) {
+    return Math.abs(n1 - n2) < 200;
+  }
+  return false;
+}
 
 interface Resource {
   id: number;
@@ -56,7 +70,7 @@ export function parseDriveLinks(rawVal?: string | null): DriveLinkItem[] {
   const mdRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
   let match;
   while ((match = mdRegex.exec(text)) !== null) {
-    links.push({ title: match[1], url: match[2] });
+    links.push({ title: match[1], url: cleanUrlProtocol(match[2]) });
   }
   if (links.length > 0) return links;
 
@@ -64,12 +78,12 @@ export function parseDriveLinks(rawVal?: string | null): DriveLinkItem[] {
   const plainUrls = text.split(/[\n,;]+/).map(s => s.trim()).filter(s => s.startsWith('http'));
   if (plainUrls.length > 0) {
     return plainUrls.map((url, i) => ({
-      title: plainUrls.length === 1 ? 'Box / Drive' : `رابط درايف ${i + 1}`,
+      title: plainUrls.length === 1 ? 'الملفات' : `رابط درايف ${i + 1}`,
       url
     }));
   }
 
-  return [{ title: 'Box / Drive', url: text }];
+  return [{ title: 'الملفات', url: text }];
 }
 
 function DriveLinkButton({ boxLink }: { boxLink?: string }) {
@@ -101,41 +115,41 @@ function DriveLinkButton({ boxLink }: { boxLink?: string }) {
 
   if (links.length === 0) return null;
 
-  // Single link -> direct click opens URL
+  // Single link -> direct click opens URL with fixed button label 'الملفات'
   if (links.length === 1) {
     return (
       <a
         href={links[0].url}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 text-xs font-bold transition shrink-0 whitespace-nowrap"
+        className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
       >
         <Folder className="w-3.5 h-3.5 text-blue-500" />
-        <span>{links[0].title || 'Box / Drive'}</span>
+        <span>الملفات</span>
       </a>
     );
   }
 
-  // Multiple links -> dropdown popup menu
+  // Multiple links (2 or more) -> fixed button label 'الملفات (N)', list in dropdown shows custom names
   return (
-    <div className="relative inline-block text-right shrink-0" ref={dropdownRef}>
+    <div className={`relative inline-block text-right shrink-0 ${isOpen ? 'z-[100]' : 'z-20'}`} ref={dropdownRef}>
       <button
         type="button"
         onClick={() => setIsOpen(prev => !prev)}
-        className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white border border-blue-500 text-xs font-bold transition cursor-pointer shadow-sm whitespace-nowrap"
+        className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer shrink-0 whitespace-nowrap shadow-xs"
       >
-        <Folder className="w-3.5 h-3.5" />
-        <span>روابط درايف ({links.length})</span>
+        <Folder className="w-3.5 h-3.5 text-blue-500" />
+        <span>الملفات ({links.length})</span>
         <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {isOpen && (
         <div 
-          className="absolute right-0 bottom-full mb-2 w-56 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150 py-1.5"
+          className="absolute right-0 bottom-full mb-2 w-56 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-2xl z-[150] overflow-hidden animate-in fade-in zoom-in-95 duration-150 py-1.5"
           dir="rtl"
         >
           <div className="px-3 py-1.5 border-b border-slate-100 dark:border-zinc-800 text-[11px] font-bold text-slate-400 dark:text-zinc-500">
-            اختر رابط المصدر ({links.length}):
+            اختر الملف ({links.length}):
           </div>
           <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 dark:divide-zinc-800/50">
             {links.map((link, idx) => (
@@ -149,7 +163,7 @@ function DriveLinkButton({ boxLink }: { boxLink?: string }) {
               >
                 <div className="flex items-center gap-2 truncate">
                   <Folder className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                  <span className="truncate">{link.title}</span>
+                  <span className="truncate">{link.title || `ملف ${idx + 1}`}</span>
                 </div>
                 <ExternalLink className="w-3 h-3 text-slate-400 shrink-0 opacity-70" />
               </a>
@@ -282,7 +296,7 @@ export function Resources() {
       const innerText = p1.trim().toLowerCase();
       return (mainText.includes(innerText) || innerText.includes(mainText)) ? '' : match;
     }).trim() : '';
-    const finalTitle = resourceForm.title?.trim() || (selectedSubj ? `مصادر مادة ${selectedSubj.code} - ${cleanName || selectedSubj.name}` : 'باقة مصادر مادة');
+    const finalTitle = resourceForm.title?.trim() || (selectedSubj ? (cleanName || selectedSubj.name) : 'باقة مصادر جديدة');
     const payload = { ...resourceForm, title: finalTitle };
 
     const url = resourceForm.id ? `/api/admin/resources/${resourceForm.id}` : '/api/admin/resources';
@@ -439,16 +453,21 @@ export function Resources() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredResources.map((item) => (
-              <SpotlightCard
-                key={item.id}
-                className="border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 flex flex-col justify-between relative group"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50">
-                      {item.courseCode ? item.courseCode.replace(/^مادة\s*/i, '').trim() : 'مصدر أكاديمي'}
-                    </span>
+            {filteredResources.map((item) => {
+              const cardSubject = item.subjectId ? subjects.find(s => matchSubjectIds(s.id, item.subjectId)) : null;
+              const isRealCode = (code?: string) => code && /^[A-Z0-9\-\_]{2,10}$/i.test(code.trim()) && !/[\u0600-\u06FF]/.test(code) && code !== 'مصدر أكاديمي';
+              const finalCodeBadge = cardSubject?.code || (isRealCode(item.courseCode) ? item.courseCode : null) || 'مصدر أكاديمي';
+
+              return (
+                <SpotlightCard
+                  key={item.id}
+                  className="border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 flex flex-col justify-between relative group"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50">
+                        {finalCodeBadge.replace(/^مادة\s*/i, '').trim()}
+                      </span>
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] text-slate-500 dark:text-zinc-400 font-medium">{item.major}</span>
                       {isAdmin && (
@@ -496,13 +515,13 @@ export function Resources() {
                 </div>
 
                 {/* Resource Links */}
-                <div className="flex items-center gap-1.5 border-t border-slate-100 dark:border-zinc-800/80 pt-3.5 mt-auto w-full overflow-x-auto no-scrollbar">
+                <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 dark:border-zinc-800/80 pt-3.5 mt-auto w-full relative z-20">
                   <button
-                    onClick={() => setSelectedCourse(item.subjectId || item.courseCode || item.id)}
-                    className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 text-xs font-bold transition shrink-0 cursor-pointer whitespace-nowrap"
+                    onClick={() => setSelectedCourse(item.courseCode || item.subjectId || item.id)}
+                    className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
                   >
                     <Info className="w-3.5 h-3.5" />
-                    <span>تفاصيل المادة</span>
+                    <span>التفاصيل</span>
                   </button>
 
                   <DriveLinkButton boxLink={item.boxLink} />
@@ -512,7 +531,7 @@ export function Resources() {
                       href={item.whatsappUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 text-xs font-bold transition shrink-0 whitespace-nowrap"
+                      className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
                     >
                       <MessageCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                       <span>واتساب</span>
@@ -520,7 +539,8 @@ export function Resources() {
                   )}
                 </div>
               </SpotlightCard>
-            ))}
+            );
+          })}
           </div>
         )}
       </InView>

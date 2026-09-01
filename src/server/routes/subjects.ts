@@ -2,10 +2,59 @@ import express from 'express';
 import { eq, sql, inArray } from 'drizzle-orm';
 import { subjects, majors, majorCourses, course_resources } from '../../db/schema';
 import { requireAuth } from '../../middleware/auth';
-import { matchId } from '../../lib/auth-utils';
+import { matchId, matchSubjectIds } from '../../lib/auth-utils';
+import { cleanCourseName } from '../../lib/url-utils';
 
 export function createSubjectsRouter(db: any) {
   const router = express.Router();
+
+  // WhatsApp Group Avatar Scraper & Proxy
+  router.get("/whatsapp-avatar", async (req: express.Request, res: express.Response): Promise<any> => {
+    try {
+      const rawUrl = String(req.query.url || '').trim();
+      if (!rawUrl || (!rawUrl.includes('chat.whatsapp.com') && !rawUrl.includes('wa.me'))) {
+        return res.status(400).json({ error: "Invalid WhatsApp URL" });
+      }
+
+      // Fetch WhatsApp invite page HTML using social crawler user agent
+      const resp = await fetch(rawUrl, {
+        headers: {
+          'User-Agent': 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9'
+        }
+      });
+
+      if (!resp.ok) {
+        return res.status(404).json({ error: "Could not fetch WhatsApp link" });
+      }
+
+      const html = await resp.text();
+      const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+                      html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+
+      if (ogMatch && ogMatch[1]) {
+        const imageUrl = ogMatch[1].replace(/&amp;/g, '&');
+        const imageResp = await fetch(imageUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          }
+        });
+        if (imageResp.ok) {
+          const contentType = imageResp.headers.get('content-type') || 'image/jpeg';
+          const buffer = await imageResp.arrayBuffer();
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          return res.send(Buffer.from(buffer));
+        }
+      }
+
+      return res.status(404).json({ error: "No group image found" });
+    } catch (err) {
+      console.error("Error fetching WhatsApp avatar:", err);
+      return res.status(500).json({ error: "Failed to load WhatsApp avatar" });
+    }
+  });
 
   const getSubjectsHandler = async (req: express.Request, res: express.Response) => {
     try {
@@ -55,66 +104,136 @@ export function createSubjectsRouter(db: any) {
   const getCourseDetailsHandler = async (req: express.Request, res: express.Response): Promise<any> => {
     try {
       const { idOrCode } = req.params;
-      const isNumeric = !isNaN(Number(idOrCode)) && idOrCode.trim() !== '';
-      const cleanSearchCode = idOrCode.trim().toLowerCase().replace(/[\s\-]/g, '');
+      const rawDecoded = decodeURIComponent(idOrCode || '').trim();
+      const realId = rawDecoded.replace(/^syn(thetic)?_/, '').trim();
+      const isNumeric = !isNaN(Number(realId)) && realId !== '';
+      const cleanSearchCode = realId.toLowerCase().replace(/[\s\-]/g, '');
 
       let subjectList = await db.select().from(subjects).where(
         isNumeric 
-          ? matchId(subjects.id, idOrCode.trim())
+          ? matchId(subjects.id, realId)
           : sql`REPLACE(REPLACE(LOWER(${subjects.code}), ' ', ''), '-', '') = ${cleanSearchCode}`
       );
+      if (subjectList.length === 0 && isNumeric) {
+        const allSubjs = await db.select().from(subjects);
+        const foundSubj = allSubjs.find((s: any) => matchSubjectIds(s.id, realId));
+        if (foundSubj) {
+          subjectList = [foundSubj];
+        }
+      }
       if (subjectList.length === 0 && !isNumeric) {
         subjectList = await db.select().from(subjects).where(
-          sql`LOWER(${subjects.name}) LIKE LOWER(${'%' + idOrCode + '%'}) OR LOWER(${subjects.code}) LIKE LOWER(${'%' + idOrCode + '%'})`
+          sql`LOWER(${subjects.name}) LIKE LOWER(${'%' + realId + '%'}) OR LOWER(${subjects.code}) LIKE LOWER(${'%' + realId + '%'})`
         );
       }
+
+      // Regex extraction fallback if realId was a title string like "مصادر مادة CS1111 - ..."
+      if (subjectList.length === 0) {
+        const extractedCode = realId.match(/[A-Z]{2,4}\d{3,4}|عال\d{4}/i)?.[0];
+        if (extractedCode) {
+          const cleanExtracted = extractedCode.toLowerCase().replace(/[\s\-]/g, '');
+          subjectList = await db.select().from(subjects).where(
+            sql`REPLACE(REPLACE(LOWER(${subjects.code}), ' ', ''), '-', '') = ${cleanExtracted}`
+          );
+        }
+      }
+
       let subject = subjectList[0];
 
-      // If subject was not found directly, check if idOrCode matches a course_resource
+      // If subject was not found directly, check if idOrCode matches a course_resource or subject_id
       if (!subject) {
         let matchingResources: any[] = [];
         if (isNumeric) {
-          matchingResources = await db.select().from(course_resources).where(matchId(course_resources.id, idOrCode.trim()));
+          matchingResources = await db.select().from(course_resources).where(
+            sql`${matchId(course_resources.id, realId)} OR ${matchId(course_resources.subjectId, realId)}`
+          );
         }
         if (matchingResources.length === 0) {
           matchingResources = await db.select().from(course_resources).where(
-            sql`LOWER(${course_resources.title}) LIKE LOWER(${'%' + idOrCode + '%'}) OR LOWER(${course_resources.description}) LIKE LOWER(${'%' + idOrCode + '%'})`
+            sql`LOWER(${course_resources.title}) LIKE LOWER(${'%' + realId + '%'}) OR LOWER(${course_resources.description}) LIKE LOWER(${'%' + realId + '%'})`
           );
         }
 
         const firstRes = matchingResources[0];
-        // If resource is linked to a subjectId, resolve the parent subject!
-        if (firstRes && firstRes.subjectId) {
-          const linkedSubj = (await db.select().from(subjects).where(matchId(subjects.id, firstRes.subjectId)))[0];
-          if (linkedSubj) {
-            subject = linkedSubj;
+        if (firstRes) {
+          // 1. If resource is linked to a subjectId, resolve the parent subject via matchSubjectIds!
+          if (firstRes.subjectId) {
+            const allSubjs = await db.select().from(subjects);
+            const linkedSubj = allSubjs.find((s: any) => matchSubjectIds(s.id, firstRes.subjectId));
+            if (linkedSubj) {
+              subject = linkedSubj;
+            }
+          }
+          // 2. If subjectId failed or wasn't set, try extracting course code from firstRes.title / firstRes.description!
+          if (!subject) {
+            const codeFromRes = (firstRes.title + ' ' + (firstRes.description || '')).match(/[A-Z]{2,4}\d{3,4}|عال\d{4}/i)?.[0];
+            if (codeFromRes) {
+              const cleanCodeFromRes = codeFromRes.toLowerCase().replace(/[\s\-]/g, '');
+              const matchedSubj = (await db.select().from(subjects).where(
+                sql`REPLACE(REPLACE(LOWER(${subjects.code}), ' ', ''), '-', '') = ${cleanCodeFromRes}`
+              ))[0];
+              if (matchedSubj) {
+                subject = matchedSubj;
+                // Auto-fix the missing or float-corrupted subjectId on the resource in database
+                db.update(course_resources).set({ subjectId: matchedSubj.id }).where(matchId(course_resources.id, firstRes.id)).catch(() => {});
+              }
+            }
           }
         }
 
         // If still no subject exists in catalog, return rich fallback course object
         if (!subject) {
           const connectUrl = process.env.CONNECT_APP_URL || 'http://localhost:3000';
-          const fallbackCode = firstRes?.title?.match(/[A-Z]{2,4}\d{3,4}|عال\d{4}/i)?.[0] || (isNumeric ? 'مادة' : idOrCode.toUpperCase());
-          const fallbackName = cleanCourseName(firstRes?.title || firstRes?.description || `مصادر مادة ${fallbackCode}`);
+          const codeMatchInRes = (firstRes?.title + ' ' + (firstRes?.description || '')).match(/[A-Z]{2,4}\d{3,4}|عال\d{4}/i)?.[0];
+          const fallbackCode = codeMatchInRes || (isNumeric ? '' : realId.replace(/^مصادر مادة\s*/i, '').replace(/^مادة\s*/i, '').trim());
+          
+          let fallbackName = firstRes?.title ? cleanCourseName(firstRes.title) : (firstRes?.description ? cleanCourseName(firstRes.description) : '');
+          if (!fallbackName || fallbackName === 'مادة' || fallbackName === 'مصادر مادة' || fallbackName === 'مصادر مادة مادة') {
+            fallbackName = fallbackCode ? fallbackCode : 'تفاصيل المصدر الأكاديمي';
+          }
+          fallbackName = fallbackName
+            .replace(/^مصادر مادة\s+مادة\s*/gi, '')
+            .replace(/^مصادر مادة\s*/gi, '')
+            .replace(/^مادة\s+مادة\s*/gi, '')
+            .trim();
+
+          const fallbackDescription = (firstRes?.description && !/^مصادر مادة/i.test(firstRes.description) && !/^تفاصيل ومعلومات/i.test(firstRes.description))
+            ? firstRes.description
+            : null;
 
           return res.json({
             course: {
               id: idOrCode,
-              code: fallbackCode,
-              name: fallbackName,
-              creditHours: 3,
+              isAcademicSubject: false,
+              code: fallbackCode || 'مصدر أكاديمي',
+              name: fallbackName || fallbackCode || 'مصدر أكاديمي',
+              creditHours: null,
               level: null,
-              description: firstRes?.description || `تفاصيل ومعلومات مادة ${fallbackCode}`,
+              description: fallbackDescription,
+              freeResourcesUrl: firstRes?.freeResourcesUrl || undefined,
+              paidResourcesUrl: firstRes?.paidResourcesUrl || undefined,
+              boxLink: firstRes?.boxLink || undefined,
+              whatsappLink: firstRes?.whatsappLink || undefined,
+              avatarUrl: firstRes?.avatarUrl || undefined,
+              bannerUrl: firstRes?.bannerUrl || undefined,
               resources: matchingResources,
               prerequisites: [],
-              dependents: [],
-              connectUrl: `${connectUrl.replace(/\/$/, '')}/academics?courseId=${encodeURIComponent(fallbackCode)}`
+              dependents: []
             }
           });
         }
       }
 
-      const allResources = await db.select().from(course_resources).where(matchId(course_resources.subjectId, subject.id));
+      const allCr = await db.select().from(course_resources);
+      let allResources = allCr.filter((cr: any) => {
+        if (matchSubjectIds(cr.subjectId, subject.id)) return true;
+        const cleanS = cleanCourseName(subject.name).toLowerCase();
+        const cleanT = cleanCourseName(cr.title).toLowerCase();
+        const cleanCode = (subject.code || '').toLowerCase().trim();
+        const titleText = (cr.title + ' ' + (cr.description || '')).toLowerCase();
+        return (cleanS && cleanT && (cleanS === cleanT || cleanT.includes(cleanS) || cleanS.includes(cleanT))) ||
+               (cleanCode && cleanCode.length > 2 && titleText.includes(cleanCode));
+      });
       const connectUrl = process.env.CONNECT_APP_URL || 'http://localhost:3000';
 
       const subjectMajorLinks = await db.select().from(majorCourses).where(matchId(majorCourses.subjectId, subject.id));
@@ -154,9 +273,18 @@ export function createSubjectsRouter(db: any) {
         dependents = allSubjectsList.filter((s: any) => depSet.has(String(s.id)));
       }
 
+      const firstWaResource = allResources.find((r: any) => r.whatsappLink || r.whatsappUrl || (r.url && r.url.includes('whatsapp')));
+      const resolvedWhatsappLink = subject.whatsappLink || firstWaResource?.whatsappLink || firstWaResource?.whatsappUrl || firstWaResource?.url || null;
+      const firstAvatar = subject.avatarUrl || allResources.find((r: any) => r.avatarUrl)?.avatarUrl || null;
+      const firstBanner = subject.bannerUrl || allResources.find((r: any) => r.bannerUrl)?.bannerUrl || null;
+
       res.json({
         course: {
           ...subject,
+          avatarUrl: firstAvatar,
+          bannerUrl: firstBanner,
+          whatsappLink: resolvedWhatsappLink,
+          isAcademicSubject: true,
           resources: allResources,
           prerequisites,
           dependents,
@@ -208,24 +336,7 @@ export function createSubjectsRouter(db: any) {
     }
   });
 
-function cleanCourseName(name: string): string {
-  if (!name) return '';
-  let cleaned = name.replace(/\s*\(([^)]+)\)/g, (match, p1) => {
-    const mainText = name.replace(/\s*\([^)]*\)/g, '').trim().toLowerCase();
-    const innerText = p1.trim().toLowerCase();
-    if (mainText === innerText || mainText.includes(innerText) || innerText.includes(mainText)) {
-      return '';
-    }
-    const mainWords = mainText.split(/\s+/).filter(w => w.length > 2);
-    const innerWords = innerText.split(/\s+/).filter(w => w.length > 2);
-    const common = innerWords.filter(w => mainWords.some(mw => mw.includes(w) || w.includes(mw)));
-    if (common.length >= Math.min(2, innerWords.length)) {
-      return '';
-    }
-    return match;
-  }).trim();
-  return cleaned || name;
-}
+
 
   router.get("/resources", requireAuth, async (req: express.Request, res: express.Response) => {
     try {
@@ -255,24 +366,35 @@ function cleanCourseName(name: string): string {
       const subjectsWithResources = new Set<number>();
 
       for (const cr of allCourseResources) {
-        const s = cr.subjectId ? subjectMap.get(cr.subjectId) : null;
-        if (s) {
-          subjectsWithResources.add(s.id);
-        }
-        const majorNames = cr.subjectId ? (subjectMajorsMap.get(cr.subjectId) || []) : [];
-        const majorStr = majorNames.length > 0 ? majorNames.join(' / ') : 'جميع التخصصات';
-        const cleanName = s ? cleanCourseName(s.name) : '';
+        const s = cr.subjectId ? (subjectMap.get(cr.subjectId) || allSubjects.find((subj: any) => matchSubjectIds(subj.id, cr.subjectId))) : null;
+        const matchedSubjByTitle = !s ? allSubjects.find((subj: any) => {
+          const cleanS = cleanCourseName(subj.name).toLowerCase();
+          const cleanT = cleanCourseName(cr.title).toLowerCase();
+          return cleanS === cleanT || (cleanS.length > 3 && cleanT.includes(cleanS)) || (cleanT.length > 3 && cleanS.includes(cleanT));
+        }) : null;
 
-        const rawTitle = cr.title || (s ? `مصادر مادة ${s.code} - ${cleanName}` : 'باقة مصادر مادة');
+        const resolvedSubject = s || matchedSubjByTitle;
+        if (resolvedSubject) {
+          subjectsWithResources.add(resolvedSubject.id);
+        }
+        const majorNames = resolvedSubject ? (subjectMajorsMap.get(resolvedSubject.id) || []) : [];
+        const majorStr = majorNames.length > 0 ? majorNames.join(' / ') : 'جميع التخصصات';
+        const cleanName = resolvedSubject ? cleanCourseName(resolvedSubject.name) : cleanCourseName(cr.title);
+
+        const rawTitle = cr.title || (resolvedSubject ? cleanName : 'باقة مصادر جديدة');
         const cleanTitle = cleanCourseName(rawTitle);
-        const extractedCode = s?.code || (rawTitle ? (rawTitle.split('-')[0].replace(/^مصادر مادة\s*/i, '').trim()) : 'مادة');
+        const codeMatch = (cr.title || cr.description || '').match(/[A-Z]{2,4}\d{3,4}|عال\d{4}/i)?.[0];
+        let extractedCode = resolvedSubject?.code || codeMatch || '';
+        if (!extractedCode || /[\u0600-\u06FF]/.test(extractedCode) || extractedCode === 'مادة') {
+          extractedCode = 'مصدر أكاديمي';
+        }
 
         resourcesList.push({
           id: cr.id,
-          subjectId: cr.subjectId || null,
+          subjectId: resolvedSubject?.id || cr.subjectId || null,
           title: cleanTitle,
           courseCode: extractedCode,
-          courseName: s ? cleanName : cleanCourseName(cr.description || cr.title || 'مصادر أكاديمية'),
+          courseName: cleanName,
           major: majorStr,
           majors: majorNames,
           type: cr.type || 'drive',
@@ -299,7 +421,7 @@ function cleanCourseName(name: string): string {
           resourcesList.push({
             id: `syn_${s.id}`,
             subjectId: s.id,
-            title: `مصادر مادة ${s.code} - ${cleanName}`,
+            title: cleanName,
             courseCode: s.code,
             courseName: cleanName,
             major: majorStr,
@@ -317,6 +439,50 @@ function cleanCourseName(name: string): string {
     } catch (error) {
       console.error(error);
       res.json([]);
+    }
+  });
+
+  // WhatsApp Group Avatar Scraper & Proxy
+  router.get("/whatsapp-avatar", async (req: express.Request, res: express.Response): Promise<any> => {
+    try {
+      const rawUrl = String(req.query.url || '').trim();
+      if (!rawUrl || (!rawUrl.includes('chat.whatsapp.com') && !rawUrl.includes('wa.me'))) {
+        return res.status(400).json({ error: "Invalid WhatsApp URL" });
+      }
+
+      // Fetch WhatsApp invite page HTML using social crawler user agent
+      const resp = await fetch(rawUrl, {
+        headers: {
+          'User-Agent': 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php) Twitterbot/1.0',
+          'Accept-Language': 'en-US,en;q=0.9'
+        }
+      });
+
+      if (!resp.ok) {
+        return res.status(404).json({ error: "Could not fetch WhatsApp link" });
+      }
+
+      const html = await resp.text();
+      const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+                      html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i) ||
+                      html.match(/<img[^>]+id=["']landing_img["'][^>]+src=["']([^"']+)["']/i);
+
+      if (ogMatch && ogMatch[1]) {
+        const imageUrl = ogMatch[1].replace(/&amp;/g, '&');
+        const imageResp = await fetch(imageUrl);
+        if (imageResp.ok) {
+          const contentType = imageResp.headers.get('content-type') || 'image/jpeg';
+          const buffer = await imageResp.arrayBuffer();
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          return res.send(Buffer.from(buffer));
+        }
+      }
+
+      return res.status(404).json({ error: "No group image found" });
+    } catch (err) {
+      console.error("Error fetching WhatsApp avatar:", err);
+      return res.status(500).json({ error: "Failed to load WhatsApp avatar" });
     }
   });
 

@@ -1,7 +1,24 @@
+'use client';
+
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Folder, Link2, Image as ImageIcon, FileText, Check, ArrowRight, ArrowLeft, Search, BookOpen, ChevronDown, Loader2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  X, 
+  Folder, 
+  BookOpen, 
+  FolderGit2, 
+  Sparkles, 
+  FileText, 
+  Check, 
+  ArrowRight, 
+  ArrowLeft, 
+  Search, 
+  Loader2,
+  MessageCircle
+} from 'lucide-react';
 import ImageUploadInput from './ImageUploadInput';
 import ResourceLinksInput from './ResourceLinksInput';
+import { cleanCourseName } from '../lib/url-utils';
 
 interface CreateResourceModalProps {
   isOpen: boolean;
@@ -26,25 +43,6 @@ interface CreateResourceModalProps {
   onSave: () => void | Promise<any>;
 }
 
-function cleanCourseName(name: string): string {
-  if (!name) return '';
-  let cleaned = name.replace(/\s*\(([^)]+)\)/g, (match, p1) => {
-    const mainText = name.replace(/\s*\([^)]*\)/g, '').trim().toLowerCase();
-    const innerText = p1.trim().toLowerCase();
-    if (mainText === innerText || mainText.includes(innerText) || innerText.includes(mainText)) {
-      return '';
-    }
-    const mainWords = mainText.split(/\s+/).filter(w => w.length > 2);
-    const innerWords = innerText.split(/\s+/).filter(w => w.length > 2);
-    const common = innerWords.filter(w => mainWords.some(mw => mw.includes(w) || w.includes(mw)));
-    if (common.length >= Math.min(2, innerWords.length)) {
-      return '';
-    }
-    return match;
-  }).trim();
-  return cleaned || name;
-}
-
 export default function CreateResourceModal({
   isOpen,
   onClose,
@@ -59,7 +57,7 @@ export default function CreateResourceModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Click outside handler to close dropdown
+  // Close dropdown on click outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -85,12 +83,12 @@ export default function CreateResourceModal({
     s.name?.toLowerCase().includes(courseSearch.toLowerCase())
   );
 
+  const canAdvance = !!(resourceForm.subjectId || selectedCourse || resourceForm.title?.trim());
+
   const handleNext = () => {
-    if (activeStep === 1) {
-      if (!resourceForm.subjectId && !selectedCourse && !resourceForm.title?.trim()) {
-        alert('Please select a course or enter a resource title');
-        return;
-      }
+    if (activeStep === 1 && !canAdvance) {
+      alert('الرجاء اختيار المادة الأكاديمية أو إدخال عنوان المصدر');
+      return;
     }
     if (activeStep < 4) {
       setActiveStep((s) => (s + 1) as any);
@@ -102,8 +100,6 @@ export default function CreateResourceModal({
       setActiveStep((s) => (s - 1) as any);
     }
   };
-
-  const canAdvance = !!(resourceForm.subjectId || selectedCourse || resourceForm.title?.trim());
 
   const handleSaveSubmit = async () => {
     if (!canAdvance) {
@@ -123,330 +119,405 @@ export default function CreateResourceModal({
     }
   };
 
+  const steps = [
+    { id: 1, title: 'المادة والعنوان', icon: BookOpen },
+    { id: 2, title: 'المجلدات والواتساب', icon: FolderGit2 },
+    { id: 3, title: 'المصادر المجانية والمدفوعة', icon: Sparkles },
+    { id: 4, title: 'الوسائط والوصف', icon: FileText }
+  ];
+
+  // Calculate track fill width for completed steps (0%, 33.3%, 66.6%, 100%)
+  const lineProgressWidth = ((activeStep - 1) / (steps.length - 1)) * 100;
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
-      <div 
-        className="w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border"
-        style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
-      >
-        {/* Header */}
-        <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-color)' }}>
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-              <Folder className="w-5 h-5" />
+    <AnimatePresence>
+      <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 sm:p-6 font-sans text-right" dir="rtl">
+        {/* Backdrop */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="absolute inset-0 bg-slate-950/70 dark:bg-black/80 backdrop-blur-sm"
+          onClick={onClose}
+        />
+
+        {/* Modal Main Window */}
+        <motion.div
+          layout
+          initial={{ opacity: 0, scale: 0.96, y: 12 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.96, y: 12 }}
+          transition={{ 
+            type: "spring", 
+            duration: 0.35, 
+            bounce: 0,
+            layout: { type: "spring", stiffness: 350, damping: 28 } 
+          }}
+          className="relative bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col z-10 text-slate-900 dark:text-white max-h-[88vh]"
+        >
+          {/* Header */}
+          <div className="p-6 bg-slate-50/80 dark:bg-zinc-900/90 border-b border-slate-200/80 dark:border-zinc-800 relative shrink-0">
+            <div className="flex items-center justify-between gap-4 mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-900/50 text-blue-600 dark:text-blue-400 shadow-xs">
+                  <Folder className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-white leading-tight">
+                    {isEditing ? `تعديل المصدر: ${cleanCourseName(resourceForm.title || selectedCourse?.name)}` : 'إضافة باقة مصادر جديدة'}
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5 font-medium">
+                    {isEditing ? 'تعديل بيانات المصدر والمجلدات المرفقة' : 'إضافة وتنسيق باقة المصادر والمجلدات والروابط بسهولة'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Close Button */}
+              <button
+                onClick={onClose}
+                className="p-2 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white rounded-full transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
+                title="إغلاق النافذة"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-            <div>
-              <h3 className="font-bold text-lg leading-tight">
-                {isEditing ? `Edit Resource: ${resourceForm.title || selectedCourse?.name}` : 'Resource Package Wizard (إضافة باقة مصادر جديدة)'}
-              </h3>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                Multi-step wizard to attach Box, WhatsApp, Free/Paid links, media & overview
-              </p>
+
+            {/* 4 Circles Horizontal Progress Stepper */}
+            <div className="relative pt-1 px-4">
+              {/* Background Track Line (Spans exactly from Node 1 center at 12.5% right to Node 4 center at 12.5% left) */}
+              <div className="absolute top-4 right-[12.5%] left-[12.5%] h-0.5 bg-slate-200 dark:bg-zinc-800 -z-0 overflow-hidden">
+                {/* Animated Completed Track Line (Starts at Node 1 center, extends exactly to active node center) */}
+                <motion.div
+                  className="h-full bg-emerald-500 rounded-full origin-right"
+                  initial={false}
+                  animate={{ width: `${((activeStep - 1) / (steps.length - 1)) * 100}%` }}
+                  transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+                />
+              </div>
+
+              {/* 4 Step Circle Nodes Grid */}
+              <div className="relative z-10 grid grid-cols-4 w-full">
+                {steps.map((step) => {
+                  const isCompleted = activeStep > step.id;
+                  const isActive = activeStep === step.id;
+
+                  return (
+                    <button
+                      key={step.id}
+                      type="button"
+                      onClick={() => {
+                        if (step.id === 1 || canAdvance) setActiveStep(step.id as any);
+                      }}
+                      className="flex flex-col items-center gap-1.5 cursor-pointer group text-center w-full"
+                    >
+                      {/* Circle Node (Clean flat, no glow, no shadow, no outer ring) */}
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-mono font-bold transition-all duration-200 ${
+                          isCompleted
+                            ? 'bg-emerald-500 text-white'
+                            : isActive
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-100 dark:bg-zinc-800 text-slate-400 dark:text-zinc-500 border border-slate-200 dark:border-zinc-700'
+                        }`}
+                      >
+                        {isCompleted ? (
+                          <Check className="w-4 h-4 text-white stroke-[3]" />
+                        ) : (
+                          step.id
+                        )}
+                      </div>
+
+                      {/* Step Label */}
+                      <span className={`text-[11px] font-bold transition px-1 truncate w-full ${
+                        isActive
+                          ? 'text-blue-600 dark:text-blue-400 font-extrabold'
+                          : isCompleted
+                          ? 'text-emerald-600 dark:text-emerald-400 font-bold'
+                          : 'text-slate-400 dark:text-zinc-500'
+                      }`}>
+                        {step.title}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
-          <button 
-            onClick={onClose}
-            className="p-2 rounded-xl hover:bg-[var(--bg-subtle)] transition"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
 
-        {/* Wizard Stepper Tabs */}
-        <div className="flex border-b px-6 gap-1 bg-[var(--bg-subtle)] text-xs font-semibold overflow-x-auto" style={{ borderColor: 'var(--border-color)' }}>
-          <button
-            onClick={() => setActiveStep(1)}
-            className={`py-3 px-2.5 border-b-2 transition flex items-center gap-1.5 shrink-0 ${activeStep === 1 ? 'border-emerald-500 text-emerald-500 font-bold' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
-          >
-            <span className="w-4 h-4 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-[10px]">1</span>
-            <span>Course & Title</span>
-          </button>
-          <button
-            onClick={() => {
-              if (canAdvance) setActiveStep(2);
-            }}
-            className={`py-3 px-2.5 border-b-2 transition flex items-center gap-1.5 shrink-0 ${activeStep === 2 ? 'border-emerald-500 text-emerald-500 font-bold' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
-          >
-            <span className="w-4 h-4 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-[10px]">2</span>
-            <span>Box & Groups</span>
-          </button>
-          <button
-            onClick={() => {
-              if (canAdvance) setActiveStep(3);
-            }}
-            className={`py-3 px-2.5 border-b-2 transition flex items-center gap-1.5 shrink-0 ${activeStep === 3 ? 'border-emerald-500 text-emerald-500 font-bold' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
-          >
-            <span className="w-4 h-4 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-[10px]">3</span>
-            <span>Free & Paid Links</span>
-          </button>
-          <button
-            onClick={() => {
-              if (canAdvance) setActiveStep(4);
-            }}
-            className={`py-3 px-2.5 border-b-2 transition flex items-center gap-1.5 shrink-0 ${activeStep === 4 ? 'border-emerald-500 text-emerald-500 font-bold' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
-          >
-            <span className="w-4 h-4 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-[10px]">4</span>
-            <span>Media & Overview</span>
-          </button>
-        </div>
+          {/* Form Body with Smooth Dynamic Height Layout Animation */}
+          <motion.div layout className={`p-6 max-h-[65vh] custom-scrollbar ${isCourseDropdownOpen ? 'overflow-visible' : 'overflow-y-auto'}`}>
+            <AnimatePresence mode="wait">
+              {/* STEP 1: Subject Selection & Resource Title */}
+              {activeStep === 1 && (
+                <motion.div
+                  key="step1"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  transition={{ duration: 0.2 }}
+                  className="space-y-5"
+                >
+                  <div className="bg-slate-50 dark:bg-zinc-800/50 rounded-2xl p-5 border border-slate-200/80 dark:border-zinc-800 space-y-4">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-zinc-200">
+                      المادة الأكاديمية المستهدفة (اختر من قائمة المواد المعتمدة)
+                    </label>
 
-        {/* Wizard Body */}
-        <div className="p-6 overflow-y-auto space-y-4 flex-1">
-          {/* STEP 1: Course & Title */}
-          {activeStep === 1 && (
-            <div className="space-y-4 animate-fadeIn">
-              {/* Search Engine Style Target Course Picker */}
-              <div className="flex flex-col gap-1.5 relative" ref={dropdownRef}>
-                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Target Course (المادة الأكاديمية - محرك بحث)</label>
-                
-                {selectedCourse ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3.5 rounded-xl border bg-blue-500/10 border-blue-500/30">
-                      <div className="flex items-center gap-2.5">
-                        <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-blue-500 text-white">
-                          {selectedCourse.code}
-                        </span>
-                        <div>
-                          <span className="font-bold text-sm" style={{ color: 'var(--text-main)' }}>{selectedCourse.name}</span>
-                          {selectedCourse.level && (
-                            <span className="text-xs block" style={{ color: 'var(--text-muted)' }}>المستوى {selectedCourse.level}</span>
-                          )}
+                    {selectedCourse ? (
+                      <div className="flex items-center justify-between p-3.5 bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 rounded-2xl">
+                        <div className="flex items-center gap-3">
+                          <span className="px-2.5 py-1 bg-blue-600 text-white text-xs font-mono font-bold rounded-lg" dir="ltr">
+                            {selectedCourse.code}
+                          </span>
+                          <div>
+                            <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                              {cleanCourseName(selectedCourse.name)}
+                            </h4>
+                            <span className="text-[11px] text-slate-500 dark:text-zinc-400">
+                              المستوى {selectedCourse.level || 'عام'} • {selectedCourse.creditHours || 3} ساعات
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setResourceForm((s: any) => ({ ...s, subjectId: undefined, title: '' }));
-                          setCourseSearch('');
-                          setIsCourseDropdownOpen(false);
-                        }}
-                        className="text-xs font-bold text-blue-400 hover:text-blue-300 px-3 py-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 transition flex items-center gap-1"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                        <span>Change Course</span>
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="relative">
-                    <div className="relative flex items-center">
-                      <Search className="w-4 h-4 absolute left-3 text-slate-400" />
-                      <input
-                        type="text"
-                        placeholder="Search by course code or name... (e.g. CS101, عال101)"
-                        value={courseSearch}
-                        onFocus={() => setIsCourseDropdownOpen(true)}
-                        onChange={e => {
-                          setCourseSearch(e.target.value);
-                          setIsCourseDropdownOpen(true);
-                        }}
-                        className="w-full pl-9 pr-8 py-2.5 rounded-xl text-sm border outline-none transition focus:border-blue-500"
-                        style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
-                      />
-                      {isCourseDropdownOpen && (
                         <button
                           type="button"
                           onClick={() => {
-                            setIsCourseDropdownOpen(false);
+                            setResourceForm((s: any) => ({ ...s, subjectId: undefined }));
                             setCourseSearch('');
                           }}
-                          className="absolute right-2.5 p-1 rounded-lg hover:bg-[var(--bg-subtle)] text-slate-400 hover:text-slate-200 transition"
-                          title="Close list"
+                          className="px-3 py-1.5 rounded-xl bg-white dark:bg-zinc-900 text-slate-600 dark:text-zinc-300 text-xs font-bold border border-slate-200 dark:border-zinc-700 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 transition cursor-pointer"
                         >
-                          <X className="w-4 h-4" />
+                          تغيير المادة
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    ) : (
+                      <div className={`relative transition-all ${isCourseDropdownOpen ? 'z-[100]' : 'z-10'}`} ref={dropdownRef}>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            placeholder="ابحث برمز المادة أو اسمها (مثال: CS1111 / أساسيات الحوسبة)..."
+                            value={courseSearch}
+                            onFocus={() => setIsCourseDropdownOpen(true)}
+                            onChange={e => {
+                              setCourseSearch(e.target.value);
+                              setIsCourseDropdownOpen(true);
+                            }}
+                            className="w-full py-3 pr-10 pl-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-bold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs"
+                          />
+                          <Search className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5" />
+                        </div>
 
-                    {isCourseDropdownOpen && (
-                      <div 
-                        className="absolute left-0 right-0 top-full mt-1 max-h-56 overflow-y-auto rounded-xl border shadow-xl z-50 divide-y animate-fadeIn"
-                        style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
-                      >
-                        {filteredSubjects.length > 0 ? (
-                          filteredSubjects.map(subj => (
-                            <button
-                              key={subj.id}
-                              type="button"
-                              onClick={() => {
-                                const defaultTitle = `مصادر مادة ${subj.code} - ${cleanCourseName(subj.name)}`;
-                                setResourceForm((s: any) => ({ 
-                                  ...s, 
-                                  subjectId: subj.id,
-                                  title: defaultTitle 
-                                }));
-                                setIsCourseDropdownOpen(false);
-                                setCourseSearch('');
-                              }}
-                              className="w-full text-left px-4 py-2.5 flex items-center justify-between hover:bg-[var(--bg-subtle)] transition"
-                            >
-                              <div className="flex items-center gap-2.5">
-                                <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-200 dark:border-blue-500/20">
-                                  {subj.code}
-                                </span>
-                                <span className="text-sm font-medium" style={{ color: 'var(--text-main)' }}>{subj.name}</span>
-                              </div>
-                              {subj.level && (
-                                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Level {subj.level}</span>
+                        {/* Dropdown Menu (Floats On Top Of All Components with Pristine Rounded Corners & Thin Scrollbar) */}
+                        {isCourseDropdownOpen && (
+                          <div className="absolute right-0 left-0 top-full mt-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-2xl z-[200] overflow-hidden">
+                            <div className="max-h-56 overflow-y-auto custom-scrollbar p-1 divide-y divide-slate-100 dark:divide-zinc-800">
+                              {filteredSubjects.length > 0 ? (
+                                filteredSubjects.map(subj => (
+                                  <button
+                                    key={subj.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setResourceForm((s: any) => ({
+                                        ...s,
+                                        subjectId: subj.id,
+                                        title: cleanCourseName(subj.name)
+                                      }));
+                                      setIsCourseDropdownOpen(false);
+                                    }}
+                                    className="w-full text-right p-3 hover:bg-blue-50 dark:hover:bg-blue-950/50 flex items-center justify-between transition group cursor-pointer rounded-xl"
+                                  >
+                                    <div>
+                                      <h5 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                                        {cleanCourseName(subj.name)}
+                                      </h5>
+                                      <span className="text-[11px] text-slate-400">المستوى {subj.level || 'عام'}</span>
+                                    </div>
+                                    <span className="text-xs font-mono font-bold px-2 py-0.5 bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 rounded-md" dir="ltr">
+                                      {subj.code}
+                                    </span>
+                                  </button>
+                                ))
+                              ) : (
+                                <div className="p-4 text-center text-xs text-slate-400">
+                                  لم يتم العثور على مادة تطابق "{courseSearch}"
+                                </div>
                               )}
-                            </button>
-                          ))
-                        ) : (
-                          <div className="py-4 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
-                            No courses match "{courseSearch}"
+                            </div>
                           </div>
                         )}
                       </div>
                     )}
                   </div>
-                )}
-              </div>
 
-              {/* Resource Package Title Input */}
-              <div className="flex flex-col gap-1 animate-fadeIn">
-                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-                  Resource Package Title (عنوان باقة المصدر) *
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. باقة مصادر عامة / تجميعات تخصص"
-                  value={resourceForm.title || ''}
-                  onChange={e => setResourceForm((s: any) => ({ ...s, title: e.target.value }))}
-                  className="w-full py-2.5 px-3 rounded-xl text-sm border outline-none"
-                  style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
-                />
-              </div>
-            </div>
-          )}
+                  {/* Resource Package Title Input (Required if no course is selected) */}
+                  {!selectedCourse && (
+                    <div className="bg-slate-50 dark:bg-zinc-800/50 rounded-2xl p-5 border border-slate-200/80 dark:border-zinc-800 space-y-2">
+                      <label className="block text-xs font-bold text-slate-700 dark:text-zinc-200">
+                        عنوان باقة المصدر / المجموعة *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="مثال: قروب تقنية المعلومات / باقة مصادر عامة..."
+                        value={resourceForm.title || ''}
+                        onChange={e => setResourceForm((s: any) => ({ ...s, title: e.target.value }))}
+                        className="w-full py-3 px-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-bold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs"
+                      />
+                    </div>
+                  )}
+                </motion.div>
+              )}
 
-          {/* STEP 2: Storage & Group Links */}
-          {activeStep === 2 && (
-            <div className="space-y-4 animate-fadeIn">
-              <ResourceLinksInput 
-                label="Box & Drive Storage Links (مجلدات درايف و Box - متعدد)" 
-                value={resourceForm.boxLink || ''} 
-                onChange={val => setResourceForm((s: any) => ({ ...s, boxLink: val }))} 
-              />
+              {/* STEP 2: Storage & WhatsApp Links */}
+              {activeStep === 2 && (
+                <motion.div
+                  key="step2"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  transition={{ duration: 0.2 }}
+                  className="space-y-5"
+                >
+                  <ResourceLinksInput 
+                    label="مجلدات تخزين الملفات (Google Drive / Box Links)" 
+                    value={resourceForm.boxLink || ''} 
+                    onChange={val => setResourceForm((s: any) => ({ ...s, boxLink: val }))} 
+                  />
 
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>WhatsApp Group Link (رابط جروب الواتساب)</label>
-                <input
-                  type="text"
-                  placeholder="https://chat.whatsapp.com/..."
-                  value={resourceForm.whatsappLink || ''}
-                  onChange={e => setResourceForm((s: any) => ({ ...s, whatsappLink: e.target.value }))}
-                  className="w-full py-2.5 px-3 rounded-xl text-sm border outline-none font-mono"
-                  style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
-                />
-              </div>
-            </div>
-          )}
+                  <div className="bg-slate-50 dark:bg-zinc-800/50 rounded-2xl p-5 border border-slate-200/80 dark:border-zinc-800 space-y-2">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-zinc-200 flex items-center gap-1.5">
+                      <MessageCircle className="w-4 h-4 text-emerald-500" />
+                      رابط مجموعة الواتساب المباشر (WhatsApp Group Link)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="https://chat.whatsapp.com/..."
+                      value={resourceForm.whatsappLink || ''}
+                      onChange={e => setResourceForm((s: any) => ({ ...s, whatsappLink: e.target.value }))}
+                      className="w-full py-3 px-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-mono font-bold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-xs"
+                      dir="ltr"
+                    />
+                  </div>
+                </motion.div>
+              )}
 
-          {/* STEP 3: Free & Paid Links */}
-          {activeStep === 3 && (
-            <div className="space-y-4 animate-fadeIn">
-              <ResourceLinksInput 
-                label="Free Resource Links List (المصادر المجانية - متعدد)" 
-                value={resourceForm.freeResourcesUrl || ''} 
-                onChange={val => setResourceForm((s: any) => ({ ...s, freeResourcesUrl: val }))} 
-              />
+              {/* STEP 3: Free & Paid Links */}
+              {activeStep === 3 && (
+                <motion.div
+                  key="step3"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  transition={{ duration: 0.2 }}
+                  className="space-y-5"
+                >
+                  <ResourceLinksInput 
+                    label="المصادر والشروحات المجانية (Free Resources Links List)" 
+                    value={resourceForm.freeResourcesUrl || ''} 
+                    onChange={val => setResourceForm((s: any) => ({ ...s, freeResourcesUrl: val }))} 
+                  />
 
-              <ResourceLinksInput 
-                label="Paid Resource Links List (المصادر المدفوعة - متعدد)" 
-                value={resourceForm.paidResourcesUrl || ''} 
-                onChange={val => setResourceForm((s: any) => ({ ...s, paidResourcesUrl: val }))} 
-                color="amber" 
-              />
-            </div>
-          )}
+                  <ResourceLinksInput 
+                    label="المصادر والشروحات المدفوعة (Paid Resources Links List)" 
+                    value={resourceForm.paidResourcesUrl || ''} 
+                    onChange={val => setResourceForm((s: any) => ({ ...s, paidResourcesUrl: val }))} 
+                    color="amber" 
+                  />
+                </motion.div>
+              )}
 
-          {/* STEP 4: Media & Overview */}
-          {activeStep === 4 && (
-            <div className="space-y-4 animate-fadeIn">
-              <ImageUploadInput 
-                label="Resource Icon / Avatar Image (صورة المصدر / اللوجو)" 
-                value={resourceForm.avatarUrl || ''} 
-                onChange={val => setResourceForm((s: any) => ({ ...s, avatarUrl: val }))} 
-                type="avatar" 
-              />
+              {/* STEP 4: Media & Overview */}
+              {activeStep === 4 && (
+                <motion.div
+                  key="step4"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  transition={{ duration: 0.2 }}
+                  className="space-y-5"
+                >
+                  <ImageUploadInput 
+                    label="صورة أفياتار المصدر / اللوجو (Resource Icon / Avatar)" 
+                    value={resourceForm.avatarUrl || ''} 
+                    onChange={val => setResourceForm((s: any) => ({ ...s, avatarUrl: val }))} 
+                    type="avatar" 
+                  />
 
-              <ImageUploadInput 
-                label="Resource Banner Image (صورة البانر والغلاف)" 
-                value={resourceForm.bannerUrl || ''} 
-                onChange={val => setResourceForm((s: any) => ({ ...s, bannerUrl: val }))} 
-                type="banner" 
-              />
+                  <ImageUploadInput 
+                    label="صورة الغلاف والبانر (Resource Banner Image)" 
+                    value={resourceForm.bannerUrl || ''} 
+                    onChange={val => setResourceForm((s: any) => ({ ...s, bannerUrl: val }))} 
+                    type="banner" 
+                  />
 
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Resource Package Overview & Description (الوصف والملخص الشامل)</label>
-                <textarea
-                  rows={5}
-                  placeholder="Comprehensive overview, syllabus summary, notes, and topics covered in this resource package..."
-                  value={resourceForm.description || ''}
-                  onChange={e => setResourceForm((s: any) => ({ ...s, description: e.target.value }))}
-                  className="w-full py-2.5 px-3 rounded-xl text-sm border outline-none resize-none"
-                  style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
-                />
-              </div>
-            </div>
-          )}
-        </div>
+                  <div className="bg-slate-50 dark:bg-zinc-800/50 rounded-2xl p-5 border border-slate-200/80 dark:border-zinc-800 space-y-2">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-zinc-200">
+                      الوصف والملخص الشامل للباقة (Resource Package Overview)
+                    </label>
+                    <textarea
+                      rows={4}
+                      placeholder="اكتب ملخص شامل ومحتوى الباقة والمواضيع التي تنطوي عليها..."
+                      value={resourceForm.description || ''}
+                      onChange={e => setResourceForm((s: any) => ({ ...s, description: e.target.value }))}
+                      className="w-full py-3 px-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs resize-none"
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t flex items-center justify-between gap-3 bg-[var(--bg-subtle)]" style={{ borderColor: 'var(--border-color)' }}>
-          <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-            <span className="font-semibold text-emerald-500">Step {activeStep} of 4</span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-semibold border hover:bg-[var(--bg-card)] transition"
-              style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
-            >
-              Cancel
-            </button>
-            {activeStep > 1 && (
-              <button
-                type="button"
-                onClick={handleBack}
-                className="px-4 py-2 rounded-xl text-xs font-semibold border hover:bg-[var(--bg-card)] transition"
-                style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
-              >
-                Back
-              </button>
-            )}
-            {activeStep < 4 && (
-              <button
-                type="button"
-                onClick={handleNext}
-                className="px-4 py-2 rounded-xl text-xs font-semibold border hover:bg-[var(--bg-card)] transition"
-                style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
-              >
-                <span>Next Step</span>
-              </button>
-            )}
+          {/* Action Footer */}
+          <motion.div layout className="p-4 px-6 border-t border-slate-200 dark:border-zinc-800 bg-slate-50/80 dark:bg-zinc-900/80 flex items-center justify-between shrink-0">
             <button
               type="button"
-              disabled={isSubmitting || !canAdvance}
-              onClick={handleSaveSubmit}
-              className={`px-5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md ${
-                canAdvance 
-                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer' 
-                  : 'bg-emerald-600/40 text-white/50 cursor-not-allowed'
-              }`}
+              onClick={onClose}
+              className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 text-xs font-bold text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer"
             >
-              {isSubmitting ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Check className="w-4 h-4" />
-              )}
-              <span>{isSubmitting ? 'جاري الحفظ...' : (isEditing ? 'Save Changes' : 'Create Resource')}</span>
+              إلغاء
             </button>
-          </div>
-        </div>
+
+            <div className="flex items-center gap-2">
+              {activeStep > 1 && (
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 text-xs font-bold text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer flex items-center gap-1.5"
+                >
+                  <ArrowRight className="w-4 h-4" />
+                  <span>السابق</span>
+                </button>
+              )}
+
+              {activeStep < 4 ? (
+                <button
+                  type="button"
+                  onClick={handleNext}
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer flex items-center gap-1.5"
+                >
+                  <span>الخطوة التالية</span>
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={isSubmitting || !canAdvance}
+                  onClick={handleSaveSubmit}
+                  className={`px-6 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer flex items-center gap-2 ${
+                    canAdvance 
+                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white' 
+                      : 'bg-emerald-600/40 text-white/50 cursor-not-allowed'
+                  }`}
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Check className="w-4 h-4" />
+                  )}
+                  <span>{isSubmitting ? 'جاري الحفظ...' : (isEditing ? 'حفظ التعديلات' : 'إنشاء الباقة')}</span>
+                </button>
+              )}
+            </div>
+          </motion.div>
+        </motion.div>
       </div>
-    </div>
+    </AnimatePresence>
   );
 }

@@ -38,8 +38,25 @@ import { or, eq, sql } from 'drizzle-orm';
 export function matchId(column: any, idRaw: string | number) {
   const strId = String(idRaw ?? '').trim();
   const numId = Number(strId);
-  if (!isNaN(numId) && Number.isSafeInteger(numId)) {
-    return or(eq(column, numId), sql`CAST(${column} AS TEXT) = ${strId}`);
+  if (!isNaN(numId) && strId !== '') {
+    return or(
+      eq(column, numId),
+      sql`CAST(${column} AS TEXT) = ${strId}`,
+      sql`ABS(CAST(${column} AS NUMERIC) - ${numId}) < 200`
+    );
   }
   return sql`CAST(${column} AS TEXT) = ${strId}`;
+}
+
+export function matchSubjectIds(id1: any, id2: any): boolean {
+  if (id1 == null || id2 == null || id1 === '' || id2 === '') return false;
+  const s1 = String(id1).trim();
+  const s2 = String(id2).trim();
+  if (s1 === s2) return true;
+  const n1 = Number(s1);
+  const n2 = Number(s2);
+  if (!isNaN(n1) && !isNaN(n2)) {
+    return Math.abs(n1 - n2) < 200;
+  }
+  return false;
 }

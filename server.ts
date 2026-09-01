@@ -9,8 +9,6 @@ import { requestLogger, logger } from "./src/middleware/logger";
 import { getFileFromStorage } from "./src/lib/storage";
 
 import { seedDefaults } from './src/server/services/seed';
-import { startMsariSync } from './src/server/services/msari-sync';
-
 import { createAuthRouter } from './src/server/routes/auth';
 import { createSubjectsRouter } from './src/server/routes/subjects';
 import { createNewsRouter } from './src/server/routes/news';
@@ -50,9 +48,6 @@ async function startServer() {
 
   // Seed default tutorials & newbie portal links if empty
   await seedDefaults(db);
-
-  // Initiate background periodic Msari dataset sync
-  startMsariSync();
 
   // Health check API
   app.get("/api/health", (req, res) => {

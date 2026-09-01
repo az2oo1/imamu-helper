@@ -1463,7 +1463,7 @@ export function AdminPage() {
             const innerText = p1.trim().toLowerCase();
             return (mainText.includes(innerText) || innerText.includes(mainText)) ? '' : match;
           }).trim() : '';
-          const finalTitle = resourceForm.title?.trim() || (selectedSubj ? `مصادر مادة ${selectedSubj.code} - ${cleanName || selectedSubj.name}` : 'باقة مصادر مادة');
+          const finalTitle = resourceForm.title?.trim() || (selectedSubj ? (cleanName || selectedSubj.name) : 'باقة مصادر جديدة');
           const payload = { ...resourceForm, title: finalTitle };
 
           const url = resourceForm.id ? `/api/admin/resources/${resourceForm.id}` : '/api/admin/resources';
