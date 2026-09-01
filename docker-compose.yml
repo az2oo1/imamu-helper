@@ -21,24 +21,20 @@ services:
       - SQL_DB_NAME=${SQL_DB_NAME:-defaultdb}
       - SQL_SSL=${SQL_SSL:-false}
       - DATABASE_URL=${DATABASE_URL:-postgresql://root@100.70.48.23:26257/defaultdb?sslmode=disable}
-      # RustFS S3 Object Storage configuration
-      - S3_ENDPOINT=${S3_ENDPOINT:-http://100.70.48.23:9000}
-      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-rustfsadmin}
-      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-rustfspassword}
+      # Garage S3 Object Storage configuration
+      - S3_ENDPOINT=${S3_ENDPOINT:-http://100.70.48.23:3900}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-garageadmin}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-garagepassword}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME:-imamu-uploads}
-      - S3_REGION=${S3_REGION:-us-east-1}
+      - S3_REGION=${S3_REGION:-garage}
       - S3_FORCE_PATH_STYLE=${S3_FORCE_PATH_STYLE:-true}
-      - S3_PUBLIC_URL=${S3_PUBLIC_URL:-http://100.70.48.23:9000/imamu-uploads}
+      - S3_PUBLIC_URL=${S3_PUBLIC_URL:-http://100.70.48.23:3900/imamu-uploads}
       # Optional features
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - APP_URL=${APP_URL:-http://100.70.48.23:3000}
-      - SMTP_HOST=${SMTP_HOST}
-      - SMTP_PORT=${SMTP_PORT}
-      - SMTP_USER=${SMTP_USER}
-      - SMTP_PASS=${SMTP_PASS}
     depends_on:
       - cockroachdb
-      - rustfs
+      - garage
     restart: unless-stopped
 
   # CockroachDB Database Service (Distributed SQL, PG-compatible)
@@ -58,25 +54,25 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # RustFS S3-Compatible Object Storage Service
-  rustfs:
-    image: rustfs/rustfs:latest
-    container_name: imamu_rustfs
+  # Garage S3-Compatible Object Storage Service
+  garage:
+    image: dxflrs/garage:v1.0.1
+    container_name: imamu_garage
     environment:
-      - RUSTFS_ACCESS_KEY=${S3_ACCESS_KEY_ID:-rustfsadmin}
-      - RUSTFS_SECRET_KEY=${S3_SECRET_ACCESS_KEY:-rustfspassword}
-      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-rustfsadmin}
-      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-rustfspassword}
+      - GARAGE_ALLOW_WORLD_READABLE_SECRETS=true
     ports:
-      - "9000:9000" # S3 API Port
+      - "3900:3900" # S3 API Port
+      - "3901:3901" # RPC Port
+      - "3902:3902" # Admin API Port
     volumes:
-      - rustfs_data:/data
+      - garage_data:/var/lib/garage/meta
+      - garage_blobs:/var/lib/garage/data
     restart: unless-stopped
 
 volumes:
   cockroach_data:
     driver: local
-  rustfs_data:
+  garage_data:
     driver: local
-
-
+  garage_blobs:
+    driver: local

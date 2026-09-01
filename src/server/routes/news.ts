@@ -72,9 +72,13 @@ export function createNewsRouter(db: any) {
 
         return {
           ...record,
+          title: record.authorName || `@${record.source}`,
+          author: record.authorName || `@${record.source}`,
+          likes: likes.length,
           likesCount: likes.length,
           commentsCount: comments.length,
-          userLiked
+          userLiked,
+          isLiked: userLiked
         };
       });
 
@@ -148,6 +152,30 @@ export function createNewsRouter(db: any) {
       });
     } catch (e) {
       res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Delete comment endpoint (User can delete own comment, Admin can delete any comment)
+  router.delete("/news/comments/:commentId", requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
+    try {
+      const commentId = req.params.commentId;
+      const userId = req.user.uid;
+
+      const commentRecs = await db.select().from(newsComments).where(matchId(newsComments.id, commentId));
+      if (commentRecs.length === 0) return res.status(404).json({ error: "Comment not found" });
+
+      const comment = commentRecs[0];
+      const isAdmin = req.user.isAdmin || req.user.role === 'ADMIN';
+
+      if (comment.userId !== userId && !isAdmin) {
+        return res.status(403).json({ error: "Forbidden: You can only delete your own comments" });
+      }
+
+      await db.delete(newsComments).where(matchId(newsComments.id, commentId));
+      res.json({ success: true, id: Number(commentId) });
+    } catch (e) {
+      console.error("[Delete Comment Error]", e);
+      res.status(500).json({ error: "Failed to delete comment" });
     }
   });
 

@@ -61,6 +61,11 @@ async function startServer() {
   app.use("/api", createTutorialsRouter(db));
   app.use("/api", createAdminRouter(db));
 
+  // JSON 404 fallback for unmatched /api routes (prevents Next.js HTML 404 rendering)
+  app.all("/api/*", (req, res) => {
+    res.status(404).json({ error: `API route not found: ${req.method} ${req.path}` });
+  });
+
   // Next.js SSR request handling
   if (process.env.NODE_ENV !== "test") {
     const dev = process.env.NODE_ENV !== "production";

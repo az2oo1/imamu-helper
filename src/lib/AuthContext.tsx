@@ -115,22 +115,22 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     });
     
     if (!res.ok) {
-      const err = await res.json();
+      const err = await res.json().catch(() => ({ error: 'Failed to login' }));
       throw new Error(err.error || 'Failed to login');
     }
     
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     const userEmail = data.user?.studentEmail || data.user?.googleEmail || email;
     localStorage.setItem('token', data.token);
     localStorage.setItem('user_email', userEmail);
-    localStorage.setItem('user_uid', data.user.uid);
+    localStorage.setItem('user_uid', data.user?.uid || '');
     document.cookie = `token=${data.token}; path=/; max-age=604800; SameSite=Lax`;
     const u: NativeUser = {
-      uid: data.user.uid,
+      uid: data.user?.uid || '',
       email: userEmail,
       getIdToken: async () => data.token,
       accessToken: data.token,
-      displayName: data.user.userName || undefined,
+      displayName: data.user?.userName || undefined,
     };
     setUser(u);
     setDbUser(data.user);
@@ -144,11 +144,11 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     });
     
     if (!res.ok) {
-      const err = await res.json();
+      const err = await res.json().catch(() => ({ error: 'Failed to register' }));
       throw new Error(err.error || 'Failed to register');
     }
     
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     const userEmail = data.user?.studentEmail || data.user?.googleEmail || email;
     localStorage.setItem('token', data.token);
     localStorage.setItem('user_email', userEmail);

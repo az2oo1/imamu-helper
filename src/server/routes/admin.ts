@@ -15,6 +15,7 @@ import { logger } from '../../middleware/logger';
 import { uploadFileToStorage, getFileFromStorage, deleteFileFromStorage, isS3Configured } from '../../lib/storage';
 import { GoogleGenAI, Type } from '@google/genai';
 import { importMsariData } from '../services/msari';
+import { extractTelegramChannelPosts } from '../services/telegram';
 
 import { getDb } from '../../db/index';
 
@@ -416,6 +417,68 @@ export function createAdminRouter(db: any) {
   router.post("/admin/upload", requireAuth, uploadStorage.any(), handleUpload as any);
   router.post("/upload", requireAuth, uploadStorage.any(), handleUpload as any);
 
+  // Fetch WhatsApp Group Avatar ONCE, Upload to S3 (Garage Storage), and return saved S3 URL
+  router.post("/admin/fetch-whatsapp-avatar", requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
+    try {
+      const { whatsappUrl } = req.body;
+      const rawUrl = String(whatsappUrl || '').trim();
+
+      if (!rawUrl || (!rawUrl.includes('chat.whatsapp.com') && !rawUrl.includes('wa.me'))) {
+        return res.status(400).json({ error: "الرجاء إدخال رابط مجموعة واتساب صحيح (chat.whatsapp.com)" });
+      }
+
+      // Fetch WhatsApp invite page HTML using social crawler user agent
+      const resp = await fetch(rawUrl, {
+        headers: {
+          'User-Agent': 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9'
+        }
+      });
+
+      if (!resp.ok) {
+        return res.status(404).json({ error: "لم يتم التمكن من تصفح رابط الواتساب" });
+      }
+
+      const html = await resp.text();
+      const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+                      html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+
+      if (!ogMatch || !ogMatch[1]) {
+        return res.status(404).json({ error: "لم يتم العثور على صورة شخصية لهذه المجموعة في الواتساب" });
+      }
+
+      const imageUrl = ogMatch[1].replace(/&amp;/g, '&');
+      const imageResp = await fetch(imageUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      });
+
+      if (!imageResp.ok) {
+        return res.status(500).json({ error: "تعذر تحميل ملف الصورة من سيرفر الواتساب" });
+      }
+
+      const contentType = imageResp.headers.get('content-type') || 'image/jpeg';
+      const arrayBuffer = await imageResp.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      // Upload to Garage S3 Storage!
+      const filename = `wa_avatar_${Date.now()}_${crypto.randomUUID().slice(0, 8)}.jpg`;
+      const uploadResult = await uploadFileToStorage(buffer, filename, contentType);
+
+      res.json({
+        success: true,
+        avatarUrl: uploadResult.url,
+        message: "تم جلب وحفظ صورة مجموعة الواتساب بنجاح في التخزين المباشر"
+      });
+    } catch (e: any) {
+      console.error("[Fetch WhatsApp Avatar Error]", e);
+      res.status(500).json({ error: e.message || "فشل جلب صورة الواتساب" });
+    }
+  });
+
   // Admin Deduplicate Subjects
   router.post("/admin/subjects/deduplicate", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
@@ -770,13 +833,88 @@ export function createAdminRouter(db: any) {
     if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
     try {
       const { handle, profilePicUrl, isActive } = req.body;
+      const cleanHandle = handle.replace(/^https?:\/\/(www\.)?t\.me\/(s\/)?/i, '').replace(/^t\.me\/(s\/)?/i, '').replace(/^@/, '').trim();
       const [ns] = await db.insert(news_sources).values({
-        handle: handle.replace(/^@/, ''), profilePicUrl, isActive: isActive ?? true
+        handle: cleanHandle, profilePicUrl, isActive: isActive ?? true
       }).returning();
       res.json(ns);
     } catch (e) {
       console.error(e);
       res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Admin Telegram Extractor
+  router.post("/admin/telegram/extract", requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
+    try {
+      const { channel, channelUrl, limit } = req.body;
+      const targetChannel = channel || channelUrl;
+      if (!targetChannel) {
+        return res.status(400).json({ error: "الرجاء إدخال اسم أو رابط قناة التليقرام" });
+      }
+
+      const result = await extractTelegramChannelPosts(targetChannel, Number(limit) || 30, db);
+      res.json(result);
+    } catch (e: any) {
+      console.error("[Telegram Extract Error]", e);
+      res.status(400).json({ error: e.message || "فشل استخراج المنشورات من التليقرام" });
+    }
+  });
+
+  // Fetch All News Sources
+  router.post("/admin/news_sources/fetch-all", requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
+    try {
+      const sources = await db.select().from(news_sources).where(eq(news_sources.isActive, true));
+      let totalNew = 0;
+      for (const s of sources) {
+        try {
+          const resObj = await extractTelegramChannelPosts(s.handle, 30, db);
+          totalNew += resObj.newPublished;
+        } catch (e) {}
+      }
+      res.json({ success: true, fetchedCount: totalNew });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Failed to fetch sources" });
+    }
+  });
+
+  // Fetch Posts from a Specific News Source (POST body or URL param)
+  router.post("/admin/news_sources/fetch", requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
+    try {
+      const handle = req.body?.handle || req.body?.channel;
+      if (!handle) return res.status(400).json({ error: "Missing handle" });
+      const result = await extractTelegramChannelPosts(handle, 30, db);
+      res.json({ success: true, fetchedCount: result.newPublished, message: `Extracted ${result.newPublished} new posts from Telegram` });
+    } catch (e: any) {
+      console.error("[Fetch News Source Error]", e);
+      res.status(400).json({ error: e.message || "Failed to fetch news source" });
+    }
+  });
+
+  router.post("/admin/news_sources/:handle/fetch", requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
+    try {
+      const handle = decodeURIComponent(req.params.handle);
+      const result = await extractTelegramChannelPosts(handle, 30, db);
+      res.json({ success: true, fetchedCount: result.newPublished, message: `Extracted ${result.newPublished} new posts from Telegram` });
+    } catch (e: any) {
+      console.error("[Fetch News Source Error]", e);
+      res.status(400).json({ error: e.message || "Failed to fetch news source" });
+    }
+  });
+
+  // Delete All Posts from a Specific News Source
+  router.delete("/admin/news_sources/:handle/posts", requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
+    try {
+      const handle = req.params.handle.replace(/^@/, '');
+      const deleted = await db.delete(news).where(or(eq(news.source, handle), eq(news.authorHandle, `@${handle}`))).returning();
+      res.json({ success: true, deletedCount: deleted.length });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Failed to delete posts" });
     }
   });
 

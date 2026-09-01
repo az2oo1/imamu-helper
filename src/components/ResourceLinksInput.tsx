@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Tag } from 'lucide-react';
 
 export interface Link {
   name: string;
   url: string;
+  code?: string;
 }
 
 interface Props {
@@ -12,38 +13,58 @@ interface Props {
   value: string;
   onChange: (val: string) => void;
   color?: 'primary' | 'amber';
+  showDiscountCode?: boolean;
 }
 
 export function parseMarkdownLinks(text: string): Link[] {
   if (!text || !text.trim()) return [];
   const links: Link[] = [];
-  const regex = /\[([^\]]*)\]\(([^)]+)\)/g;
-  let match;
-  let hasMatches = false;
-  while ((match = regex.exec(text)) !== null) {
-    hasMatches = true;
-    links.push({ name: match[1], url: match[2] });
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+  for (const line of lines) {
+    const regex = /\[([^\]]*)\]\(([^)]+)\)(?:\s*(?:-|كود|code|خصم)?\s*[:\-\s]*([A-Z0-9_\-]+))?/i;
+    const match = line.match(regex);
+    if (match) {
+      let rawTitle = match[1].trim();
+      const rawUrl = match[2].trim();
+      let extractedCode = match[3]?.trim();
+
+      if (!extractedCode) {
+        const codeInTitleMatch = rawTitle.match(/(?:كود|كود الخصم|code|خصم)\s*[:\-\s]*([A-Z0-9_\-]+)/i);
+        if (codeInTitleMatch) {
+          extractedCode = codeInTitleMatch[1];
+          rawTitle = rawTitle.replace(/(?:كود|كود الخصم|code|خصم)\s*[:\-\s]*[A-Z0-9_\-]+/gi, '').replace(/[\(\)\[\]\-\|]+$/, '').trim();
+        }
+      }
+
+      links.push({ name: rawTitle, url: rawUrl, code: extractedCode || '' });
+    } else {
+      const parts = line.split(/\s+/).filter(Boolean);
+      if (parts[0]) {
+        links.push({ name: `رابط ${links.length + 1}`, url: parts[0] });
+      }
+    }
   }
-  if (!hasMatches && text.trim()) {
-    const urls = text.split(/\s+/).filter(Boolean);
-    urls.forEach((url, i) => {
-      links.push({ name: `رابط ${i + 1}`, url });
-    });
-  }
+
   return links;
 }
 
 function serializeMarkdownLinks(links: Link[]): string {
   return links
     .filter(l => l.url?.trim() || l.name?.trim())
-    .map(l => `[${l.name ?? ''}](${l.url ?? ''})`)
+    .map(l => {
+      const name = l.name ?? '';
+      const url = l.url ?? '';
+      const code = l.code?.trim() ? ` - ${l.code.trim()}` : '';
+      return `[${name}](${url})${code}`;
+    })
     .join('\n');
 }
 
-export default function ResourceLinksInput({ label, value, onChange }: Props) {
+export default function ResourceLinksInput({ label, value, onChange, color, showDiscountCode = false }: Props) {
+  const isPaidColor = color === 'amber' || showDiscountCode;
   const [links, setLinks] = useState<Link[]>(() => parseMarkdownLinks(value));
 
-  // Sync from external value prop only when it differs from current serialized state
   useEffect(() => {
     const currentSerialized = serializeMarkdownLinks(links);
     if (value !== currentSerialized) {
@@ -51,14 +72,14 @@ export default function ResourceLinksInput({ label, value, onChange }: Props) {
     }
   }, [value]);
 
-  const updateLink = (index: number, field: 'name' | 'url', val: string) => {
+  const updateLink = (index: number, field: 'name' | 'url' | 'code', val: string) => {
     const updated = links.map((item, i) => (i === index ? { ...item, [field]: val } : item));
     setLinks(updated);
     onChange(serializeMarkdownLinks(updated));
   };
 
   const addLink = () => {
-    const updated = [...links, { name: '', url: '' }];
+    const updated = [...links, { name: '', url: '', code: '' }];
     setLinks(updated);
     onChange(serializeMarkdownLinks(updated));
   };
@@ -76,12 +97,20 @@ export default function ResourceLinksInput({ label, value, onChange }: Props) {
         <button 
           type="button" 
           onClick={addLink}
-          className="text-xs font-bold flex items-center gap-1 text-blue-600 hover:text-blue-500 dark:text-blue-400 transition cursor-pointer hover:scale-[1.03] active:scale-95"
+          className={`text-xs font-bold flex items-center gap-1 transition cursor-pointer hover:scale-[1.03] active:scale-95 ${
+            isPaidColor ? 'text-amber-600 hover:text-amber-500 dark:text-amber-400' : 'text-blue-600 hover:text-blue-500 dark:text-blue-400'
+          }`}
         >
           <Plus className="w-3.5 h-3.5" />
           <span>+ إضافة رابط جديد</span>
         </button>
       </div>
+
+      {isPaidColor && (
+        <p className="text-[10px] text-slate-400 dark:text-zinc-500 font-normal leading-relaxed opacity-60 px-0.5 select-none">
+          * استخدام أكواد الخصم عند الاشتراك يساهم في دعم وتمويل المنصة للاستمرار والتطوير والصيانة.
+        </p>
+      )}
       
       <div className="space-y-2.5">
         {links.length === 0 && (
@@ -102,10 +131,10 @@ export default function ResourceLinksInput({ label, value, onChange }: Props) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: -6 }}
                 transition={{ duration: 0.2 }}
-                className="flex gap-2 items-start"
+                className="flex flex-col sm:flex-row gap-2 items-start"
               >
                 {/* Link Name Input */}
-                <div className="flex-1">
+                <div className="flex-1 w-full">
                   <input
                     type="text"
                     placeholder="اسم الملف / المصدر *"
@@ -126,7 +155,7 @@ export default function ResourceLinksInput({ label, value, onChange }: Props) {
                 </div>
 
                 {/* Link URL Input */}
-                <div className="flex-1">
+                <div className="flex-1 w-full">
                   <input
                     type="url"
                     placeholder="الرابط https://..."
@@ -145,6 +174,20 @@ export default function ResourceLinksInput({ label, value, onChange }: Props) {
                     </span>
                   )}
                 </div>
+
+                {/* Discount Code Input (for paid links) */}
+                {isPaidColor && (
+                  <div className="w-full sm:w-36 shrink-0">
+                    <input
+                      type="text"
+                      placeholder="كود الخصم (اختياري)"
+                      value={link.code || ''}
+                      onChange={e => updateLink(i, 'code', e.target.value)}
+                      className="w-full py-2.5 px-3 rounded-xl text-xs border outline-none transition font-mono font-bold uppercase text-amber-900 dark:text-amber-200 bg-amber-50/50 dark:bg-amber-950/20 border-amber-200/80 dark:border-amber-900/60 focus:border-amber-400 placeholder-amber-400/60 dark:placeholder-amber-600/60"
+                      dir="ltr"
+                    />
+                  </div>
+                )}
 
                 {/* Delete Button */}
                 <button

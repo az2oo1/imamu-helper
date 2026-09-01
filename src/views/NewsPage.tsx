@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../lib/AuthContext';
 import { 
   Newspaper, Heart, MessageSquare, Share2, Eye, Clock, 
-  ChevronLeft, ThumbsUp, Send, User, Check, Sparkles, Image, Video, X
+  ChevronLeft, ThumbsUp, Send, User, Check, Sparkles, Image, Video, X, Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { InView, SpotlightCard } from '../components/ui';
@@ -32,7 +32,8 @@ interface NewsItem {
   images?: string[];
   videoUrl?: string;
   views: number;
-  likes: number;
+  likes?: number;
+  likesCount?: number;
   isLiked?: boolean;
   commentsCount: number;
   createdAt: string;
@@ -40,7 +41,7 @@ interface NewsItem {
 }
 
 export function NewsPage() {
-  const { user } = useAuth();
+  const { user, dbUser } = useAuth();
   const [news, setNews] = useState<NewsItem[]>([]);
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -58,9 +59,11 @@ export function NewsPage() {
   const fetchNews = async () => {
     try {
       const res = await fetch('/api/news');
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setNews(data);
+      if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
+        const data = await res.json().catch(() => null);
+        if (Array.isArray(data)) {
+          setNews(data);
+        }
       }
     } catch (e) {
       console.error('Failed to fetch news', e);
@@ -74,17 +77,20 @@ export function NewsPage() {
   const handleLike = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      const token = user ? await user.getIdToken() : localStorage.getItem('token');
+      const token = user ? await user.getIdToken() : (localStorage.getItem('token') || localStorage.getItem('imamu_token') || '');
       const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
       const res = await fetch(`/api/news/${id}/like`, { method: 'POST', headers });
       if (res.ok) {
         setNews(news.map(item => {
           if (item.id === id) {
             const isLiked = !item.isLiked;
+            const currentLikes = item.likes ?? item.likesCount ?? 0;
+            const newLikes = isLiked ? currentLikes + 1 : Math.max(0, currentLikes - 1);
             return {
               ...item,
               isLiked,
-              likes: isLiked ? item.likes + 1 : item.likes - 1
+              likes: newLikes,
+              likesCount: newLikes
             };
           }
           return item;
@@ -100,9 +106,11 @@ export function NewsPage() {
     setSelectedNews(item);
     try {
       const res = await fetch(`/api/news/${item.id}/comments`);
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setComments(data);
+      if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
+        const data = await res.json().catch(() => null);
+        if (Array.isArray(data)) {
+          setComments(data);
+        }
       }
     } catch (e) {
       console.error('Failed to fetch comments', e);
@@ -122,14 +130,40 @@ export function NewsPage() {
         body: JSON.stringify({ content: newComment })
       });
 
-      if (res.ok) {
-        const commentData = await res.json();
-        setComments([commentData, ...comments]);
-        setNewComment('');
-        setNews(news.map(n => n.id === selectedNews.id ? { ...n, commentsCount: n.commentsCount + 1 } : n));
+      if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
+        const commentData = await res.json().catch(() => null);
+        if (commentData) {
+          setComments([commentData, ...comments]);
+          setNewComment('');
+          const newCount = (selectedNews.commentsCount || 0) + 1;
+          setSelectedNews({ ...selectedNews, commentsCount: newCount });
+          setNews(news.map(n => n.id === selectedNews.id ? { ...n, commentsCount: newCount } : n));
+        }
       }
     } catch (e) {
       console.error('Failed to submit comment', e);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) return;
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/news/comments/${commentId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setComments(prev => prev.filter(c => c.id !== commentId));
+        if (selectedNews) {
+          const newCount = Math.max(0, (selectedNews.commentsCount || 1) - 1);
+          setSelectedNews({ ...selectedNews, commentsCount: newCount });
+          setNews(prev => prev.map(n => n.id === selectedNews.id ? { ...n, commentsCount: newCount } : n));
+        }
+      }
+    } catch (e) {
+      console.error('Failed to delete comment', e);
     }
   };
 
@@ -138,6 +172,8 @@ export function NewsPage() {
     : news.filter(n => n.category === activeCategory);
 
   const featuredItem = news.find(n => n.isFeatured) || news[0];
+
+  const isAdminUser = !!(dbUser?.isAdmin || dbUser?.role === 'ADMIN');
 
   return (
     <div className="flex flex-col flex-1 w-full pb-24 px-4 sm:px-6 lg:px-8 pt-8 relative max-w-7xl mx-auto text-right min-h-screen" dir="rtl">
@@ -180,7 +216,7 @@ export function NewsPage() {
 
                 <div className="flex items-center justify-between w-full border-t border-slate-100 dark:border-zinc-800 pt-4 mt-auto">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-zinc-800 flex items-center justify-center font-bold text-xs text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700">
+                    <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-zinc-800 flex items-center justify-center font-bold text-xs text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 overflow-hidden">
                       {featuredItem.authorAvatar ? (
                         <img src={featuredItem.authorAvatar} alt="" className="w-full h-full rounded-full object-cover" />
                       ) : (
@@ -199,7 +235,7 @@ export function NewsPage() {
                       className={`flex items-center gap-1.5 transition ${featuredItem.isLiked ? 'text-rose-600 font-bold' : 'hover:text-rose-600'}`}
                     >
                       <Heart className={`w-4 h-4 ${featuredItem.isLiked ? 'fill-rose-600 text-rose-600' : ''}`} />
-                      <span>{featuredItem.likes}</span>
+                      <span>{featuredItem.likes ?? featuredItem.likesCount ?? 0}</span>
                     </button>
                     
                     <button 
@@ -207,7 +243,7 @@ export function NewsPage() {
                       className="flex items-center gap-1.5 hover:text-blue-600 transition"
                     >
                       <MessageSquare className="w-4 h-4" />
-                      <span>{featuredItem.commentsCount}</span>
+                      <span>{featuredItem.commentsCount ?? 0}</span>
                     </button>
                   </div>
                 </div>
@@ -299,7 +335,7 @@ export function NewsPage() {
                   className={`flex items-center gap-1.5 transition ${item.isLiked ? 'text-rose-600 font-bold' : 'hover:text-rose-600'}`}
                 >
                   <Heart className={`w-4 h-4 ${item.isLiked ? 'fill-rose-600 text-rose-600' : ''}`} />
-                  <span>{item.likes}</span>
+                  <span>{item.likes ?? item.likesCount ?? 0}</span>
                 </button>
 
                 <div className="flex items-center gap-3">
@@ -308,7 +344,7 @@ export function NewsPage() {
                     className="flex items-center gap-1 hover:text-blue-600 transition"
                   >
                     <MessageSquare className="w-4 h-4" />
-                    <span>{item.commentsCount}</span>
+                    <span>{item.commentsCount ?? 0}</span>
                   </button>
 
                   <button 
@@ -350,22 +386,22 @@ export function NewsPage() {
         )}
       </AnimatePresence>
 
-      {/* Comments Drawer Modal */}
+      {/* Comments Drawer Modal (Positioned at the Left Edge) */}
       <AnimatePresence>
         {selectedNews && (
-          <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/40 dark:bg-black/70 backdrop-blur-xs">
+          <div className="fixed inset-0 z-50 bg-slate-900/40 dark:bg-black/70 backdrop-blur-xs flex justify-start pointer-events-auto">
             <motion.div
-              initial={{ x: '100%' }}
+              initial={{ x: '-100%' }}
               animate={{ x: 0 }}
-              exit={{ x: '100%' }}
+              exit={{ x: '-100%' }}
               transition={{ type: 'spring', bounce: 0, duration: 0.35 }}
-              className="w-full max-w-md bg-white dark:bg-zinc-900 h-full shadow-2xl border-r border-slate-200 dark:border-zinc-800 flex flex-col p-6 text-right"
+              className="w-full max-w-md bg-white dark:bg-zinc-900 h-full shadow-2xl border-l border-slate-200 dark:border-zinc-800 flex flex-col p-6 text-right fixed left-0 top-0 bottom-0 z-50"
               dir="rtl"
             >
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-4 mb-4">
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                   <MessageSquare className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                  <span>التعليقات والمناقشة</span>
+                  <span>التعليقات والمناقشة ({comments.length})</span>
                 </h3>
                 <button 
                   onClick={() => setSelectedNews(null)}
@@ -388,20 +424,35 @@ export function NewsPage() {
                     لا توجد تعليقات بعد. كن أول من يكتب تعليقاً!
                   </div>
                 ) : (
-                  comments.map(c => (
-                    <div key={c.id} className="p-3.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 flex flex-col gap-1.5">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 flex items-center justify-center font-bold text-[10px]">
-                          {c.userName ? c.userName.charAt(0).toUpperCase() : 'ط'}
+                  comments.map(c => {
+                    const canDelete = isAdminUser || (user && (user.uid === c.userId || user.email === c.userName));
+                    return (
+                      <div key={c.id} className="p-3.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 flex flex-col gap-1.5 group">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 flex items-center justify-center font-bold text-[10px]">
+                              {c.userName ? c.userName.charAt(0).toUpperCase() : 'ط'}
+                            </div>
+                            <span className="text-xs font-bold text-slate-900 dark:text-white">@{c.userName || 'طالب'}</span>
+                            <span className="text-[10px] text-slate-400 dark:text-zinc-500 mr-2">
+                              {new Date(c.createdAt).toLocaleDateString('ar-SA')}
+                            </span>
+                          </div>
+
+                          {canDelete && (
+                            <button
+                              onClick={(e) => handleDeleteComment(c.id, e)}
+                              className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition"
+                              title="حذف التعليق"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
-                        <span className="text-xs font-bold text-slate-900 dark:text-white">@{c.userName || 'طالب'}</span>
-                        <span className="text-[10px] text-slate-400 dark:text-zinc-500 mr-auto">
-                          {new Date(c.createdAt).toLocaleDateString('ar-SA')}
-                        </span>
+                        <p className="text-xs text-slate-700 dark:text-zinc-300 leading-relaxed pr-8">{c.content}</p>
                       </div>
-                      <p className="text-xs text-slate-700 dark:text-zinc-300 leading-relaxed pr-8">{c.content}</p>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
 

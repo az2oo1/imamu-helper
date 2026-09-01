@@ -4,10 +4,11 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../lib/AuthContext';
 import { BookOpen, Search, ExternalLink, Folder, Plus, Trash2, Pencil, Info, MessageCircle, ChevronDown } from 'lucide-react';
+import { WhatsappIcon } from '../components/WhatsappIcon';
 import { InView, SpotlightCard } from '../components/ui';
 import { CourseDetailsModal } from '../components/CourseDetailsModal';
 import CreateResourceModal from '../components/CreateResourceModal';
-import { cleanCourseName, cleanUrlProtocol, parseResourceUrl, isWhatsappUrl } from '../lib/url-utils';
+import { cleanCourseName, cleanUrlProtocol, parseResourceUrl, parseAllResourceLinks, isWhatsappUrl } from '../lib/url-utils';
 
 function matchSubjectIds(id1: any, id2: any): boolean {
   if (id1 == null || id2 == null || id1 === '' || id2 === '') return false;
@@ -31,6 +32,7 @@ interface Resource {
   major: string;
   type: string;
   boxLink?: string;
+  fileUrl?: string;
   whatsappUrl?: string;
   whatsappLink?: string;
   freeResourcesUrl?: string;
@@ -46,44 +48,13 @@ interface DriveLinkItem {
   url: string;
 }
 
-export function parseDriveLinks(rawVal?: string | null): DriveLinkItem[] {
+export function parseDriveLinks(rawVal?: string): DriveLinkItem[] {
   if (!rawVal || !rawVal.trim()) return [];
-  const text = rawVal.trim();
-
-  // Try JSON Array Format
-  if (text.startsWith('[') && text.endsWith(']')) {
-    try {
-      const parsed = JSON.parse(text);
-      if (Array.isArray(parsed)) {
-        return parsed
-          .map((item: any, idx: number) => ({
-            title: item.title || item.name || `رابط مصادر ${idx + 1}`,
-            url: item.url || item.link || ''
-          }))
-          .filter(item => Boolean(item.url));
-      }
-    } catch (_e) {}
-  }
-
-  // Try Markdown Format [title](url)
-  const links: DriveLinkItem[] = [];
-  const mdRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
-  let match;
-  while ((match = mdRegex.exec(text)) !== null) {
-    links.push({ title: match[1], url: cleanUrlProtocol(match[2]) });
-  }
-  if (links.length > 0) return links;
-
-  // Split plain URLs by newline or comma
-  const plainUrls = text.split(/[\n,;]+/).map(s => s.trim()).filter(s => s.startsWith('http'));
-  if (plainUrls.length > 0) {
-    return plainUrls.map((url, i) => ({
-      title: plainUrls.length === 1 ? 'الملفات' : `رابط درايف ${i + 1}`,
-      url
-    }));
-  }
-
-  return [{ title: 'الملفات', url: text }];
+  const parsed = parseAllResourceLinks(rawVal);
+  return parsed.map((item, idx) => ({
+    title: item.title || (parsed.length === 1 ? 'الملفات' : `رابط درايف ${idx + 1}`),
+    url: item.url
+  }));
 }
 
 function DriveLinkButton({ boxLink }: { boxLink?: string }) {
@@ -184,9 +155,8 @@ export function Resources() {
   const [majors, setMajors] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [selectedMajor, setSelectedMajor] = useState('all');
-  const [selectedType, setSelectedType] = useState('all');
   const [loading, setLoading] = useState(true);
-  const [selectedCourse, setSelectedCourse] = useState<string | number | null>(null);
+  const [selectedCourse, setSelectedCourse] = useState<any | null>(null);
 
   // Admin Resource Wizard Form State
   const [isAddResourceOpen, setIsAddResourceOpen] = useState(false);
@@ -353,19 +323,85 @@ export function Resources() {
     setIsAddResourceOpen(true);
   };
 
+  const MAJOR_OPTIONS = [
+    { value: 'all', label: 'جميع التخصصات' },
+    { value: 'CS', label: 'علوم الحاسب (CS)' },
+    { value: 'IS', label: 'نظم المعلومات (IS)' },
+    { value: 'IT', label: 'تقنية المعلومات (IT)' },
+    { value: 'SE', label: 'هندسة البرمجيات (SE)' },
+    { value: 'MAT', label: 'الرياضيات (MATH / MAT)' },
+    { value: 'PHYS', label: 'الفيزياء (PHYS / PHY)' },
+    { value: 'STAT', label: 'الإحصاء (STAT)' },
+    { value: 'ISLM', label: 'الدراسات الإسلامية (ISLM / IC)' },
+    { value: 'ARAB', label: 'اللغة العربية (ARAB)' },
+    { value: 'ENG', label: 'اللغة الإنجليزية (ENG)' },
+    { value: 'BUS', label: 'إدارة الأعمال والمالية (BUS / MGMT)' },
+  ];
+
   const filteredResources = resources.filter(r => {
+    const cardSubject = r.subjectId ? subjects.find(s => matchSubjectIds(s.id, r.subjectId)) : null;
+    const code = (cardSubject?.code || r.courseCode || '').toUpperCase().trim();
+    const name = (cardSubject?.name || r.courseName || r.title || '').toLowerCase();
+    const rawMajor = (r.major || '').toLowerCase();
+    const subMajors = Array.isArray((cardSubject as any)?.majors) ? (cardSubject as any).majors.map((m: string) => String(m).toLowerCase()) : [];
+
     const matchesSearch = 
       r.title.toLowerCase().includes(search.toLowerCase()) ||
       r.courseCode.toLowerCase().includes(search.toLowerCase()) ||
-      r.courseName.toLowerCase().includes(search.toLowerCase());
+      r.courseName.toLowerCase().includes(search.toLowerCase()) ||
+      code.toLowerCase().includes(search.toLowerCase()) ||
+      name.toLowerCase().includes(search.toLowerCase());
     
-    const matchesMajor = selectedMajor === 'all' || 
-      r.major === selectedMajor || 
-      (r.major && r.major.includes(selectedMajor)) ||
-      (Array.isArray((r as any).majors) && (r as any).majors.includes(selectedMajor));
-    const matchesType = selectedType === 'all' || r.type === selectedType;
+    const matchesMajor = (() => {
+      if (selectedMajor === 'all') return true;
 
-    return matchesSearch && matchesMajor && matchesType;
+      const matchesPrefix = (prefixRegex: RegExp) => prefixRegex.test(code);
+      const matchesStr = (str: string) => 
+        rawMajor.includes(str) || 
+        name.includes(str) || 
+        code.toLowerCase().includes(str) ||
+        subMajors.some((m: string) => m.includes(str));
+
+      if (selectedMajor === 'CS') {
+        return matchesPrefix(/^CS/i) || matchesStr('حاسب') || matchesStr('computer') || matchesStr('برمجة') || matchesStr('خوارزميات');
+      }
+      if (selectedMajor === 'IS') {
+        return matchesPrefix(/^IS(?!LM)/i) || matchesStr('نظم') || matchesStr('information systems');
+      }
+      if (selectedMajor === 'IT') {
+        return matchesPrefix(/^IT/i) || matchesStr('تقنية') || matchesStr('information technology');
+      }
+      if (selectedMajor === 'SE') {
+        return matchesPrefix(/^SE/i) || matchesStr('هندسة برمجيات') || matchesStr('software');
+      }
+      if (selectedMajor === 'MAT') {
+        return matchesPrefix(/^(MAT|MATH)/i) || matchesStr('رياضيات') || matchesStr('math') || matchesStr('تفاضل') || matchesStr('جبر');
+      }
+      if (selectedMajor === 'PHYS') {
+        return matchesPrefix(/^(PHYS|PHY)/i) || matchesStr('فيزياء') || matchesStr('physics');
+      }
+      if (selectedMajor === 'STAT') {
+        return matchesPrefix(/^STAT/i) || matchesStr('إحصاء') || matchesStr('statistics');
+      }
+      if (selectedMajor === 'ISLM') {
+        return matchesPrefix(/^(ISLM|IC|SALM)/i) || matchesStr('إسلام') || matchesStr('islam');
+      }
+      if (selectedMajor === 'ARAB') {
+        return matchesPrefix(/^ARAB/i) || matchesStr('عرب') || matchesStr('arabic');
+      }
+      if (selectedMajor === 'ENG') {
+        return matchesPrefix(/^ENG/i) || matchesStr('إنجليز') || matchesStr('english');
+      }
+      if (selectedMajor === 'BUS') {
+        return matchesPrefix(/^(BUS|MGMT|FIN|ACCT|ECON)/i) || matchesStr('إدارة') || matchesStr('مالية') || matchesStr('business');
+      }
+
+      return rawMajor.includes(selectedMajor.toLowerCase()) || 
+        r.major === selectedMajor ||
+        subMajors.some((m: string) => m.includes(selectedMajor.toLowerCase()));
+    })();
+
+    return matchesSearch && matchesMajor;
   });
 
   return (
@@ -413,30 +449,18 @@ export function Resources() {
         </div>
 
         {/* Major Select */}
-        <div className="w-full md:w-56">
+        <div className="w-full md:w-64">
           <select
             value={selectedMajor}
             onChange={e => setSelectedMajor(e.target.value)}
-            className="w-full p-2.5 bg-slate-50 dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900"
+            className="w-full p-2.5 bg-slate-50 dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 cursor-pointer font-semibold"
           >
-            <option value="all">جميع التخصصات</option>
-            {majors.map(m => (
+            {MAJOR_OPTIONS.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+            {majors.filter(m => m && !MAJOR_OPTIONS.some(o => o.value === m || o.label.includes(m))).map(m => (
               <option key={m} value={m}>{m}</option>
             ))}
-          </select>
-        </div>
-
-        {/* Type Select */}
-        <div className="w-full md:w-48">
-          <select
-            value={selectedType}
-            onChange={e => setSelectedType(e.target.value)}
-            className="w-full p-2.5 bg-slate-50 dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900"
-          >
-            <option value="all">جميع أنواع الملفات</option>
-            <option value="exam">اختبارات سابقة</option>
-            <option value="summary">ملخصات ودراسات</option>
-            <option value="group">مجموعات التواصل</option>
           </select>
         </div>
       </div>
@@ -455,8 +479,15 @@ export function Resources() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredResources.map((item) => {
               const cardSubject = item.subjectId ? subjects.find(s => matchSubjectIds(s.id, item.subjectId)) : null;
-              const isRealCode = (code?: string) => code && /^[A-Z0-9\-\_]{2,10}$/i.test(code.trim()) && !/[\u0600-\u06FF]/.test(code) && code !== 'مصدر أكاديمي';
-              const finalCodeBadge = cardSubject?.code || (isRealCode(item.courseCode) ? item.courseCode : null) || 'مصدر أكاديمي';
+              const isRealCode = (code?: string) => code && /^[A-Z0-9\-\_]{2,10}$/i.test(code.trim()) && !/[\u0600-\u06FF]/.test(code) && code !== 'مصدر أكاديمي' && code !== 'مجموعة طلابية';
+              const isGroupResource = item.type === 'group' || item.type === 'whatsapp' || item.title.includes('قروب') || item.title.includes('مجموعة');
+              const finalCodeBadge = cardSubject?.code || (isRealCode(item.courseCode) ? item.courseCode : null) || (isGroupResource ? 'مجموعة طلابية' : 'مصدر أكاديمي');
+
+              const isWaUrl = (u?: string) => Boolean(u && (u.includes('whatsapp.com') || u.includes('wa.me')));
+              const resolvedWaUrl = isWaUrl(item.whatsappUrl) ? item.whatsappUrl :
+                                    isWaUrl(item.whatsappLink) ? item.whatsappLink :
+                                    isWaUrl(item.fileUrl) ? item.fileUrl :
+                                    isWaUrl(item.boxLink) ? item.boxLink : null;
 
               return (
                 <SpotlightCard
@@ -501,7 +532,7 @@ export function Resources() {
                     {item.title}
                   </h3>
                   
-                  {item.description && item.description.trim() !== item.title.trim() ? (
+                  {item.description && item.description.trim() ? (
                     <p className="text-xs text-slate-500 dark:text-zinc-400 line-clamp-2 leading-relaxed mb-4">
                       {item.description}
                     </p>
@@ -517,7 +548,7 @@ export function Resources() {
                 {/* Resource Links */}
                 <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 dark:border-zinc-800/80 pt-3.5 mt-auto w-full relative z-20">
                   <button
-                    onClick={() => setSelectedCourse(item.courseCode || item.subjectId || item.id)}
+                    onClick={() => setSelectedCourse(item)}
                     className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
                   >
                     <Info className="w-3.5 h-3.5" />
@@ -526,14 +557,14 @@ export function Resources() {
 
                   <DriveLinkButton boxLink={item.boxLink} />
 
-                  {item.whatsappUrl && (
+                  {resolvedWaUrl && (
                     <a
-                      href={item.whatsappUrl}
+                      href={resolvedWaUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
                     >
-                      <MessageCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <WhatsappIcon className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 fill-current" />
                       <span>واتساب</span>
                     </a>
                   )}
@@ -548,7 +579,14 @@ export function Resources() {
       <CourseDetailsModal 
         isOpen={!!selectedCourse} 
         onClose={() => setSelectedCourse(null)} 
-        courseIdOrCode={selectedCourse} 
+        courseIdOrCode={
+          selectedCourse ? (
+            typeof selectedCourse === 'object' ? (
+              (selectedCourse.subjectId ? (selectedCourse.courseCode && selectedCourse.courseCode !== 'مجموعة طلابية' && selectedCourse.courseCode !== 'مصدر أكاديمي' ? selectedCourse.courseCode : selectedCourse.subjectId) : null) || selectedCourse.id
+            ) : selectedCourse
+          ) : null
+        } 
+        initialData={selectedCourse ? (typeof selectedCourse === 'object' ? selectedCourse : resources.find(r => r.id === selectedCourse || r.courseCode === selectedCourse || r.subjectId === selectedCourse)) : null}
       />
 
       {/* Unified 4-Step Resource Package Wizard Modal */}

@@ -32,7 +32,7 @@ export default function ImageUploadInput({ label, value, onChange, type, uploadU
       });
 
       if (res.ok) {
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         const uploadedUrl = data.urls?.[0] || data.url;
         if (uploadedUrl) {
           onChange(uploadedUrl);

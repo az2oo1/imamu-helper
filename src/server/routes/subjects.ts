@@ -154,10 +154,13 @@ export function createSubjectsRouter(db: any) {
           );
         }
 
-        const firstRes = matchingResources[0];
+        const firstRes = isNumeric 
+          ? (matchingResources.find((r: any) => matchId(r.id, realId)) || matchingResources[0])
+          : matchingResources[0];
+
         if (firstRes) {
-          // 1. If resource is linked to a subjectId, resolve the parent subject via matchSubjectIds!
-          if (firstRes.subjectId) {
+          // 1. Only resolve parent subject if firstRes has a subjectId AND realId was NOT explicitly requesting a specific resource ID!
+          if (firstRes.subjectId && !isNumeric) {
             const allSubjs = await db.select().from(subjects);
             const linkedSubj = allSubjs.find((s: any) => matchSubjectIds(s.id, firstRes.subjectId));
             if (linkedSubj) {
@@ -165,7 +168,7 @@ export function createSubjectsRouter(db: any) {
             }
           }
           // 2. If subjectId failed or wasn't set, try extracting course code from firstRes.title / firstRes.description!
-          if (!subject) {
+          if (!subject && !isNumeric) {
             const codeFromRes = (firstRes.title + ' ' + (firstRes.description || '')).match(/[A-Z]{2,4}\d{3,4}|عال\d{4}/i)?.[0];
             if (codeFromRes) {
               const cleanCodeFromRes = codeFromRes.toLowerCase().replace(/[\s\-]/g, '');
@@ -181,13 +184,14 @@ export function createSubjectsRouter(db: any) {
           }
         }
 
-        // If still no subject exists in catalog, return rich fallback course object
+        // If still no subject exists in catalog (or if a specific resource was queried directly), return rich fallback course object
         if (!subject) {
           const connectUrl = process.env.CONNECT_APP_URL || 'http://localhost:3000';
           const codeMatchInRes = (firstRes?.title + ' ' + (firstRes?.description || '')).match(/[A-Z]{2,4}\d{3,4}|عال\d{4}/i)?.[0];
-          const fallbackCode = codeMatchInRes || (isNumeric ? '' : realId.replace(/^مصادر مادة\s*/i, '').replace(/^مادة\s*/i, '').trim());
+          const isGroupRes = firstRes?.type === 'group' || firstRes?.type === 'whatsapp' || firstRes?.title?.includes('قروب') || firstRes?.title?.includes('مجموعة');
+          const fallbackCode = codeMatchInRes || (isGroupRes ? 'مجموعة طلابية' : (isNumeric ? 'مصدر أكاديمي' : realId.replace(/^مصادر مادة\s*/i, '').replace(/^مادة\s*/i, '').trim()));
           
-          let fallbackName = firstRes?.title ? cleanCourseName(firstRes.title) : (firstRes?.description ? cleanCourseName(firstRes.description) : '');
+          let fallbackName = firstRes?.title || (firstRes?.description ? cleanCourseName(firstRes.description) : '');
           if (!fallbackName || fallbackName === 'مادة' || fallbackName === 'مصادر مادة' || fallbackName === 'مصادر مادة مادة') {
             fallbackName = fallbackCode ? fallbackCode : 'تفاصيل المصدر الأكاديمي';
           }
@@ -197,13 +201,12 @@ export function createSubjectsRouter(db: any) {
             .replace(/^مادة\s+مادة\s*/gi, '')
             .trim();
 
-          const fallbackDescription = (firstRes?.description && !/^مصادر مادة/i.test(firstRes.description) && !/^تفاصيل ومعلومات/i.test(firstRes.description))
-            ? firstRes.description
-            : null;
+          const fallbackDescription = firstRes?.description?.trim() || null;
 
           return res.json({
             course: {
               id: idOrCode,
+              subjectId: firstRes?.subjectId || null,
               isAcademicSubject: false,
               code: fallbackCode || 'مصدر أكاديمي',
               name: fallbackName || fallbackCode || 'مصدر أكاديمي',
@@ -277,10 +280,16 @@ export function createSubjectsRouter(db: any) {
       const resolvedWhatsappLink = subject.whatsappLink || firstWaResource?.whatsappLink || firstWaResource?.whatsappUrl || firstWaResource?.url || null;
       const firstAvatar = subject.avatarUrl || allResources.find((r: any) => r.avatarUrl)?.avatarUrl || null;
       const firstBanner = subject.bannerUrl || allResources.find((r: any) => r.bannerUrl)?.bannerUrl || null;
+      const firstResWithDesc = allResources.find((r: any) => r.description && r.description.trim() && !r.description.trim().startsWith('المتطلبات السابقة:') && !r.description.trim().startsWith('المتطلب السابق:'));
+      const subjDescIsPrereqOnly = subject.description?.trim().startsWith('المتطلبات السابقة:') || subject.description?.trim().startsWith('المتطلب السابق:');
+      const resolvedDescription = (subjDescIsPrereqOnly && firstResWithDesc?.description) 
+        ? firstResWithDesc.description.trim() 
+        : (subject.description?.trim() || firstResWithDesc?.description?.trim() || null);
 
       res.json({
         course: {
           ...subject,
+          description: resolvedDescription,
           avatarUrl: firstAvatar,
           bannerUrl: firstBanner,
           whatsappLink: resolvedWhatsappLink,
@@ -299,6 +308,8 @@ export function createSubjectsRouter(db: any) {
 
   router.get("/subjects/:idOrCode/details", getCourseDetailsHandler);
   router.get("/courses/:idOrCode/details", getCourseDetailsHandler);
+  router.get("/subjects/:idOrCode", getCourseDetailsHandler);
+  router.get("/courses/:idOrCode", getCourseDetailsHandler);
 
   router.get("/majors", async (req: express.Request, res: express.Response) => {
     try {
@@ -383,10 +394,18 @@ export function createSubjectsRouter(db: any) {
 
         const rawTitle = cr.title || (resolvedSubject ? cleanName : 'باقة مصادر جديدة');
         const cleanTitle = cleanCourseName(rawTitle);
+        const isWaUrl = (u?: string) => Boolean(u && (u.includes('whatsapp.com') || u.includes('wa.me')));
+        const resolvedWa = isWaUrl(cr.whatsappLink) ? cr.whatsappLink : 
+                           isWaUrl(cr.whatsappUrl) ? cr.whatsappUrl : 
+                           isWaUrl(cr.url) ? cr.url : 
+                           (cr.type === 'whatsapp' || cr.type === 'group') ? cr.url : undefined;
+
         const codeMatch = (cr.title || cr.description || '').match(/[A-Z]{2,4}\d{3,4}|عال\d{4}/i)?.[0];
         let extractedCode = resolvedSubject?.code || codeMatch || '';
         if (!extractedCode || /[\u0600-\u06FF]/.test(extractedCode) || extractedCode === 'مادة') {
-          extractedCode = 'مصدر أكاديمي';
+          extractedCode = (cr.type === 'group' || cr.type === 'whatsapp' || cr.title?.includes('قروب') || cr.title?.includes('مجموعة')) 
+            ? 'مجموعة طلابية' 
+            : 'مصدر أكاديمي';
         }
 
         resourcesList.push({
@@ -397,12 +416,12 @@ export function createSubjectsRouter(db: any) {
           courseName: cleanName,
           major: majorStr,
           majors: majorNames,
-          type: cr.type || 'drive',
+          type: cr.type || (resolvedWa ? 'group' : 'drive'),
           fileUrl: cr.url,
           driveUrl: (cr.type === 'drive' || cr.type === 'summary') ? cr.url : (cr.driveLink || undefined),
           boxLink: cr.boxLink || undefined,
-          whatsappUrl: (cr.type === 'whatsapp' || cr.type === 'group') ? cr.url : (cr.whatsappLink || undefined),
-          whatsappLink: cr.whatsappLink || undefined,
+          whatsappUrl: resolvedWa,
+          whatsappLink: resolvedWa,
           freeResourcesUrl: cr.freeResourcesUrl || undefined,
           paidResourcesUrl: cr.paidResourcesUrl || undefined,
           avatarUrl: cr.avatarUrl || undefined,
@@ -430,6 +449,7 @@ export function createSubjectsRouter(db: any) {
             fileUrl: s.driveLink || '',
             driveUrl: s.driveLink || undefined,
             whatsappUrl: s.whatsappLink || undefined,
+            description: s.description || undefined,
             createdAt: new Date().toISOString()
           });
         }

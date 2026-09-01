@@ -14,11 +14,13 @@ import {
   ArrowLeft, 
   Search, 
   Loader2,
-  MessageCircle
+  MessageCircle,
+  Download
 } from 'lucide-react';
 import ImageUploadInput from './ImageUploadInput';
 import ResourceLinksInput from './ResourceLinksInput';
-import { cleanCourseName } from '../lib/url-utils';
+import { cleanCourseName, isWhatsappUrl, parseAllResourceLinks } from '../lib/url-utils';
+import { WhatsappIcon } from './WhatsappIcon';
 
 interface CreateResourceModalProps {
   isOpen: boolean;
@@ -28,7 +30,7 @@ interface CreateResourceModalProps {
     subjectId?: number;
     title: string;
     type: string;
-    url: string;
+    url?: string;
     driveLink?: string;
     boxLink?: string;
     whatsappLink?: string;
@@ -55,7 +57,43 @@ export default function CreateResourceModal({
   const [courseSearch, setCourseSearch] = useState('');
   const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFetchingWaAvatar, setIsFetchingWaAvatar] = useState(false);
+  const [waAvatarMessage, setWaAvatarMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const handleFetchWhatsappAvatar = async () => {
+    const waUrl = resourceForm.whatsappLink?.trim();
+    if (!waUrl) {
+      setWaAvatarMessage({ type: 'error', text: 'الرجاء إضافة رابط مجموعة الواتساب أولاً في الخطوة الثانية' });
+      return;
+    }
+
+    setIsFetchingWaAvatar(true);
+    setWaAvatarMessage(null);
+    try {
+      const token = localStorage.getItem('imamu_token');
+      const res = await fetch('/api/admin/fetch-whatsapp-avatar', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ whatsappUrl: waUrl })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.avatarUrl) {
+        throw new Error(data.error || 'تعذر جلب صورة مجموعة الواتساب');
+      }
+
+      setResourceForm((s: any) => ({ ...s, avatarUrl: data.avatarUrl }));
+      setWaAvatarMessage({ type: 'success', text: 'تم جلب صورة المجموعة وحفظها بنجاح في تخزين S3!' });
+    } catch (err: any) {
+      setWaAvatarMessage({ type: 'error', text: err.message || 'فشل جلب الصورة من رابط الواتساب' });
+    } finally {
+      setIsFetchingWaAvatar(false);
+    }
+  };
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -72,10 +110,8 @@ export default function CreateResourceModal({
 
   const isEditing = !!resourceForm.id;
   const selectedCourse = subjects.find(s => 
-    resourceForm.subjectId !== undefined && resourceForm.subjectId !== null && String(s.id) === String(resourceForm.subjectId)
-  ) || (resourceForm.title ? subjects.find(s => 
-    s.code && resourceForm.title.toLowerCase().includes(s.code.toLowerCase())
-  ) : undefined);
+    Boolean(resourceForm.subjectId) && String(s.id) === String(resourceForm.subjectId)
+  );
 
   const filteredSubjects = subjects.filter(s => 
     !courseSearch || 
@@ -347,21 +383,36 @@ export default function CreateResourceModal({
                     )}
                   </div>
 
-                  {/* Resource Package Title Input (Required if no course is selected) */}
-                  {!selectedCourse && (
-                    <div className="bg-slate-50 dark:bg-zinc-800/50 rounded-2xl p-5 border border-slate-200/80 dark:border-zinc-800 space-y-2">
+                  {/* Resource Package Title & Description Inputs */}
+                  <div className="bg-slate-50 dark:bg-zinc-800/50 rounded-2xl p-5 border border-slate-200/80 dark:border-zinc-800 space-y-4">
+                    {!selectedCourse && (
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-slate-700 dark:text-zinc-200">
+                          عنوان باقة المصدر / المجموعة *
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="مثال: قروب تقنية المعلومات / باقة مصادر عامة..."
+                          value={resourceForm.title || ''}
+                          onChange={e => setResourceForm((s: any) => ({ ...s, title: e.target.value }))}
+                          className="w-full py-3 px-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-bold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs"
+                        />
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
                       <label className="block text-xs font-bold text-slate-700 dark:text-zinc-200">
-                        عنوان باقة المصدر / المجموعة *
+                        الوصف والتفاصيل (اختياري)
                       </label>
-                      <input
-                        type="text"
-                        placeholder="مثال: قروب تقنية المعلومات / باقة مصادر عامة..."
-                        value={resourceForm.title || ''}
-                        onChange={e => setResourceForm((s: any) => ({ ...s, title: e.target.value }))}
-                        className="w-full py-3 px-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-bold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs"
+                      <textarea
+                        rows={3}
+                        placeholder="اكتب وصفاً ثرياً ومختصراً يوضح محتويات وأهداف هذه الباقة أو المجموعة..."
+                        value={resourceForm.description || ''}
+                        onChange={e => setResourceForm((s: any) => ({ ...s, description: e.target.value }))}
+                        className="w-full py-3 px-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs resize-none"
                       />
                     </div>
-                  )}
+                  </div>
                 </motion.div>
               )}
 
@@ -383,7 +434,7 @@ export default function CreateResourceModal({
 
                   <div className="bg-slate-50 dark:bg-zinc-800/50 rounded-2xl p-5 border border-slate-200/80 dark:border-zinc-800 space-y-2">
                     <label className="block text-xs font-bold text-slate-700 dark:text-zinc-200 flex items-center gap-1.5">
-                      <MessageCircle className="w-4 h-4 text-emerald-500" />
+                      <WhatsappIcon className="w-4 h-4 text-emerald-500 fill-current" />
                       رابط مجموعة الواتساب المباشر (WhatsApp Group Link)
                     </label>
                     <input
@@ -433,6 +484,39 @@ export default function CreateResourceModal({
                   transition={{ duration: 0.2 }}
                   className="space-y-5"
                 >
+                  {/* WhatsApp Avatar Fetch Action Card */}
+                  {resourceForm.whatsappLink && (
+                    <div className="bg-emerald-50/80 dark:bg-emerald-950/40 rounded-2xl p-4 border border-emerald-200 dark:border-emerald-900/60 space-y-2.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <WhatsappIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 fill-current" />
+                          <span className="text-xs font-bold text-slate-800 dark:text-zinc-200">
+                            صورة مجموعة الواتساب المكتشفة
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={isFetchingWaAvatar}
+                          onClick={handleFetchWhatsappAvatar}
+                          className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold transition-all duration-200 hover:scale-[1.02] active:scale-95 cursor-pointer flex items-center gap-1.5 shrink-0 shadow-sm"
+                        >
+                          {isFetchingWaAvatar ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Download className="w-3.5 h-3.5" />
+                          )}
+                          <span>{isFetchingWaAvatar ? 'جاري الجلب والتخزين...' : 'جلب صورة الواتساب إلى S3'}</span>
+                        </button>
+                      </div>
+
+                      {waAvatarMessage && (
+                        <p className={`text-[11px] font-bold ${waAvatarMessage.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
+                          {waAvatarMessage.text}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   <ImageUploadInput 
                     label="صورة أفياتار المصدر / اللوجو (Resource Icon / Avatar)" 
                     value={resourceForm.avatarUrl || ''} 

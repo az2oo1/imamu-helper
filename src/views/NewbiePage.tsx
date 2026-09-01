@@ -24,7 +24,7 @@ export function NewbiePage() {
   // Fetch newbie links from database
   useEffect(() => {
     fetch('/api/newbie/links')
-      .then(r => r.json())
+      .then(r => r.ok && r.headers.get('content-type')?.includes('application/json') ? r.json() : [])
       .then(data => {
         if (Array.isArray(data)) {
           setNewbieLinks(data);

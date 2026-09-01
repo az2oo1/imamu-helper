@@ -3,14 +3,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../lib/AuthContext';
 import {
-  ShieldAlert, ShieldCheck, Twitter, Calendar, BookOpen, FileText,
+  ShieldAlert, ShieldCheck, Calendar, BookOpen, FileText,
   Trash2, Link as LinkIcon, Download, Upload, Plus, Search, X,
   Users, BarChart3, Settings, HelpCircle, ExternalLink, PlusCircle,
   ChevronDown, ChevronUp, Activity, Server, Database, Cpu, Globe,
   Shield, UserCheck, UserX, Eye, Sparkles, Command, Hash, Clock,
   CheckCircle2, AlertTriangle, Info, XCircle, RefreshCw, Zap, 
   LayoutDashboard, Newspaper, GraduationCap, BookMarked, Link2,
-  MoreHorizontal, ArrowUpRight, TrendingUp, Bell, Folder, Wrench, Edit3
+  MoreHorizontal, ArrowUpRight, TrendingUp, Bell, Folder, Wrench, Edit3, Send
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { TutorialsTab } from '../components/TutorialsTab';
@@ -210,6 +210,8 @@ export function AdminPage() {
   const [resourceSearch, setResourceSearch] = useState('');
   const [resourceFilterType, setResourceFilterType] = useState('ALL');
   const [globalSettings, setGlobalSettings] = useState<any>({ fetchRangeDays: 30, autoDeleteDays: 30 });
+  const [telegramChannelInput, setTelegramChannelInput] = useState('');
+  const [isExtractingTelegram, setIsExtractingTelegram] = useState(false);
 
   const [sourceForm, setSourceForm] = useState<{ id?: number; handle: string }>({ handle: '' });
   const [majorForm, setMajorForm] = useState<{
@@ -322,7 +324,14 @@ export function AdminPage() {
   // ============================================================================
   // API HELPERS
   // ============================================================================
-  const getToken = async () => user?.getIdToken() || '';
+  const getToken = async () => {
+    const local = typeof window !== 'undefined' ? (localStorage.getItem('token') || localStorage.getItem('imamu_token')) : null;
+    if (local) return local;
+    if (user) {
+      try { return await user.getIdToken(); } catch (e) {}
+    }
+    return '';
+  };
   const authHeaders = async () => ({ Authorization: `Bearer ${await getToken()}`, 'Content-Type': 'application/json' });
 
   const fetchData = async () => {
@@ -486,18 +495,80 @@ export function AdminPage() {
   };
 
 
+  const [fetchingHandle, setFetchingHandle] = useState<string | null>(null);
+  const [isFetchingAll, setIsFetchingAll] = useState(false);
+
   const handleFetchPosts = async (handle: string, fetchAll: boolean = false) => {
+    if (fetchAll) setIsFetchingAll(true);
+    else setFetchingHandle(handle);
     try {
       const t = await getToken();
-      const url = fetchAll ? `/api/admin/news_sources/fetch-all` : `/api/admin/news_sources/${handle}/fetch`;
-      const res = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${t}` } });
-      const data = await res.json();
+      if (fetchAll) {
+        const res = await fetch('/api/admin/news_sources/fetch-all', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${t}` }
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.success) {
+          if (data.fetchedCount === 0) toast('warning', 'لم يتم العثور على منشورات جديدة');
+          else toast('success', `تم تحديث ونشر ${data.fetchedCount} خبر جديد من القنوات الرسمية`);
+          fetchData();
+        } else {
+          const errDetail = data.error || data.message || (res.status === 401 ? 'جلسة الدخول منتهية' : res.status === 403 ? 'يتطلب صلاحيات مدير النظام' : `خطأ في الخادم (${res.status})`);
+          toast('error', 'تعذر تحديث الأخبار: ' + errDetail);
+        }
+      } else {
+        const res = await fetch('/api/admin/telegram/extract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` },
+          body: JSON.stringify({ channel: handle, limit: 30 })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.success) {
+          toast('success', `تم تحديث ونشر ${data.newPublished} خبر جديد من قناة @${data.channelHandle}`);
+          fetchData();
+        } else {
+          const errDetail = data.error || data.message || (res.status === 401 ? 'جلسة الدخول منتهية' : res.status === 403 ? 'يتطلب صلاحيات مدير النظام' : `خطأ في الخادم (${res.status})`);
+          toast('error', 'تعذر تحديث الأخبار: ' + errDetail);
+        }
+      }
+    } catch (e: any) {
+      console.error(e);
+      toast('error', 'حدث خطأ في الاتصال بالسيرفر: ' + (e.message || 'شبكة غير متاحة'));
+    } finally {
+      if (fetchAll) setIsFetchingAll(false);
+      else setFetchingHandle(null);
+    }
+  };
+
+  const handleExtractTelegram = async () => {
+    if (!telegramChannelInput.trim()) {
+      toast('error', 'الرجاء إدخال اسم أو رابط قناة التليقرام');
+      return;
+    }
+    setIsExtractingTelegram(true);
+    try {
+      const t = await getToken();
+      const res = await fetch('/api/admin/telegram/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` },
+        body: JSON.stringify({ channel: telegramChannelInput.trim(), limit: 30 })
+      });
+      const data = await res.json().catch(() => ({}));
       if (res.ok && data.success) {
-        if (data.fetchedCount === 0) toast('warning', 'No new posts fetched. Sources may be rate-limited.');
-        else toast('success', `Fetched ${data.fetchedCount} recent posts`);
+        toast('success', `تم استخراج ${data.totalExtracted} منشور ونشر ${data.newPublished} خبر جديد من قناة @${data.channelHandle}`);
+        setTelegramChannelInput('');
         fetchData();
-      } else toast('error', 'Failed to fetch: ' + (data.message || data.error || 'Unknown error'));
-    } catch (e) { console.error(e); toast('error', 'Network error'); }
+      } else {
+        const errDetail = data.error || data.message || (res.status === 401 ? 'جلسة الدخول منتهية، يرجى تسجيل الدخول مجدداً' : res.status === 403 ? 'عذراً، هذا الإجراء يتطلب صلاحيات مدير النظام' : `خطأ في السيرفر (${res.status})`);
+        toast('error', errDetail);
+      }
+    } catch (e: any) {
+      console.error(e);
+      toast('error', 'حدث خطأ في الاتصال أثناء استخراج التليقرام: ' + (e.message || 'خطأ شبكة'));
+    } finally {
+      setIsExtractingTelegram(false);
+    }
   };
 
   // ============================================================================
@@ -538,22 +609,56 @@ export function AdminPage() {
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Track handles & RSS feeds to fetch announcements</p>
         </div>
         <button
+          disabled={isFetchingAll}
           onClick={() => handleFetchPosts('', true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition shadow-sm"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition shadow-sm disabled:opacity-50 cursor-pointer"
         >
-          <RefreshCw className="w-4 h-4" /> Fetch All Now
+          <RefreshCw className={`w-4 h-4 ${isFetchingAll ? 'animate-spin' : ''}`} />
+          <span>{isFetchingAll ? 'جاري التحديث...' : 'Fetch All Now'}</span>
         </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* Add Source + Settings */}
+        {/* Add Source + Telegram Extractor + Settings */}
         <div className="space-y-4">
+          {/* Telegram Extractor Card */}
+          <div className="rounded-2xl p-5 border space-y-4 shadow-sm" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-sky-500/10 text-sky-500">
+                <Send className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>Telegram Channel Extractor (30 Posts)</h4>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Extract last 30 messages from any public Telegram channel and publish to News page.</p>
+              </div>
+            </div>
+            
+            <div className="flex flex-col gap-2">
+              <input
+                type="text"
+                placeholder="e.g. IMAMU_NEWS or https://t.me/s/channel"
+                value={telegramChannelInput}
+                onChange={e => setTelegramChannelInput(e.target.value)}
+                className="w-full py-2.5 px-3 rounded-xl text-sm border font-mono"
+                style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
+              />
+              <button
+                disabled={isExtractingTelegram || !telegramChannelInput.trim()}
+                onClick={handleExtractTelegram}
+                className="w-full bg-sky-600 hover:bg-sky-500 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer shadow-xs"
+              >
+                {isExtractingTelegram ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                <span>{isExtractingTelegram ? 'جاري استخراج ورفع 30 خبر...' : 'استخراج ونشر 30 خبر من التليقرام'}</span>
+              </button>
+            </div>
+          </div>
+
           <div className="rounded-2xl p-5 border space-y-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-            <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>Add News Source</h4>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Enter a Twitter handle or RSS Feed URL.</p>
+            <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>Add News Source (Telegram / RSS)</h4>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Enter a Telegram channel handle or RSS Feed URL.</p>
             <input
               type="text"
-              placeholder="Handle (e.g. IMAMU_News) or RSS URL"
+              placeholder="Channel Handle (e.g. IMAMU_NEWS) or URL"
               value={sourceForm.handle}
               onChange={e => setSourceForm({ ...sourceForm, handle: e.target.value.trim() })}
               className="w-full py-2 px-3 rounded-xl text-sm border"
@@ -578,17 +683,6 @@ export function AdminPage() {
                 <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Auto-Delete Older Than (Days)</label>
                 <input type="number" min="1" value={globalSettings.autoDeleteDays} onChange={e => setGlobalSettings((s: any) => ({ ...s, autoDeleteDays: parseInt(e.target.value) || 30 }))} className="py-2 px-3 rounded-xl text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
               </div>
-              <div className="border-t pt-3 space-y-3" style={{ borderColor: 'var(--border-color)' }}>
-                <div className="text-xs font-semibold" style={{ color: 'var(--text-main)' }}>X / Twitter Credentials (Optional)</div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs" style={{ color: 'var(--text-muted)' }}>auth_token</label>
-                  <input type="password" placeholder="X session auth_token" value={globalSettings.twitterAuthToken || ''} onChange={e => setGlobalSettings((s: any) => ({ ...s, twitterAuthToken: e.target.value }))} className="py-2 px-3 rounded-xl text-xs border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs" style={{ color: 'var(--text-muted)' }}>ct0 (CSRF)</label>
-                  <input type="password" placeholder="X session ct0 token" value={globalSettings.twitterCt0 || ''} onChange={e => setGlobalSettings((s: any) => ({ ...s, twitterCt0: e.target.value }))} className="py-2 px-3 rounded-xl text-xs border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-                </div>
-              </div>
               <button
                 className="w-full bg-[var(--color-imamu-blue)] text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-blue-light)] transition"
                 onClick={() => handlePostWithMethod('/api/admin/global_settings', 'PUT', globalSettings, () => toast('success', 'Settings saved!'))}
@@ -609,8 +703,8 @@ export function AdminPage() {
               {newsSources.map(s => (
                 <div key={s.id} className="p-4 flex flex-col xl:flex-row xl:items-center justify-between gap-4 transition hover:bg-[var(--bg-subtle)]" style={{ borderColor: 'var(--border-color)' }}>
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-[#1DA1F2]/10 rounded-full flex items-center justify-center shrink-0 overflow-hidden">
-                      {s.profilePicUrl ? <img src={s.profilePicUrl} className="w-full h-full object-cover" /> : <Twitter className="w-5 h-5 text-[#1DA1F2]" />}
+                    <div className="w-12 h-12 bg-sky-500/10 rounded-full flex items-center justify-center shrink-0 overflow-hidden">
+                      {s.profilePicUrl ? <img src={s.profilePicUrl} className="w-full h-full object-cover" /> : <Send className="w-5 h-5 text-sky-500" />}
                     </div>
                     <div>
                       <div className="font-semibold text-lg" style={{ color: 'var(--text-main)' }}>@{s.handle}</div>
@@ -622,7 +716,14 @@ export function AdminPage() {
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <button onClick={() => handleFetchPosts(s.handle, false)} className="bg-blue-500/10 text-blue-500 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-500/20 transition whitespace-nowrap">Fetch Now</button>
+                    <button 
+                      disabled={fetchingHandle === s.handle}
+                      onClick={() => handleFetchPosts(s.handle, false)} 
+                      className="bg-blue-500/10 text-blue-500 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-500/20 transition whitespace-nowrap disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                    >
+                      {fetchingHandle === s.handle ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
+                      <span>{fetchingHandle === s.handle ? 'جاري السحب...' : 'Fetch Now'}</span>
+                    </button>
                     <button onClick={() => handleDelete(`/api/admin/news_sources/${s.handle}/posts`, `all posts from @${s.handle}`)} className="bg-red-500/10 text-red-400 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-500/20 transition whitespace-nowrap">Empty Posts</button>
                     <button onClick={() => handleDelete(`/api/admin/news_sources/${s.id}`, `@${s.handle}`)} className="p-1.5 rounded-lg hover:bg-red-500/10 transition" title="Delete Source">
                       <Trash2 className="w-5 h-5 text-red-400" />
