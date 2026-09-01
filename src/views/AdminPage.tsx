@@ -10,7 +10,7 @@ import {
   Shield, UserCheck, UserX, Eye, Sparkles, Command, Hash, Clock,
   CheckCircle2, AlertTriangle, Info, XCircle, RefreshCw, Zap, 
   LayoutDashboard, Newspaper, GraduationCap, BookMarked, Link2,
-  MoreHorizontal, ArrowUpRight, TrendingUp, Bell, Folder, Wrench, Edit3, Send
+  MoreHorizontal, ArrowUpRight, TrendingUp, Bell, Folder, Wrench, Edit3, Send, Mail
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { TutorialsTab } from '../components/TutorialsTab';
@@ -286,6 +286,42 @@ export function AdminPage() {
 
   // Modals
   const [deleteModal, setDeleteModal] = useState<{ url: string; message: string } | null>(null);
+
+  // Test Email State (Using Main Route: /api/auth/send-code)
+  const [testEmailRecipient, setTestEmailRecipient] = useState('');
+  const [testEmailCode, setTestEmailCode] = useState('');
+  const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
+
+  const handleSendTestEmail = async () => {
+    if (!testEmailRecipient || !testEmailRecipient.trim()) {
+      toast('error', 'يرجى كتابة البريد الإلكتروني أو الرقم الجامعي');
+      return;
+    }
+    setIsSendingTestEmail(true);
+    try {
+      const res = await fetch('/api/auth/send-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: testEmailRecipient.trim(),
+          customCode: testEmailCode.trim() || undefined
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast('success', data.message || 'تم إرسال رمز التحقق بنجاح!');
+      } else {
+        toast('error', data.error || 'فشل إرسال رمز التحقق');
+      }
+    } catch (e: any) {
+      toast('error', 'حدث خطأ في الاتصال بالخادم');
+    } finally {
+      setIsSendingTestEmail(false);
+    }
+  };
 
   // Sync activeTab with URL search param on mount
   useEffect(() => {
@@ -1342,6 +1378,62 @@ export function AdminPage() {
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>SMTP Password</label>
                 <input type="password" value={globalSettings.smtpPass || ''} onChange={e => setGlobalSettings((s: any) => ({ ...s, smtpPass: e.target.value }))} placeholder="App Password" className="py-2 px-3 rounded-xl text-sm border w-full" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+              </div>
+            </div>
+
+            {/* Send Verification Code (Main Route: /api/auth/send-code) */}
+            <div className="pt-6 mt-6 border-t space-y-4" style={{ borderColor: 'var(--border-color)' }}>
+              <div>
+                <h4 className="font-semibold text-sm mb-1 flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
+                  <Mail className="w-4 h-4 text-blue-500" /> إرسال رمز التحقق عبر المسار الرئيسي (/api/auth/send-code)
+                </h4>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>اختبار إرسال الرموز عبر المسار الرئيسي المعتمد بإنشاء الحسابات وتأكيد إعدادات SMTP.</p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>البريد الإلكتروني / الرقم الجامعي (Recipient) *</label>
+                  <input
+                    type="text"
+                    value={testEmailRecipient}
+                    onChange={e => setTestEmailRecipient(e.target.value)}
+                    placeholder="441000000 أو student@sm.imamu.edu.sa"
+                    className="py-2 px-3 rounded-xl text-sm border w-full"
+                    style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>رمز مخصص (Custom Code - اختياري)</label>
+                  <input
+                    type="text"
+                    value={testEmailCode}
+                    onChange={e => setTestEmailCode(e.target.value)}
+                    placeholder="توليد تلقائي 6 أرقام أو أدخل رمزك"
+                    className="py-2 px-3 rounded-xl text-sm border w-full"
+                    style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-start">
+                <button
+                  type="button"
+                  disabled={isSendingTestEmail || !testEmailRecipient.trim()}
+                  onClick={handleSendTestEmail}
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl font-bold text-xs sm:text-sm transition disabled:opacity-50 cursor-pointer shadow-sm"
+                >
+                  {isSendingTestEmail ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>جاري إرسال الرمز...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      <span>إرسال رمز التحقق</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
 

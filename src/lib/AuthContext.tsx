@@ -15,7 +15,7 @@ interface AuthContextType {
   dbUser: any | null; // Database user
   loading: boolean;
   signInWithEmail: (email: string, pass: string) => Promise<void>;
-  signUpWithEmail: (email: string, pass: string, phone: string, userName: string, code: string) => Promise<void>;
+  signUpWithEmail: (email: string, pass: string, phone: string, userName: string, code: string, extraData?: { major?: string; currentGpa?: string; completedCourses?: string[] }) => Promise<void>;
   signOut: () => Promise<void>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<void>;
@@ -136,11 +136,20 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     setDbUser(data.user);
   };
 
-  const signUpWithEmail = async (email: string, pass: string, phone: string, userName: string, code: string) => {
+  const signUpWithEmail = async (email: string, pass: string, phone: string, userName: string, code: string, extraData?: { major?: string; currentGpa?: string; completedCourses?: string[] }) => {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password: pass, phone, userName, code })
+      body: JSON.stringify({
+        email,
+        password: pass,
+        phone,
+        userName,
+        code,
+        major: extraData?.major,
+        currentGpa: extraData?.currentGpa,
+        completedCourses: extraData?.completedCourses
+      })
     });
     
     if (!res.ok) {

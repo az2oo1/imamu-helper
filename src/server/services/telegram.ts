@@ -26,13 +26,14 @@ export function unescapeHtml(text: string): string {
   if (!text) return '';
   return text
     .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<a[^>]*href=["']([^"']+)["'][^>]*>([^<]+)<\/a>/gi, (_, href, anchor) => {
+    .replace(/<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, (_, href, anchor) => {
       const cleanAnchor = anchor.replace(/<[^>]+>/g, '').trim();
-      if (cleanAnchor.startsWith('#') || cleanAnchor.startsWith('@') || href.startsWith('?') || href.startsWith('tg://')) {
+      // Remove query parameters like ?q=%23... attached to telegram hashtags or search URLs
+      if (cleanAnchor.startsWith('#') || cleanAnchor.startsWith('@') || href.includes('?q=') || href.startsWith('tg://')) {
         return cleanAnchor;
       }
       if (cleanAnchor === href || href.includes(cleanAnchor)) return cleanAnchor;
-      return `${cleanAnchor} (${href})`;
+      return `[${cleanAnchor}](${href})`;
     })
     .replace(/<[^>]+>/g, '')
     .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
@@ -43,6 +44,13 @@ export function unescapeHtml(text: string): string {
     .replace(/&gt;/g, '>')
     .replace(/&#39;/g, "'")
     .replace(/&nbsp;/g, ' ')
+    .replace(/&rlm;/gi, '')
+    .replace(/&lrm;/gi, '')
+    .replace(/\u200F/g, '')
+    .replace(/\u200E/g, '')
+    .replace(/\s*\(\?q=[^)]+\)/gi, '')
+    .replace(/\s*\(\?q=%23[^)]+\)/gi, '')
+    .replace(/\s*\?q=%23[^\s)]+/gi, '')
     .trim();
 }
 

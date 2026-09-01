@@ -113,32 +113,7 @@ export function ProfilePage() {
   const [phoneEditable, setPhoneEditable] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    if (!profileForm.userName || profileForm.userName === dbUser?.userName) {
-      setUsernameStatus('idle');
-      return;
-    }
-    const checkUsername = async () => {
-      setUsernameStatus('checking');
-      try {
-        const res = await fetch(`/api/check-username?username=${encodeURIComponent(profileForm.userName)}`, {
-          headers: { Authorization: `Bearer ${await user?.getIdToken()}` }
-        });
-        const data = await res.json();
-        if (data.available) {
-          setUsernameStatus('available');
-        } else {
-          setUsernameStatus('taken');
-        }
-      } catch (err) {
-        console.error(err);
-        setUsernameStatus('idle');
-      }
-    };
-    
-    const delay = setTimeout(checkUsername, 500);
-    return () => clearTimeout(delay);
-  }, [profileForm.userName, dbUser?.userName, user]);
+  // Username check removed as display names are non-unique
 
   useEffect(() => {
     const authHeader: Record<string, string> = (user as any)?.accessToken ? { Authorization: `Bearer ${(user as any).accessToken}` } : {};
@@ -182,7 +157,6 @@ export function ProfilePage() {
 
   const saveProfile = async (overrides?: any) => {
     if(!user) return;
-    if (usernameStatus === 'taken' || usernameStatus === 'checking') return;
     setIsSaving(true);
     setFeedback(null);
     const token = await user.getIdToken();
@@ -407,19 +381,9 @@ export function ProfilePage() {
                             setProfileForm(p => ({...p, userName: val}));
                           }}
                           onBlur={() => saveProfile()}
-                          className="w-full pr-10 pl-10 py-3 bg-slate-50/80 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-600"
+                          className="w-full pr-10 pl-4 py-3 bg-slate-50/80 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-600"
                         />
-                        <div className="absolute left-3.5 flex items-center">
-                          {usernameStatus === 'checking' && <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />}
-                          {usernameStatus === 'available' && <CheckCircle2 className="w-4.5 h-4.5 text-emerald-500" />}
-                          {usernameStatus === 'taken' && (
-                            <span title="الاسم مستخدم مسبقاً">
-                              <AlertCircle className="w-4.5 h-4.5 text-red-500" />
-                            </span>
-                          )}
-                        </div>
                       </div>
-                      {usernameStatus === 'taken' && <p className="text-[11px] font-semibold text-red-500 mt-1.5">هذا الاسم مستخدم بالفعل.</p>}
                     </div>
 
                     {/* Phone Number */}

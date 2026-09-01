@@ -462,49 +462,5 @@ export function createSubjectsRouter(db: any) {
     }
   });
 
-  // WhatsApp Group Avatar Scraper & Proxy
-  router.get("/whatsapp-avatar", async (req: express.Request, res: express.Response): Promise<any> => {
-    try {
-      const rawUrl = String(req.query.url || '').trim();
-      if (!rawUrl || (!rawUrl.includes('chat.whatsapp.com') && !rawUrl.includes('wa.me'))) {
-        return res.status(400).json({ error: "Invalid WhatsApp URL" });
-      }
-
-      // Fetch WhatsApp invite page HTML using social crawler user agent
-      const resp = await fetch(rawUrl, {
-        headers: {
-          'User-Agent': 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php) Twitterbot/1.0',
-          'Accept-Language': 'en-US,en;q=0.9'
-        }
-      });
-
-      if (!resp.ok) {
-        return res.status(404).json({ error: "Could not fetch WhatsApp link" });
-      }
-
-      const html = await resp.text();
-      const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
-                      html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i) ||
-                      html.match(/<img[^>]+id=["']landing_img["'][^>]+src=["']([^"']+)["']/i);
-
-      if (ogMatch && ogMatch[1]) {
-        const imageUrl = ogMatch[1].replace(/&amp;/g, '&');
-        const imageResp = await fetch(imageUrl);
-        if (imageResp.ok) {
-          const contentType = imageResp.headers.get('content-type') || 'image/jpeg';
-          const buffer = await imageResp.arrayBuffer();
-          res.setHeader('Content-Type', contentType);
-          res.setHeader('Cache-Control', 'public, max-age=86400');
-          return res.send(Buffer.from(buffer));
-        }
-      }
-
-      return res.status(404).json({ error: "No group image found" });
-    } catch (err) {
-      console.error("Error fetching WhatsApp avatar:", err);
-      return res.status(500).json({ error: "Failed to load WhatsApp avatar" });
-    }
-  });
-
   return router;
 }

@@ -2,8 +2,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import jwt from 'jsonwebtoken';
 import { Resources } from '../../src/views/Resources';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_dev_only';
+import { JWT_SECRET } from '../../src/lib/config';
 
 export default async function Page() {
   const cookieStore = await cookies();

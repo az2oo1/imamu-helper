@@ -23,7 +23,7 @@ import {
   TextEffect
 } from '../components/ui';
 
-const DynamicConfetti = dynamic(() => import('react-confetti'), { ssr: false });
+const DynamicConfetti = dynamic(() => import('react-confetti').then((mod) => mod.default || mod), { ssr: false });
 
 const features = [
   {

@@ -18,6 +18,7 @@ import { importMsariData } from '../services/msari';
 import { extractTelegramChannelPosts } from '../services/telegram';
 
 import { getDb } from '../../db/index';
+import { sendCustomEmail } from '../../lib/mailer';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 

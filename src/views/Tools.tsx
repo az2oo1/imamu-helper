@@ -212,37 +212,16 @@ export function Tools() {
   return (
     <div className="flex flex-col flex-1 w-full max-w-5xl mx-auto pb-24 px-4 sm:px-6 pt-8 text-right" dir="rtl">
       {/* Header */}
-      <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <span className="text-xs font-semibold tracking-widest text-blue-600 dark:text-blue-400 uppercase mb-1.5 block">
-            الأدوات الأكاديمية
-          </span>
-          <h1 className="text-2xl sm:text-3xl font-display font-bold tracking-tight text-slate-900 dark:text-white mb-2">
-            الأدوات والخدمات الطلابية
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-lg">
-            أدوات وحاسبات منظمة مخصصة لتسهيل تجربتك الأكاديمية بجامعة الإمام.
-          </p>
-        </div>
-
-        {isAdmin && (
-          <div className="flex flex-wrap items-center gap-2 shrink-0 self-start sm:self-auto">
-            <Link
-              href="/admin?tab=tools"
-              className="flex items-center gap-2 px-3.5 py-2 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 font-bold text-xs sm:text-sm rounded-xl transition shadow-sm border border-slate-200 dark:border-zinc-700"
-            >
-              <Wrench className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              <span>إدارة الأدوات (لوحة التحكم)</span>
-            </Link>
-            <button
-              onClick={openAddModal}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl transition shadow-md"
-            >
-              <Plus className="w-4 h-4" />
-              <span>إضافة أداة جديدة</span>
-            </button>
-          </div>
-        )}
+      <div className="mb-8">
+        <span className="text-xs font-semibold tracking-widest text-blue-600 dark:text-blue-400 uppercase mb-1.5 block">
+          الأدوات الأكاديمية
+        </span>
+        <h1 className="text-2xl sm:text-3xl font-display font-bold tracking-tight text-slate-900 dark:text-white mb-2">
+          الأدوات والخدمات الطلابية
+        </h1>
+        <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-lg">
+          أدوات وحاسبات منظمة مخصصة لتسهيل تجربتك الأكاديمية بجامعة الإمام.
+        </p>
       </div>
 
       {/* Grid */}
