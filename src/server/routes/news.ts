@@ -69,9 +69,11 @@ export function createNewsRouter(db: any) {
         const likes = allLikes.filter((l: any) => String(l.newsId) === String(record.id));
         const comments = allComments.filter((c: any) => String(c.newsId) === String(record.id));
         const userLiked = currentUserId ? likes.some((l: any) => l.userId === currentUserId) : false;
+        const effectiveAvatar = record.profilePicUrl || record.authorAvatar || null;
 
         return {
           ...record,
+          authorAvatar: effectiveAvatar,
           title: record.authorName || `@${record.source}`,
           author: record.authorName || `@${record.source}`,
           likes: likes.length,

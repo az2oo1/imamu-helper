@@ -234,11 +234,11 @@ export function calculateProgressPercent(startInput: DateInput, endInput: DateIn
  * 7. Category Descriptor Badge Helper
  */
 export function getEventCategoryMeta(flags: AcademicEventFlags): { label: string; icon: string; badgeClass: string } | null {
-  if (flags.isSemesterStart) return { label: '🚀 بداية الفصل', icon: '🚀', badgeClass: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30' };
+  if (flags.isSemesterStart) return { label: '🚀 بداية الفصل', icon: '🚀', badgeClass: 'bg-[var(--color-imamu-brown)/15] text-[var(--color-imamu-accent)] border-amber-700/30' };
   if (flags.isSemesterEnd) return { label: '🏁 نهاية الفصل', icon: '🏁', badgeClass: 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30' };
   if (flags.isHoliday) return { label: '🌴 بداية إجازة', icon: '🌴', badgeClass: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' };
   if (flags.isHolidayEnd) return { label: '🔄 نهاية إجازة', icon: '🔄', badgeClass: 'bg-teal-500/15 text-teal-600 dark:text-teal-400 border-teal-500/30' };
-  if (flags.isEid) return { label: '🌙 احتفال العيد', icon: '🌙', badgeClass: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30' };
+  if (flags.isEid) return { label: '🌙 احتفال العيد', icon: '🌙', badgeClass: 'bg-amber-500/15 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] border-amber-500/30' };
   if (flags.isNationalDay) return { label: '🇸🇦 اليوم الوطني', icon: '🇸🇦', badgeClass: 'bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 border-emerald-600/40' };
   return null;
 }

@@ -42,7 +42,7 @@ export default function CreateEventModal({
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b pb-4" style={{ borderColor: 'var(--border-color)' }}>
           <h3 className="text-lg font-bold flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
-            <Calendar className="w-5 h-5 text-blue-500" />
+            <Calendar className="w-5 h-5 text-[var(--color-imamu-accent)]" />
             <span>{eventForm.id ? 'تعديل موعد أكاديمي' : 'إضافة موعد أكاديمي جديد'}</span>
           </h3>
           <button 
@@ -129,11 +129,11 @@ export default function CreateEventModal({
                 onClick={() => setEventForm((s: any) => ({ ...s, isSemesterStart: !s.isSemesterStart }))}
                 className={`flex items-center justify-center gap-2 p-2.5 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
                   eventForm.isSemesterStart 
-                    ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/40 shadow-xs ring-2 ring-blue-500/20' 
+                    ? 'bg-[var(--color-imamu-brown)/15] text-[var(--color-imamu-accent)] border-amber-700/40 shadow-xs ring-2 ring-[var(--color-imamu-brown)/20]' 
                     : 'bg-slate-100/80 dark:bg-zinc-800/80 text-slate-500 border-slate-200 dark:border-zinc-700'
                 }`}
               >
-                <Calendar className={`w-4 h-4 ${eventForm.isSemesterStart ? 'text-blue-500' : ''}`} />
+                <Calendar className={`w-4 h-4 ${eventForm.isSemesterStart ? 'text-[var(--color-imamu-accent)]' : ''}`} />
                 <span>بداية الفصل</span>
               </button>
 
@@ -157,7 +157,7 @@ export default function CreateEventModal({
                 onClick={() => setEventForm((s: any) => ({ ...s, isEid: !s.isEid }))}
                 className={`flex items-center justify-center gap-2 p-2.5 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
                   eventForm.isEid 
-                    ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/40 shadow-xs ring-2 ring-amber-500/20' 
+                    ? 'bg-amber-500/15 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] border-amber-500/40 shadow-xs ring-2 ring-amber-500/20' 
                     : 'bg-slate-100/80 dark:bg-zinc-800/80 text-slate-500 border-slate-200 dark:border-zinc-700'
                 }`}
               >
@@ -192,7 +192,7 @@ export default function CreateEventModal({
               onSave();
               onClose();
             }}
-            className="flex-1 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md transition cursor-pointer disabled:opacity-50"
+            className="flex-1 py-3 px-4 rounded-xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white font-bold text-sm shadow-md transition cursor-pointer disabled:opacity-50"
           >
             {eventForm.id ? 'حفظ التعديلات' : 'إضافة الموعد'}
           </button>

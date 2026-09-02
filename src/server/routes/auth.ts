@@ -10,6 +10,8 @@ import { normalizeUserIdentifier, formatStudentEmail, sanitizeUser } from '../..
 import { JWT_SECRET } from '../../lib/config';
 import { downloadAndUploadToStorage } from '../../lib/storage';
 
+import { logEvent } from '../../lib/logger';
+
 export function createAuthRouter(db: any) {
   const router = express.Router();
 
@@ -217,6 +219,10 @@ export function createAuthRouter(db: any) {
         return res.status(401).json({ error: "حساب غير موجود. يرجى إنشاء حساب جديد أولاً." });
       }
 
+      if (user.isBanned) {
+        return res.status(403).json({ error: "تم حظر هذا الحساب من استخدام المنصة. يرجى التواصل مع الإدارة." });
+      }
+
       if (!valid) {
         return res.status(401).json({ error: "كلمة المرور غير صحيحة. يرجى المحاولة مرة أخرى." });
       }
@@ -274,16 +280,18 @@ export function createAuthRouter(db: any) {
       if (!req.user) return res.status(401).json({ error: "No user" });
       let { phone, major, currentGpa, finishedHours, completedCourses, profilePicUrl, userName } = req.body;
 
+      const [existingUser] = await db.select().from(users).where(eq(users.uid, req.user.uid));
+
       if (userName !== undefined && userName !== null) {
         const trimmedUserName = String(userName).trim();
         if (trimmedUserName) {
-          const existingUser = await db.select().from(users).where(
+          const checkUser = await db.select().from(users).where(
             and(
               sql`LOWER(${users.userName}) = LOWER(${trimmedUserName})`,
               sql`${users.uid} != ${req.user.uid}`
             )
           );
-          if (existingUser.length > 0) {
+          if (checkUser.length > 0) {
             return res.status(400).json({ error: "Username already taken" });
           }
           userName = trimmedUserName;
@@ -298,7 +306,55 @@ export function createAuthRouter(db: any) {
       const result = await db.update(users).set({
         phone, major, currentGpa, finishedHours, completedCourses: completedCourses ? (typeof completedCourses === 'string' ? completedCourses : JSON.stringify(completedCourses)) : null, profilePicUrl, userName
       }).where(eq(users.uid, req.user.uid)).returning();
-      res.json(sanitizeUser(result[0]));
+
+      const updatedUser = result[0];
+
+      // Track profile change logs
+      if (existingUser) {
+        const changes: string[] = [];
+        const oldData: Record<string, any> = {};
+        const newData: Record<string, any> = {};
+
+        if (phone !== undefined && String(phone).trim() !== String(existingUser.phone || '').trim()) {
+          changes.push(`رقم الجوال: من [${existingUser.phone || 'غير مدخل'}] إلى [${phone || 'غير مدخل'}]`);
+          oldData.phone = existingUser.phone;
+          newData.phone = phone;
+        }
+        if (userName !== undefined && String(userName).trim() !== String(existingUser.userName || '').trim()) {
+          changes.push(`اسم المستخدم: من [${existingUser.userName || 'غير مدخل'}] إلى [${userName || 'غير مدخل'}]`);
+          oldData.userName = existingUser.userName;
+          newData.userName = userName;
+        }
+        if (major !== undefined && String(major).trim() !== String(existingUser.major || '').trim()) {
+          changes.push(`التخصص: من [${existingUser.major || 'غير محدد'}] إلى [${major || 'غير محدد'}]`);
+          oldData.major = existingUser.major;
+          newData.major = major;
+        }
+        if (finishedHours !== undefined && Number(finishedHours) !== Number(existingUser.finishedHours)) {
+          changes.push(`الساعات المجتازة: من [${existingUser.finishedHours || 0}] إلى [${finishedHours || 0}]`);
+          oldData.finishedHours = existingUser.finishedHours;
+          newData.finishedHours = finishedHours;
+        }
+        if (profilePicUrl !== undefined && profilePicUrl !== existingUser.profilePicUrl) {
+          changes.push(`الصورة الشخصية: تم تحديث رابط الصورة الشخصية`);
+          oldData.profilePicUrl = existingUser.profilePicUrl;
+          newData.profilePicUrl = profilePicUrl;
+        }
+
+        if (changes.length > 0) {
+          await logEvent({
+            level: 'info',
+            category: 'USER_ACTION',
+            action: 'UPDATE_PROFILE',
+            message: `تعديل بيانات الحساب للمستخدم (${updatedUser.userName || updatedUser.email}): ${changes.join(' ، ')}`,
+            userId: updatedUser.uid,
+            userEmail: updatedUser.email,
+            metadata: { old: oldData, new: newData, changes }
+          });
+        }
+      }
+
+      res.json(sanitizeUser(updatedUser));
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: "Failed to update user" });

@@ -22,11 +22,11 @@ export async function syncExternalImagesToStorage(db: any) {
     const newsItems = await db.select().from(news);
     for (const n of newsItems) {
       const updates: any = {};
-      if (n.authorAvatar && (n.authorAvatar.startsWith('http://') || n.authorAvatar.startsWith('https://')) && !n.authorAvatar.includes('telesco.pe')) {
+      if (n.authorAvatar && (n.authorAvatar.startsWith('http://') || n.authorAvatar.startsWith('https://'))) {
         const storedAvatar = await downloadAndUploadToStorage(n.authorAvatar, 'tg_avatar');
         if (storedAvatar && storedAvatar !== n.authorAvatar) updates.authorAvatar = storedAvatar;
       }
-      if (n.imageUrl && (n.imageUrl.startsWith('http://') || n.imageUrl.startsWith('https://')) && !n.imageUrl.includes('telesco.pe')) {
+      if (n.imageUrl && (n.imageUrl.startsWith('http://') || n.imageUrl.startsWith('https://'))) {
         const storedImg = await downloadAndUploadToStorage(n.imageUrl, 'tg_photo');
         if (storedImg && storedImg !== n.imageUrl) updates.imageUrl = storedImg;
       }
@@ -96,7 +96,7 @@ export async function seedDefaults(db: any) {
       const [secAcademic] = await db.insert(tutorial_sections).values({
         title: 'الحياة الأكاديمية والتسجيل',
         icon: 'GraduationCap',
-        color: 'text-blue-600 bg-blue-50 border-blue-100/50'
+        color: 'text-[var(--color-imamu-accent)] bg-stone-50 border-stone-100/50'
       }).returning();
 
       const [secServices] = await db.insert(tutorial_sections).values({

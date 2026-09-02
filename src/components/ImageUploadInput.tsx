@@ -97,7 +97,7 @@ export default function ImageUploadInput({ label, value, onChange, type, uploadU
             className="flex items-center justify-center gap-2 px-3 py-2 bg-[var(--bg-subtle)] hover:bg-[var(--border-color)] text-xs font-semibold rounded-xl border transition w-full disabled:opacity-50"
             style={{ borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
           >
-            {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4 text-blue-500" />}
+            {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4 text-[var(--color-imamu-accent)]" />}
             <span>{isUploading ? 'Uploading to Object Storage...' : (value ? 'Change Image' : 'Upload to Storage')}</span>
           </button>
           <input

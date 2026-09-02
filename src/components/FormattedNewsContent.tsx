@@ -92,7 +92,7 @@ export function FormattedNewsContent({ content, className = '', truncateLines }:
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 my-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-200/80 dark:border-blue-900/60 text-blue-700 dark:text-blue-300 font-bold text-xs hover:bg-blue-100 dark:hover:bg-blue-900/80 transition-all shadow-2xs group"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 my-0.5 rounded-lg bg-stone-50 dark:bg-stone-950/60 border border-amber-200/80 dark:border-stone-900/60 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] font-bold text-xs hover:bg-stone-100 dark:hover:bg-stone-900/80 transition-all shadow-2xs group"
             >
               <PlatformIcon url={url} />
               <span>{label}</span>
@@ -109,7 +109,7 @@ export function FormattedNewsContent({ content, className = '', truncateLines }:
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 my-0.5 rounded-lg bg-slate-100 dark:bg-zinc-800/90 border border-slate-200/80 dark:border-zinc-700/80 text-slate-800 dark:text-zinc-200 font-bold text-xs hover:bg-blue-50 dark:hover:bg-blue-950/60 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 transition-all shadow-2xs group"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 my-0.5 rounded-lg bg-slate-100 dark:bg-zinc-800/90 border border-slate-200/80 dark:border-zinc-700/80 text-slate-800 dark:text-zinc-200 font-bold text-xs hover:bg-stone-50 dark:hover:bg-stone-950/60 hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)] hover:border-amber-200 transition-all shadow-2xs group"
             >
               <PlatformIcon url={url} />
               <span>{label}</span>
@@ -126,7 +126,7 @@ export function FormattedNewsContent({ content, className = '', truncateLines }:
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-1 px-2 py-0.5 my-0.5 rounded-md bg-blue-50/70 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-medium text-xs hover:underline ltr"
+              className="inline-flex items-center gap-1 px-2 py-0.5 my-0.5 rounded-md bg-stone-50/70 dark:bg-stone-950/40 text-[var(--color-imamu-accent)] font-medium text-xs hover:underline ltr"
               dir="ltr"
             >
               <PlatformIcon url={url} />
@@ -139,7 +139,7 @@ export function FormattedNewsContent({ content, className = '', truncateLines }:
           lineTokens.push(
             <span
               key={`${lineIdx}-${m.index}`}
-              className="font-extrabold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline cursor-pointer transition-colors px-0.5"
+              className="font-extrabold text-[var(--color-imamu-accent)] hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)] hover:underline cursor-pointer transition-colors px-0.5"
             >
               {tag}
             </span>

@@ -15,6 +15,8 @@ export const users = pgTable('users', {
   finishedHours: integer('finished_hours'),
   completedCourses: text('completed_courses'), // JSON array of course codes
   isAdmin: boolean('is_admin').default(false),
+  isBanned: boolean('is_banned').default(false),
+  adminPermissions: text('admin_permissions'), // JSON array string of granted permission keys
   profilePicUrl: text('profile_pic_url'),
   createdAt: timestamp('created_at').defaultNow(),
 }, (table) => ({
@@ -159,7 +161,7 @@ export const tutorial_sections = pgTable('tutorial_sections', {
   id: serial('id').primaryKey(),
   title: text('title').notNull(),
   icon: text('icon').notNull().default('GraduationCap'),
-  color: text('color').notNull().default('text-blue-600 bg-blue-50 border-blue-100/50'),
+  color: text('color').notNull().default('text-[var(--color-imamu-accent)] bg-stone-50 border-stone-100/50'),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
@@ -233,5 +235,21 @@ export const tools = pgTable('tools', {
   link: text('link').notNull(),
   icon: text('icon'),
   category: text('category'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const contributors = pgTable('contributors', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  role: text('role').notNull(),
+  category: text('category').notNull().default('other'),
+  photoUrl: text('photo_url'),
+  userId: text('user_id'),
+  bio: text('bio'),
+  socialLinks: text('social_links'),
+  linkedMajor: text('linked_major'),
+  linkedTools: text('linked_tools'),
+  isPublic: boolean('is_public').default(true),
+  displayOrder: integer('display_order').default(0),
   createdAt: timestamp('created_at').defaultNow(),
 });

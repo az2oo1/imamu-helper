@@ -222,10 +222,10 @@ export function HowToPage() {
       
       {/* Main Header */}
       <div className="mb-8 relative z-10">
-        <span className="text-xs sm:text-sm font-semibold tracking-widest text-blue-600 dark:text-blue-400 uppercase mb-2 block">
+        <span className="text-xs sm:text-sm font-semibold tracking-widest text-[var(--color-imamu-accent)] uppercase mb-2 block">
           دليل الطالب والمستجدين
         </span>
-        <h1 className="text-3xl sm:text-4xl font-display font-bold tracking-tight text-slate-900 dark:text-white mb-2">الدليلة</h1>
+        <h1 className="text-3xl sm:text-4xl font-serif font-bold tracking-tight text-slate-900 dark:text-white mb-2">الدليلة</h1>
         <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-xl">
           دليلك المتكامل للتعرف على الأنظمة، الإجراءات الأكاديمية، والخدمات الطلابية بجامعة الإمام.
         </p>
@@ -250,7 +250,7 @@ export function HowToPage() {
               }}
               className="inline-flex items-center gap-2 text-xs text-slate-700 dark:text-zinc-300 font-bold mb-6 bg-white dark:bg-zinc-900 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-2xs self-start hover:bg-slate-50 dark:hover:bg-zinc-800 transition"
             >
-              <ArrowLeft className="w-4 h-4 rotate-180 text-blue-600 dark:text-blue-400" /> العودة إلى قائمة الشروحات
+              <ArrowLeft className="w-4 h-4 rotate-180 text-[var(--color-imamu-accent)]" /> العودة إلى قائمة الشروحات
             </button>
 
             {/* Header Detail Card */}
@@ -258,7 +258,7 @@ export function HowToPage() {
               {(() => {
                 const section = sections.find(s => s.id === selectedTutorial.sectionId);
                 return (
-                  <span className="text-xs font-bold px-3 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 mb-4 inline-block">
+                  <span className="text-xs font-bold px-3 py-1 rounded-lg bg-stone-50 dark:bg-stone-950/50 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] border border-amber-200 dark:border-stone-900/50 mb-4 inline-block">
                     {section?.title || 'شرح'}
                   </span>
                 );
@@ -276,13 +276,13 @@ export function HowToPage() {
               {!selectedTutorial.text.trim().startsWith('[') && selectedTutorial.steps && selectedTutorial.steps.filter(s => s.trim().length > 0).length > 0 && (
                 <>
                   <h2 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                    <CheckSquare className="w-4 h-4 text-blue-600 dark:text-blue-400" /> خطوات وتفاصيل الشرح:
+                    <CheckSquare className="w-4 h-4 text-[var(--color-imamu-accent)]" /> خطوات وتفاصيل الشرح:
                   </h2>
                   <div className="relative border-r-2 border-slate-200 dark:border-zinc-800 mr-2.5 pr-6 space-y-6 mb-8 text-right">
                     {selectedTutorial.steps.filter(s => s.trim().length > 0).map((step, index) => {
                       return (
                         <div key={index} className="relative flex flex-col gap-1">
-                          <span className="absolute -right-[33px] top-1 flex items-center justify-center shrink-0 w-5.5 h-5.5 rounded-full bg-blue-600 text-white text-[10px] font-bold shadow-2xs z-10">
+                          <span className="absolute -right-[33px] top-1 flex items-center justify-center shrink-0 w-5.5 h-5.5 rounded-full bg-[var(--color-imamu-brown)] text-white text-[10px] font-bold shadow-2xs z-10">
                             {index + 1}
                           </span>
                           <p className="text-xs sm:text-sm text-slate-800 dark:text-zinc-200 font-normal leading-relaxed pt-0.5">{step}</p>
@@ -306,7 +306,7 @@ export function HowToPage() {
                         router.push(selectedTutorial.linkUrl!);
                       }
                     }}
-                    className="btn-rise inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-5 rounded-xl text-xs shadow-md shadow-blue-600/20 w-full sm:w-auto justify-center cursor-pointer"
+                    className="btn-rise inline-flex items-center gap-2 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white font-bold py-3 px-5 rounded-xl text-xs shadow-md shadow-[var(--color-imamu-brown)/20] w-full sm:w-auto justify-center cursor-pointer"
                   >
                     <ExternalLink className="w-4 h-4 shrink-0" /> {selectedTutorial.linkTitle || 'الانتقال للرابط المذكور'}
                   </a>
@@ -340,7 +340,7 @@ export function HowToPage() {
             <div className="bg-white dark:bg-zinc-900 border border-slate-200/90 dark:border-zinc-800 rounded-2xl p-6 sm:p-8 shadow-2xs space-y-6 text-right" dir="rtl">
               <div>
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
-                  <MessageSquare className="w-4.5 h-4.5 text-blue-600 dark:text-blue-400" /> استفسارات ومناقشة الشرح ({tutorialComments.length})
+                  <MessageSquare className="w-4.5 h-4.5 text-[var(--color-imamu-accent)]" /> استفسارات ومناقشة الشرح ({tutorialComments.length})
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
                   إذا كان لديك سؤال أو استفسار حول هذا الشرح، يمكنك كتابته هنا ليتفاعل معك الطلاب أو المشرفون.
@@ -360,12 +360,12 @@ export function HowToPage() {
                         {c.profilePicUrl ? (
                           <img src={c.profilePicUrl} alt="" className="w-7 h-7 rounded-full object-cover border border-slate-200 dark:border-zinc-700" />
                         ) : (
-                          <div className="w-7 h-7 rounded-full bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 font-bold text-xs border border-blue-200 dark:border-blue-900/50">
+                          <div className="w-7 h-7 rounded-full bg-stone-50 dark:bg-stone-950/50 text-[var(--color-imamu-accent)] flex items-center justify-center shrink-0 font-bold text-xs border border-amber-200 dark:border-stone-900/50">
                             {c.userName ? c.userName.charAt(0).toUpperCase() : 'ط'}
                           </div>
                         )}
                         <div className="flex flex-col text-right">
-                          <span className="text-xs font-bold text-slate-900 dark:text-white">@{c.userName || 'طالب'}</span>
+                          <span className="text-xs font-bold text-slate-900 dark:text-white">{c.userName || 'طالب'}</span>
                           <span className="text-[10px] text-slate-400 dark:text-zinc-500">
                             {c.createdAt ? new Date(c.createdAt).toLocaleDateString('ar-SA', { hour: '2-digit', minute: '2-digit' }) : ''}
                           </span>
@@ -386,20 +386,20 @@ export function HowToPage() {
                       value={tutorialCommentInput}
                       onChange={e => setTutorialCommentInput(e.target.value)}
                       placeholder="اكتب استفسارك أو تعليقك هنا..."
-                      className="w-full p-3.5 bg-white dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 rounded-xl outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 focus:border-blue-600 text-xs resize-none text-right text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500"
+                      className="w-full p-3.5 bg-white dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 rounded-xl outline-none focus:ring-2 focus:ring-stone-100 dark:focus:ring-stone-900 focus:border-[var(--color-imamu-brown)] text-xs resize-none text-right text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500"
                     />
                     <div className="flex justify-end">
                       <button
                         onClick={submitTutorialComment}
                         disabled={!tutorialCommentInput.trim()}
-                        className="btn-rise bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-md shadow-blue-600/20 disabled:opacity-50 cursor-pointer"
+                        className="btn-rise bg-[var(--color-imamu-brown)] text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-md shadow-[var(--color-imamu-brown)/20] disabled:opacity-50 cursor-pointer"
                       >
                         إرسال التعليق
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 text-amber-900 dark:text-amber-400 rounded-xl p-4 text-xs font-bold text-center">
+                  <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] rounded-xl p-4 text-xs font-bold text-center">
                     يرجى تسجيل الدخول لتتمكن من إضافة استفسار أو التعليق على هذا الشرح.
                   </div>
                 )}
@@ -420,7 +420,7 @@ export function HowToPage() {
             <div className="w-full max-w-4xl mx-auto">
               <div 
                 onClick={() => router.push('/newbie')}
-                className="w-full bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 rounded-2xl p-6 sm:p-8 text-white shadow-md relative overflow-hidden cursor-pointer"
+                className="w-full bg-gradient-to-r from-amber-900 via-amber-800 to-indigo-700 rounded-2xl p-6 sm:p-8 text-white shadow-md relative overflow-hidden cursor-pointer"
               >
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-6 relative z-10">
                   <div className="flex items-center gap-5 text-center sm:text-right flex-col sm:flex-row">
@@ -432,12 +432,12 @@ export function HowToPage() {
                       <h2 className="text-lg sm:text-xl font-bold mt-1.5 flex items-center gap-2 justify-center sm:justify-start">
                         دليل الطلاب المستجدين (عش آل إمام) 🎓
                       </h2>
-                      <p className="text-xs text-blue-100 mt-1 max-w-lg leading-relaxed">
+                      <p className="text-xs text-stone-100 mt-1 max-w-lg leading-relaxed">
                         بوابتك الشاملة للتعرف على الأنظمة الأكاديمية، السكن، المكافآت، والمباني والتحضيري خطوة بخطوة.
                       </p>
                     </div>
                   </div>
-                  <span className="px-5 py-2.5 bg-white text-blue-900 font-bold text-xs rounded-xl shadow-md shrink-0">
+                  <span className="px-5 py-2.5 bg-white text-stone-900 font-bold text-xs rounded-xl shadow-md shrink-0">
                     استكشف الدليل الأكاديمي
                   </span>
                 </div>
@@ -455,7 +455,7 @@ export function HowToPage() {
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   placeholder="ابحث عن شروحات، مواضيع، أو خدمات..."
-                  className="w-full pr-11 pl-4 py-3 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 focus:border-blue-600 outline-none shadow-2xs text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500"
+                  className="w-full pr-11 pl-4 py-3 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-stone-100 dark:focus:ring-stone-900 focus:border-[var(--color-imamu-brown)] outline-none shadow-2xs text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500"
                 />
                 {searchQuery && (
                   <button 
@@ -481,12 +481,12 @@ export function HowToPage() {
                     {/* Section Header */}
                     <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-3">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 shadow-2xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-900/50">
+                        <div className="w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 shadow-2xs text-[var(--color-imamu-accent)] bg-stone-50 dark:bg-stone-950/50 border-amber-200 dark:border-stone-900/50">
                           <SectionIcon className="w-4.5 h-4.5" />
                         </div>
                         <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">{section.title}</h2>
                       </div>
-                      <span className="text-xs text-blue-700 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900/50 px-3 py-1 rounded-full">
+                      <span className="text-xs text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] font-bold bg-stone-50 dark:bg-stone-950/50 border border-amber-200 dark:border-stone-900/50 px-3 py-1 rounded-full">
                         {sectionTutorials.length} شروحات
                       </span>
                     </div>
@@ -496,12 +496,12 @@ export function HowToPage() {
                       {sectionTutorials.map((tutorial) => (
                         <SpotlightCard
                           key={tutorial.id}
-                          spotlightColor="rgba(37, 99, 235, 0.12)"
+                          spotlightColor="rgba(139, 94, 60, 0.12)"
                           onClick={() => selectTutorial(tutorial)}
                           className="cursor-pointer border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5"
                         >
                           <div className="flex items-start gap-4 h-full">
-                            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                            <div className="w-10 h-10 rounded-xl bg-stone-50 dark:bg-stone-950/50 border border-amber-200 dark:border-stone-900/50 text-[var(--color-imamu-accent)] flex items-center justify-center shrink-0">
                               <SectionIcon className="w-5 h-5" />
                             </div>
                             <div className="flex-1 min-w-0 text-right">
@@ -532,7 +532,7 @@ export function HowToPage() {
             {/* Directories Banners Grid */}
             <div className="w-full max-w-4xl mx-auto mt-16 border-t border-slate-200 dark:border-zinc-800 pt-10 text-right">
               <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2 pr-1">
-                <Compass className="w-5 h-5 text-blue-600 dark:text-blue-400" /> وسائل الاتصال بالجامعة 📞
+                <Compass className="w-5 h-5 text-teal-600 dark:text-teal-400" /> وسائل الاتصال بالجامعة 📞
               </h2>
               <p className="text-xs text-slate-600 dark:text-zinc-400 mb-6">
                 سواء كنت بحاجة للاتصال بهاتف جهة أكاديمية أو العثور على البريد الإلكتروني الرسمي لكليتك، اختر الدليل المناسب أدناه:
@@ -541,14 +541,14 @@ export function HowToPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <SpotlightCard 
                   onClick={() => router.push('/numbers')}
-                  className="cursor-pointer border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-2xs"
+                  className="cursor-pointer border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-2xs group hover:border-emerald-500/40 transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 flex items-center justify-center shrink-0">
                       <Icons.Phone className="w-5 h-5" />
                     </div>
                     <div className="text-right">
-                      <h4 className="font-bold text-xs text-slate-900 dark:text-white">دليل الأرقام الهاتفية والتحويلات 📞</h4>
+                      <h4 className="font-bold text-xs text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">دليل الأرقام الهاتفية والتحويلات 📞</h4>
                       <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">أرقام الكليات، العمادات، والتحويلات.</p>
                     </div>
                   </div>
@@ -556,14 +556,14 @@ export function HowToPage() {
 
                 <SpotlightCard 
                   onClick={() => router.push('/emails')}
-                  className="cursor-pointer border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-2xs"
+                  className="cursor-pointer border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-2xs group hover:border-blue-500/40 transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 flex items-center justify-center shrink-0">
                       <Icons.Mail className="w-5 h-5" />
                     </div>
                     <div className="text-right">
-                      <h4 className="font-bold text-xs text-slate-900 dark:text-white">دليل البريد الإلكتروني الأكاديمي ✉️</h4>
+                      <h4 className="font-bold text-xs text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">دليل البريد الإلكتروني الأكاديمي ✉️</h4>
                       <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">إيميلات شؤون الطلاب والأقسام.</p>
                     </div>
                   </div>
@@ -586,7 +586,7 @@ export function HowToPage() {
             >
               <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 ${
                 customAlert.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400' : 
-                customAlert.type === 'error' ? 'bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400' : 'bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400'
+                customAlert.type === 'error' ? 'bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400' : 'bg-stone-50 dark:bg-stone-950/50 text-[var(--color-imamu-accent)]'
               }`}>
                 {customAlert.type === 'success' && <CheckCircle className="w-6 h-6" />}
                 {customAlert.type === 'error' && <AlertCircle className="w-6 h-6" />}
@@ -596,7 +596,7 @@ export function HowToPage() {
               <p className="text-xs text-slate-600 dark:text-zinc-400 mb-6 leading-relaxed">{customAlert.message}</p>
               <button 
                 onClick={() => setCustomAlert(null)}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-xs transition shadow-md shadow-blue-600/20"
+                className="w-full bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white font-bold py-2.5 rounded-xl text-xs transition shadow-md shadow-[var(--color-imamu-brown)/20]"
               >
                 موافق
               </button>
@@ -626,7 +626,7 @@ export function HowToPage() {
                 value={negativeFeedbackComment}
                 onChange={e => setNegativeFeedbackComment(e.target.value)}
                 placeholder="اكتب تعليقك هنا..."
-                className="w-full p-3.5 bg-slate-50 dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 rounded-xl outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 focus:border-blue-600 text-xs resize-none mb-6 text-right text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500"
+                className="w-full p-3.5 bg-slate-50 dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 rounded-xl outline-none focus:ring-2 focus:ring-stone-100 dark:focus:ring-stone-900 focus:border-[var(--color-imamu-brown)] text-xs resize-none mb-6 text-right text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500"
               />
               <div className="flex gap-3">
                 <button 
@@ -716,7 +716,7 @@ function renderTutorialContent(text: string) {
                   <div key={blockIdx} className="relative border-r-2 border-slate-200 dark:border-zinc-800 mr-3 pr-6 space-y-6 my-6 text-right">
                     {steps.map((step: string, index: number) => (
                       <div key={index} className="relative flex flex-col gap-1">
-                        <span className="absolute -right-[35px] top-0.5 flex items-center justify-center shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-[10px] font-bold shadow-2xs">
+                        <span className="absolute -right-[35px] top-0.5 flex items-center justify-center shrink-0 w-6 h-6 rounded-full bg-[var(--color-imamu-brown)] text-white text-[10px] font-bold shadow-2xs">
                           {index + 1}
                         </span>
                         <p className="text-xs sm:text-sm text-slate-800 dark:text-zinc-200 font-normal leading-relaxed pt-0.5">{step}</p>
@@ -737,7 +737,7 @@ function renderTutorialContent(text: string) {
                           href={btn.url}
                           target={btn.url.startsWith('http') ? '_blank' : undefined}
                           rel={btn.url.startsWith('http') ? 'noopener noreferrer' : undefined}
-                          className="inline-flex items-center gap-2 bg-blue-600 text-white font-bold py-2.5 px-4.5 rounded-xl text-xs shadow-md shadow-blue-600/20 w-full sm:w-auto justify-center"
+                          className="inline-flex items-center gap-2 bg-[var(--color-imamu-brown)] text-white font-bold py-2.5 px-4.5 rounded-xl text-xs shadow-md shadow-[var(--color-imamu-brown)/20] w-full sm:w-auto justify-center"
                         >
                           <ExternalLink className="w-4 h-4 shrink-0" /> {btn.label}
                         </a>

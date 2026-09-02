@@ -20,16 +20,16 @@ export default function AdminDashboardTab({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div 
           onClick={() => setActiveTab('users')}
-          className="p-5 rounded-2xl border transition cursor-pointer hover:border-blue-500/50 group"
+          className="p-5 rounded-2xl border transition cursor-pointer hover:border-amber-700/50 group"
           style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Registered Users</span>
-            <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500 border border-blue-500/20 group-hover:scale-110 transition">
+            <div className="p-2 rounded-xl bg-[var(--color-imamu-brown)/10] text-[var(--color-imamu-accent)] border border-amber-700/20 group-hover:scale-110 transition">
               <Users className="w-5 h-5" />
             </div>
           </div>
-          <p className="text-2xl font-bold mt-2 font-display" style={{ color: 'var(--text-main)' }}>{stats?.totalUsers || 0}</p>
+          <p className="text-2xl font-bold mt-2 font-serif" style={{ color: 'var(--text-main)' }}>{stats?.totalUsers || 0}</p>
           <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Students & admins in system</p>
         </div>
 
@@ -44,7 +44,7 @@ export default function AdminDashboardTab({
               <BookOpen className="w-5 h-5" />
             </div>
           </div>
-          <p className="text-2xl font-bold mt-2 font-display" style={{ color: 'var(--text-main)' }}>{stats?.totalSubjects || 0}</p>
+          <p className="text-2xl font-bold mt-2 font-serif" style={{ color: 'var(--text-main)' }}>{stats?.totalSubjects || 0}</p>
           <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Registered college subjects</p>
         </div>
 
@@ -59,7 +59,7 @@ export default function AdminDashboardTab({
               <GraduationCap className="w-5 h-5" />
             </div>
           </div>
-          <p className="text-2xl font-bold mt-2 font-display" style={{ color: 'var(--text-main)' }}>{stats?.totalMajors || 0}</p>
+          <p className="text-2xl font-bold mt-2 font-serif" style={{ color: 'var(--text-main)' }}>{stats?.totalMajors || 0}</p>
           <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>College academic plans</p>
         </div>
 
@@ -70,11 +70,11 @@ export default function AdminDashboardTab({
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Academic Events</span>
-            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 group-hover:scale-110 transition">
+            <div className="p-2 rounded-xl bg-amber-500/10 text-[var(--color-imamu-accent)] border border-amber-500/20 group-hover:scale-110 transition">
               <Calendar className="w-5 h-5" />
             </div>
           </div>
-          <p className="text-2xl font-bold mt-2 font-display" style={{ color: 'var(--text-main)' }}>{stats?.totalEvents || 0}</p>
+          <p className="text-2xl font-bold mt-2 font-serif" style={{ color: 'var(--text-main)' }}>{stats?.totalEvents || 0}</p>
           <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Exams, deadlines & events</p>
         </div>
       </div>
@@ -93,7 +93,7 @@ export default function AdminDashboardTab({
             </div>
             <div className="p-3 rounded-xl bg-[var(--bg-subtle)] border" style={{ borderColor: 'var(--border-color)' }}>
               <span className="block text-[11px] font-semibold text-slate-400">Node Process Memory</span>
-              <span className="font-mono font-bold mt-0.5 block text-blue-400">
+              <span className="font-mono font-bold mt-0.5 block text-[var(--color-imamu-accent)]">
                 {health.memory?.heapUsed || 0}MB / {health.memory?.heapTotal || 0}MB
               </span>
             </div>

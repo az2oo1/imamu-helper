@@ -85,7 +85,7 @@ export function ImageViewerModal({ imageUrl, onClose, title }: ImageViewerModalP
 
             <button
               onClick={handleDownload}
-              className="p-2.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-md transition"
+              className="p-2.5 rounded-full bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white shadow-md transition"
               title="تحميل الصورة"
             >
               <Download className="w-5 h-5" />

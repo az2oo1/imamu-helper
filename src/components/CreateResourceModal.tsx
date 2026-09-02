@@ -195,7 +195,7 @@ export default function CreateResourceModal({
           <div className="p-6 bg-slate-50/80 dark:bg-zinc-900/90 border-b border-slate-200/80 dark:border-zinc-800 relative shrink-0">
             <div className="flex items-center justify-between gap-4 mb-6">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-2xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-900/50 text-blue-600 dark:text-blue-400 shadow-xs">
+                <div className="p-2.5 rounded-2xl bg-stone-50 dark:bg-stone-950/60 border border-amber-200 dark:border-stone-900/50 text-[var(--color-imamu-accent)] shadow-xs">
                   <Folder className="w-5 h-5" />
                 </div>
                 <div>
@@ -252,7 +252,7 @@ export default function CreateResourceModal({
                           isCompleted
                             ? 'bg-emerald-500 text-white'
                             : isActive
-                            ? 'bg-blue-600 text-white'
+                            ? 'bg-[var(--color-imamu-brown)] text-white'
                             : 'bg-slate-100 dark:bg-zinc-800 text-slate-400 dark:text-zinc-500 border border-slate-200 dark:border-zinc-700'
                         }`}
                       >
@@ -266,7 +266,7 @@ export default function CreateResourceModal({
                       {/* Step Label */}
                       <span className={`text-[11px] font-bold transition px-1 truncate w-full ${
                         isActive
-                          ? 'text-blue-600 dark:text-blue-400 font-extrabold'
+                          ? 'text-[var(--color-imamu-accent)] font-extrabold'
                           : isCompleted
                           ? 'text-emerald-600 dark:text-emerald-400 font-bold'
                           : 'text-slate-400 dark:text-zinc-500'
@@ -299,9 +299,9 @@ export default function CreateResourceModal({
                     </label>
 
                     {selectedCourse ? (
-                      <div className="flex items-center justify-between p-3.5 bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 rounded-2xl">
+                      <div className="flex items-center justify-between p-3.5 bg-stone-50/70 dark:bg-stone-950/40 border border-amber-200 dark:border-stone-900/50 rounded-2xl">
                         <div className="flex items-center gap-3">
-                          <span className="px-2.5 py-1 bg-blue-600 text-white text-xs font-mono font-bold rounded-lg" dir="ltr">
+                          <span className="px-2.5 py-1 bg-[var(--color-imamu-brown)] text-white text-xs font-mono font-bold rounded-lg" dir="ltr">
                             {selectedCourse.code}
                           </span>
                           <div>
@@ -336,7 +336,7 @@ export default function CreateResourceModal({
                               setCourseSearch(e.target.value);
                               setIsCourseDropdownOpen(true);
                             }}
-                            className="w-full py-3 pr-10 pl-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-bold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs"
+                            className="w-full py-3 pr-10 pl-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-bold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-[var(--color-imamu-brown)] shadow-xs"
                           />
                           <Search className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5" />
                         </div>
@@ -358,15 +358,15 @@ export default function CreateResourceModal({
                                       }));
                                       setIsCourseDropdownOpen(false);
                                     }}
-                                    className="w-full text-right p-3 hover:bg-blue-50 dark:hover:bg-blue-950/50 flex items-center justify-between transition group cursor-pointer rounded-xl"
+                                    className="w-full text-right p-3 hover:bg-stone-50 dark:hover:bg-stone-950/50 flex items-center justify-between transition group cursor-pointer rounded-xl"
                                   >
                                     <div>
-                                      <h5 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                                      <h5 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-[var(--color-imamu-accent)] dark:group-hover:text-[var(--color-imamu-accent)]">
                                         {cleanCourseName(subj.name)}
                                       </h5>
                                       <span className="text-[11px] text-slate-400">المستوى {subj.level || 'عام'}</span>
                                     </div>
-                                    <span className="text-xs font-mono font-bold px-2 py-0.5 bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 rounded-md" dir="ltr">
+                                    <span className="text-xs font-mono font-bold px-2 py-0.5 bg-stone-50 dark:bg-stone-950/60 text-[var(--color-imamu-accent)] border border-amber-200 dark:border-stone-900/50 rounded-md" dir="ltr">
                                       {subj.code}
                                     </span>
                                   </button>
@@ -395,7 +395,7 @@ export default function CreateResourceModal({
                           placeholder="مثال: قروب تقنية المعلومات / باقة مصادر عامة..."
                           value={resourceForm.title || ''}
                           onChange={e => setResourceForm((s: any) => ({ ...s, title: e.target.value }))}
-                          className="w-full py-3 px-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-bold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs"
+                          className="w-full py-3 px-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-bold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-[var(--color-imamu-brown)] shadow-xs"
                         />
                       </div>
                     )}
@@ -409,7 +409,7 @@ export default function CreateResourceModal({
                         placeholder="اكتب وصفاً ثرياً ومختصراً يوضح محتويات وأهداف هذه الباقة أو المجموعة..."
                         value={resourceForm.description || ''}
                         onChange={e => setResourceForm((s: any) => ({ ...s, description: e.target.value }))}
-                        className="w-full py-3 px-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs resize-none"
+                        className="w-full py-3 px-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-[var(--color-imamu-brown)] shadow-xs resize-none"
                       />
                     </div>
                   </div>
@@ -540,7 +540,7 @@ export default function CreateResourceModal({
                       placeholder="اكتب ملخص شامل ومحتوى الباقة والمواضيع التي تنطوي عليها..."
                       value={resourceForm.description || ''}
                       onChange={e => setResourceForm((s: any) => ({ ...s, description: e.target.value }))}
-                      className="w-full py-3 px-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs resize-none"
+                      className="w-full py-3 px-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-[var(--color-imamu-brown)] shadow-xs resize-none"
                     />
                   </div>
                 </motion.div>
@@ -574,7 +574,7 @@ export default function CreateResourceModal({
                 <button
                   type="button"
                   onClick={handleNext}
-                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer flex items-center gap-1.5"
+                  className="px-5 py-2.5 rounded-xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-light)] text-white text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer flex items-center gap-1.5"
                 >
                   <span>الخطوة التالية</span>
                   <ArrowLeft className="w-4 h-4" />

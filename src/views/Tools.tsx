@@ -35,17 +35,17 @@ function renderToolIcon(iconName?: string | React.ReactNode) {
   if (React.isValidElement(iconName)) return iconName;
   switch (iconName) {
     case 'Calculator':
-      return <Calculator className="w-5 h-5 text-blue-600 dark:text-blue-400" />;
+      return <Calculator className="w-5 h-5 text-amber-600 dark:text-amber-400" />;
     case 'FileText':
       return <FileText className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />;
     case 'Sparkles':
-      return <Sparkles className="w-5 h-5 text-amber-600 dark:text-amber-400" />;
+      return <Sparkles className="w-5 h-5 text-violet-600 dark:text-violet-400" />;
     case 'Globe':
       return <Globe className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />;
     case 'Link':
       return <LinkIcon className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />;
     default:
-      return <Wrench className="w-5 h-5 text-amber-600 dark:text-amber-400" />;
+      return <Wrench className="w-5 h-5 text-blue-600 dark:text-blue-400" />;
   }
 }
 
@@ -91,7 +91,7 @@ export function Tools() {
       title: "حاسبة المعدل والتوقعات",
       description: "حساب دقيق للمعدل الفصلي والتراكمي وفق سلم جامعة الإمام، ومعاينة التوقعات المستقبلية.",
       category: "الحسابات الأكاديمية",
-      icon: <Calculator className="w-5 h-5 text-blue-600 dark:text-blue-400" />,
+      icon: <Calculator className="w-5 h-5 text-amber-600 dark:text-amber-400" />,
       link: "/tools/gpa",
       isStatic: true
     },
@@ -213,10 +213,10 @@ export function Tools() {
     <div className="flex flex-col flex-1 w-full max-w-5xl mx-auto pb-24 px-4 sm:px-6 pt-8 text-right" dir="rtl">
       {/* Header */}
       <div className="mb-8">
-        <span className="text-xs font-semibold tracking-widest text-blue-600 dark:text-blue-400 uppercase mb-1.5 block">
+        <span className="text-xs font-semibold tracking-widest text-[var(--color-imamu-accent)] uppercase mb-1.5 block">
           الأدوات الأكاديمية
         </span>
-        <h1 className="text-2xl sm:text-3xl font-display font-bold tracking-tight text-slate-900 dark:text-white mb-2">
+        <h1 className="text-2xl sm:text-3xl font-serif font-bold tracking-tight text-slate-900 dark:text-white mb-2">
           الأدوات والخدمات الطلابية
         </h1>
         <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-lg">
@@ -236,10 +236,10 @@ export function Tools() {
                   target={isExternal ? '_blank' : '_self'}
                   className="block h-full"
                 >
-                  <SpotlightCard className="h-full border border-slate-200/80 dark:border-zinc-800/80 bg-white/80 dark:bg-zinc-900/90 backdrop-blur-xl p-5 hover:border-blue-500/40 transition-all duration-250 flex flex-col justify-between">
+                  <SpotlightCard className="h-full border border-slate-200/80 dark:border-zinc-800/80 bg-white/80 dark:bg-zinc-900/90 backdrop-blur-xl p-5 hover:border-amber-700/40 transition-all duration-250 flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between mb-3.5">
-                        <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700/60 flex items-center justify-center group-hover:scale-105 transition-transform">
+                        <div className="w-10 h-10 rounded-xl bg-stone-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700/60 flex items-center justify-center group-hover:scale-105 transition-transform">
                           {tool.icon}
                         </div>
                         <div className="flex items-center gap-2">
@@ -262,7 +262,7 @@ export function Tools() {
                                     icon: tool.iconName || 'Wrench'
                                   });
                                 }}
-                                className="p-1 rounded bg-slate-100 dark:bg-zinc-800 text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition"
+                                className="p-1 rounded bg-slate-100 dark:bg-zinc-800 text-slate-500 hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)] transition"
                                 title="تعديل"
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
@@ -284,7 +284,7 @@ export function Tools() {
                         </div>
                       </div>
 
-                      <h3 className="text-base font-display font-bold text-slate-900 dark:text-white mb-1.5 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                      <h3 className="text-base font-serif font-bold text-slate-900 dark:text-white mb-1.5 group-hover:text-[var(--color-imamu-accent)] dark:group-hover:text-[var(--color-imamu-accent)] transition-colors">
                         {tool.name}
                       </h3>
                       
@@ -293,7 +293,7 @@ export function Tools() {
                       </p>
                     </div>
 
-                    <div className="flex items-center text-xs font-bold text-blue-600 dark:text-blue-400 group-hover:-translate-x-1 transition-transform border-t border-slate-100 dark:border-zinc-800/80 pt-3 mt-auto">
+                    <div className="flex items-center text-xs font-bold text-[var(--color-imamu-accent)] group-hover:-translate-x-1 transition-transform border-t border-slate-100 dark:border-zinc-800/80 pt-3 mt-auto">
                       <span>دخول الأداة</span>
                       <ChevronLeft className="w-3.5 h-3.5 mr-1" />
                     </div>
@@ -337,7 +337,7 @@ export function Tools() {
                   value={toolForm.title}
                   onChange={(e) => setToolForm({ ...toolForm, title: e.target.value })}
                   placeholder="مثال: حاسبة التحويل"
-                  className="w-full px-3 py-2 rounded-xl text-sm border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 rounded-xl text-sm border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--color-imamu-brown)]"
                 />
               </div>
 
@@ -349,7 +349,7 @@ export function Tools() {
                   value={toolForm.link}
                   onChange={(e) => setToolForm({ ...toolForm, link: e.target.value })}
                   placeholder="مثال: https://... أو /tools/gpa"
-                  className="w-full px-3 py-2 rounded-xl text-sm border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 rounded-xl text-sm border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--color-imamu-brown)]"
                 />
               </div>
 
@@ -360,7 +360,7 @@ export function Tools() {
                   value={toolForm.category}
                   onChange={(e) => setToolForm({ ...toolForm, category: e.target.value })}
                   placeholder="مثال: خدمات إضافية"
-                  className="w-full px-3 py-2 rounded-xl text-sm border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 rounded-xl text-sm border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--color-imamu-brown)]"
                 />
               </div>
 
@@ -369,7 +369,7 @@ export function Tools() {
                 <select
                   value={toolForm.icon}
                   onChange={(e) => setToolForm({ ...toolForm, icon: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl text-sm border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 rounded-xl text-sm border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--color-imamu-brown)]"
                 >
                   <option value="Wrench">Wrench</option>
                   <option value="Calculator">Calculator</option>
@@ -387,7 +387,7 @@ export function Tools() {
                   value={toolForm.description}
                   onChange={(e) => setToolForm({ ...toolForm, description: e.target.value })}
                   placeholder="وصف الأداة..."
-                  className="w-full px-3 py-2 rounded-xl text-sm border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 rounded-xl text-sm border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--color-imamu-brown)]"
                 />
               </div>
 
@@ -395,7 +395,7 @@ export function Tools() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm shadow-md transition disabled:opacity-50"
+                  className="flex-1 py-2 rounded-xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white font-bold text-xs sm:text-sm shadow-md transition disabled:opacity-50"
                 >
                   {isSubmitting ? 'جاري الحفظ...' : editingTool ? 'تحديث' : 'إضافة'}
                 </button>

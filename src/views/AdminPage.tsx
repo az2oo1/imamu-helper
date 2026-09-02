@@ -7,24 +7,18 @@ import {
   Trash2, Link as LinkIcon, Download, Upload, Plus, X,
   Users, Settings, HelpCircle, ExternalLink, Server, Command,
   CheckCircle2, AlertTriangle, Info, XCircle, RefreshCw, Zap, 
-  LayoutDashboard, Newspaper, GraduationCap, Link2, Folder, Edit3, Send, Mail
+  LayoutDashboard, Newspaper, GraduationCap, Link2, Folder, Edit3, Send, Mail, HeartHandshake
 } from 'lucide-react';
 import { TutorialsTab } from '../components/TutorialsTab';
 import CreateCourseModal from '../components/CreateCourseModal';
 import CreateResourceModal from '../components/CreateResourceModal';
 import CreateEventModal from '../components/CreateEventModal';
 import AdminDashboardTab from './admin/AdminDashboardTab';
-
 import AdminUsersTab from './admin/AdminUsersTab';
-import { AnimatedNumber } from '../components/ui';
+import AdminContributorsTab from './admin/AdminContributorsTab';
 import { parseDate, formatDate } from '../lib/date-utils';
 
-
-
-// ============================================================================
-// TYPES
-// ============================================================================
-type Tab = 'dashboard' | 'users' | 'news_sources' | 'majors' | 'events' | 'subjects' | 'resources' | 'tutorials' | 'newbie_links' | 'settings';
+type Tab = 'dashboard' | 'users' | 'contributors' | 'news_sources' | 'majors' | 'events' | 'subjects' | 'resources' | 'tutorials' | 'newbie_links' | 'settings';
 
 interface Toast {
   id: string;
@@ -68,9 +62,9 @@ function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id
           key={t.id}
           className="pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border backdrop-blur-xl animate-[slideUp_0.3s_ease-out] min-w-[280px]"
           style={{
-            background: t.type === 'success' ? 'rgba(16,185,129,0.12)' : t.type === 'error' ? 'rgba(239,68,68,0.12)' : t.type === 'warning' ? 'rgba(245,158,11,0.12)' : 'rgba(59,130,246,0.12)',
-            borderColor: t.type === 'success' ? 'rgba(16,185,129,0.3)' : t.type === 'error' ? 'rgba(239,68,68,0.3)' : t.type === 'warning' ? 'rgba(245,158,11,0.3)' : 'rgba(59,130,246,0.3)',
-            color: t.type === 'success' ? '#10b981' : t.type === 'error' ? '#ef4444' : t.type === 'warning' ? '#f59e0b' : '#3b82f6'
+            background: t.type === 'success' ? 'rgba(16,185,129,0.12)' : t.type === 'error' ? 'rgba(239,68,68,0.12)' : t.type === 'warning' ? 'rgba(245,158,11,0.12)' : 'rgba(139,94,60,0.12)',
+            borderColor: t.type === 'success' ? 'rgba(16,185,129,0.3)' : t.type === 'error' ? 'rgba(239,68,68,0.3)' : t.type === 'warning' ? 'rgba(245,158,11,0.3)' : 'rgba(139,94,60,0.3)',
+            color: t.type === 'success' ? '#10b981' : t.type === 'error' ? '#ef4444' : t.type === 'warning' ? '#f59e0b' : '#A0723A'
           }}
         >
           {t.type === 'success' && <CheckCircle2 className="w-5 h-5 shrink-0" />}
@@ -318,6 +312,7 @@ export function AdminPage() {
   const tabDefs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
     { id: 'users', label: 'User Management', icon: <Users className="w-5 h-5" /> },
+    { id: 'contributors', label: 'Contributors & Recognition', icon: <HeartHandshake className="w-5 h-5" /> },
     { id: 'news_sources', label: 'News Sources', icon: <Newspaper className="w-5 h-5" /> },
     { id: 'majors', label: 'Academic Majors', icon: <GraduationCap className="w-5 h-5" /> },
     { id: 'events', label: 'Calendar Dates', icon: <Calendar className="w-5 h-5" /> },
@@ -327,6 +322,42 @@ export function AdminPage() {
     { id: 'newbie_links', label: 'Newbie Links', icon: <Link2 className="w-5 h-5" /> },
     { id: 'settings', label: 'Global Settings', icon: <Settings className="w-5 h-5" /> },
   ];
+
+  // Granular admin permissions filter
+  const userPerms = React.useMemo(() => {
+    const permVal = dbUser?.adminPermissions;
+    if (!permVal) return null;
+    if (Array.isArray(permVal)) return permVal;
+    try {
+      const parsed = JSON.parse(permVal);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch (e) {
+      return null;
+    }
+  }, [dbUser?.adminPermissions]);
+
+  const hasPermissionForTab = (tabId: Tab): boolean => {
+    if (!userPerms || userPerms.length === 0 || userPerms.includes('*') || userPerms.includes('all')) return true;
+    if (tabId === 'dashboard') return true;
+    if (tabId === 'users' || tabId === 'contributors') return userPerms.includes('users') || userPerms.includes('contributors');
+    if (tabId === 'majors' || tabId === 'subjects') return userPerms.includes('courses');
+    if (tabId === 'resources') return userPerms.includes('resources');
+    if (tabId === 'events') return userPerms.includes('dates');
+    if (tabId === 'news_sources') return userPerms.includes('news');
+    if (tabId === 'tutorials') return userPerms.includes('tutorials');
+    if (tabId === 'newbie_links') return userPerms.includes('newbie');
+    if (tabId === 'settings') return userPerms.includes('logs');
+    return true;
+  };
+
+  const visibleTabs = tabDefs.filter(t => hasPermissionForTab(t.id));
+
+  // Ensure activeTab is accessible
+  useEffect(() => {
+    if (visibleTabs.length > 0 && !visibleTabs.some(t => t.id === activeTab)) {
+      setActiveTab(visibleTabs[0].id);
+    }
+  }, [visibleTabs, activeTab]);
 
   // ============================================================================
   // API HELPERS
@@ -584,7 +615,7 @@ export function AdminPage() {
   if (authLoading || (user && dbUser === null)) {
     return (
       <div className="flex flex-col items-center justify-center py-32 text-center">
-        <RefreshCw className="w-10 h-10 text-blue-500 animate-spin mb-4" />
+        <RefreshCw className="w-10 h-10 text-[var(--color-imamu-accent)] animate-spin mb-4" />
         <p style={{ color: 'var(--text-muted)' }}>جاري التحقق من صلاحيات الدخول...</p>
       </div>
     );
@@ -594,7 +625,7 @@ export function AdminPage() {
     return (
       <div className="flex flex-col items-center justify-center py-32 text-center">
         <ShieldAlert className="w-20 h-20 text-red-500 mb-6" />
-        <h1 className="text-3xl font-display font-bold mb-2" style={{ color: 'var(--text-main)' }}>Access Denied</h1>
+        <h1 className="text-3xl font-serif font-bold mb-2" style={{ color: 'var(--text-main)' }}>Access Denied</h1>
         <p style={{ color: 'var(--text-muted)' }}>You must be an administrator to view this page.</p>
       </div>
     );
@@ -609,7 +640,7 @@ export function AdminPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h3 className="text-2xl font-display font-bold" style={{ color: 'var(--text-main)' }}>News Sources</h3>
+          <h3 className="text-2xl font-serif font-bold" style={{ color: 'var(--text-main)' }}>News Sources</h3>
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Track handles & RSS feeds to fetch announcements</p>
         </div>
         <button
@@ -670,7 +701,7 @@ export function AdminPage() {
             />
             <button
               onClick={() => handlePost('/api/admin/news_sources', sourceForm, () => setSourceForm({ handle: '' }))}
-              className="w-full bg-[var(--color-imamu-blue)] text-white px-4 py-2 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-blue-light)] transition"
+              className="w-full bg-[var(--color-imamu-brown)] text-white px-4 py-2 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-brown-light)] transition"
             >
               Add Source
             </button>
@@ -688,7 +719,7 @@ export function AdminPage() {
                 <input type="number" min="1" value={globalSettings.autoDeleteDays} onChange={e => setGlobalSettings((s: any) => ({ ...s, autoDeleteDays: parseInt(e.target.value) || 30 }))} className="py-2 px-3 rounded-xl text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
               </div>
               <button
-                className="w-full bg-[var(--color-imamu-blue)] text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-blue-light)] transition"
+                className="w-full bg-[var(--color-imamu-brown)] text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-brown-light)] transition"
                 onClick={() => handlePostWithMethod('/api/admin/global_settings', 'PUT', globalSettings, () => toast('success', 'Settings saved!'))}
               >
                 Save Settings
@@ -723,7 +754,7 @@ export function AdminPage() {
                     <button 
                       disabled={fetchingHandle === s.handle}
                       onClick={() => handleFetchPosts(s.handle, false)} 
-                      className="bg-blue-500/10 text-blue-500 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-500/20 transition whitespace-nowrap disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                      className="bg-[var(--color-imamu-brown)/10] text-[var(--color-imamu-accent)] px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-[var(--color-imamu-brown-light)]/20 transition whitespace-nowrap disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                     >
                       {fetchingHandle === s.handle ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
                       <span>{fetchingHandle === s.handle ? 'جاري السحب...' : 'Fetch Now'}</span>
@@ -749,7 +780,7 @@ export function AdminPage() {
   const renderMajors = () => (
     <div className="space-y-6">
       <div>
-        <h3 className="text-2xl font-display font-bold" style={{ color: 'var(--text-main)' }}>Academic Majors</h3>
+        <h3 className="text-2xl font-serif font-bold" style={{ color: 'var(--text-main)' }}>Academic Majors</h3>
         <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Configure degree planning programs, requirement groups, and courses</p>
       </div>
 
@@ -774,7 +805,7 @@ export function AdminPage() {
                     const method = majorForm.id ? 'PUT' : 'POST';
                     handlePostWithMethod(url, method, majorForm, () => setMajorForm({ id: undefined, name: '', pdfUrl: '', courses: [], batches: [] }));
                   }}
-                  className="flex-1 bg-[var(--color-imamu-blue)] text-white py-2 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-blue-light)] transition"
+                  className="flex-1 bg-[var(--color-imamu-brown)] text-white py-2 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-brown-light)] transition"
                 >
                   {majorForm.id ? 'Update Major' : 'Add Major'}
                 </button>
@@ -793,7 +824,7 @@ export function AdminPage() {
                 <div key={m.id} className="py-3 flex items-center justify-between group">
                   <div className="min-w-0 flex-1">
                     <div className="font-medium text-sm truncate" style={{ color: 'var(--text-main)' }}>{m.name}</div>
-                    {m.pdfUrl && <a href={m.pdfUrl} target="_blank" rel="noreferrer" className="text-[10px] text-[var(--color-imamu-blue)] font-medium hover:underline flex items-center gap-1 mt-1"><LinkIcon className="w-2.5 h-2.5" /> PDF Plan</a>}
+                    {m.pdfUrl && <a href={m.pdfUrl} target="_blank" rel="noreferrer" className="text-[10px] text-[var(--color-imamu-brown)] font-medium hover:underline flex items-center gap-1 mt-1"><LinkIcon className="w-2.5 h-2.5" /> PDF Plan</a>}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <button
@@ -821,7 +852,7 @@ export function AdminPage() {
           <div className="rounded-2xl p-5 border space-y-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
             <div className="flex justify-between items-center border-b pb-3" style={{ borderColor: 'var(--border-color)' }}>
               <span className="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>Plan Levels & Batches (المستويات والحزم)</span>
-              <button type="button" onClick={() => setMajorForm(f => ({ ...f, batches: [...f.batches, { name: `Batch ${f.batches.length + 1}`, reqCount: '1' }] }))} className="text-xs text-[var(--color-imamu-blue)] font-medium hover:underline">+ Add Batch</button>
+              <button type="button" onClick={() => setMajorForm(f => ({ ...f, batches: [...f.batches, { name: `Batch ${f.batches.length + 1}`, reqCount: '1' }] }))} className="text-xs text-[var(--color-imamu-brown)] font-medium hover:underline">+ Add Batch</button>
             </div>
             {majorForm.batches.length > 0 && (
               <div className="rounded-xl p-3 space-y-2 border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}>
@@ -919,7 +950,7 @@ export function AdminPage() {
                                 key={c.subjectId}
                                 draggable
                                 onDragStart={(e) => { setDraggedSubjectId(c.subjectId); e.dataTransfer.setData('text/plain', c.subjectId.toString()); }}
-                                className="p-2 rounded shadow-sm text-xs cursor-grab active:cursor-grabbing border transition hover:border-[var(--color-imamu-blue)] shrink-0"
+                                className="p-2 rounded shadow-sm text-xs cursor-grab active:cursor-grabbing border transition hover:border-[var(--color-imamu-brown)] shrink-0"
                                 style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
                               >
                                 <div className="font-semibold" style={{ color: 'var(--text-main)' }}>{subj.code}</div>
@@ -960,7 +991,7 @@ export function AdminPage() {
       <div className="space-y-6" dir="rtl">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h3 className="text-2xl font-display font-bold" style={{ color: 'var(--text-main)' }}>المواعيد والتقويم الأكاديمي ({events.length})</h3>
+            <h3 className="text-2xl font-serif font-bold" style={{ color: 'var(--text-main)' }}>المواعيد والتقويم الأكاديمي ({events.length})</h3>
             <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>إدارة المواعيد الرسمية، الاختبارات، الإجازات، وبداية ونهاية الفصول الدراسية</p>
           </div>
 
@@ -971,7 +1002,7 @@ export function AdminPage() {
               });
               setIsEventModalOpen(true);
             }}
-            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl transition shadow-md shadow-blue-600/20 border border-blue-500/30 shrink-0 cursor-pointer"
+            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl transition shadow-md shadow-[var(--color-imamu-brown)/20] border border-amber-700/30 shrink-0 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>إضافة موعد / حدث جديد</span>
@@ -1016,7 +1047,7 @@ export function AdminPage() {
               <h4 className="font-bold text-xs" style={{ color: 'var(--text-main)' }}>اشتراكات تقويم Google / Apple (ICS)</h4>
               <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>يستطيع الطلاب المزامنة مباشرة مع التقويم عبر رابط التغذية الرسمية.</p>
               <a href="/api/calendar.ics" download className="flex items-center justify-center gap-2 border font-bold py-2 rounded-xl text-xs w-full transition hover:bg-[var(--bg-subtle)]" style={{ borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>
-                <Download className="w-4 h-4 text-blue-500" /> تحميل ملف التقويم (.ics)
+                <Download className="w-4 h-4 text-[var(--color-imamu-accent)]" /> تحميل ملف التقويم (.ics)
               </a>
             </div>
 
@@ -1050,11 +1081,11 @@ export function AdminPage() {
                           {e.title}
                         </span>
 
-                        {e.isSemesterStart && <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30">🚀 بداية الفصل</span>}
+                        {e.isSemesterStart && <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[var(--color-imamu-brown)/15] text-[var(--color-imamu-accent)] border border-amber-700/30">🚀 بداية الفصل</span>}
                         {e.isSemesterEnd && <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30">🏁 نهاية الفصل</span>}
                         {e.isHoliday && <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">🌴 بداية إجازة</span>}
                         {e.isHolidayEnd && <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-500/30">🔄 نهاية إجازة</span>}
-                        {e.isEid && <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">🌙 احتفال العيد</span>}
+                        {e.isEid && <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/15 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] border border-amber-500/30">🌙 احتفال العيد</span>}
                         {e.isNationalDay && <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 border border-emerald-600/40">🇸🇦 اليوم الوطني</span>}
                       </div>
 
@@ -1066,7 +1097,7 @@ export function AdminPage() {
                     </div>
 
                     <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
-                      <div className="flex items-center gap-1.5 text-xs font-mono font-bold px-3 py-1.5 rounded-xl border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--color-imamu-blue)' }}>
+                      <div className="flex items-center gap-1.5 text-xs font-mono font-bold px-3 py-1.5 rounded-xl border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--color-imamu-brown)' }}>
                         <Calendar className="w-3.5 h-3.5" />
                         <span>{dateDisplay}</span>
                       </div>
@@ -1141,7 +1172,7 @@ export function AdminPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h3 className="text-2xl font-display font-bold" style={{ color: 'var(--text-main)' }}>Academic Courses (المقررات والمواد)</h3>
+          <h3 className="text-2xl font-serif font-bold" style={{ color: 'var(--text-main)' }}>Academic Courses (المقررات والمواد)</h3>
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Manage course metadata, credits, level, syllabus, and basic info</p>
         </div>
 
@@ -1152,7 +1183,7 @@ export function AdminPage() {
             });
             setIsCourseModalOpen(true);
           }}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-semibold text-xs sm:text-sm rounded-xl transition shadow-sm border border-blue-500/30 shrink-0"
+          className="flex items-center gap-2 px-4 py-2 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] active:scale-95 text-white font-semibold text-xs sm:text-sm rounded-xl transition shadow-sm border border-amber-700/30 shrink-0"
         >
           <Plus className="w-4 h-4" />
           <span>Create New Course</span>
@@ -1172,7 +1203,7 @@ export function AdminPage() {
               onClick={() => { if (confirm('Deduplicate courses? Keeps only the best per course code.')) handlePost('/api/admin/subjects/deduplicate', {}, () => toast('success', 'Duplicates removed!')); }}
               className="p-2 rounded-xl transition hover:bg-amber-500/10" title="Clean Duplicates"
             >
-              <Zap className="w-4 h-4 text-amber-500" />
+              <Zap className="w-4 h-4 text-[var(--color-imamu-accent)]" />
             </button>
           </div>
         </div>
@@ -1181,7 +1212,7 @@ export function AdminPage() {
           {subjects.filter(s => s.code?.toLowerCase().includes(subjectSearch.toLowerCase()) || s.name?.toLowerCase().includes(subjectSearch.toLowerCase())).slice(0, subjectLimit).map(s => (
             <div key={s.id} className="py-3.5 px-5 flex items-center justify-between group hover:bg-[var(--bg-subtle)] transition">
               <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className="font-mono text-xs px-2.5 py-1 rounded-lg border font-bold shrink-0 bg-blue-500/10 text-blue-500 border-blue-500/20">{s.code}</div>
+                <div className="font-mono text-xs px-2.5 py-1 rounded-lg border font-bold shrink-0 bg-[var(--color-imamu-brown)/10] text-[var(--color-imamu-accent)] border-amber-700/20">{s.code}</div>
                 <div className="flex-1 min-w-0">
                   <div className="font-bold text-sm truncate" style={{ color: 'var(--text-main)' }}>{s.name}</div>
                   <div className="flex items-center gap-2 mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -1213,7 +1244,7 @@ export function AdminPage() {
                     });
                     setIsCourseModalOpen(true);
                   }} 
-                  className="px-3 py-1.5 rounded-xl border text-xs font-bold transition hover:bg-blue-500/10 text-blue-500 border-blue-500/30"
+                  className="px-3 py-1.5 rounded-xl border text-xs font-bold transition hover:bg-[var(--color-imamu-brown-light)]/10 text-[var(--color-imamu-accent)] border-amber-700/30"
                 >
                   Edit Course
                 </button>
@@ -1253,7 +1284,7 @@ export function AdminPage() {
   const renderNewbieLinks = () => (
     <div className="space-y-6">
       <div>
-        <h3 className="text-2xl font-display font-bold" style={{ color: 'var(--text-main)' }}>Newbie Links</h3>
+        <h3 className="text-2xl font-serif font-bold" style={{ color: 'var(--text-main)' }}>Newbie Links</h3>
         <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Manage orientation links for new students</p>
       </div>
 
@@ -1281,7 +1312,7 @@ export function AdminPage() {
                     const method = newbieLinkForm.id ? 'PUT' : 'POST';
                     handlePostWithMethod(url, method, newbieLinkForm, () => setNewbieLinkForm({ id: undefined, title: '', url: '', description: '' }));
                   }}
-                  className="flex-1 bg-[var(--color-imamu-blue)] text-white py-2 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-blue-light)] transition"
+                  className="flex-1 bg-[var(--color-imamu-brown)] text-white py-2 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-brown-light)] transition"
                 >
                   {newbieLinkForm.id ? 'Update Link' : 'Add Link'}
                 </button>
@@ -1301,7 +1332,7 @@ export function AdminPage() {
                 <div key={link.id} className="py-3.5 px-5 flex items-center justify-between group transition hover:bg-[var(--bg-subtle)]">
                   <div className="min-w-0 flex-1 pr-3">
                     <div className="font-medium text-sm" style={{ color: 'var(--text-main)' }}>{link.title}</div>
-                    <a href={link.url} target="_blank" rel="noreferrer" className="text-xs text-[var(--color-imamu-blue)] hover:underline flex items-center gap-1 mt-0.5">
+                    <a href={link.url} target="_blank" rel="noreferrer" className="text-xs text-[var(--color-imamu-brown)] hover:underline flex items-center gap-1 mt-0.5">
                       <ExternalLink className="w-3 h-3" /> {link.url?.length > 50 ? link.url.slice(0, 50) + '...' : link.url}
                     </a>
                     {link.description && <p className="text-xs mt-1 truncate" style={{ color: 'var(--text-muted)' }}>{link.description}</p>}
@@ -1326,7 +1357,7 @@ export function AdminPage() {
   const renderSettings = () => (
     <div className="space-y-6">
       <div>
-        <h3 className="text-2xl font-display font-bold" style={{ color: 'var(--text-main)' }}>Global Settings</h3>
+        <h3 className="text-2xl font-serif font-bold" style={{ color: 'var(--text-main)' }}>Global Settings</h3>
         <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Configure database backups, schedules, and mailing setups</p>
       </div>
 
@@ -1335,7 +1366,7 @@ export function AdminPage() {
           <div className="rounded-2xl p-5 border space-y-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
             <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>Database Utilities</h4>
             <div className="flex flex-col gap-3">
-              <label className="bg-[var(--color-imamu-blue)] text-white px-4 py-2 rounded-xl font-medium flex items-center justify-center gap-2 cursor-pointer text-sm hover:bg-[var(--color-imamu-blue-light)] transition w-full">
+              <label className="bg-[var(--color-imamu-brown)] text-white px-4 py-2 rounded-xl font-medium flex items-center justify-center gap-2 cursor-pointer text-sm hover:bg-[var(--color-imamu-brown-light)] transition w-full">
                 <Upload className="w-4 h-4" /> Import Database
                 <input type="file" accept=".json,.zip" className="hidden" onChange={async (e) => {
                   const file = e.target.files?.[0];
@@ -1438,7 +1469,7 @@ export function AdminPage() {
             <div className="pt-6 mt-6 border-t space-y-4" style={{ borderColor: 'var(--border-color)' }}>
               <div>
                 <h4 className="font-semibold text-sm mb-1 flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
-                  <Mail className="w-4 h-4 text-blue-500" /> إرسال رمز التحقق عبر المسار الرئيسي (/api/auth/send-code)
+                  <Mail className="w-4 h-4 text-[var(--color-imamu-accent)]" /> إرسال رمز التحقق عبر المسار الرئيسي (/api/auth/send-code)
                 </h4>
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>اختبار إرسال الرموز عبر المسار الرئيسي المعتمد بإنشاء الحسابات وتأكيد إعدادات SMTP.</p>
               </div>
@@ -1473,7 +1504,7 @@ export function AdminPage() {
                   type="button"
                   disabled={isSendingTestEmail || !testEmailRecipient.trim()}
                   onClick={handleSendTestEmail}
-                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl font-bold text-xs sm:text-sm transition disabled:opacity-50 cursor-pointer shadow-sm"
+                  className="flex items-center gap-2 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white px-5 py-2 rounded-xl font-bold text-xs sm:text-sm transition disabled:opacity-50 cursor-pointer shadow-sm"
                 >
                   {isSendingTestEmail ? (
                     <>
@@ -1492,7 +1523,7 @@ export function AdminPage() {
 
             <div className="pt-4 border-t flex justify-end" style={{ borderColor: 'var(--border-color)' }}>
               <button
-                className="btn-rise bg-[var(--color-imamu-blue)] text-white px-5 py-2 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-blue-light)] transition cursor-pointer"
+                className="btn-rise bg-[var(--color-imamu-brown)] text-white px-5 py-2 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-brown-light)] transition cursor-pointer"
                 onClick={() => handlePostWithMethod('/api/admin/global_settings', 'PUT', globalSettings, () => toast('success', 'Settings saved!'))}
               >
                 Save All Settings
@@ -1504,7 +1535,7 @@ export function AdminPage() {
           {health && (
             <div className="rounded-2xl p-5 border space-y-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
               <h4 className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
-                <Server className="w-4 h-4 text-blue-500" /> System Information
+                <Server className="w-4 h-4 text-[var(--color-imamu-accent)]" /> System Information
               </h4>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="flex flex-col gap-0.5">
@@ -1540,7 +1571,7 @@ export function AdminPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h3 className="text-2xl font-display font-bold" style={{ color: 'var(--text-main)' }}>Course Resources (المصادر والمراجع الأكاديمية)</h3>
+          <h3 className="text-2xl font-serif font-bold" style={{ color: 'var(--text-main)' }}>Course Resources (المصادر والمراجع الأكاديمية)</h3>
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Manage academic drives, summaries, past exams, and study links via resource wizard</p>
         </div>
 
@@ -1603,7 +1634,7 @@ export function AdminPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     {r.courseCode && (
-                      <span className="font-mono text-xs px-2.5 py-0.5 rounded-md font-bold bg-blue-500/10 text-blue-500 border border-blue-500/20">
+                      <span className="font-mono text-xs px-2.5 py-0.5 rounded-md font-bold bg-[var(--color-imamu-brown)/10] text-[var(--color-imamu-accent)] border border-amber-700/20">
                         {r.courseCode}
                       </span>
                     )}
@@ -1622,7 +1653,7 @@ export function AdminPage() {
                         href={r.fileUrl || r.driveUrl || r.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-blue-400 hover:underline flex items-center gap-1 font-mono"
+                        className="text-[var(--color-imamu-accent)] hover:underline flex items-center gap-1 font-mono"
                       >
                         <ExternalLink className="w-3 h-3" /> Link
                       </a>
@@ -1743,6 +1774,7 @@ export function AdminPage() {
     switch (activeTab) {
       case 'dashboard': return <AdminDashboardTab stats={stats} health={health} setSearchUser={setUserSearch} setActiveTab={setActiveTab} />;
       case 'users': return <AdminUsersTab adminUsers={adminUsers} searchUser={userSearch} setSearchUser={setUserSearch} fetchUsers={fetchUsers} handleDelete={handleDelete} />;
+      case 'contributors': return <AdminContributorsTab />;
       case 'news_sources': return renderNewsSources();
       case 'majors': return renderMajors();
       case 'events': return renderEvents();
@@ -1763,7 +1795,7 @@ export function AdminPage() {
       {/* Header */}
       <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-display font-bold inline-flex items-center gap-3" style={{ color: 'var(--text-main)' }}>
+          <h1 className="text-3xl sm:text-4xl font-serif font-bold inline-flex items-center gap-3" style={{ color: 'var(--text-main)' }}>
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
               <ShieldCheck className="w-6 h-6 text-white" />
             </div>
@@ -1786,13 +1818,13 @@ export function AdminPage() {
         {/* Sidebar */}
         <div className="w-full md:w-56 shrink-0">
           <nav className="flex flex-col space-y-0.5">
-            {tabDefs.map(t => (
+            {visibleTabs.map(t => (
               <button
                 key={t.id}
                 onClick={() => setActiveTab(t.id)}
                 className={`flex items-center gap-3 w-full px-3.5 py-2.5 text-left rounded-xl text-sm font-medium transition-all duration-200 ${
                   activeTab === t.id
-                    ? 'bg-[var(--color-imamu-blue)] text-white shadow-md shadow-blue-500/20'
+                    ? 'bg-[var(--color-imamu-brown)] text-white shadow-md shadow-[var(--color-imamu-brown)/20]'
                     : 'hover:bg-[var(--bg-subtle)]'
                 }`}
                 style={activeTab !== t.id ? { color: 'var(--text-muted)' } : undefined}
@@ -1811,7 +1843,7 @@ export function AdminPage() {
       </div>
 
       {/* Command Palette */}
-      <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} onSelect={setActiveTab} tabs={tabDefs} />
+      <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} onSelect={setActiveTab} tabs={visibleTabs} />
 
       {/* Delete Modal */}
       {deleteModal && (

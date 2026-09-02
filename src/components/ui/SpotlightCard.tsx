@@ -13,7 +13,7 @@ interface SpotlightCardProps {
 export function SpotlightCard({
   children,
   className = '',
-  spotlightColor = 'rgba(37, 99, 235, 0.12)',
+  spotlightColor = 'rgba(139, 94, 60, 0.12)',
   onClick,
 }: SpotlightCardProps) {
   const mouseX = useMotionValue(0);
@@ -37,7 +37,7 @@ export function SpotlightCard({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={onClick}
-      whileHover={{ borderColor: 'rgba(37, 99, 235, 0.4)' }}
+      whileHover={{ borderColor: 'rgba(139, 94, 60, 0.40)' }}
       transition={{ duration: 0.2 }}
       className={`relative rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-2xs ${className}`}
     >

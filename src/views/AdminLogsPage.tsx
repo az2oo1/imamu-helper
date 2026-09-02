@@ -124,7 +124,7 @@ export function AdminLogsPage() {
         );
       case 'warn':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 dark:bg-amber-950/60 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] border border-amber-200 dark:border-amber-900/50">
             <AlertTriangle className="w-3.5 h-3.5" /> WARN
           </span>
         );
@@ -142,7 +142,7 @@ export function AdminLogsPage() {
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-stone-50 dark:bg-stone-950/60 text-[var(--color-imamu-accent)] border border-amber-200 dark:border-stone-900/50">
             <Info className="w-3.5 h-3.5" /> INFO
           </span>
         );
@@ -152,7 +152,7 @@ export function AdminLogsPage() {
   if (authLoading || (user && dbUser === null)) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 flex flex-col items-center justify-center text-center p-4">
-        <RefreshCw className="w-10 h-10 text-blue-500 animate-spin mb-4" />
+        <RefreshCw className="w-10 h-10 text-[var(--color-imamu-accent)] animate-spin mb-4" />
         <p className="text-slate-600 dark:text-zinc-400 text-sm font-medium">جاري التحقق من صلاحيات الدخول...</p>
       </div>
     );
@@ -162,7 +162,7 @@ export function AdminLogsPage() {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 flex flex-col items-center justify-center text-center p-4">
         <ShieldAlert className="w-20 h-20 text-red-500 mb-6" />
-        <h1 className="text-3xl font-display font-bold mb-2 text-slate-900 dark:text-white">Access Denied</h1>
+        <h1 className="text-3xl font-serif font-bold mb-2 text-slate-900 dark:text-white">Access Denied</h1>
         <p className="text-slate-600 dark:text-zinc-400 text-sm">You must be an administrator to view this page.</p>
       </div>
     );
@@ -175,10 +175,10 @@ export function AdminLogsPage() {
         {/* Header Title */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200 dark:border-zinc-800 pb-6">
           <div>
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-1">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[var(--color-imamu-accent)] mb-1">
               <Activity className="w-4 h-4 animate-pulse text-emerald-500" /> مركز الرقابة والتدقيق الأمني
             </div>
-            <h1 className="text-3xl font-display font-extrabold text-slate-900 dark:text-white">
+            <h1 className="text-3xl font-serif font-extrabold text-slate-900 dark:text-white">
               سجلات أحداث النظام (System Logs)
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-1">
@@ -203,7 +203,7 @@ export function AdminLogsPage() {
               onClick={handleExportLogs}
               className="px-3.5 py-2 rounded-xl text-xs font-bold bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition flex items-center gap-1.5 shadow-2xs"
             >
-              <Download className="w-4 h-4 text-blue-500" /> تصدير السجلات (JSON)
+              <Download className="w-4 h-4 text-[var(--color-imamu-accent)]" /> تصدير السجلات (JSON)
             </button>
 
             <button
@@ -234,10 +234,10 @@ export function AdminLogsPage() {
           </div>
 
           <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-slate-200/80 dark:border-zinc-800 shadow-sm flex flex-col justify-between">
-            <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1">
+            <span className="text-xs font-semibold text-[var(--color-imamu-accent)] flex items-center gap-1">
               <Server className="w-3.5 h-3.5" /> عمليات المزامنة
             </span>
-            <div className="text-2xl sm:text-3xl font-extrabold text-blue-600 dark:text-blue-400 mt-2">
+            <div className="text-2xl sm:text-3xl font-extrabold text-[var(--color-imamu-accent)] mt-2">
               {(stats?.sync ?? 0).toLocaleString()}
             </div>
           </div>
@@ -274,7 +274,7 @@ export function AdminLogsPage() {
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && fetchLogs()}
-                className="w-full pr-10 pl-4 py-2.5 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-white outline-none focus:border-blue-500 transition"
+                className="w-full pr-10 pl-4 py-2.5 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-white outline-none focus:border-[var(--color-imamu-brown)] transition"
               />
             </div>
 
@@ -294,7 +294,7 @@ export function AdminLogsPage() {
                   onClick={() => setSelectedLevel(f.id)}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
                     selectedLevel === f.id
-                      ? 'bg-blue-600 text-white shadow-xs'
+                      ? 'bg-[var(--color-imamu-brown)] text-white shadow-xs'
                       : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-200 dark:hover:bg-zinc-700'
                   }`}
                 >
@@ -325,7 +325,7 @@ export function AdminLogsPage() {
                 {logs.map(log => (
                   <tr 
                     key={log.id} 
-                    className="hover:bg-blue-50/30 dark:hover:bg-zinc-800/40 transition-colors"
+                    className="hover:bg-stone-50/30 dark:hover:bg-zinc-800/40 transition-colors"
                   >
                     <td className="py-3.5 px-4 whitespace-nowrap text-slate-500 dark:text-zinc-400 text-xs font-mono" dir="ltr">
                       {log?.createdAt ? (isNaN(new Date(log.createdAt).getTime()) ? String(log.createdAt) : new Date(log.createdAt).toLocaleString('ar-SA')) : '-'}
@@ -336,7 +336,7 @@ export function AdminLogsPage() {
                     <td className="py-3.5 px-4 whitespace-nowrap font-bold text-slate-700 dark:text-zinc-300">
                       {log.category}
                     </td>
-                    <td className="py-3.5 px-4 font-mono font-bold text-blue-600 dark:text-blue-400 text-xs" dir="ltr">
+                    <td className="py-3.5 px-4 font-mono font-bold text-[var(--color-imamu-accent)] text-xs" dir="ltr">
                       {log.action}
                     </td>
                     <td className="py-3.5 px-4 text-slate-800 dark:text-zinc-200 max-w-md truncate" dir="auto">
@@ -352,7 +352,7 @@ export function AdminLogsPage() {
                     <td className="py-3.5 px-4 text-center">
                       <button
                         onClick={() => setSelectedLog(log)}
-                        className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-zinc-800 hover:bg-blue-50 dark:hover:bg-blue-950/60 text-slate-700 dark:text-zinc-300 hover:text-blue-600 transition"
+                        className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-zinc-800 hover:bg-stone-50 dark:hover:bg-stone-950/60 text-slate-700 dark:text-zinc-300 hover:text-[var(--color-imamu-accent)] transition"
                       >
                         عرض
                       </button>
@@ -419,7 +419,7 @@ export function AdminLogsPage() {
                   {selectedLog.userEmail && (
                     <div className="p-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs">
                       <span className="text-slate-400 dark:text-zinc-500 font-bold block mb-1">المستخدم المرتبط</span>
-                      <span className="font-bold text-blue-600 dark:text-blue-400">{selectedLog.userEmail}</span>
+                      <span className="font-bold text-[var(--color-imamu-accent)]">{selectedLog.userEmail}</span>
                     </div>
                   )}
 

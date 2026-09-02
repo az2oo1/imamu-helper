@@ -43,7 +43,7 @@ export async function sendVerificationEmail(email: string, code: string, config?
       text: `Your verification code is: ${code}`,
       html: `
         <div style="font-family: Arial, sans-serif; direction: rtl; text-align: right; padding: 20px; background-color: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; max-width: 500px;">
-          <h2 style="color: #2563eb; margin-top: 0;">رمز التحقق الخاص بك 🔑</h2>
+          <h2 style="color: #8B5E3C; margin-top: 0;">رمز التحقق الخاص بك 🔑</h2>
           <p style="font-size: 14px; color: #334155;">استخدم الرمز التالي لتأكيد حسابك في دليل جامعة الإمام:</p>
           <div style="font-size: 28px; font-weight: bold; letter-spacing: 4px; color: #1e293b; background: #ffffff; padding: 12px 24px; display: inline-block; border-radius: 8px; border: 1px solid #cbd5e1; margin: 10px 0;">
             ${code}
@@ -81,7 +81,7 @@ export async function sendCustomEmail(
       text: body,
       html: `
         <div style="font-family: Arial, sans-serif; direction: rtl; text-align: right; padding: 24px; background-color: #f8fafc; border-radius: 16px; border: 1px solid #e2e8f0; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #2563eb; margin-top: 0;">دليل جامعة الإمام - رسالة تجريبية 📧</h2>
+          <h2 style="color: #8B5E3C; margin-top: 0;">دليل جامعة الإمام - رسالة تجريبية 📧</h2>
           <div style="font-size: 14px; color: #334155; background: #ffffff; padding: 16px; border-radius: 12px; border: 1px solid #cbd5e1; margin-bottom: 16px;">
             ${body.replace(/\n/g, '<br/>')}
           </div>

@@ -55,7 +55,7 @@ export function NumbersPage() {
       {/* Back Button */}
       <button 
         onClick={() => router.push('/how-to')}
-        className="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition font-semibold mb-6 bg-white dark:bg-zinc-900/40 hover:bg-slate-50 dark:hover:bg-zinc-800/40 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-xs self-start"
+        className="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-zinc-400 hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)] transition font-semibold mb-6 bg-white dark:bg-zinc-900/40 hover:bg-slate-50 dark:hover:bg-zinc-800/40 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-xs self-start"
       >
         <ArrowLeft className="w-4 h-4 rotate-180" /> العودة إلى الدليلة
       </button>
@@ -63,10 +63,10 @@ export function NumbersPage() {
       {/* Header Info */}
       <div className="mb-8">
         <div className="inline-flex items-center gap-3 mb-2.5">
-          <div className="w-10 h-10 bg-blue-50 dark:bg-zinc-900 border border-blue-200 dark:border-zinc-800 rounded-xl flex items-center justify-center shadow-xs text-blue-600 dark:text-zinc-400">
+          <div className="w-10 h-10 bg-stone-50 dark:bg-zinc-900 border border-amber-200 dark:border-zinc-800 rounded-xl flex items-center justify-center shadow-xs text-[var(--color-imamu-accent)] dark:text-zinc-400">
             <Phone className="w-5 h-5" />
           </div>
-          <h1 className="text-3xl font-display font-bold text-slate-900 dark:text-zinc-100">دليل الأرقام الهاتفية والتحويلات</h1>
+          <h1 className="text-3xl font-serif font-bold text-slate-900 dark:text-zinc-100">دليل الأرقام الهاتفية والتحويلات</h1>
         </div>
         <p className="text-sm text-slate-500 dark:text-zinc-400 mr-13 font-semibold leading-relaxed">
           الأرقام والخطوط الهاتفية الرسمية المعتمدة للتواصل المباشر مع إدارات وكليات جامعة الإمام بالرياض.
@@ -81,7 +81,7 @@ export function NumbersPage() {
             onClick={() => setActiveCategory(tab.key)}
             className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all duration-200 ${
               activeCategory === tab.key
-                ? 'bg-blue-600 border-transparent text-white shadow-sm'
+                ? 'bg-[var(--color-imamu-brown)] border-transparent text-white shadow-sm'
                 : 'bg-white dark:bg-zinc-900/60 border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800 hover:text-slate-900 dark:hover:text-zinc-100'
             }`}
           >
@@ -100,7 +100,7 @@ export function NumbersPage() {
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
           placeholder="ابحث عن كلية، قسم، مسؤول أو رقم..."
-          className="w-full pr-11 pl-4 py-3 bg-white dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-700 rounded-2xl outline-none transition shadow-xs text-xs text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:border-blue-500 dark:focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+          className="w-full pr-11 pl-4 py-3 bg-white dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-700 rounded-2xl outline-none transition shadow-xs text-xs text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:border-[var(--color-imamu-brown)] dark:focus:border-[var(--color-imamu-brown)] focus:ring-2 focus:ring-[var(--color-imamu-brown)]/20"
         />
       </div>
 
@@ -122,7 +122,7 @@ export function NumbersPage() {
                     <td className="p-3.5 font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
                       <span className={`w-2 h-2 rounded-full shrink-0 ${
                         contact.category === 'safety' ? 'bg-red-500' :
-                        contact.category === 'colleges' ? 'bg-indigo-500' : 'bg-blue-500'
+                        contact.category === 'colleges' ? 'bg-indigo-500' : 'bg-[var(--color-imamu-brown)]'
                       }`} />
                       {contact.department}
                     </td>
@@ -130,7 +130,7 @@ export function NumbersPage() {
                     <td className="p-3.5 text-center">
                       <a 
                         href={`tel:${contact.number}`}
-                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 dark:bg-zinc-800 border border-blue-200 dark:border-zinc-700 text-blue-600 dark:text-zinc-300 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 dark:hover:text-white hover:border-transparent transition shadow-xs"
+                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-stone-50 dark:bg-zinc-800 border border-amber-200 dark:border-zinc-700 text-[var(--color-imamu-accent)] dark:text-zinc-300 hover:bg-[var(--color-imamu-brown)] hover:text-white dark:hover:bg-[var(--color-imamu-brown)] dark:hover:text-white hover:border-transparent transition shadow-xs"
                         title="اتصال مباشر"
                       >
                         <Phone className="w-3.5 h-3.5" />

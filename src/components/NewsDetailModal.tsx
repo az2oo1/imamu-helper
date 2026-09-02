@@ -224,9 +224,14 @@ export function NewsDetailModal({
             {/* Header: Author info & Source badge */}
             <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900/50 flex items-center justify-center font-bold text-sm text-blue-600 dark:text-blue-400 overflow-hidden shrink-0">
+                <div className="w-10 h-10 rounded-full bg-stone-50 dark:bg-stone-950/50 border border-amber-200 dark:border-stone-900/50 flex items-center justify-center font-bold text-sm text-[var(--color-imamu-accent)] overflow-hidden shrink-0">
                   {item.authorAvatar ? (
-                    <img src={item.authorAvatar} alt="" className="w-full h-full object-cover" />
+                    <img 
+                      src={item.authorAvatar} 
+                      alt={item.author} 
+                      className="w-full h-full rounded-full object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
                   ) : (
                     item.author.charAt(0)
                   )}
@@ -234,7 +239,7 @@ export function NewsDetailModal({
                 <div className="flex flex-col text-right">
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm font-bold text-slate-900 dark:text-white line-clamp-1">{item.author}</span>
-                    <Sparkles className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                    <Sparkles className="w-3.5 h-3.5 text-[var(--color-imamu-accent)] shrink-0" />
                   </div>
                   <span className="text-[11px] text-slate-400 dark:text-zinc-500">
                     {item.authorHandle || `@${item.source || 'IMAMU'}`}
@@ -272,14 +277,14 @@ export function NewsDetailModal({
                   </button>
 
                   <div className="flex items-center gap-1.5 text-slate-500 dark:text-zinc-400 font-medium">
-                    <MessageSquare className="w-4 h-4 text-blue-500" />
+                    <MessageSquare className="w-4 h-4 text-[var(--color-imamu-accent)]" />
                     <span>{comments.length} تعليق</span>
                   </div>
                 </div>
 
                 <button
                   onClick={handleCopyShare}
-                  className="flex items-center gap-1.5 text-slate-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-zinc-800/50 border border-slate-200 dark:border-zinc-700 transition"
+                  className="flex items-center gap-1.5 text-slate-600 dark:text-zinc-400 hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)] px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-zinc-800/50 border border-slate-200 dark:border-zinc-700 transition"
                   title="مشاركة الخبر"
                 >
                   {copiedLink ? (
@@ -321,11 +326,11 @@ export function NewsDetailModal({
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 flex items-center justify-center font-bold text-[10px] shrink-0">
+                              <div className="w-6 h-6 rounded-full bg-stone-100 dark:bg-stone-900/40 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] flex items-center justify-center font-bold text-[10px] shrink-0">
                                 {c.userName ? c.userName.charAt(0).toUpperCase() : 'ط'}
                               </div>
                               <span className="text-xs font-bold text-slate-900 dark:text-white">
-                                @{c.userName || 'طالب'}
+                                {c.userName || 'طالب'}
                               </span>
                               <span className="text-[10px] text-slate-400 dark:text-zinc-500 mr-1">
                                 {formatDate(c.createdAt, 'ar-display')}
@@ -362,12 +367,12 @@ export function NewsDetailModal({
                   onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
                   placeholder={currentUser ? "اكتب تعليقك هنا..." : "سجل الدخول للتمكن من التعليق"}
                   disabled={!currentUser}
-                  className="flex-1 px-4 py-2.5 bg-slate-50 dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 placeholder-slate-400 dark:placeholder-zinc-500"
+                  className="flex-1 px-4 py-2.5 bg-slate-50 dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[var(--color-imamu-brown)]/20 focus:border-[var(--color-imamu-brown)] placeholder-slate-400 dark:placeholder-zinc-500"
                 />
                 <button
                   onClick={handleAddComment}
                   disabled={!currentUser || !newCommentText.trim()}
-                  className="bg-blue-600 text-white px-4 py-2.5 rounded-xl hover:bg-blue-700 transition disabled:opacity-40 flex items-center justify-center shrink-0 font-bold"
+                  className="bg-[var(--color-imamu-brown)] text-white px-4 py-2.5 rounded-xl hover:bg-[var(--color-imamu-brown-dark)] transition disabled:opacity-40 flex items-center justify-center shrink-0 font-bold"
                 >
                   <Send className="w-4 h-4 rotate-180" />
                 </button>

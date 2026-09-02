@@ -62,7 +62,7 @@ export function TutorialsTab({
   // Section form state
   const [secTitle, setSecTitle] = useState('');
   const [secIcon, setSecIcon] = useState('GraduationCap');
-  const [secColor, setSecColor] = useState('text-blue-400 bg-blue-950/40 border-blue-900/50');
+  const [secColor, setSecColor] = useState('text-[var(--color-imamu-accent)] bg-stone-950/40 border-stone-900/50');
   const [iconSearchQuery, setIconSearchQuery] = useState('');
 
   // Tutorial form states
@@ -77,8 +77,8 @@ export function TutorialsTab({
 
   // Section presets for easy selection
   const colorOptions = [
-    { name: 'blue', label: 'أزرق', value: 'text-blue-400 bg-blue-950/40 border border-blue-900/50' },
-    { name: 'amber', label: 'ذهبي', value: 'text-amber-400 bg-amber-950/40 border border-amber-900/50' },
+    { name: 'brown', label: 'بني', value: 'text-[var(--color-imamu-accent)] bg-stone-950/40 border border-stone-900/50' },
+    { name: 'amber', label: 'ذهبي', value: 'text-[var(--color-imamu-accent)] bg-amber-950/40 border border-amber-900/50' },
     { name: 'emerald', label: 'أخضر', value: 'text-emerald-400 bg-emerald-950/40 border border-emerald-900/50' },
     { name: 'purple', label: 'بنفسجي', value: 'text-purple-400 bg-purple-950/40 border border-purple-900/50' }
   ];
@@ -122,7 +122,7 @@ export function TutorialsTab({
     setEditingSection(null);
     setSecTitle('');
     setSecIcon('GraduationCap');
-    setSecColor('text-blue-400 bg-blue-950/40 border border-blue-900/50');
+    setSecColor('text-[var(--color-imamu-accent)] bg-stone-950/40 border border-stone-900/50');
     setIconSearchQuery('');
     setShowSectionForm(false);
   };
@@ -345,7 +345,7 @@ export function TutorialsTab({
         {/* Top Header Card */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-6" style={{ borderColor: 'var(--border-color)' }}>
           <div>
-            <h3 className="text-xl font-display font-bold mb-1" style={{ color: 'var(--text-main)' }}>إدارة شروحات الدليلة</h3>
+            <h3 className="text-xl font-serif font-bold mb-1" style={{ color: 'var(--text-main)' }}>إدارة شروحات الدليلة</h3>
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>إضافة وتعديل الأقسام ومكونات الشروحات التوضيحية للطلاب.</p>
           </div>
           <div className="flex gap-2">
@@ -358,7 +358,7 @@ export function TutorialsTab({
             </button>
             <button
               onClick={startNewTutorial}
-              className="bg-[var(--color-imamu-blue)] text-white hover:bg-[var(--color-imamu-blue-light)] px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md"
+              className="bg-[var(--color-imamu-brown)] text-white hover:bg-[var(--color-imamu-brown-light)] px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md"
             >
               <Plus className="w-4 h-4" /> إضافة شرح جديد
             </button>
@@ -378,7 +378,7 @@ export function TutorialsTab({
               {/* Modal Header */}
               <div className="p-5 border-b flex items-center justify-between" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}>
                 <div className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-blue-500" />
+                  <Sparkles className="w-5 h-5 text-[var(--color-imamu-accent)]" />
                   <h3 className="text-base font-bold" style={{ color: 'var(--text-main)' }}>
                     {editingSection ? 'تعديل التصنيف' : 'إضافة تصنيف جديد'}
                   </h3>
@@ -434,7 +434,7 @@ export function TutorialsTab({
                   <div className="flex justify-between items-center">
                     <label className="text-xs font-bold" style={{ color: 'var(--text-muted)' }}>لون التصنيف:</label>
                     <span className="text-[10px] font-bold" style={{ color: 'var(--text-main)' }}>
-                      {colorOptions.find(o => o.value === secColor)?.label || 'أزرق'}
+                      {colorOptions.find(o => o.value === secColor)?.label || 'بني'}
                     </span>
                   </div>
                   <div className="relative flex items-center p-4 rounded-2xl border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}>
@@ -448,7 +448,7 @@ export function TutorialsTab({
                         const idx = parseInt(e.target.value, 10);
                         setSecColor(colorOptions[idx].value);
                       }}
-                      className="w-full h-1.5 bg-gradient-to-r from-blue-500 via-amber-500 via-emerald-500 to-purple-500 rounded-lg appearance-none cursor-pointer outline-none"
+                      className="w-full h-1.5 bg-gradient-to-r from-amber-700 via-amber-500 via-emerald-500 to-purple-500 rounded-lg appearance-none cursor-pointer outline-none"
                     />
                   </div>
                 </div>
@@ -494,7 +494,7 @@ export function TutorialsTab({
                           onClick={() => setSecIcon(icoName)}
                           className={`p-3 rounded-xl flex items-center justify-center border transition-all ${
                             isSelected 
-                              ? 'bg-blue-600/10 border-blue-500 text-blue-500 scale-105 shadow-inner' 
+                              ? 'bg-[var(--color-imamu-brown)]/10 border-amber-700 text-[var(--color-imamu-accent)] scale-105 shadow-inner' 
                               : 'hover:bg-[var(--bg-card)]'
                           }`}
                           style={!isSelected ? { background: 'var(--bg-card)', borderColor: 'var(--border-color)', color: 'var(--text-muted)' } : {}}
@@ -527,7 +527,7 @@ export function TutorialsTab({
                 <button
                   type="submit"
                   disabled={!secTitle.trim()}
-                  className="btn-rise px-6 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:pointer-events-none text-white rounded-xl text-xs font-bold transition shadow-md cursor-pointer"
+                  className="btn-rise px-6 py-2.5 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-light)] disabled:opacity-50 disabled:pointer-events-none text-white rounded-xl text-xs font-bold transition shadow-md cursor-pointer"
                 >
                   {editingSection ? 'حفظ التعديلات' : 'إنشاء التصنيف'}
                 </button>
@@ -556,7 +556,7 @@ export function TutorialsTab({
                   <div className="flex gap-1.5 opacity-80 group-hover:opacity-100 transition">
                     <button
                       onClick={() => startEditSection(sec)}
-                      className="p-1 hover:text-blue-400 rounded border border-transparent hover:border-[var(--border-color)]"
+                      className="p-1 hover:text-[var(--color-imamu-accent)] rounded border border-transparent hover:border-[var(--border-color)]"
                     >
                       <Edit className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
                     </button>
@@ -648,7 +648,7 @@ export function TutorialsTab({
             <ArrowRight className="w-4.5 h-4.5" />
           </button>
           <div>
-            <h3 className="text-lg font-display font-bold" style={{ color: 'var(--text-main)' }}>
+            <h3 className="text-lg font-serif font-bold" style={{ color: 'var(--text-main)' }}>
               {isCreating ? 'إضافة شرح جديد' : 'تعديل الشرح'}
             </h3>
             <p className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>{tutTitle || 'مخطط شرح الدليلة'}</p>
@@ -740,7 +740,7 @@ export function TutorialsTab({
             {/* External Links Info */}
             <div className="border rounded-2xl p-5 space-y-4 shadow-sm" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
               <h4 className="font-bold text-xs border-b pb-2 flex items-center gap-1.5" style={{ color: 'var(--text-main)', borderColor: 'var(--border-color)' }}>
-                <Link className="w-4 h-4 text-blue-500" />
+                <Link className="w-4 h-4 text-[var(--color-imamu-accent)]" />
                 زر رابط خارجي اختياري (Call to Action)
               </h4>
 
@@ -780,7 +780,7 @@ export function TutorialsTab({
                   className="px-3 py-1.5 border hover:bg-[var(--bg-subtle)] text-xs rounded-xl transition flex items-center gap-1.5 font-bold shadow-xs"
                   style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
                 >
-                  <FileText className="w-3.5 h-3.5 text-blue-500" /> نص توضيحي
+                  <FileText className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" /> نص توضيحي
                 </button>
                 <button
                   type="button"
@@ -788,7 +788,7 @@ export function TutorialsTab({
                   className="px-3 py-1.5 border hover:bg-[var(--bg-subtle)] text-xs rounded-xl transition flex items-center gap-1.5 font-bold shadow-xs"
                   style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
                 >
-                  <CheckSquare className="w-3.5 h-3.5 text-amber-500" /> خطوات
+                  <CheckSquare className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" /> خطوات
                 </button>
                 <button
                   type="button"
@@ -838,8 +838,8 @@ export function TutorialsTab({
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>#{blockIdx + 1}</span>
                       <span className="text-xs font-bold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
-                        {block.type === 'text' && <><FileText className="w-4 h-4 text-blue-500" /> نص توضيحي</>}
-                        {block.type === 'steps' && <><CheckSquare className="w-4 h-4 text-amber-500" /> خطوات الشرح التوضيحي</>}
+                        {block.type === 'text' && <><FileText className="w-4 h-4 text-[var(--color-imamu-accent)]" /> نص توضيحي</>}
+                        {block.type === 'steps' && <><CheckSquare className="w-4 h-4 text-[var(--color-imamu-accent)]" /> خطوات الشرح التوضيحي</>}
                         {block.type === 'list' && <><Compass className="w-4 h-4 text-purple-500" /> عناصر القائمة النقطية</>}
                         {block.type === 'table' && <><PlusCircle className="w-4 h-4 text-emerald-500" /> جدول بيانات</>}
                         {block.type === 'media' && <><Image className="w-4 h-4 text-rose-500" /> وسائط (صورة أو فيديو)</>}
@@ -946,7 +946,7 @@ export function TutorialsTab({
                           <div className="flex gap-2">
                             <button
                               type="button"
-                              className={`px-3 py-1.5 text-xs rounded-xl font-bold border transition ${block.listType === 'ordered' ? 'bg-blue-600 border-blue-600 text-white' : 'hover:bg-[var(--bg-subtle)]'}`}
+                              className={`px-3 py-1.5 text-xs rounded-xl font-bold border transition ${block.listType === 'ordered' ? 'bg-[var(--color-imamu-brown)] border-[var(--color-imamu-brown)] text-white' : 'hover:bg-[var(--bg-subtle)]'}`}
                               style={block.listType !== 'ordered' ? { background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' } : {}}
                               onClick={() => updateBlock(blockIdx, { listType: 'ordered' })}
                             >
@@ -954,7 +954,7 @@ export function TutorialsTab({
                             </button>
                             <button
                               type="button"
-                              className={`px-3 py-1.5 text-xs rounded-xl font-bold border transition ${block.listType === 'unordered' ? 'bg-blue-600 border-blue-600 text-white' : 'hover:bg-[var(--bg-subtle)]'}`}
+                              className={`px-3 py-1.5 text-xs rounded-xl font-bold border transition ${block.listType === 'unordered' ? 'bg-[var(--color-imamu-brown)] border-[var(--color-imamu-brown)] text-white' : 'hover:bg-[var(--bg-subtle)]'}`}
                               style={block.listType !== 'unordered' ? { background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' } : {}}
                               onClick={() => updateBlock(blockIdx, { listType: 'unordered' })}
                             >
@@ -1119,7 +1119,7 @@ export function TutorialsTab({
                           <div className="flex gap-2">
                             <button
                               type="button"
-                              className={`px-3 py-1.5 text-xs rounded-xl font-bold border transition ${block.mediaType === 'image' ? 'bg-blue-600 border-blue-600 text-white' : 'hover:bg-[var(--bg-subtle)]'}`}
+                              className={`px-3 py-1.5 text-xs rounded-xl font-bold border transition ${block.mediaType === 'image' ? 'bg-[var(--color-imamu-brown)] border-[var(--color-imamu-brown)] text-white' : 'hover:bg-[var(--bg-subtle)]'}`}
                               style={block.mediaType !== 'image' ? { background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' } : {}}
                               onClick={() => updateBlock(blockIdx, { mediaType: 'image' })}
                             >
@@ -1127,7 +1127,7 @@ export function TutorialsTab({
                             </button>
                             <button
                               type="button"
-                              className={`px-3 py-1.5 text-xs rounded-xl font-bold border transition ${block.mediaType === 'video' ? 'bg-blue-600 border-blue-600 text-white' : 'hover:bg-[var(--bg-subtle)]'}`}
+                              className={`px-3 py-1.5 text-xs rounded-xl font-bold border transition ${block.mediaType === 'video' ? 'bg-[var(--color-imamu-brown)] border-[var(--color-imamu-brown)] text-white' : 'hover:bg-[var(--bg-subtle)]'}`}
                               style={block.mediaType !== 'video' ? { background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' } : {}}
                               onClick={() => updateBlock(blockIdx, { mediaType: 'video' })}
                             >
@@ -1301,7 +1301,7 @@ export function TutorialsTab({
                       <div key={blockIdx} className="relative border-r-2 mr-3 pr-6 space-y-6 my-6 text-right" style={{ borderColor: 'var(--border-color)' }}>
                         {stepsItems.map((step, sIdx) => (
                           <div key={sIdx} className="relative flex flex-col gap-1">
-                            <span className="absolute -right-[35px] top-0.5 flex items-center justify-center shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-[10px] font-bold shadow-sm z-10">
+                            <span className="absolute -right-[35px] top-0.5 flex items-center justify-center shrink-0 w-6 h-6 rounded-full bg-[var(--color-imamu-brown)] text-white text-[10px] font-bold shadow-sm z-10">
                               {sIdx + 1}
                             </span>
                             <p className="text-xs sm:text-sm font-normal leading-relaxed pt-0.5" style={{ color: 'var(--text-main)' }}>{step || 'محتوى الخطوة فارغ...'}</p>
@@ -1399,7 +1399,7 @@ export function TutorialsTab({
                               href={btn.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 px-4.5 rounded-md text-xs transition shadow-sm w-full sm:w-auto justify-center"
+                              className="inline-flex items-center gap-2 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-light)] text-white font-bold py-2.5 px-4.5 rounded-md text-xs transition shadow-sm w-full sm:w-auto justify-center"
                             >
                               <ExternalLink className="w-4 h-4 shrink-0" /> {btn.label}
                             </a>
@@ -1420,7 +1420,7 @@ export function TutorialsTab({
                     href={tutLinkUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 px-4.5 rounded-md text-xs transition shadow-sm w-full sm:w-auto justify-center"
+                    className="inline-flex items-center gap-2 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-light)] text-white font-bold py-2.5 px-4.5 rounded-md text-xs transition shadow-sm w-full sm:w-auto justify-center"
                   >
                     <ExternalLink className="w-4 h-4 shrink-0" /> {tutLinkTitle || 'الانتقال للرابط المذكور'}
                   </a>

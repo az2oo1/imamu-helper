@@ -118,12 +118,12 @@ const colleges: College[] = [
 
 const collegeThemes: Record<string, string> = {
   engineering: 'bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-900/50 text-orange-900 dark:text-orange-300 border-r-4 border-r-orange-500 shadow-xs',
-  ccis: 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900/50 text-blue-900 dark:text-blue-300 border-r-4 border-r-blue-500 shadow-xs',
+  ccis: 'bg-stone-50 dark:bg-stone-950/30 border-amber-200 dark:border-stone-900/50 text-stone-900 dark:text-[var(--color-imamu-accent)] border-r-4 border-r-amber-700 shadow-xs',
   science: 'bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-900/50 text-purple-900 dark:text-purple-300 border-r-4 border-r-purple-500 shadow-xs',
   economics: 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/50 text-emerald-900 dark:text-emerald-300 border-r-4 border-r-emerald-500 shadow-xs',
   sharia: 'bg-indigo-50 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-900/50 text-indigo-900 dark:text-indigo-300 border-r-4 border-r-indigo-500 shadow-xs',
   languages: 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900/50 text-rose-900 dark:text-rose-300 border-r-4 border-r-rose-500 shadow-xs',
-  deanships: 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/50 text-amber-900 dark:text-amber-300 border-r-4 border-r-amber-500 shadow-xs'
+  deanships: 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/50 text-[var(--color-imamu-accent)] dark:text-amber-300 border-r-4 border-r-amber-500 shadow-xs'
 };
 
 export function EmailsPage() {
@@ -145,7 +145,7 @@ export function EmailsPage() {
       {/* Back Button */}
       <button 
         onClick={() => router.push('/how-to')}
-        className="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition font-semibold mb-6 bg-white dark:bg-zinc-900/40 hover:bg-slate-50 dark:hover:bg-zinc-800/40 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-xs self-start"
+        className="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-zinc-400 hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)] transition font-semibold mb-6 bg-white dark:bg-zinc-900/40 hover:bg-slate-50 dark:hover:bg-zinc-800/40 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-xs self-start"
       >
         <ArrowLeft className="w-4 h-4 rotate-180" /> العودة إلى الدليلة
       </button>
@@ -156,7 +156,7 @@ export function EmailsPage() {
           <div className="w-10 h-10 bg-emerald-50 dark:bg-zinc-900 border border-emerald-200 dark:border-zinc-800 rounded-2xl flex items-center justify-center shadow-xs">
             <Mail className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
           </div>
-          <h1 className="text-3xl font-display font-bold text-slate-900 dark:text-zinc-100">دليل البريد الإلكتروني لكليات الجامعة</h1>
+          <h1 className="text-3xl font-serif font-bold text-slate-900 dark:text-zinc-100">دليل البريد الإلكتروني لكليات الجامعة</h1>
         </div>
         <p className="text-sm text-slate-500 dark:text-zinc-400 mr-13 font-semibold leading-relaxed">
           الدليل الموحد للتواصل مع منسوبي ومسؤولي الكليات، المرشدين الأكاديميين، والأقسام العلمية بجامعة الإمام.
@@ -178,7 +178,7 @@ export function EmailsPage() {
               }}
               className={`p-4 rounded-2xl border text-right transition-all duration-300 flex flex-col gap-1 w-full ${
                 selectedCollegeId === 'deanships'
-                  ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/50 text-amber-900 dark:text-amber-300 border-r-4 border-r-amber-500 shadow-xs'
+                  ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/50 text-[var(--color-imamu-accent)] dark:text-amber-300 border-r-4 border-r-amber-500 shadow-xs'
                   : 'bg-slate-50 dark:bg-zinc-900/40 border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800/60 hover:border-slate-300 dark:hover:border-zinc-700'
               }`}
             >
@@ -197,7 +197,7 @@ export function EmailsPage() {
                 }}
                 className={`p-4 rounded-2xl border text-right transition-all duration-300 flex flex-col gap-1 w-full ${
                   selectedCollegeId === college.id 
-                    ? (collegeThemes[college.id] || 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900/50 text-blue-900 dark:text-blue-300 border-r-4 border-r-blue-500 shadow-xs') 
+                    ? (collegeThemes[college.id] || 'bg-stone-50 dark:bg-stone-950/30 border-amber-200 dark:border-stone-900/50 text-stone-900 dark:text-[var(--color-imamu-accent)] border-r-4 border-r-amber-700 shadow-xs') 
                     : 'bg-slate-50 dark:bg-zinc-900/40 border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800/60 hover:border-slate-300 dark:hover:border-zinc-700'
                 }`}
               >
@@ -223,7 +223,7 @@ export function EmailsPage() {
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="ابحث عن قسم، مسؤول أو إيميل..."
-              className="w-full pr-11 pl-4 py-3 bg-white dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-700 rounded-2xl outline-none transition shadow-xs text-xs text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:border-blue-500 dark:focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+              className="w-full pr-11 pl-4 py-3 bg-white dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-700 rounded-2xl outline-none transition shadow-xs text-xs text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:border-[var(--color-imamu-brown)] dark:focus:border-[var(--color-imamu-brown)] focus:ring-2 focus:ring-[var(--color-imamu-brown)]/20"
             />
           </div>
 
@@ -276,7 +276,7 @@ export function EmailsPage() {
 
           {/* Quick Notice Tip */}
           <div className="bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 p-4 rounded-2xl flex gap-3 text-right">
-            <span className="text-amber-600 font-bold text-lg select-none">💡</span>
+            <span className="text-[var(--color-imamu-accent)] font-bold text-lg select-none">💡</span>
             <p className="text-[11px] text-slate-700 dark:text-zinc-300 leading-relaxed">
               <strong className="text-slate-900 dark:text-zinc-100">توجيه هام:</strong> يرجى مراسلة الكليات والعمادات باستخدام <strong className="text-slate-900 dark:text-zinc-100">بريدك الإلكتروني الجامعي الأكاديمي</strong> الرسمي لضمان الحصول على رد وتفادي تصنيف رسالتك كبريد غير هام.
             </p>

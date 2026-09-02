@@ -50,6 +50,7 @@ const SCHEMA_VERIFICATION_STATEMENTS = [
   `ALTER TABLE major_courses ADD COLUMN IF NOT EXISTS prereq text`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS student_email text`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS google_email text`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned boolean DEFAULT false`,
   `CREATE INDEX IF NOT EXISTS idx_users_user_name ON users(user_name)`,
   `ALTER TABLE course_resources ADD COLUMN IF NOT EXISTS drive_link text`,
   `ALTER TABLE course_resources ADD COLUMN IF NOT EXISTS box_link text`,
@@ -97,12 +98,28 @@ const SCHEMA_VERIFICATION_STATEMENTS = [
     category text,
     created_at timestamp DEFAULT now()
   )`,
+  `CREATE TABLE IF NOT EXISTS contributors (
+    id serial PRIMARY KEY,
+    name text NOT NULL,
+    role text NOT NULL,
+    category text DEFAULT 'other' NOT NULL,
+    photo_url text,
+    user_id text,
+    bio text,
+    social_links text,
+    linked_major text,
+    linked_tools text,
+    is_public boolean DEFAULT true,
+    display_order integer DEFAULT 0,
+    created_at timestamp DEFAULT now()
+  )`,
   `ALTER TABLE events ADD COLUMN IF NOT EXISTS is_holiday boolean DEFAULT false`,
   `ALTER TABLE events ADD COLUMN IF NOT EXISTS is_holiday_end boolean DEFAULT false`,
   `ALTER TABLE events ADD COLUMN IF NOT EXISTS is_semester_start boolean DEFAULT false`,
   `ALTER TABLE events ADD COLUMN IF NOT EXISTS is_semester_end boolean DEFAULT false`,
   `ALTER TABLE events ADD COLUMN IF NOT EXISTS is_eid boolean DEFAULT false`,
-  `ALTER TABLE events ADD COLUMN IF NOT EXISTS is_national_day boolean DEFAULT false`
+  `ALTER TABLE events ADD COLUMN IF NOT EXISTS is_national_day boolean DEFAULT false`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS admin_permissions text`
 ];
 
 

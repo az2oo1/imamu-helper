@@ -92,8 +92,8 @@ export function GpaCalculator() {
       <div className="p-6 sm:p-8 flex-1 border-b md:border-b-0 md:border-l border-slate-200/90 dark:border-zinc-800">
         <div className="mb-6 flex justify-between items-center">
           <div>
-            <h2 className="text-lg sm:text-xl font-display font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-2.5">
-              <div className="p-2 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900/50 rounded-xl text-blue-600 dark:text-blue-400">
+            <h2 className="text-lg sm:text-xl font-serif font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-2.5">
+              <div className="p-2 bg-stone-50 dark:bg-stone-950/50 border border-amber-200 dark:border-stone-900/50 rounded-xl text-[var(--color-imamu-accent)]">
                 <Calculator className="w-5 h-5" />
               </div>
               <span>مواد الفصل الدراسي</span>
@@ -127,7 +127,7 @@ export function GpaCalculator() {
                     placeholder={`مادة ${i + 1}`}
                     value={course.name}
                     onChange={e => updateCourse(course.id, 'name', e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 py-2.5 px-3.5 rounded-xl focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 focus:border-blue-600 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition"
+                    className="w-full bg-slate-50 dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 py-2.5 px-3.5 rounded-xl focus:ring-2 focus:ring-stone-100 dark:focus:ring-stone-900 focus:border-[var(--color-imamu-brown)] text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition"
                   />
                 </div>
                 <div className="col-span-3">
@@ -137,14 +137,14 @@ export function GpaCalculator() {
                     max="10"
                     value={course.credits}
                     onChange={e => updateCourse(course.id, 'credits', Number(e.target.value))}
-                    className="w-full bg-slate-50 dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 py-2.5 px-3 text-center rounded-xl focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 focus:border-blue-600 text-xs sm:text-sm text-slate-900 dark:text-white font-bold outline-none transition"
+                    className="w-full bg-slate-50 dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 py-2.5 px-3 text-center rounded-xl focus:ring-2 focus:ring-stone-100 dark:focus:ring-stone-900 focus:border-[var(--color-imamu-brown)] text-xs sm:text-sm text-slate-900 dark:text-white font-bold outline-none transition"
                   />
                 </div>
                 <div className="col-span-3">
                   <select
                     value={course.grade}
                     onChange={e => updateCourse(course.id, 'grade', e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 py-2.5 px-2 sm:px-3 text-center rounded-xl focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 focus:border-blue-600 text-xs sm:text-sm text-slate-900 dark:text-white font-bold outline-none cursor-pointer transition"
+                    className="w-full bg-slate-50 dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 py-2.5 px-2 sm:px-3 text-center rounded-xl focus:ring-2 focus:ring-stone-100 dark:focus:ring-stone-900 focus:border-[var(--color-imamu-brown)] text-xs sm:text-sm text-slate-900 dark:text-white font-bold outline-none cursor-pointer transition"
                   >
                     {GRADES.map(g => (
                       <option key={g} value={g} className="bg-white dark:bg-zinc-900 text-slate-900 dark:text-white">{g} ({GRADE_POINTS[g]})</option>
@@ -168,7 +168,7 @@ export function GpaCalculator() {
 
         <button 
           onClick={addCourse}
-          className="btn-rise w-full flex items-center justify-center gap-2 py-3.5 bg-blue-50/50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-400 font-bold text-xs rounded-2xl border border-dashed border-blue-200 dark:border-blue-900/60 transition cursor-pointer"
+          className="btn-rise w-full flex items-center justify-center gap-2 py-3.5 bg-stone-50/50 dark:bg-stone-950/30 hover:bg-stone-100 dark:hover:bg-stone-900/50 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] font-bold text-xs rounded-2xl border border-dashed border-amber-200 dark:border-stone-900/60 transition cursor-pointer"
         >
           <Plus className="w-4 h-4" /> إضافة مادة جديدة
         </button>
@@ -179,8 +179,8 @@ export function GpaCalculator() {
         <div className="w-full">
           {/* Prior GPA Settings */}
           <div className="w-full mb-6 pb-6 border-b border-slate-200 dark:border-zinc-800">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-3.5 flex items-center justify-center gap-1.5">
-              <Award className="w-4 h-4 text-blue-600 dark:text-blue-400" /> السجل الأكاديمي السابق
+            <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--color-imamu-accent)] mb-3.5 flex items-center justify-center gap-1.5">
+              <Award className="w-4 h-4 text-[var(--color-imamu-accent)]" /> السجل الأكاديمي السابق
             </h3>
             <div className="grid grid-cols-2 gap-2.5">
               <div>
@@ -188,7 +188,7 @@ export function GpaCalculator() {
                 <input 
                   type="number" step="0.01" min="0" max="5.0" placeholder="4.50"
                   value={prevGpa} onChange={e => setPrevGpa(e.target.value)}
-                  className="w-full bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-800 py-2 px-3 text-center rounded-xl text-sm text-slate-900 dark:text-white font-bold outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 focus:border-blue-600"
+                  className="w-full bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-800 py-2 px-3 text-center rounded-xl text-sm text-slate-900 dark:text-white font-bold outline-none focus:ring-2 focus:ring-stone-100 dark:focus:ring-stone-900 focus:border-[var(--color-imamu-brown)]"
                 />
               </div>
               <div>
@@ -196,7 +196,7 @@ export function GpaCalculator() {
                 <input 
                   type="number" min="0" placeholder="85"
                   value={prevHours} onChange={e => setPrevHours(e.target.value)}
-                  className="w-full bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-800 py-2 px-3 text-center rounded-xl text-sm text-slate-900 dark:text-white font-bold outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 focus:border-blue-600"
+                  className="w-full bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-800 py-2 px-3 text-center rounded-xl text-sm text-slate-900 dark:text-white font-bold outline-none focus:ring-2 focus:ring-stone-100 dark:focus:ring-stone-900 focus:border-[var(--color-imamu-brown)]"
                 />
               </div>
             </div>
@@ -206,7 +206,7 @@ export function GpaCalculator() {
           {/* Results Display */}
           <div className="text-center w-full py-2">
             <h3 className="text-xs font-bold text-slate-500 dark:text-zinc-400 mb-1">المعدل الفصلي</h3>
-            <div className="text-4xl sm:text-5xl font-display font-black text-blue-600 dark:text-blue-400 mb-1 tracking-tight">
+            <div className="text-4xl sm:text-5xl font-serif font-black text-[var(--color-imamu-accent)] mb-1 tracking-tight">
               <AnimatedNumber
                 value={parseFloat(calculations.semesterGpa)}
                 format={(val) => val.toFixed(2)}
@@ -218,14 +218,14 @@ export function GpaCalculator() {
 
             <div className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-2xs">
               <h3 className="text-xs font-bold text-slate-500 dark:text-zinc-400 mb-1">المعدل التراكمي المتوقع</h3>
-              <div className="text-2xl sm:text-3xl font-display font-black text-slate-900 dark:text-white mb-1">
+              <div className="text-2xl sm:text-3xl font-serif font-black text-slate-900 dark:text-white mb-1">
                 <AnimatedNumber
                   value={parseFloat(Number(prevHours) > 0 ? calculations.newCumulativeGpa : calculations.semesterGpa)}
                   format={(val) => val.toFixed(2)}
                 />
               </div>
               <p className="text-[11px] text-slate-500 dark:text-zinc-400 font-medium">
-                إجمالي <span className="text-blue-600 dark:text-blue-400 font-bold">{calculations.totalCredits}</span> ساعة أكاديمية
+                إجمالي <span className="text-[var(--color-imamu-accent)] font-bold">{calculations.totalCredits}</span> ساعة أكاديمية
               </p>
             </div>
           </div>

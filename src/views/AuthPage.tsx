@@ -356,19 +356,19 @@ export function AuthPage() {
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-            className="mx-auto h-14 w-14 bg-gradient-to-tr from-blue-50 to-indigo-50 dark:from-blue-950/80 dark:to-indigo-950/80 rounded-2xl flex items-center justify-center mb-3 border border-blue-100 dark:border-blue-900/50 text-blue-600 dark:text-blue-400 shadow-sm"
+            className="mx-auto h-14 w-14 bg-gradient-to-tr from-stone-50 to-indigo-50 dark:from-stone-950/80 dark:to-indigo-950/80 rounded-2xl flex items-center justify-center mb-3 border border-stone-100 dark:border-stone-900/50 text-[var(--color-imamu-accent)] shadow-sm"
           >
             {!isLogin ? (
-              signupStep === 4 ? <GraduationCap className="h-7 w-7 text-blue-600 dark:text-blue-400" /> :
-              signupStep === 3 ? <Sparkles className="h-7 w-7 text-blue-600 dark:text-blue-400" /> :
-              signupStep === 2 ? <Mail className="h-7 w-7 text-blue-600 dark:text-blue-400" /> :
-              <Lock className="h-7 w-7 text-blue-600 dark:text-blue-400" />
+              signupStep === 4 ? <GraduationCap className="h-7 w-7 text-[var(--color-imamu-accent)]" /> :
+              signupStep === 3 ? <Sparkles className="h-7 w-7 text-[var(--color-imamu-accent)]" /> :
+              signupStep === 2 ? <Mail className="h-7 w-7 text-[var(--color-imamu-accent)]" /> :
+              <Lock className="h-7 w-7 text-[var(--color-imamu-accent)]" />
             ) : (
-              <Lock className="h-7 w-7 text-blue-600 dark:text-blue-400" />
+              <Lock className="h-7 w-7 text-[var(--color-imamu-accent)]" />
             )}
           </motion.div>
           
-          <h2 className="text-2xl sm:text-3xl font-display font-bold text-slate-900 dark:text-white">
+          <h2 className="text-2xl sm:text-3xl font-serif font-bold text-slate-900 dark:text-white">
             {isForgotPassword ? 'إعادة ضبط كلمة المرور' : (isLogin ? 'مرحباً بعودتك' : 'إنشاء حساب جديد')}
           </h2>
 
@@ -392,8 +392,8 @@ export function AuthPage() {
                   <div 
                     key={stepNum}
                     className={`flex-1 h-2 rounded-full transition-all duration-300 ${
-                      isCompleted ? 'bg-blue-600 dark:bg-blue-500' :
-                      isActive ? 'bg-blue-600 dark:bg-blue-400 ring-2 ring-blue-500/20' :
+                      isCompleted ? 'bg-[var(--color-imamu-brown)] dark:bg-[var(--color-imamu-brown)]' :
+                      isActive ? 'bg-[var(--color-imamu-brown)] dark:bg-[var(--color-imamu-brown)] ring-2 ring-[var(--color-imamu-brown)/20]' :
                       'bg-slate-200 dark:bg-zinc-800'
                     }`}
                   />
@@ -410,11 +410,11 @@ export function AuthPage() {
                   <div 
                     key={step.num} 
                     className={`flex items-center gap-1 transition-colors ${
-                      isActive || isCompleted ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-zinc-500'
+                      isActive || isCompleted ? 'text-[var(--color-imamu-accent)]' : 'text-slate-500 dark:text-zinc-500'
                     }`}
                   >
                     {isCompleted ? (
-                      <Check className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 stroke-[3]" />
+                      <Check className="w-3.5 h-3.5 text-[var(--color-imamu-accent)] stroke-[3]" />
                     ) : (
                       <StepIcon className="w-3.5 h-3.5" />
                     )}
@@ -453,7 +453,7 @@ export function AuthPage() {
                   required
                   value={formData.email}
                   onChange={x => setFormData({ ...formData, email: x.target.value })}
-                  className="w-full pr-11 pl-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-600 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
+                  className="w-full pr-11 pl-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-[var(--color-imamu-brown)] text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
                   placeholder="44xxxxxxx@sm.imamu.edu.sa"
                   dir="ltr"
                 />
@@ -471,7 +471,7 @@ export function AuthPage() {
                     required
                     value={forgotCode}
                     onChange={x => setForgotCode(x.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-600 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-center font-mono text-lg tracking-widest"
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-[var(--color-imamu-brown)] text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-center font-mono text-lg tracking-widest"
                     placeholder="123456"
                   />
                 </div>
@@ -488,7 +488,7 @@ export function AuthPage() {
                       required
                       value={formData.password}
                       onChange={x => setFormData({ ...formData, password: x.target.value })}
-                      className="w-full pr-11 pl-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-600 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
+                      className="w-full pr-11 pl-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-[var(--color-imamu-brown)] text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
                       placeholder="••••••••"
                     />
                   </div>
@@ -506,7 +506,7 @@ export function AuthPage() {
                       required
                       value={repeatPassword}
                       onChange={x => setRepeatPassword(x.target.value)}
-                      className="w-full pr-11 pl-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-600 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
+                      className="w-full pr-11 pl-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-[var(--color-imamu-brown)] text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
                       placeholder="••••••••"
                     />
                   </div>
@@ -517,7 +517,7 @@ export function AuthPage() {
             <button
               type="submit"
               disabled={loadingAction}
-              className="btn-rise w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 shadow-sm font-bold transition disabled:opacity-50 cursor-pointer mt-4"
+              className="btn-rise w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl text-white bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] dark:bg-[var(--color-imamu-brown)] dark:hover:bg-[var(--color-imamu-brown-light)] shadow-sm font-bold transition disabled:opacity-50 cursor-pointer mt-4"
             >
               {loadingAction ? <Loader2 className="w-5 h-5 animate-spin" /> : (forgotCodeSent ? 'إعادة ضبط كلمة المرور' : 'إرسال رمز التحقق')}
             </button>
@@ -540,7 +540,7 @@ export function AuthPage() {
                   required
                   value={formData.email}
                   onChange={x => setFormData({ ...formData, email: x.target.value })}
-                  className="w-full pr-11 pl-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-600 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
+                  className="w-full pr-11 pl-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-[var(--color-imamu-brown)] text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
                   placeholder="44xxxxxxx@sm.imamu.edu.sa"
                   dir="ltr"
                 />
@@ -560,7 +560,7 @@ export function AuthPage() {
                   required
                   value={formData.password}
                   onChange={x => setFormData({ ...formData, password: x.target.value })}
-                  className="w-full pr-11 pl-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-600 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
+                  className="w-full pr-11 pl-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-[var(--color-imamu-brown)] text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
                   placeholder="••••••••"
                 />
               </div>
@@ -570,7 +570,7 @@ export function AuthPage() {
               <button 
                 type="button" 
                 onClick={() => { setIsForgotPassword(true); setError(''); setForgotCodeSent(false); }}
-                className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                className="text-sm font-medium text-[var(--color-imamu-accent)] hover:underline cursor-pointer"
               >
                 نسيت كلمة المرور؟
               </button>
@@ -579,7 +579,7 @@ export function AuthPage() {
             <button
               type="submit"
               disabled={loadingAction}
-              className="btn-rise w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 shadow-sm font-bold transition disabled:opacity-50 cursor-pointer mt-4"
+              className="btn-rise w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl text-white bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] dark:bg-[var(--color-imamu-brown)] dark:hover:bg-[var(--color-imamu-brown-light)] shadow-sm font-bold transition disabled:opacity-50 cursor-pointer mt-4"
             >
               {loadingAction ? <Loader2 className="w-5 h-5 animate-spin" /> : 'تسجيل الدخول'}
             </button>
@@ -613,7 +613,7 @@ export function AuthPage() {
                         required
                         value={formData.email}
                         onChange={x => setFormData({ ...formData, email: x.target.value })}
-                        className="w-full pr-11 pl-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-600 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
+                        className="w-full pr-11 pl-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-[var(--color-imamu-brown)] text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
                         placeholder="44xxxxxxx@sm.imamu.edu.sa"
                         dir="ltr"
                       />
@@ -633,7 +633,7 @@ export function AuthPage() {
                         required
                         value={formData.password}
                         onChange={x => setFormData({ ...formData, password: x.target.value })}
-                        className="w-full pr-11 pl-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-600 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
+                        className="w-full pr-11 pl-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-[var(--color-imamu-brown)] text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
                         placeholder="••••••••"
                       />
                     </div>
@@ -652,7 +652,7 @@ export function AuthPage() {
                         required
                         value={formData.confirmPassword}
                         onChange={x => setFormData({ ...formData, confirmPassword: x.target.value })}
-                        className="w-full pr-11 pl-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-600 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
+                        className="w-full pr-11 pl-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-[var(--color-imamu-brown)] text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
                         placeholder="••••••••"
                       />
                     </div>
@@ -662,7 +662,7 @@ export function AuthPage() {
                     type="button"
                     onClick={handleNextStep1}
                     disabled={loadingAction}
-                    className="btn-rise w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 shadow-sm font-bold transition disabled:opacity-50 cursor-pointer mt-5"
+                    className="btn-rise w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl text-white bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] dark:bg-[var(--color-imamu-brown)] dark:hover:bg-[var(--color-imamu-brown-light)] shadow-sm font-bold transition disabled:opacity-50 cursor-pointer mt-5"
                   >
                     {loadingAction ? <Loader2 className="w-5 h-5 animate-spin" /> : (
                       <>
@@ -704,7 +704,7 @@ export function AuthPage() {
                           onChange={e => handleOtpChange(idx, e.target.value)}
                           onKeyDown={e => handleOtpKeyDown(idx, e)}
                           onPaste={handleOtpPaste}
-                          className="w-10 h-12 sm:w-12 sm:h-14 text-center text-xl font-bold font-mono bg-slate-50 dark:bg-zinc-950 border-2 border-slate-200 dark:border-zinc-800 rounded-xl focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 text-slate-900 dark:text-white outline-none transition"
+                          className="w-10 h-12 sm:w-12 sm:h-14 text-center text-xl font-bold font-mono bg-slate-50 dark:bg-zinc-950 border-2 border-slate-200 dark:border-zinc-800 rounded-xl focus:border-[var(--color-imamu-brown)] focus:ring-2 focus:ring-[var(--color-imamu-brown)]/20 text-slate-900 dark:text-white outline-none transition"
                         />
                       ))}
                     </div>
@@ -715,7 +715,7 @@ export function AuthPage() {
                       type="button"
                       onClick={handleSendCode}
                       disabled={loadingAction}
-                      className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                      className="text-xs font-bold text-[var(--color-imamu-accent)] hover:underline cursor-pointer"
                     >
                       {loadingAction ? 'جاري إعادة الإرسال...' : 'إعادة إرسال رمز التحقق'}
                     </button>
@@ -734,7 +734,7 @@ export function AuthPage() {
                     <button
                       type="button"
                       onClick={handleNextStep2}
-                      className="flex-2 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition shadow-sm cursor-pointer flex items-center justify-center gap-1"
+                      className="flex-2 py-3 px-4 rounded-xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white font-bold transition shadow-sm cursor-pointer flex items-center justify-center gap-1"
                     >
                       <span>المتابعة</span>
                       <ChevronLeft className="w-4 h-4" />
@@ -756,7 +756,7 @@ export function AuthPage() {
                   {/* Card 1: البيانات الشخصية */}
                   <div className="bg-slate-50/70 dark:bg-zinc-950/70 p-4 rounded-2xl border border-slate-200/80 dark:border-zinc-800/80 space-y-3.5">
                     <div className="flex items-center gap-2 pb-1.5 border-b border-slate-200/60 dark:border-zinc-800/80">
-                      <div className="p-1 rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
+                      <div className="p-1 rounded-lg bg-stone-100 dark:bg-stone-950 text-[var(--color-imamu-accent)]">
                         <User className="w-4 h-4" />
                       </div>
                       <h4 className="text-xs font-bold text-slate-900 dark:text-white">البيانات الشخصية</h4>
@@ -776,7 +776,7 @@ export function AuthPage() {
                           required
                           value={formData.userName}
                           onChange={x => setFormData({ ...formData, userName: x.target.value })}
-                          className="w-full pr-10 pl-4 py-2.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-600 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
+                          className="w-full pr-10 pl-4 py-2.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-[var(--color-imamu-brown)] text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
                           placeholder="أحمد محمد"
                         />
                       </div>
@@ -796,7 +796,7 @@ export function AuthPage() {
                           required
                           value={formData.phone}
                           onChange={x => setFormData({ ...formData, phone: x.target.value })}
-                          className="w-full pr-10 pl-4 py-2.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-600 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
+                          className="w-full pr-10 pl-4 py-2.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-[var(--color-imamu-brown)] text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
                           placeholder="05XXXXXXXX"
                           dir="ltr"
                         />
@@ -825,7 +825,7 @@ export function AuthPage() {
                         <select
                           value={formData.major}
                           onChange={x => setFormData({ ...formData, major: x.target.value })}
-                          className="w-full pr-10 pl-4 py-2.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-600 text-sm text-slate-900 dark:text-white outline-none transition text-right cursor-pointer"
+                          className="w-full pr-10 pl-4 py-2.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-[var(--color-imamu-brown)] text-sm text-slate-900 dark:text-white outline-none transition text-right cursor-pointer"
                         >
                           <option value="" className="dark:bg-zinc-900">اختر التخصص (اختياري)...</option>
                           {majorsList.map(m => (
@@ -851,7 +851,7 @@ export function AuthPage() {
                           max="5.0"
                           value={formData.currentGpa}
                           onChange={x => setFormData({ ...formData, currentGpa: x.target.value })}
-                          className="w-full pr-10 pl-4 py-2.5 font-mono bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-600 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
+                          className="w-full pr-10 pl-4 py-2.5 font-mono bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-[var(--color-imamu-brown)] text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none transition text-right"
                           placeholder="مثال 4.5"
                           dir="ltr"
                         />
@@ -873,7 +873,7 @@ export function AuthPage() {
                       type="button"
                       onClick={handleNextStep3}
                       disabled={loadingAction || loadingData}
-                      className="flex-2 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition shadow-sm cursor-pointer flex items-center justify-center gap-1 disabled:opacity-50"
+                      className="flex-2 py-3 px-4 rounded-xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white font-bold transition shadow-sm cursor-pointer flex items-center justify-center gap-1 disabled:opacity-50"
                     >
                       {loadingAction ? <Loader2 className="w-5 h-5 animate-spin" /> : (
                         formData.major ? (
@@ -933,7 +933,7 @@ export function AuthPage() {
                             className={`p-3 rounded-xl border transition-all duration-200 flex items-center justify-between cursor-pointer select-none ${
                               isChecked
                                 ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-400 dark:border-emerald-700'
-                                : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 hover:border-blue-400'
+                                : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 hover:border-amber-700'
                             }`}
                           >
                             <div className="flex items-center gap-2">
@@ -944,7 +944,7 @@ export function AuthPage() {
                               </div>
                               <div className="text-right">
                                 <span className="font-bold text-xs text-slate-900 dark:text-white block">{s.name}</span>
-                                <span className="font-mono text-[10px] text-blue-600 dark:text-blue-400">{s.code} ({s.creditHours || 3} ساعات)</span>
+                                <span className="font-mono text-[10px] text-[var(--color-imamu-accent)]">{s.code} ({s.creditHours || 3} ساعات)</span>
                               </div>
                             </div>
                           </div>
@@ -1000,7 +1000,7 @@ export function AuthPage() {
               }
               setError('');
             }}
-            className="text-blue-600 dark:text-blue-400 font-bold hover:underline cursor-pointer"
+            className="text-[var(--color-imamu-accent)] font-bold hover:underline cursor-pointer"
           >
             {isForgotPassword ? 'تسجيل الدخول' : (isLogin ? 'إنشاء حساب' : 'تسجيل الدخول')}
           </button>

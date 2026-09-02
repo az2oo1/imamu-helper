@@ -6,7 +6,8 @@ import { eq, desc, or, sql } from 'drizzle-orm';
 import { 
   users, majors, subjects, course_resources, events, news, majorCourses, 
   news_sources, global_settings, tutorial_sections, tutorials, tutorial_feedback, 
-  activity_logs, newbie_links, tools, newsLikes, newsComments
+  activity_logs, newbie_links, tools, newsLikes, newsComments, tutorial_comments,
+  contributors
 } from '../../db/schema';
 import { requireAuth, AuthRequest } from '../../middleware/auth';
 import { matchId } from '../../lib/auth-utils';
@@ -17,6 +18,7 @@ import { importMsariData } from '../services/msari';
 import { extractTelegramChannelPosts } from '../services/telegram';
 import { syncExternalImagesToStorage } from '../services/seed';
 import { calculateMokafaaDate, formatDate, parseDate } from '../../lib/date-utils';
+import { logEvent } from '../../lib/logger';
 
 import { getDb } from '../../db/index';
 
@@ -252,7 +254,7 @@ export function createAdminRouter(db: any) {
         userList = await db.select().from(users).orderBy(desc(users.id));
       }
       res.json(userList.map((u: any) => {
-        const { passwordHash, ...sanitized } = u;
+        const { passwordHash, currentGpa, ...sanitized } = u; // Omit GPA from user list as well
         return sanitized;
       }));
     } catch (e) {
@@ -262,13 +264,102 @@ export function createAdminRouter(db: any) {
   };
   router.get("/admin/users", requireAuth, getUsersHandler as any);
 
-  // Toggle Admin Status
-  const toggleAdminHandler = async (req: AuthRequest, res: express.Response): Promise<any> => {
+  // Get User Details (Without GPA, including activity & interactions)
+  router.get("/admin/users/:id/details", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Admin only" });
     try {
       const idParam = req.params.id;
       const condition = or(
-        sql`${users.id}::text = ${idParam}`,
+        matchId(users.id, idParam),
+        eq(users.uid, idParam),
+        eq(users.email, idParam)
+      );
+      const userList = await db.select().from(users).where(condition);
+      const targetUser = userList[0];
+
+      if (!targetUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Fetch user comments & likes
+      const nComments = await db.select().from(newsComments).where(eq(newsComments.userId, targetUser.uid));
+      const tComments = await db.select().from(tutorial_comments).where(eq(tutorial_comments.userId, targetUser.uid));
+      const nLikes = await db.select().from(newsLikes).where(eq(newsLikes.userId, targetUser.uid));
+
+      // Explicitly omit GPA and Password Hash!
+      const { passwordHash, currentGpa, ...sanitizedUser } = targetUser;
+
+      res.json({
+        user: sanitizedUser,
+        stats: {
+          commentsCount: nComments.length + tComments.length,
+          likesCount: nLikes.length,
+        },
+        comments: [
+          ...nComments.map(c => ({ id: c.id, content: c.content, category: 'أخبار', createdAt: c.createdAt })),
+          ...tComments.map(c => ({ id: c.id, content: c.content, category: 'شروحات', createdAt: c.createdAt })),
+        ],
+        likesCount: nLikes.length
+      });
+    } catch (e: any) {
+      console.error("[Get User Details Error]", e);
+      res.status(500).json({ error: "Failed to fetch user details" });
+    }
+  });
+
+  // Toggle Ban Status
+  router.put("/admin/users/:id/toggle-ban", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Admin only" });
+    try {
+      const idParam = req.params.id;
+      const condition = or(
+        matchId(users.id, idParam),
+        eq(users.uid, idParam),
+        eq(users.email, idParam)
+      );
+      const userList = await db.select().from(users).where(condition);
+      const targetUser = userList[0];
+
+      if (!targetUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      if (req.user?.uid && targetUser.uid === req.user.uid) {
+        return res.status(400).json({ error: "Cannot ban your own admin account" });
+      }
+
+      const newIsBanned = !targetUser.isBanned;
+      const [updated] = await db.update(users)
+        .set({ isBanned: newIsBanned })
+        .where(condition)
+        .returning();
+
+      await logEvent({
+        level: 'admin',
+        category: 'ADMIN',
+        action: newIsBanned ? 'BAN_USER' : 'UNBAN_USER',
+        message: `قام المسؤول (${req.user?.email || 'الأدمن'}) بـ ${newIsBanned ? 'حظر' : 'إلغاء حظر'} حساب المستخدم (${targetUser.userName || targetUser.email})`,
+        userId: req.user?.uid,
+        userEmail: req.user?.email,
+        metadata: { targetUserId: targetUser.uid, targetUserEmail: targetUser.email, isBanned: newIsBanned }
+      });
+
+      const { passwordHash, currentGpa, ...sanitized } = updated;
+      res.json({ success: true, user: sanitized });
+    } catch (e: any) {
+      console.error("[Toggle Ban Error]", e);
+      res.status(500).json({ error: "Failed to update user ban status" });
+    }
+  });
+
+  // Toggle Admin Status with optional permissions list
+  const toggleAdminHandler = async (req: AuthRequest, res: express.Response): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Admin only" });
+    try {
+      const idParam = req.params.id;
+      const { permissions } = req.body;
+      const condition = or(
+        matchId(users.id, idParam),
         eq(users.uid, idParam),
         eq(users.email, idParam)
       );
@@ -280,10 +371,22 @@ export function createAdminRouter(db: any) {
       }
 
       const newIsAdmin = !targetUser.isAdmin;
+      const permString = newIsAdmin ? (Array.isArray(permissions) ? JSON.stringify(permissions) : targetUser.adminPermissions || null) : null;
+
       const [updated] = await db.update(users)
-        .set({ isAdmin: newIsAdmin })
+        .set({ isAdmin: newIsAdmin, adminPermissions: permString })
         .where(condition)
         .returning();
+
+      await logEvent({
+        level: 'admin',
+        category: 'ADMIN',
+        action: newIsAdmin ? 'GRANT_ADMIN' : 'REVOKE_ADMIN',
+        message: `قام المسؤول (${req.user?.email || 'الأدمن'}) بـ ${newIsAdmin ? 'منح' : 'سحب'} صلاحيات المسؤول للمستخدم (${targetUser.userName || targetUser.email})${newIsAdmin && Array.isArray(permissions) ? ` بالصلاحيات: [${permissions.join(', ')}]` : ''}`,
+        userId: req.user?.uid,
+        userEmail: req.user?.email,
+        metadata: { targetUserId: targetUser.uid, targetUserEmail: targetUser.email, isAdmin: newIsAdmin, permissions }
+      });
 
       const { passwordHash, ...sanitized } = updated;
       res.json({ success: true, user: sanitized });
@@ -294,13 +397,58 @@ export function createAdminRouter(db: any) {
   };
   router.put("/admin/users/:id/toggle-admin", requireAuth, toggleAdminHandler as any);
 
+  // Update Admin Permissions
+  router.put("/admin/users/:id/permissions", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Admin only" });
+    try {
+      const idParam = req.params.id;
+      const { permissions } = req.body;
+      if (!Array.isArray(permissions)) {
+        return res.status(400).json({ error: "Permissions must be an array" });
+      }
+      const condition = or(
+        matchId(users.id, idParam),
+        eq(users.uid, idParam),
+        eq(users.email, idParam)
+      );
+      const userList = await db.select().from(users).where(condition);
+      const targetUser = userList[0];
+
+      if (!targetUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const permString = JSON.stringify(permissions);
+      const [updated] = await db.update(users)
+        .set({ isAdmin: true, adminPermissions: permString })
+        .where(condition)
+        .returning();
+
+      await logEvent({
+        level: 'admin',
+        category: 'ADMIN',
+        action: 'UPDATE_ADMIN_PERMISSIONS',
+        message: `قام المسؤول (${req.user?.email || 'الأدمن'}) بتحديث صلاحيات المسؤول للمستخدم (${targetUser.userName || targetUser.email}) إلى: [${permissions.join(', ')}]`,
+        userId: req.user?.uid,
+        userEmail: req.user?.email,
+        metadata: { targetUserId: targetUser.uid, targetUserEmail: targetUser.email, permissions }
+      });
+
+      const { passwordHash, ...sanitized } = updated;
+      res.json({ success: true, user: sanitized });
+    } catch (e: any) {
+      console.error("[Update Permissions Error]", e);
+      res.status(500).json({ error: "Failed to update admin permissions" });
+    }
+  });
+
   // Delete User
   const deleteUserHandler = async (req: AuthRequest, res: express.Response): Promise<any> => {
     if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Admin only" });
     try {
       const idParam = req.params.id;
       const condition = or(
-        sql`${users.id}::text = ${idParam}`,
+        matchId(users.id, idParam),
         eq(users.uid, idParam),
         eq(users.email, idParam)
       );
@@ -316,6 +464,17 @@ export function createAdminRouter(db: any) {
       }
 
       await db.delete(users).where(condition);
+
+      await logEvent({
+        level: 'admin',
+        category: 'ADMIN',
+        action: 'DELETE_USER',
+        message: `قام المسؤول (${req.user?.email || 'الأدمن'}) بحذف حساب المستخدم (${targetUser.userName || targetUser.email}) نهائياً`,
+        userId: req.user?.uid,
+        userEmail: req.user?.email,
+        metadata: { targetUserId: targetUser.uid, targetUserEmail: targetUser.email }
+      });
+
       res.json({ success: true, message: "User deleted successfully" });
     } catch (e: any) {
       console.error("[Delete User Error]", e);
@@ -330,7 +489,7 @@ export function createAdminRouter(db: any) {
     try {
       const idParam = req.params.id;
       const condition = or(
-        sql`${users.id}::text = ${idParam}`,
+        matchId(users.id, idParam),
         eq(users.uid, idParam),
         eq(users.email, idParam)
       );
@@ -1269,6 +1428,134 @@ export function createAdminRouter(db: any) {
     }
   };
   router.delete("/admin/tools/:id", requireAuth, deleteToolHandler as any);
+
+  // ============================================================================
+  // ADMIN: CONTRIBUTORS MANAGEMENT
+  // ============================================================================
+  router.get('/admin/contributors', requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: 'Admin only' });
+    try {
+      const records = await db.select().from(contributors).orderBy(contributors.displayOrder, contributors.id);
+      res.json(records);
+    } catch (e: any) {
+      console.error(e);
+      res.status(500).json({ error: 'Failed to fetch admin contributors' });
+    }
+  });
+
+  router.post('/admin/contributors', requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: 'Admin only' });
+    try {
+      const { 
+        name, role, category, photoUrl, userId, bio, 
+        socialLinks, linkedMajor, linkedTools, isPublic, displayOrder 
+      } = req.body;
+
+      if (!name || !role) {
+        return res.status(400).json({ error: 'الاسم والمسمى الوظيفي مطلوبان' });
+      }
+
+      const socialStr = socialLinks ? (typeof socialLinks === 'string' ? socialLinks : JSON.stringify(socialLinks)) : null;
+      const toolsStr = linkedTools ? (typeof linkedTools === 'string' ? linkedTools : JSON.stringify(linkedTools)) : null;
+
+      const [newContr] = await db.insert(contributors).values({
+        name: name.trim(),
+        role: role.trim(),
+        category: category || 'other',
+        photoUrl: photoUrl || '',
+        userId: userId ? String(userId).trim() : null,
+        bio: bio ? bio.trim() : null,
+        socialLinks: socialStr,
+        linkedMajor: linkedMajor ? linkedMajor.trim() : null,
+        linkedTools: toolsStr,
+        isPublic: isPublic !== undefined ? Boolean(isPublic) : true,
+        displayOrder: displayOrder ? Number(displayOrder) : 0
+      }).returning();
+
+      await logEvent({
+        level: 'admin',
+        category: 'ADMIN',
+        action: 'CREATE_CONTRIBUTOR',
+        message: `قام المسؤول (${req.user?.email}) بإضافة المساهم الجديد (${name}) بمسمى (${role})`,
+        userId: req.user?.uid,
+        userEmail: req.user?.email,
+        metadata: { contributorId: newContr.id, name, role }
+      });
+
+      res.json(newContr);
+    } catch (e: any) {
+      console.error('[Create Contributor Error]', e);
+      res.status(500).json({ error: 'Failed to create contributor' });
+    }
+  });
+
+  router.put('/admin/contributors/:id', requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: 'Admin only' });
+    try {
+      const id = req.params.id;
+      const { 
+        name, role, category, photoUrl, userId, bio, 
+        socialLinks, linkedMajor, linkedTools, isPublic, displayOrder 
+      } = req.body;
+
+      const updateData: any = {};
+      if (name !== undefined) updateData.name = name.trim();
+      if (role !== undefined) updateData.role = role.trim();
+      if (category !== undefined) updateData.category = category;
+      if (photoUrl !== undefined) updateData.photoUrl = photoUrl;
+      if (userId !== undefined) updateData.userId = userId ? String(userId).trim() : null;
+      if (bio !== undefined) updateData.bio = bio ? bio.trim() : null;
+      if (socialLinks !== undefined) updateData.socialLinks = typeof socialLinks === 'string' ? socialLinks : JSON.stringify(socialLinks);
+      if (linkedMajor !== undefined) updateData.linkedMajor = linkedMajor ? linkedMajor.trim() : null;
+      if (linkedTools !== undefined) updateData.linkedTools = typeof linkedTools === 'string' ? linkedTools : JSON.stringify(linkedTools);
+      if (isPublic !== undefined) updateData.isPublic = Boolean(isPublic);
+      if (displayOrder !== undefined) updateData.displayOrder = Number(displayOrder);
+
+      const [updated] = await db.update(contributors).set(updateData).where(matchId(contributors.id, id)).returning();
+      if (!updated) return res.status(404).json({ error: 'Contributor not found' });
+
+      await logEvent({
+        level: 'admin',
+        category: 'ADMIN',
+        action: 'UPDATE_CONTRIBUTOR',
+        message: `قام المسؤول (${req.user?.email}) بتحديث بيانات المساهم (${updated.name})`,
+        userId: req.user?.uid,
+        userEmail: req.user?.email,
+        metadata: { contributorId: updated.id, name: updated.name }
+      });
+
+      res.json(updated);
+    } catch (e: any) {
+      console.error('[Update Contributor Error]', e);
+      res.status(500).json({ error: 'Failed to update contributor' });
+    }
+  });
+
+  router.delete('/admin/contributors/:id', requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: 'Admin only' });
+    try {
+      const id = req.params.id;
+      const target = await db.select().from(contributors).where(matchId(contributors.id, id));
+      if (target.length === 0) return res.status(404).json({ error: 'Contributor not found' });
+
+      await db.delete(contributors).where(matchId(contributors.id, id));
+
+      await logEvent({
+        level: 'admin',
+        category: 'ADMIN',
+        action: 'DELETE_CONTRIBUTOR',
+        message: `قام المسؤول (${req.user?.email}) بحذف المساهم (${target[0].name}) نهائياً`,
+        userId: req.user?.uid,
+        userEmail: req.user?.email,
+        metadata: { contributorId: id, name: target[0].name }
+      });
+
+      res.json({ success: true, message: 'Contributor deleted successfully' });
+    } catch (e: any) {
+      console.error('[Delete Contributor Error]', e);
+      res.status(500).json({ error: 'Failed to delete contributor' });
+    }
+  });
 
   return router;
 }

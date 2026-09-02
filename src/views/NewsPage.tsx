@@ -187,10 +187,10 @@ export function NewsPage() {
       
       {/* Page Header */}
       <div className="mb-8 relative z-10">
-        <span className="text-xs sm:text-sm font-semibold tracking-widest text-blue-600 dark:text-blue-400 uppercase mb-2 block">
+        <span className="text-xs sm:text-sm font-semibold tracking-widest text-[var(--color-imamu-accent)] uppercase mb-2 block">
           التحديثات والإعلانات الرسمية
         </span>
-        <h1 className="text-3xl sm:text-4xl font-display font-bold tracking-tight text-slate-900 dark:text-white mb-2">أخبار وحسابات جامعة الإمام</h1>
+        <h1 className="text-3xl sm:text-4xl font-serif font-bold tracking-tight text-slate-900 dark:text-white mb-2">أخبار وحسابات جامعة الإمام</h1>
         <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-xl">
           آخر التحديثات والأخبار الأكاديمية والفعاليات مباشرة من قنوات الحسابات الرسمية بالجامعة.
         </p>
@@ -204,7 +204,7 @@ export function NewsPage() {
               
               <div className={`${(featuredItem.videoUrl || (featuredItem.imageUrl && isFeaturedImageValid)) ? 'lg:col-span-7' : 'lg:col-span-12'} flex flex-col items-start text-right order-2 lg:order-1`}>
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 text-xs font-bold border border-blue-200 dark:border-blue-900/50">
+                  <span className="px-3 py-1 rounded-full bg-stone-50 dark:bg-stone-950/50 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] text-xs font-bold border border-amber-200 dark:border-stone-900/50">
                     أبرز التحديثات
                   </span>
                   <span className="text-xs text-slate-400 dark:text-zinc-500 flex items-center gap-1">
@@ -215,7 +215,7 @@ export function NewsPage() {
 
                 <h2 
                   onClick={() => setSelectedNews(featuredItem)}
-                  className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-3 leading-snug cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                  className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-3 leading-snug cursor-pointer hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)] transition-colors"
                 >
                   {featuredItem.title}
                 </h2>
@@ -233,9 +233,14 @@ export function NewsPage() {
 
                 <div className="flex items-center justify-between w-full border-t border-slate-100 dark:border-zinc-800 pt-4 mt-auto">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-zinc-800 flex items-center justify-center font-bold text-xs text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 overflow-hidden">
+                    <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 flex items-center justify-center font-bold text-xs text-slate-700 dark:text-zinc-300 overflow-hidden shrink-0">
                       {featuredItem.authorAvatar ? (
-                        <img src={featuredItem.authorAvatar} alt="" className="w-full h-full rounded-full object-cover" />
+                        <img 
+                          src={featuredItem.authorAvatar} 
+                          alt={featuredItem.author} 
+                          className="w-full h-full rounded-full object-cover"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
                       ) : (
                         featuredItem.author.charAt(0)
                       )}
@@ -257,9 +262,9 @@ export function NewsPage() {
                     
                     <button 
                       onClick={() => setSelectedNews(featuredItem)}
-                      className="flex items-center gap-1.5 hover:text-blue-600 transition"
+                      className="flex items-center gap-1.5 hover:text-[var(--color-imamu-accent)] transition"
                     >
-                      <MessageSquare className="w-4 h-4 text-blue-500" />
+                      <MessageSquare className="w-4 h-4 text-[var(--color-imamu-accent)]" />
                       <span>{featuredItem.commentsCount ?? 0}</span>
                     </button>
                   </div>
@@ -312,14 +317,19 @@ export function NewsPage() {
             <SpotlightCard
               key={item.id}
               onClick={() => setSelectedNews(item)}
-              className="break-inside-avoid inline-block w-full cursor-pointer border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 hover:border-blue-500/40 transition duration-200 shadow-2xs"
+              className="break-inside-avoid inline-block w-full cursor-pointer border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 hover:border-amber-700/40 transition duration-200 shadow-2xs"
             >
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 flex items-center justify-center font-bold text-xs text-slate-700 dark:text-zinc-300 overflow-hidden">
+                    <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 flex items-center justify-center font-bold text-xs text-slate-700 dark:text-zinc-300 overflow-hidden shrink-0">
                       {item.authorAvatar ? (
-                        <img src={item.authorAvatar} alt="" className="w-full h-full object-cover" />
+                        <img 
+                          src={item.authorAvatar} 
+                          alt={item.author} 
+                          className="w-full h-full rounded-full object-cover"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
                       ) : (
                         item.author.charAt(0)
                       )}
@@ -373,9 +383,9 @@ export function NewsPage() {
                       e.stopPropagation();
                       setSelectedNews(item);
                     }}
-                    className="flex items-center gap-1 hover:text-blue-600 transition"
+                    className="flex items-center gap-1 hover:text-[var(--color-imamu-accent)] transition"
                   >
-                    <MessageSquare className="w-4 h-4 text-blue-500" />
+                    <MessageSquare className="w-4 h-4 text-[var(--color-imamu-accent)]" />
                     <span>{item.commentsCount ?? 0}</span>
                   </button>
 

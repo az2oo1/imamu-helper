@@ -98,7 +98,7 @@ export default function ResourceLinksInput({ label, value, onChange, color, show
           type="button" 
           onClick={addLink}
           className={`text-xs font-bold flex items-center gap-1 transition cursor-pointer hover:scale-[1.03] active:scale-95 ${
-            isPaidColor ? 'text-amber-600 hover:text-amber-500 dark:text-amber-400' : 'text-blue-600 hover:text-blue-500 dark:text-blue-400'
+            isPaidColor ? 'text-amber-600 hover:text-amber-500 dark:text-amber-400' : 'text-emerald-600 hover:text-emerald-500 dark:text-emerald-400'
           }`}
         >
           <Plus className="w-3.5 h-3.5" />
@@ -143,7 +143,7 @@ export default function ResourceLinksInput({ label, value, onChange, color, show
                     className={`w-full py-2.5 px-3 rounded-xl text-xs border outline-none transition ${
                       isNameEmpty 
                         ? 'border-red-500 bg-red-50/60 dark:bg-red-950/30 text-red-900 dark:text-red-200 focus:ring-1 focus:ring-red-500' 
-                        : 'focus:border-blue-500'
+                        : 'focus:border-[var(--color-imamu-brown)]'
                     }`}
                     style={!isNameEmpty ? { background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' } : {}}
                   />
@@ -164,7 +164,7 @@ export default function ResourceLinksInput({ label, value, onChange, color, show
                     className={`w-full py-2.5 px-3 rounded-xl text-xs border outline-none transition font-mono ${
                       isUrlEmpty 
                         ? 'border-red-500 bg-red-50/60 dark:bg-red-950/30 text-red-900 dark:text-red-200 focus:ring-1 focus:ring-red-500' 
-                        : 'focus:border-blue-500'
+                        : 'focus:border-[var(--color-imamu-brown)]'
                     }`}
                     style={!isUrlEmpty ? { background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' } : {}}
                   />
@@ -183,7 +183,7 @@ export default function ResourceLinksInput({ label, value, onChange, color, show
                       placeholder="كود الخصم (اختياري)"
                       value={link.code || ''}
                       onChange={e => updateLink(i, 'code', e.target.value)}
-                      className="w-full py-2.5 px-3 rounded-xl text-xs border outline-none transition font-mono font-bold uppercase text-amber-900 dark:text-amber-200 bg-amber-50/50 dark:bg-amber-950/20 border-amber-200/80 dark:border-amber-900/60 focus:border-amber-400 placeholder-amber-400/60 dark:placeholder-amber-600/60"
+                      className="w-full py-2.5 px-3 rounded-xl text-xs border outline-none transition font-mono font-bold uppercase text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] bg-amber-50/50 dark:bg-amber-950/20 border-amber-200/80 dark:border-amber-900/60 focus:border-amber-400 placeholder-amber-400/60 dark:placeholder-amber-600/60"
                       dir="ltr"
                     />
                   </div>

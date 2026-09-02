@@ -44,7 +44,7 @@ export default function CreateCourseModal({
         {/* Header */}
         <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-color)' }}>
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500 border border-blue-500/20">
+            <div className="p-2 rounded-xl bg-[var(--color-imamu-brown)/10] text-[var(--color-imamu-accent)] border border-amber-700/20">
               <BookOpen className="w-5 h-5" />
             </div>
             <div>
@@ -143,7 +143,7 @@ export default function CreateCourseModal({
               onSave();
               onClose();
             }}
-            className="px-5 py-2 rounded-xl text-xs font-bold bg-[var(--color-imamu-blue)] text-white hover:bg-[var(--color-imamu-blue-light)] transition flex items-center gap-1.5 shadow-md"
+            className="px-5 py-2 rounded-xl text-xs font-bold bg-[var(--color-imamu-brown)] text-white hover:bg-[var(--color-imamu-brown-light)] transition flex items-center gap-1.5 shadow-md"
           >
             <Check className="w-4 h-4" />
             <span>{isEditing ? 'Save Changes' : 'Create Course'}</span>

@@ -42,18 +42,17 @@ export function TopBar() {
             </button>
 
             {/* Brand Logo */}
-            <Link href="/" className="flex items-center gap-3 group">
-              <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-600/20 group-hover:scale-105 transition-transform duration-200">
-                <GraduationCap className="h-5 w-5 text-white" />
-              </div>
-              <div className="flex flex-col">
-                <span className="font-display font-extrabold text-lg text-slate-900 dark:text-white tracking-tight leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                  مساعد الإمام
-                </span>
-                <span className="text-[10px] text-slate-500 dark:text-zinc-400 font-semibold -mt-0.5 hidden sm:inline">
-                  منصة طلابية مستقلة
-                </span>
-              </div>
+            <Link href="/" className="flex items-center group shrink-0 py-1">
+              <img 
+                src="/logo_dark.png" 
+                alt="مساعد الإمام" 
+                className="h-12 sm:h-14 w-auto object-contain dark:hidden group-hover:scale-105 transition-transform duration-200" 
+              />
+              <img 
+                src="/logo_light.png" 
+                alt="مساعد الإمام" 
+                className="h-12 sm:h-14 w-auto object-contain hidden dark:block group-hover:scale-105 transition-transform duration-200" 
+              />
             </Link>
             
             {/* Nav Tabs */}
@@ -75,13 +74,13 @@ export function TopBar() {
                           : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-zinc-900/80"
                       )}
                     >
-                      <link.icon className={clsx("w-4 h-4 transition-colors", isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-400 dark:text-zinc-500")} />
+                      <link.icon className={clsx("w-4 h-4 transition-colors", isActive ? "text-[var(--color-imamu-accent)]" : "text-slate-400 dark:text-zinc-500")} />
                       <span>{link.name}</span>
                       {isActive && (
                         <motion.div
                           layoutId="active-topbar-pill"
                           initial={false}
-                          className="absolute inset-0 bg-blue-500/10 dark:bg-blue-500/15 border border-blue-500/30 rounded-full -z-10"
+                          className="absolute inset-0 bg-[var(--color-imamu-brown)/10] dark:bg-[var(--color-imamu-brown)]/15 border border-amber-700/30 rounded-full -z-10"
                           transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                         />
                       )}
@@ -102,7 +101,7 @@ export function TopBar() {
               aria-label="Toggle Theme"
             >
               {theme === 'dark' ? (
-                <Sun className="w-4.5 h-4.5 text-amber-400" />
+                <Sun className="w-4.5 h-4.5 text-[var(--color-imamu-accent)]" />
               ) : (
                 <Moon className="w-4.5 h-4.5 text-slate-700" />
               )}
@@ -140,7 +139,7 @@ export function TopBar() {
                       >
                         <div className="px-4 py-2 border-b border-slate-100 dark:border-zinc-800 mb-1 text-right">
                           <p className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">الحساب الشخصي</p>
-                          <p className="text-xs font-bold text-slate-900 dark:text-white truncate">@{dbUser?.userName || 'طالب'}</p>
+                          <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{dbUser?.userName || 'طالب'}</p>
                         </div>
                         <Link 
                           href="/profile" 
@@ -156,10 +155,10 @@ export function TopBar() {
                             <Link 
                               href="/admin" 
                               onClick={() => setProfileMenuOpen(false)}
-                              className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-slate-50 dark:hover:bg-zinc-800 transition text-right"
+                              className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-[var(--color-imamu-accent)] hover:bg-slate-50 dark:hover:bg-zinc-800 transition text-right"
                               dir="rtl"
                             >
-                              <Shield className="w-4 h-4 text-blue-500" />
+                              <Shield className="w-4 h-4 text-[var(--color-imamu-accent)]" />
                               لوحة تحكم المسؤول
                             </Link>
                             <Link 
@@ -193,7 +192,7 @@ export function TopBar() {
             ) : (
               <Link
                 href="/login"
-                className="flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 text-xs font-bold transition-all shadow-md shadow-blue-600/20 active:scale-95"
+                className="flex items-center gap-2 rounded-full bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white px-5 py-2 text-xs font-bold transition-all shadow-md shadow-[var(--color-imamu-brown)/20] active:scale-95"
               >
                 <LogIn className="w-4 h-4" />
                 <span>تسجيل الدخول</span>
@@ -223,11 +222,17 @@ export function TopBar() {
               dir="rtl"
             >
               <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-zinc-800">
-                <Link href="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center">
-                    <GraduationCap className="h-4.5 w-4.5 text-white" />
-                  </div>
-                  <span className="font-display font-extrabold text-slate-900 dark:text-white text-lg">مساعد الإمام</span>
+                <Link href="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center py-1">
+                  <img 
+                    src="/logo_dark.png" 
+                    alt="مساعد الإمام" 
+                    className="h-11 w-auto object-contain dark:hidden" 
+                  />
+                  <img 
+                    src="/logo_light.png" 
+                    alt="مساعد الإمام" 
+                    className="h-11 w-auto object-contain hidden dark:block" 
+                  />
                 </Link>
                 <button 
                   className="p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-900"
@@ -248,11 +253,11 @@ export function TopBar() {
                       className={clsx(
                         "px-4 py-3 rounded-2xl flex items-center gap-3 text-sm font-semibold transition-all",
                         isActive 
-                          ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/30 font-bold" 
+                          ? "bg-[var(--color-imamu-brown)/10] text-[var(--color-imamu-accent)] border border-amber-700/30 font-bold" 
                           : "text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-900 hover:text-slate-900 dark:hover:text-white"
                       )}
                     >
-                      <link.icon className={clsx("w-4 h-4", isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-400 dark:text-zinc-500")} />
+                      <link.icon className={clsx("w-4 h-4", isActive ? "text-[var(--color-imamu-accent)]" : "text-slate-400 dark:text-zinc-500")} />
                       {link.name}
                     </Link>
                   );
@@ -265,7 +270,7 @@ export function TopBar() {
                   className="flex items-center justify-between w-full px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs font-bold text-slate-800 dark:text-zinc-200"
                 >
                   <span>النمط ({theme === 'dark' ? 'داكن' : 'فاتح'})</span>
-                  {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
+                  {theme === 'dark' ? <Sun className="w-4 h-4 text-[var(--color-imamu-accent)]" /> : <Moon className="w-4 h-4 text-slate-700" />}
                 </button>
 
                 {user && (
@@ -279,7 +284,7 @@ export function TopBar() {
                         )}
                       </div>
                       <div className="flex flex-col overflow-hidden text-right">
-                        <span className="text-sm font-bold text-slate-900 dark:text-white truncate">@{dbUser?.userName || user.displayName || 'طالب'}</span>
+                        <span className="text-sm font-bold text-slate-900 dark:text-white truncate">{dbUser?.userName || user.displayName || 'طالب'}</span>
                         <span className="text-xs text-slate-500 dark:text-zinc-400 truncate">{dbUser?.major || 'طالب'}</span>
                       </div>
                     </div>

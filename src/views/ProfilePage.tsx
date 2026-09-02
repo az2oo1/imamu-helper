@@ -157,7 +157,7 @@ export function ProfilePage() {
   if (authLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[450px] w-full py-20" dir="rtl">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600 dark:text-blue-400 mb-3" />
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--color-imamu-accent)] mb-3" />
         <p className="text-sm font-bold text-slate-600 dark:text-zinc-400">جاري التحقق من الجلسة...</p>
       </div>
     );
@@ -211,7 +211,7 @@ export function ProfilePage() {
   return (
     <div className="flex flex-col flex-1 max-w-6xl w-full mx-auto pb-24 px-4 sm:px-6" dir="rtl">
       <div className="mb-8 text-right">
-        <h1 className="text-3xl sm:text-4xl font-display font-bold text-slate-900 dark:text-white mb-2">الملف الشخصي</h1>
+        <h1 className="text-3xl sm:text-4xl font-serif font-bold text-slate-900 dark:text-white mb-2">الملف الشخصي</h1>
         <p className="text-sm text-slate-500 dark:text-zinc-400">إدارة التفاصيل الشخصية والأكاديمية والتقدم في المواد الدراسية.</p>
       </div>
 
@@ -267,15 +267,15 @@ export function ProfilePage() {
           <button 
             type="button"
             onClick={() => document.getElementById('pfp-upload')?.click()}
-            className="mt-3.5 inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 px-4 py-2 rounded-xl border border-blue-200 dark:border-blue-900/50 transition shadow-2xs cursor-pointer"
+            className="mt-3.5 inline-flex items-center gap-1.5 text-xs font-bold text-[var(--color-imamu-accent)] bg-stone-50 dark:bg-stone-950/50 hover:bg-stone-100 dark:hover:bg-stone-900/60 px-4 py-2 rounded-xl border border-amber-200 dark:border-stone-900/50 transition shadow-2xs cursor-pointer"
           >
             <Camera className="w-3.5 h-3.5" />
             <span>تغيير الصورة الشخصية</span>
           </button>
 
           <div className="mt-4 flex flex-col items-center">
-            <h2 className="text-xl font-display font-bold text-slate-900 dark:text-white" dir="ltr">
-              @{dbUser?.userName || profileForm.userName || (user?.email ? user.email.split('@')[0] : 'user')}
+            <h2 className="text-xl font-serif font-bold text-slate-900 dark:text-white" dir="ltr">
+              {dbUser?.userName || profileForm.userName || (user?.email ? user.email.split('@')[0] : 'user')}
             </h2>
             <p className="text-xs text-slate-500 dark:text-zinc-400 font-mono mt-1" dir="ltr">
               {user?.email || ''}
@@ -304,16 +304,16 @@ export function ProfilePage() {
               onClick={() => setActiveTab('progress')} 
               className={`relative pb-3.5 px-4 font-bold transition-colors duration-200 text-sm flex items-center gap-2 select-none cursor-pointer ${
                 activeTab === 'progress' 
-                  ? 'text-blue-600 dark:text-blue-400' 
+                  ? 'text-[var(--color-imamu-accent)]' 
                   : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
               }`}
             >
-              <GraduationCap className={`w-4.5 h-4.5 transition-colors ${activeTab === 'progress' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-zinc-500'}`} />
+              <GraduationCap className={`w-4.5 h-4.5 transition-colors ${activeTab === 'progress' ? 'text-[var(--color-imamu-accent)]' : 'text-slate-400 dark:text-zinc-500'}`} />
               <span>التقدم والمقررات</span>
               {activeTab === 'progress' && (
                 <motion.div
                   layoutId="activeTabUnderline"
-                  className="absolute bottom-0 right-0 left-0 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full shadow-xs shadow-blue-500/50"
+                  className="absolute bottom-0 right-0 left-0 h-0.5 bg-[var(--color-imamu-brown)] dark:bg-[var(--color-imamu-brown)] rounded-full shadow-xs shadow-[var(--color-imamu-brown)/20]"
                   transition={{ type: "spring", stiffness: 400, damping: 32 }}
                 />
               )}
@@ -324,16 +324,16 @@ export function ProfilePage() {
               onClick={() => setActiveTab('profile')} 
               className={`relative pb-3.5 px-4 font-bold transition-colors duration-200 text-sm flex items-center gap-2 select-none cursor-pointer ${
                 activeTab === 'profile' 
-                  ? 'text-blue-600 dark:text-blue-400' 
+                  ? 'text-[var(--color-imamu-accent)]' 
                   : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
               }`}
             >
-              <Settings className={`w-4.5 h-4.5 transition-colors ${activeTab === 'profile' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-zinc-500'}`} />
+              <Settings className={`w-4.5 h-4.5 transition-colors ${activeTab === 'profile' ? 'text-[var(--color-imamu-accent)]' : 'text-slate-400 dark:text-zinc-500'}`} />
               <span>إعدادات الحساب</span>
               {activeTab === 'profile' && (
                 <motion.div
                   layoutId="activeTabUnderline"
-                  className="absolute bottom-0 right-0 left-0 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full shadow-xs shadow-blue-500/50"
+                  className="absolute bottom-0 right-0 left-0 h-0.5 bg-[var(--color-imamu-brown)] dark:bg-[var(--color-imamu-brown)] rounded-full shadow-xs shadow-[var(--color-imamu-brown)/20]"
                   transition={{ type: "spring", stiffness: 400, damping: 32 }}
                 />
               )}
@@ -364,7 +364,7 @@ export function ProfilePage() {
                 {/* Personal Details Section (No Card Box) */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 pb-2 border-b border-slate-200/60 dark:border-zinc-800/60">
-                    <UserCircle2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    <UserCircle2 className="w-5 h-5 text-[var(--color-imamu-accent)]" />
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white">التفاصيل الشخصية</h3>
                   </div>
                   
@@ -383,7 +383,7 @@ export function ProfilePage() {
                             setProfileForm(p => ({...p, userName: val}));
                           }}
                           onBlur={() => saveProfile()}
-                          className="w-full pr-10 pl-4 py-3 bg-slate-50/80 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-600"
+                          className="w-full pr-10 pl-4 py-3 bg-slate-50/80 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-4 focus:ring-[var(--color-imamu-brown)]/10 focus:border-[var(--color-imamu-brown)] transition text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-600"
                         />
                       </div>
                     </div>
@@ -393,7 +393,7 @@ export function ProfilePage() {
                       <div className="flex justify-between items-center mb-2">
                         <label className="text-xs font-bold text-slate-700 dark:text-zinc-300">رقم الجوال</label>
                         {!phoneEditable && (
-                          <button type="button" onClick={() => setPhoneEditable(true)} className="text-blue-600 dark:text-blue-400 hover:underline text-xs font-bold transition">
+                          <button type="button" onClick={() => setPhoneEditable(true)} className="text-[var(--color-imamu-accent)] hover:underline text-xs font-bold transition">
                             تعديل
                           </button>
                         )}
@@ -407,7 +407,7 @@ export function ProfilePage() {
                           disabled={!phoneEditable}
                           onChange={e => setProfileForm(p => ({...p, phone: e.target.value}))}
                           onBlur={() => saveProfile()}
-                          className={`w-full pr-10 pl-4 py-3 bg-slate-50/80 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-600 ${!phoneEditable ? 'opacity-65 cursor-not-allowed bg-slate-100/60 dark:bg-zinc-900/40' : ''}`}
+                          className={`w-full pr-10 pl-4 py-3 bg-slate-50/80 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-4 focus:ring-[var(--color-imamu-brown)]/10 focus:border-[var(--color-imamu-brown)] transition text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-600 ${!phoneEditable ? 'opacity-65 cursor-not-allowed bg-slate-100/60 dark:bg-zinc-900/40' : ''}`}
                           dir="ltr"
                         />
                       </div>
@@ -418,7 +418,7 @@ export function ProfilePage() {
                 {/* Academic Status Section (No Card Box) */}
                 <div className="space-y-4 pt-4 border-t border-slate-200/60 dark:border-zinc-800/60">
                   <div className="flex items-center gap-2 pb-2 border-b border-slate-200/60 dark:border-zinc-800/60">
-                    <BookOpen className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    <BookOpen className="w-5 h-5 text-[var(--color-imamu-accent)]" />
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white">الحالة الأكاديمية</h3>
                   </div>
 
@@ -435,7 +435,7 @@ export function ProfilePage() {
                             setProfileForm(p => ({...p, major: newMajor}));
                             saveProfile({ major: newMajor });
                           }}
-                          className="w-full pr-10 pl-10 py-3 appearance-none bg-slate-50/80 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition text-sm text-slate-900 dark:text-white cursor-pointer"
+                          className="w-full pr-10 pl-10 py-3 appearance-none bg-slate-50/80 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-4 focus:ring-[var(--color-imamu-brown)]/10 focus:border-[var(--color-imamu-brown)] transition text-sm text-slate-900 dark:text-white cursor-pointer"
                         >
                           <option value="" className="dark:bg-zinc-900">اختر التخصص...</option>
                           {majors.map(m => (
@@ -458,7 +458,7 @@ export function ProfilePage() {
                             value={profileForm.currentGpa}
                             onChange={e => setProfileForm(p => ({...p, currentGpa: e.target.value}))}
                             onBlur={() => saveProfile()}
-                            className="w-full pr-10 pl-4 py-3 font-mono bg-slate-50/80 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-600"
+                            className="w-full pr-10 pl-4 py-3 font-mono bg-slate-50/80 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-4 focus:ring-[var(--color-imamu-brown)]/10 focus:border-[var(--color-imamu-brown)] transition text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-600"
                             dir="ltr"
                           />
                         </div>
@@ -475,7 +475,7 @@ export function ProfilePage() {
                             value={profileForm.finishedHours}
                             onChange={e => setProfileForm(p => ({...p, finishedHours: e.target.value}))}
                             onBlur={() => saveProfile()}
-                            className="w-full pr-10 pl-4 py-3 font-mono bg-slate-50/80 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-600"
+                            className="w-full pr-10 pl-4 py-3 font-mono bg-slate-50/80 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-4 focus:ring-[var(--color-imamu-brown)]/10 focus:border-[var(--color-imamu-brown)] transition text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-600"
                             dir="ltr"
                           />
                         </div>
@@ -503,13 +503,13 @@ export function ProfilePage() {
                             اجتزت <AnimatedNumber value={progressData.totalFinishedInReq} /> من {progressData.totalReq} مقرر (إجمالي <AnimatedNumber value={progressData.totalFinishedHours} /> ساعة معتمدة)
                           </span>
                         </div>
-                        <span className="text-blue-600 dark:text-blue-400 font-black text-2xl"><AnimatedNumber value={progressData.percentFinished} />%</span>
+                        <span className="text-[#C48B57] dark:text-[#E2A676] font-black text-2xl"><AnimatedNumber value={progressData.percentFinished} />%</span>
                       </div>
 
                       {/* Solid Color Progress Bar (No Gradient) */}
                       <div className="w-full bg-slate-200/80 dark:bg-zinc-800 rounded-full h-3 overflow-hidden">
                         <motion.div 
-                          className="bg-blue-600 dark:bg-blue-500 h-full rounded-full"
+                          className="bg-[#B87D4B] dark:bg-[#C48B57] h-full rounded-full"
                           initial={{ width: 0 }}
                           animate={{ width: `${progressData.percentFinished}%` }}
                           transition={{ duration: 0.8, ease: "easeOut" }}
@@ -538,7 +538,7 @@ export function ProfilePage() {
                               progressData.allGroupNames.forEach(n => { nextState[n] = false; });
                               setCollapsedGroups(nextState);
                             }}
-                            className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200/50 dark:border-blue-900/50 cursor-pointer"
+                            className="text-xs font-bold text-[var(--color-imamu-accent)] hover:underline px-3 py-1.5 rounded-xl bg-stone-50 dark:bg-stone-950/40 border border-amber-200/50 dark:border-stone-900/50 cursor-pointer"
                           >
                             توسيع الكل
                           </button>
@@ -623,7 +623,7 @@ export function ProfilePage() {
                                     <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap ${
                                       isGroupFull 
                                         ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' 
-                                        : 'bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-900/50'
+                                        : 'bg-stone-50 dark:bg-stone-950/50 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] border-amber-200 dark:border-stone-900/50'
                                     }`}>
                                       المنجز: {selectedInGroup} / {reqCount}
                                     </span>
@@ -688,13 +688,13 @@ export function ProfilePage() {
                                                     ? 'bg-emerald-50/70 border-emerald-400 dark:bg-emerald-950/40 dark:border-emerald-700 shadow-xs cursor-pointer hover:bg-emerald-100/60 dark:hover:bg-emerald-900/50' 
                                                     : isLocked 
                                                       ? 'bg-slate-100/70 border-slate-200 dark:bg-zinc-950/70 dark:border-zinc-800/80 cursor-not-allowed opacity-75' 
-                                                      : 'bg-white border-slate-200/90 hover:border-blue-400 dark:bg-zinc-900 dark:border-zinc-800 dark:hover:border-zinc-700 cursor-pointer shadow-2xs hover:shadow-sm'
+                                                      : 'bg-white border-slate-200/90 hover:border-amber-700 dark:bg-zinc-900 dark:border-zinc-800 dark:hover:border-zinc-700 cursor-pointer shadow-2xs hover:shadow-sm'
                                                 }`}
                                               >
                                                 <div className="flex items-start justify-between gap-2">
                                                   <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-1.5 mb-1">
-                                                      <span className="font-mono text-[11px] font-bold text-blue-600 dark:text-blue-400">{s.code}</span>
+                                                      <span className="font-mono text-[11px] font-bold text-[var(--color-imamu-accent)]">{s.code}</span>
                                                       <span className="text-[10px] text-slate-400 dark:text-zinc-500">•</span>
                                                       <span className="text-[10px] font-semibold text-slate-500 dark:text-zinc-400">{s.creditHours || 3} س</span>
                                                     </div>
@@ -708,11 +708,11 @@ export function ProfilePage() {
                                                       <CheckCircle2 className="w-3.5 h-3.5" /> تم الاجتياز
                                                     </span>
                                                   ) : isLocked ? (
-                                                    <span className="inline-flex items-center gap-1 font-bold text-amber-700 dark:text-amber-400 truncate" title={`يتطلب اجتياز: ${unmetPrereqs.join(', ')}`}>
+                                                    <span className="inline-flex items-center gap-1 font-bold text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] truncate" title={`يتطلب اجتياز: ${unmetPrereqs.join(', ')}`}>
                                                       <span>🔒 يتطلب: {unmetPrereqs.join(', ')}</span>
                                                     </span>
                                                   ) : (
-                                                    <span className="inline-flex items-center gap-1 font-bold text-slate-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400">
+                                                    <span className="inline-flex items-center gap-1 font-bold text-slate-500 dark:text-zinc-400 hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)]">
                                                       <span>انقر لتحديد المادة</span>
                                                     </span>
                                                   )}
@@ -744,7 +744,7 @@ export function ProfilePage() {
               <button 
                 type="submit"
                 disabled={isSaving || usernameStatus === 'taken' || usernameStatus === 'checking'}
-                className="btn-rise flex items-center justify-center gap-2 bg-[var(--color-imamu-blue)] text-white font-medium py-3 px-8 rounded-xl hover:bg-[var(--color-imamu-blue-light)] transition disabled:opacity-70 disabled:cursor-not-allowed shadow-sm min-w-[140px] cursor-pointer"
+                className="btn-rise flex items-center justify-center gap-2 bg-[var(--color-imamu-brown)] text-white font-medium py-3 px-8 rounded-xl hover:bg-[var(--color-imamu-brown-light)] transition disabled:opacity-70 disabled:cursor-not-allowed shadow-sm min-w-[140px] cursor-pointer"
               >
                 {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'حفظ التغييرات'}
               </button>

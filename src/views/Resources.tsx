@@ -95,7 +95,7 @@ function DriveLinkButton({ boxLink }: { boxLink?: string }) {
         rel="noopener noreferrer"
         className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
       >
-        <Folder className="w-3.5 h-3.5 text-blue-500" />
+        <Folder className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
         <span>الملفات</span>
       </a>
     );
@@ -109,7 +109,7 @@ function DriveLinkButton({ boxLink }: { boxLink?: string }) {
         onClick={() => setIsOpen(prev => !prev)}
         className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer shrink-0 whitespace-nowrap shadow-xs"
       >
-        <Folder className="w-3.5 h-3.5 text-blue-500" />
+        <Folder className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
         <span>الملفات ({links.length})</span>
         <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
@@ -130,10 +130,10 @@ function DriveLinkButton({ boxLink }: { boxLink?: string }) {
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setIsOpen(false)}
-                className="flex items-center justify-between px-3.5 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-950/50 text-xs font-semibold text-slate-800 dark:text-zinc-200 hover:text-blue-600 dark:hover:text-blue-400 transition"
+                className="flex items-center justify-between px-3.5 py-2.5 hover:bg-stone-50 dark:hover:bg-stone-950/50 text-xs font-semibold text-slate-800 dark:text-zinc-200 hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)] transition"
               >
                 <div className="flex items-center gap-2 truncate">
-                  <Folder className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                  <Folder className="w-3.5 h-3.5 text-[var(--color-imamu-accent)] shrink-0" />
                   <span className="truncate">{link.title || `ملف ${idx + 1}`}</span>
                 </div>
                 <ExternalLink className="w-3 h-3 text-slate-400 shrink-0 opacity-70" />
@@ -410,10 +410,10 @@ export function Resources() {
       {/* Header */}
       <div className="mb-8 relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <span className="text-xs sm:text-sm font-semibold tracking-widest text-blue-600 dark:text-blue-400 uppercase mb-2 block">
+          <span className="text-xs sm:text-sm font-semibold tracking-widest text-[var(--color-imamu-accent)] uppercase mb-2 block">
             المكتبة الأكاديمية الرقمية
           </span>
-          <h1 className="text-3xl sm:text-4xl font-display font-bold tracking-tight text-slate-900 dark:text-white mb-2">المصادر والتجميعات الطلابية</h1>
+          <h1 className="text-3xl sm:text-4xl font-serif font-bold tracking-tight text-slate-900 dark:text-white mb-2">المصادر والتجميعات الطلابية</h1>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-xl">
             اختبارات سابقة، ملخصات، وروابط المجموعات الطلابية مرتبة حسب المواد والتخصصات.
           </p>
@@ -423,7 +423,7 @@ export function Resources() {
         {isAdmin && (
           <button
             onClick={() => setIsAddResourceOpen(true)}
-            className="btn-rise flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-md shadow-blue-600/20 cursor-pointer shrink-0 self-start md:self-auto"
+            className="btn-rise flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-xs font-bold transition shadow-md shadow-[var(--color-imamu-brown)/20] cursor-pointer shrink-0 self-start md:self-auto"
           >
             <Plus className="w-4 h-4" />
             <span>إضافة مصدر جديد</span>
@@ -444,7 +444,7 @@ export function Resources() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="ابحث برمز المادة أو اسمها..."
-            className="w-full pr-11 pl-4 py-2.5 bg-slate-50 dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 rounded-xl outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 focus:border-blue-600 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500"
+            className="w-full pr-11 pl-4 py-2.5 bg-slate-50 dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 rounded-xl outline-none focus:ring-2 focus:ring-stone-100 dark:focus:ring-stone-900 focus:border-[var(--color-imamu-brown)] text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500"
           />
         </div>
 
@@ -453,7 +453,7 @@ export function Resources() {
           <select
             value={selectedMajor}
             onChange={e => setSelectedMajor(e.target.value)}
-            className="w-full p-2.5 bg-slate-50 dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 cursor-pointer font-semibold"
+            className="w-full p-2.5 bg-slate-50 dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-stone-100 dark:focus:ring-stone-900 cursor-pointer font-semibold"
           >
             {MAJOR_OPTIONS.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -496,7 +496,7 @@ export function Resources() {
                 >
                   <div>
                     <div className="flex items-center justify-between mb-4">
-                      <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50">
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-stone-50 dark:bg-stone-950/50 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] border border-amber-200 dark:border-stone-900/50">
                         {finalCodeBadge.replace(/^مادة\s*/i, '').trim()}
                       </span>
                     <div className="flex items-center gap-2">
@@ -508,7 +508,7 @@ export function Resources() {
                               e.stopPropagation();
                               openEditModal(item);
                             }}
-                            className="p-1 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition cursor-pointer"
+                            className="p-1 text-slate-400 hover:text-[var(--color-imamu-accent)] hover:bg-stone-50 dark:hover:bg-stone-950/40 rounded-lg transition cursor-pointer"
                             title="تعديل هذا المصدر"
                           >
                             <Pencil className="w-3.5 h-3.5" />
@@ -549,7 +549,7 @@ export function Resources() {
                 <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 dark:border-zinc-800/80 pt-3.5 mt-auto w-full relative z-20">
                   <button
                     onClick={() => setSelectedCourse(item)}
-                    className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
+                    className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-stone-50 dark:bg-stone-950/50 hover:bg-stone-100 dark:hover:bg-stone-900/60 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] border border-amber-200 dark:border-stone-900/50 text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
                   >
                     <Info className="w-3.5 h-3.5" />
                     <span>التفاصيل</span>

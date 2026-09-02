@@ -85,13 +85,13 @@ export function NewbiePage() {
       {/* Back Button */}
       <button 
         onClick={() => router.push('/how-to')}
-        className="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition font-semibold mb-6 bg-white dark:bg-zinc-900/40 hover:bg-slate-50 dark:hover:bg-zinc-800/40 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-xs self-start"
+        className="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-zinc-400 hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)] transition font-semibold mb-6 bg-white dark:bg-zinc-900/40 hover:bg-slate-50 dark:hover:bg-zinc-800/40 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-xs self-start"
       >
         <ArrowLeft className="w-4 h-4 rotate-180" /> العودة إلى الدليلة
       </button>
 
       {/* Hero Premium Banner */}
-      <div className="w-full bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 rounded-3xl p-8 sm:p-10 text-white shadow-xl relative overflow-hidden mb-8 text-right border border-blue-500/30">
+      <div className="w-full bg-gradient-to-br from-amber-800 via-amber-900 to-indigo-700 rounded-3xl p-8 sm:p-10 text-white shadow-xl relative overflow-hidden mb-8 text-right border border-amber-700/30">
         {/* Glowing absolute background accent */}
         <div className="absolute -right-10 -top-10 w-96 h-96 bg-white/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute left-0 bottom-0 w-80 h-80 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
@@ -103,8 +103,8 @@ export function NewbiePage() {
             </div>
             <div>
               <span className="bg-white/20 text-amber-300 text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-wider backdrop-blur-xs">دليل المستجدين الأكاديمي</span>
-              <h1 className="text-2xl sm:text-3xl font-display font-bold mt-2">دليل الطلاب المستجدين (عش آل إمام) 🎓</h1>
-              <p className="text-xs text-blue-50 mt-1.5 font-medium max-w-2xl leading-relaxed">
+              <h1 className="text-2xl sm:text-3xl font-serif font-bold mt-2">دليل الطلاب المستجدين (عش آل إمام) 🎓</h1>
+              <p className="text-xs text-stone-50 mt-1.5 font-medium max-w-2xl leading-relaxed">
                 مرحبًا بك في جامعة الإمام. دليل متكامل وموثق لمساعدتك في بدء رحلتك الجامعية وتفعيل كافة الأنظمة والبطاقات الأكاديمية والمصرفية بيسر وسهولة.
               </p>
             </div>
@@ -118,11 +118,11 @@ export function NewbiePage() {
           onClick={() => setNewbieTab('about')}
           className={`flex flex-col items-center justify-center text-center p-5 rounded-2xl border transition-all duration-200 ${
             newbieTab === 'about' 
-              ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900/50 text-blue-700 dark:text-blue-400 shadow-xs font-bold' 
+              ? 'bg-stone-50 dark:bg-stone-950/40 border-amber-200 dark:border-stone-900/50 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] shadow-xs font-bold' 
               : 'bg-white dark:bg-zinc-900/40 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800/50 hover:text-slate-900 dark:hover:text-zinc-100 shadow-xs'
           }`}
         >
-          <Compass className={`w-6 h-6 mb-2 ${newbieTab === 'about' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-zinc-500'}`} />
+          <Compass className={`w-6 h-6 mb-2 ${newbieTab === 'about' ? 'text-[var(--color-imamu-accent)]' : 'text-slate-400 dark:text-zinc-500'}`} />
           <span className="text-xs font-bold">الحياة الجامعية والكليات</span>
         </button>
 
@@ -154,11 +154,11 @@ export function NewbiePage() {
           onClick={() => setNewbieTab('checklist')}
           className={`flex flex-col items-center justify-center text-center p-5 rounded-2xl border transition-all duration-200 ${
             newbieTab === 'checklist' 
-              ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-900/50 text-amber-700 dark:text-amber-400 shadow-xs font-bold' 
+              ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-900/50 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] shadow-xs font-bold' 
               : 'bg-white dark:bg-zinc-900/40 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800/50 hover:text-slate-900 dark:hover:text-zinc-100 shadow-xs'
           }`}
         >
-          <CheckSquare className={`w-6 h-6 mb-2 ${newbieTab === 'checklist' ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400 dark:text-zinc-500'}`} />
+          <CheckSquare className={`w-6 h-6 mb-2 ${newbieTab === 'checklist' ? 'text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)]' : 'text-slate-400 dark:text-zinc-500'}`} />
           <span className="text-xs font-bold">قائمة مهام المستجد ({completedCount}/{checklistItems.length})</span>
         </button>
       </div>
@@ -236,7 +236,7 @@ export function NewbiePage() {
                       نظام إلكتروني أكاديمي كامل يُستخدم في إعداد الجداول الدراسية الأسبوعية، تسجيل المواد وحذفها وإضافتها وتعديل شعبها، معرفة الغيابات والإنذارات ونسبة الحرمان الأكاديمي، واستخراج السجل والدرجات النهائية.
                     </p>
                   </div>
-                  <a href="https://bstss.imamu.edu.sa/StudentSelfService" target="_blank" rel="noreferrer" className="text-xs text-blue-600 dark:text-blue-400 font-bold flex items-center gap-1 mt-4 hover:underline">
+                  <a href="https://bstss.imamu.edu.sa/StudentSelfService" target="_blank" rel="noreferrer" className="text-xs text-[var(--color-imamu-accent)] font-bold flex items-center gap-1 mt-4 hover:underline">
                     تسجيل دخول البوابة <ExternalLink className="w-3.5 h-3.5" />
                   </a>
                 </div>
@@ -248,7 +248,7 @@ export function NewbiePage() {
                       بريد إلكتروني رسمي للطلاب بنطاق الجامعة (<span className="font-sans text-[10px]">@sm.imamu.edu.sa</span>) يعتمد على باقة مايكروسوفت Office 365. يُستخدم لتلقي إعلانات الكلية، والتواصل الرسمي مع الأساتذة والدعم الفني.
                     </p>
                   </div>
-                  <a href="https://mail.imamu.edu.sa/imamowa/" target="_blank" rel="noreferrer" className="text-xs text-blue-600 dark:text-blue-400 font-bold flex items-center gap-1 mt-4 hover:underline">
+                  <a href="https://mail.imamu.edu.sa/imamowa/" target="_blank" rel="noreferrer" className="text-xs text-[var(--color-imamu-accent)] font-bold flex items-center gap-1 mt-4 hover:underline">
                     تسجيل دخول البريد <ExternalLink className="w-3.5 h-3.5" />
                   </a>
                 </div>
@@ -260,7 +260,7 @@ export function NewbiePage() {
                       منصة الفصول الافتراضية والتعليم الإلكتروني الرسمية بالجامعة. تحتوي على الملفات والمذكرات والشرائح لكل مادة، الواجبات والأنشطة الأسبوعية، الاختبارات القصيرة، والتواصل المباشر للمحاضرات عن بعد.
                     </p>
                   </div>
-                  <a href="https://lms.imamu.edu.sa" target="_blank" rel="noreferrer" className="text-xs text-blue-600 dark:text-blue-400 font-bold flex items-center gap-1 mt-4 hover:underline">
+                  <a href="https://lms.imamu.edu.sa" target="_blank" rel="noreferrer" className="text-xs text-[var(--color-imamu-accent)] font-bold flex items-center gap-1 mt-4 hover:underline">
                     تسجيل دخول المنصة <ExternalLink className="w-3.5 h-3.5" />
                   </a>
                 </div>
@@ -315,13 +315,13 @@ export function NewbiePage() {
             >
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <span className="text-xs font-semibold text-slate-500 dark:text-zinc-400">أكمل قائمة المهام لتجهيز ملفك الجامعي بالكامل:</span>
-                <span className="text-xs font-bold text-blue-600 dark:text-blue-400">نسبة الإنجاز: {progressPercent}%</span>
+                <span className="text-xs font-bold text-[var(--color-imamu-accent)]">نسبة الإنجاز: {progressPercent}%</span>
               </div>
               
               {/* Progress Bar */}
               <div className="w-full bg-slate-100 dark:bg-zinc-950 h-2.5 rounded-full overflow-hidden border border-slate-200 dark:border-zinc-800">
                 <div 
-                  className="bg-blue-600 h-full transition-all duration-500 rounded-full"
+                  className="bg-[var(--color-imamu-brown)] h-full transition-all duration-500 rounded-full"
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
@@ -354,7 +354,7 @@ export function NewbiePage() {
       {/* University Contact Directories Links */}
       <div className="w-full bg-white dark:bg-zinc-900/40 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 sm:p-8 shadow-xs mb-8 text-right">
         <h3 className="text-sm font-bold text-slate-900 dark:text-zinc-100 mb-2 flex items-center gap-2 pr-1">
-          <Compass className="w-4.5 h-4.5 text-blue-600 dark:text-blue-500" /> وسائل الاتصال بالجامعة 📞
+          <Compass className="w-4.5 h-4.5 text-teal-600 dark:text-teal-400" /> وسائل الاتصال بالجامعة 📞
         </h3>
         <p className="text-xs text-slate-500 dark:text-zinc-400 mb-6 mr-7">
           يمكنك تصفح أدلة الاتصال المعتمدة بالجامعة للبحث عن أرقام الهواتف أو البريد الإلكتروني الرسمي مباشرة:
@@ -364,35 +364,35 @@ export function NewbiePage() {
           {/* 1. Phone Numbers Directory Button */}
           <button 
             onClick={() => router.push('/numbers')}
-            className="flex items-center justify-between p-4 bg-slate-50/80 hover:bg-slate-100/80 dark:bg-zinc-950/40 dark:hover:bg-zinc-800/60 border border-slate-200 dark:border-zinc-800 rounded-xl transition text-right group w-full shadow-xs hover:shadow-sm"
+            className="flex items-center justify-between p-4 bg-slate-50/80 hover:bg-slate-100/80 dark:bg-zinc-950/40 dark:hover:bg-zinc-800/60 border border-slate-200 dark:border-zinc-800 hover:border-emerald-500/40 rounded-xl transition text-right group w-full shadow-xs hover:shadow-sm"
           >
             <div className="flex items-center gap-3">
-              <div className="w-8.5 h-8.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 flex items-center justify-center shrink-0">
+              <div className="w-8.5 h-8.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 flex items-center justify-center shrink-0">
                 <Phone className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="font-bold text-xs text-slate-900 dark:text-zinc-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">دليل الأرقام الهاتفية والتحويلات</h4>
+                <h4 className="font-bold text-xs text-slate-900 dark:text-zinc-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">دليل الأرقام الهاتفية والتحويلات</h4>
                 <p className="text-[10px] text-slate-500 dark:text-zinc-400 mt-0.5">أرقام الكليات، العمادات، وخطوط الطوارئ والسلامة.</p>
               </div>
             </div>
-            <ChevronLeft className="w-4 h-4 text-slate-400 dark:text-zinc-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors rotate-180" />
+            <ChevronLeft className="w-4 h-4 text-slate-400 dark:text-zinc-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors rotate-180" />
           </button>
 
           {/* 2. College Emails Directory Button */}
           <button 
             onClick={() => router.push('/emails')}
-            className="flex items-center justify-between p-4 bg-slate-50/80 hover:bg-slate-100/80 dark:bg-zinc-950/40 dark:hover:bg-zinc-800/60 border border-slate-200 dark:border-zinc-800 rounded-xl transition text-right group w-full shadow-xs hover:shadow-sm"
+            className="flex items-center justify-between p-4 bg-slate-50/80 hover:bg-slate-100/80 dark:bg-zinc-950/40 dark:hover:bg-zinc-800/60 border border-slate-200 dark:border-zinc-800 hover:border-blue-500/40 rounded-xl transition text-right group w-full shadow-xs hover:shadow-sm"
           >
             <div className="flex items-center gap-3">
-              <div className="w-8.5 h-8.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 flex items-center justify-center shrink-0">
+              <div className="w-8.5 h-8.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 flex items-center justify-center shrink-0">
                 <Mail className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="font-bold text-xs text-slate-900 dark:text-zinc-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">دليل البريد الإلكتروني الأكاديمي</h4>
+                <h4 className="font-bold text-xs text-slate-900 dark:text-zinc-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">دليل البريد الإلكتروني الأكاديمي</h4>
                 <p className="text-[10px] text-slate-500 dark:text-zinc-400 mt-0.5">إيميلات شؤون الطلاب، العميد، ومسؤولي التخصصات.</p>
               </div>
             </div>
-            <ChevronLeft className="w-4 h-4 text-slate-400 dark:text-zinc-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors rotate-180" />
+            <ChevronLeft className="w-4 h-4 text-slate-400 dark:text-zinc-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors rotate-180" />
           </button>
         </div>
       </div>
@@ -400,7 +400,7 @@ export function NewbiePage() {
       {/* Dynamic Newbie Links Grid Section */}
       <div className="w-full relative z-10 text-right">
         <h3 className="text-sm font-bold text-slate-900 dark:text-zinc-100 mb-4 flex items-center gap-2 pr-1">
-          <ExternalLink className="w-4.5 h-4.5 text-blue-600 dark:text-blue-500" /> روابط ومنصات هامة للمستجدين
+          <ExternalLink className="w-4.5 h-4.5 text-[var(--color-imamu-accent)]" /> روابط ومنصات هامة للمستجدين
         </h3>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -418,11 +418,11 @@ export function NewbiePage() {
                     <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 flex items-center justify-center shrink-0">
                       {getLinkIcon(link.title, link.url)}
                     </div>
-                    <h4 className="font-bold text-sm text-slate-900 dark:text-zinc-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                    <h4 className="font-bold text-sm text-slate-900 dark:text-zinc-100 group-hover:text-[var(--color-imamu-accent)] dark:group-hover:text-[var(--color-imamu-accent)] transition-colors">
                       {link.title}
                     </h4>
                   </div>
-                  <ChevronLeft className="w-4.5 h-4.5 text-slate-400 dark:text-zinc-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors rotate-180" />
+                  <ChevronLeft className="w-4.5 h-4.5 text-slate-400 dark:text-zinc-400 group-hover:text-[var(--color-imamu-accent)] dark:group-hover:text-[var(--color-imamu-accent)] transition-colors rotate-180" />
                 </div>
                 {link.description && (
                   <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
@@ -452,7 +452,7 @@ function getLinkIcon(title: string, url: string) {
     return <BookOpen className="w-5 h-5 text-indigo-400" />;
   }
   if (u.includes('bstss') || t.includes('banner') || t.includes('ذاتية') || t.includes('خدمة')) {
-    return <GraduationCap className="w-5 h-5 text-blue-400" />;
+    return <GraduationCap className="w-5 h-5 text-[var(--color-imamu-accent)]" />;
   }
   if (u.includes('mail') || u.includes('imamowa') || t.includes('بريد') || t.includes('إيميل')) {
     return <Mail className="w-5 h-5 text-emerald-400" />;

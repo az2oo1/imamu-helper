@@ -194,13 +194,13 @@ export function PlansToolPage() {
 
             {/* Total Courses Tag */}
             <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800/90 px-3 py-1.5 rounded-full border border-slate-200 dark:border-zinc-700/80">
-              <BookOpen className="w-3.5 h-3.5 text-blue-500" />
+              <BookOpen className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
               <span>{totalCoursesCount} مادة دراسية</span>
             </span>
 
             {/* PDF Files Tag */}
             <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800/90 px-3 py-1.5 rounded-full border border-slate-200 dark:border-zinc-700/80">
-              <FileText className="w-3.5 h-3.5 text-amber-500" />
+              <FileText className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
               <span>{currentMajorPdfList.length} ملفات PDF</span>
             </span>
           </div>
@@ -211,7 +211,7 @@ export function PlansToolPage() {
           {/* Header Bar: Section Title & Add File Button */}
           <div className="flex items-center justify-between gap-3 bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-2xs">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-200/50 dark:border-blue-900/40 shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-stone-50 dark:bg-stone-950/60 text-[var(--color-imamu-accent)] flex items-center justify-center border border-amber-200/50 dark:border-stone-900/40 shrink-0">
                 <Layers className="w-4.5 h-4.5" />
               </div>
               <div>
@@ -224,7 +224,7 @@ export function PlansToolPage() {
             {isAdmin && (
               <button
                 onClick={() => setIsAddPdfOpen(true)}
-                className="btn-rise flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-2xs cursor-pointer shrink-0"
+                className="btn-rise flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-xs font-bold transition shadow-2xs cursor-pointer shrink-0"
               >
                 <Plus className="w-4 h-4" />
                 <span>إضافة ملف PDF</span>
@@ -249,11 +249,11 @@ export function PlansToolPage() {
                       className="bg-slate-50/80 dark:bg-zinc-950/80 px-5 py-4 flex items-center justify-between gap-4 cursor-pointer select-none hover:bg-slate-100/80 dark:hover:bg-zinc-900/90 transition border-b border-slate-100 dark:border-zinc-800/80"
                     >
                       <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className={`p-1 rounded-lg transition-transform duration-200 ${isOpen ? 'rotate-180 text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-zinc-500'}`}>
+                        <div className={`p-1 rounded-lg transition-transform duration-200 ${isOpen ? 'rotate-180 text-[var(--color-imamu-accent)]' : 'text-slate-400 dark:text-zinc-500'}`}>
                           <ChevronDown className="w-4.5 h-4.5" />
                         </div>
 
-                        <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200/50 dark:border-blue-900/40 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+                        <div className="w-8 h-8 rounded-xl bg-stone-50 dark:bg-stone-950/60 border border-amber-200/50 dark:border-stone-900/40 flex items-center justify-center text-[var(--color-imamu-accent)] shrink-0">
                           <FileText className="w-4 h-4" />
                         </div>
 
@@ -263,7 +263,7 @@ export function PlansToolPage() {
                               {pdf.title}
                             </h4>
                             {idx === 0 && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/80 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 shrink-0">
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-stone-50 dark:bg-stone-950/80 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] border border-amber-200 dark:border-stone-900/50 shrink-0">
                                 الخطة الرئيسية
                               </span>
                             )}
@@ -278,7 +278,7 @@ export function PlansToolPage() {
                           className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
                             downloadingId === (pdf.id || pdf.title)
                               ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 scale-105 shadow-2xs'
-                              : 'bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-900/50 hover:bg-blue-100 text-blue-700 dark:text-blue-400'
+                              : 'bg-stone-50 dark:bg-stone-950/50 border-amber-200 dark:border-stone-900/50 hover:bg-stone-100 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)]'
                           }`}
                           title="تحميل الملف"
                         >
@@ -332,7 +332,7 @@ export function PlansToolPage() {
               {isAdmin && (
                 <button
                   onClick={() => setIsAddPdfOpen(true)}
-                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold cursor-pointer"
+                  className="mt-4 px-4 py-2 bg-[var(--color-imamu-brown)] text-white rounded-xl text-xs font-bold cursor-pointer"
                 >
                   إضافة ملف PDF الآن
                 </button>
@@ -348,18 +348,18 @@ export function PlansToolPage() {
     <div className="flex flex-col flex-1 w-full max-w-5xl mx-auto pb-24 px-4 sm:px-6 pt-8 text-right" dir="rtl">
       <Link 
         href="/tools" 
-        className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-700 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 mb-6 w-fit transition self-start bg-white dark:bg-zinc-900 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-2xs" 
+        className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-700 dark:text-zinc-300 hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)] mb-6 w-fit transition self-start bg-white dark:bg-zinc-900 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-2xs" 
         dir="rtl"
       >
-        <ArrowLeft className="w-4 h-4 rotate-180 text-blue-600 dark:text-blue-400" />
+        <ArrowLeft className="w-4 h-4 rotate-180 text-[var(--color-imamu-accent)]" />
         <span>العودة إلى الأدوات</span>
       </Link>
 
       <div className="mb-8">
-        <span className="text-xs sm:text-sm font-semibold tracking-widest text-blue-600 dark:text-blue-400 uppercase mb-2 block">
+        <span className="text-xs sm:text-sm font-semibold tracking-widest text-[var(--color-imamu-accent)] uppercase mb-2 block">
           التخطيط والتسجيل
         </span>
-        <h1 className="text-3xl sm:text-4xl font-display font-bold tracking-tight text-slate-900 dark:text-white mb-2">الخطط الدراسية</h1>
+        <h1 className="text-3xl sm:text-4xl font-serif font-bold tracking-tight text-slate-900 dark:text-white mb-2">الخطط الدراسية</h1>
         <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-xl">
           تصفح التخصصات المتاحة لعرض واستعراض الخطط الدراسية وملفات الـ PDF المعتمَدة لكل تخصص.
         </p>
@@ -377,7 +377,7 @@ export function PlansToolPage() {
               placeholder="البحث عن تخصص..." 
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pr-11 pl-4 py-3 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 focus:border-blue-600 outline-none shadow-2xs text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500"
+              className="w-full pr-11 pl-4 py-3 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-stone-100 dark:focus:ring-stone-900 focus:border-[var(--color-imamu-brown)] outline-none shadow-2xs text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500"
             />
           </div>
           
@@ -392,14 +392,14 @@ export function PlansToolPage() {
                       onClick={() => setSelectedMajor(m)}
                       className={`text-right px-4 py-3 rounded-xl transition flex items-center justify-between group cursor-pointer ${
                         isSelected 
-                          ? 'bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900/50 text-blue-700 dark:text-blue-400 font-bold' 
+                          ? 'bg-stone-50 dark:bg-stone-950/50 border border-amber-200 dark:border-stone-900/50 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] font-bold' 
                           : 'hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300'
                       }`}
                     >
                       <span className="text-xs sm:text-sm truncate">
                         {m.name}
                       </span>
-                      {isSelected && <GraduationCap className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mr-2" />}
+                      {isSelected && <GraduationCap className="w-4 h-4 text-[var(--color-imamu-accent)] shrink-0 mr-2" />}
                     </button>
                   );
                 })}
@@ -419,7 +419,7 @@ export function PlansToolPage() {
           ) : (
             <div className="h-full min-h-[380px] flex items-center justify-center bg-white dark:bg-zinc-900 rounded-3xl border border-dashed border-slate-300 dark:border-zinc-800 p-8 text-center">
               <div className="flex flex-col items-center max-w-sm">
-                <div className="w-14 h-14 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900/50 rounded-2xl flex items-center justify-center mb-4 text-blue-600 dark:text-blue-400">
+                <div className="w-14 h-14 bg-stone-50 dark:bg-stone-950/50 border border-amber-200 dark:border-stone-900/50 rounded-2xl flex items-center justify-center mb-4 text-[var(--color-imamu-accent)]">
                   <FileText className="w-7 h-7" />
                 </div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1.5">اختر تخصصاً لعرض الخطة</h3>
@@ -442,7 +442,7 @@ export function PlansToolPage() {
             </button>
             
             <div className="flex items-center gap-3 mb-5">
-              <div className="w-10 h-10 rounded-2xl bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+              <div className="w-10 h-10 rounded-2xl bg-stone-50 dark:bg-stone-950/50 border border-amber-200 dark:border-stone-900/50 flex items-center justify-center text-[var(--color-imamu-accent)] shrink-0">
                 <FileText className="w-5 h-5" />
               </div>
               <div>
@@ -459,7 +459,7 @@ export function PlansToolPage() {
                   placeholder="مثال: خطة 1446هـ"
                   value={newPdfTitle}
                   onChange={e => setNewPdfTitle(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs sm:text-sm outline-none focus:border-blue-500 text-slate-900 dark:text-white"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs sm:text-sm outline-none focus:border-[var(--color-imamu-brown)] text-slate-900 dark:text-white"
                 />
               </div>
 
@@ -471,7 +471,7 @@ export function PlansToolPage() {
                   placeholder="https://example.com/plan.pdf"
                   value={newPdfUrl}
                   onChange={e => setNewPdfUrl(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs sm:text-sm outline-none focus:border-blue-500 text-slate-900 dark:text-white dir-ltr text-left"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs sm:text-sm outline-none focus:border-[var(--color-imamu-brown)] text-slate-900 dark:text-white dir-ltr text-left"
                   dir="ltr"
                 />
               </div>
@@ -486,7 +486,7 @@ export function PlansToolPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-600/20 transition cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-xs font-bold shadow-md shadow-[var(--color-imamu-brown)/20] transition cursor-pointer"
                 >
                   إضافة الملف
                 </button>

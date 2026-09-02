@@ -83,7 +83,7 @@ export async function extractTelegramChannelPosts(
   };
 
   let channelTitle = channelHandle;
-  let channelAvatarUrl: string | null = null;
+  let channelAvatarUrl: any = null;
   const rawPostsMap = new Map<string, ExtractedTelegramPost>();
 
   const parseHtmlPage = (html: string) => {
@@ -194,8 +194,17 @@ export async function extractTelegramChannelPosts(
     throw new Error(`لم يتم العثور على أي منشورات عامة في قناة التليقرام @${channelHandle}. يرجى التأكد من أن القناة عامة وليست خاصة.`);
   }
 
-  // Use direct raw Telegram Channel Avatar URL (avoid server-side 404 HTTP downloads)
-  const finalChannelAvatarUrl = channelAvatarUrl || null;
+  // Store channel avatar locally so browser loads it smoothly without telesco.pe CORS/CSP issues
+  let finalChannelAvatarUrl: string | null = (channelAvatarUrl as string | null) || null;
+  const avatarUrlStr = typeof channelAvatarUrl === 'string' ? channelAvatarUrl : '';
+  if (avatarUrlStr && (avatarUrlStr.startsWith('http://') || avatarUrlStr.startsWith('https://'))) {
+    try {
+      const stored = await downloadAndUploadToStorage(avatarUrlStr, 'tg_avatar');
+      if (stored) finalChannelAvatarUrl = stored;
+    } catch (e) {
+      console.warn('[Telegram Avatar Download Error]', e);
+    }
+  }
 
   // 1. Insert/Update channel source in news_sources
   const existingSource = await db.select().from(news_sources).where(

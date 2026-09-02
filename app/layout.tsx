@@ -9,6 +9,7 @@ export const metadata = {
 };
 
 import { TopBar } from '../src/components/TopBar';
+import { Footer } from '../src/components/Footer';
 
 export default function RootLayout({
   children,
@@ -30,6 +31,7 @@ export default function RootLayout({
               <div className="flex-1 flex flex-col">
                 {children}
               </div>
+              <Footer />
             </div>
           </AuthProvider>
         </ThemeProvider>
