@@ -11,6 +11,7 @@ import { FormattedNewsContent } from '../components/FormattedNewsContent';
 import { NewsDetailModal } from '../components/NewsDetailModal';
 import { ImageViewerModal } from '../components/ImageViewerModal';
 import { NewsMediaPreview } from '../components/NewsMediaPreview';
+import { formatDate } from '../lib/date-utils';
 
 interface Comment {
   id: number;
@@ -208,7 +209,7 @@ export function NewsPage() {
                   </span>
                   <span className="text-xs text-slate-400 dark:text-zinc-500 flex items-center gap-1">
                     <Clock className="w-3.5 h-3.5" />
-                    {new Date(featuredItem.createdAt).toLocaleDateString('ar-SA')}
+                    {formatDate(featuredItem.createdAt, 'ar-display')}
                   </span>
                 </div>
 
@@ -329,7 +330,7 @@ export function NewsPage() {
                     </div>
                   </div>
                   <span className="text-[10px] text-slate-400 dark:text-zinc-500">
-                    {new Date(item.createdAt).toLocaleDateString('ar-SA')}
+                    {formatDate(item.createdAt, 'ar-display')}
                   </span>
                 </div>
 

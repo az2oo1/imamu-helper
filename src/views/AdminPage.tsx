@@ -3,22 +3,21 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../lib/AuthContext';
 import {
-  ShieldAlert, ShieldCheck, Calendar, BookOpen, FileText,
-  Trash2, Link as LinkIcon, Download, Upload, Plus, Search, X,
-  Users, BarChart3, Settings, HelpCircle, ExternalLink, PlusCircle,
-  ChevronDown, ChevronUp, Activity, Server, Database, Cpu, Globe,
-  Shield, UserCheck, UserX, Eye, Sparkles, Command, Hash, Clock,
+  ShieldAlert, ShieldCheck, Calendar, BookOpen,
+  Trash2, Link as LinkIcon, Download, Upload, Plus, X,
+  Users, Settings, HelpCircle, ExternalLink, Server, Command,
   CheckCircle2, AlertTriangle, Info, XCircle, RefreshCw, Zap, 
-  LayoutDashboard, Newspaper, GraduationCap, BookMarked, Link2,
-  MoreHorizontal, ArrowUpRight, TrendingUp, Bell, Folder, Wrench, Edit3, Send, Mail
+  LayoutDashboard, Newspaper, GraduationCap, Link2, Folder, Edit3, Send, Mail
 } from 'lucide-react';
-import { format } from 'date-fns';
 import { TutorialsTab } from '../components/TutorialsTab';
 import CreateCourseModal from '../components/CreateCourseModal';
 import CreateResourceModal from '../components/CreateResourceModal';
+import CreateEventModal from '../components/CreateEventModal';
 import AdminDashboardTab from './admin/AdminDashboardTab';
+
 import AdminUsersTab from './admin/AdminUsersTab';
 import { AnimatedNumber } from '../components/ui';
+import { parseDate, formatDate } from '../lib/date-utils';
 
 
 
@@ -149,40 +148,10 @@ function CommandPalette({ open, onClose, onSelect, tabs }: { open: boolean; onCl
   );
 }
 
-// ============================================================================
-// STAT CARD
-// ============================================================================
-function StatCard({ label, value, icon, color, sub }: { label: string; value: number; icon: React.ReactNode; color: string; sub?: string }) {
-  return (
-    <div
-      className="relative rounded-2xl p-5 border overflow-hidden group transition-all duration-300 hover:scale-[1.02] hover:shadow-lg"
-      style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
-    >
-      <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl" style={{ background: color }} />
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{label}</p>
-          <p className="text-3xl font-bold tracking-tight" style={{ color: 'var(--text-main)' }}>
-            <AnimatedNumber value={value} />
-          </p>
-          {sub && <p className="text-xs mt-1.5 font-medium" style={{ color }}>{sub}</p>}
-        </div>
-        <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: `${color}18`, color }}>
-          {icon}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// MAIN ADMIN PAGE
-// ============================================================================
 export function AdminPage() {
   const { user, dbUser, loading: authLoading } = useAuth();
   const isAdmin = !!(dbUser?.isAdmin || dbUser?.role === 'ADMIN');
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
 
   // Toast
@@ -251,10 +220,13 @@ export function AdminPage() {
     tags: '' 
   });
 
-  const [eventForm, setEventForm] = useState<{ id?: number; title: string; date: string; description: string }>({ title: '', date: '', description: '' });
+  const [eventForm, setEventForm] = useState<{ id?: number; title: string; date: string; description: string; isHoliday?: boolean; isHolidayEnd?: boolean; isSemesterStart?: boolean; isSemesterEnd?: boolean; isEid?: boolean; isNationalDay?: boolean }>({ title: '', date: '', description: '', isHoliday: false, isHolidayEnd: false, isSemesterStart: false, isSemesterEnd: false, isEid: false, isNationalDay: false });
   const [newbieLinkForm, setNewbieLinkForm] = useState<{ id?: number; title: string; url: string; description: string }>({ title: '', url: '', description: '' });
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
   const [isResourceModalOpen, setIsResourceModalOpen] = useState(false);
+  const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+
+
 
 
 
@@ -265,9 +237,8 @@ export function AdminPage() {
   const [majorSearch, setMajorSearch] = useState('');
   const [majorLimit, setMajorLimit] = useState(10);
   const [eventSearch, setEventSearch] = useState('');
-  const [eventLimit, setEventLimit] = useState(20);
+  const [eventLimit, setEventLimit] = useState(1000);
   const [unassignedSearch, setUnassignedSearch] = useState('');
-  const [expandedCourseId, setExpandedCourseId] = useState<number | null>(null);
   const [resourceForm, setResourceForm] = useState<{
     id?: number;
     subjectId?: number;
@@ -629,10 +600,7 @@ export function AdminPage() {
     );
   }
 
-  // ============================================================================
-  // CHART COLORS
-  // ============================================================================
-  const chartColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+
 
   // ============================================================================
   // TAB: NEWS SOURCES
@@ -747,7 +715,7 @@ export function AdminPage() {
                       <div className="text-xs mt-1 flex gap-2 flex-wrap" style={{ color: 'var(--text-muted)' }}>
                         <span className="font-medium px-2 py-0.5 rounded" style={{ background: 'var(--bg-subtle)' }}>{s.newsCount || 0} posts</span>
                         <span style={{ color: 'var(--border-color)' }}>•</span>
-                        <span>Last fetched: {s.lastFetched ? (isNaN(new Date(s.lastFetched).getTime()) ? String(s.lastFetched) : new Date(s.lastFetched).toLocaleString()) : 'Never'}</span>
+                        <span>Last fetched: {s.lastFetched ? formatDate(s.lastFetched, 'ar-full') : 'Never'}</span>
                       </div>
                     </div>
                   </div>
@@ -974,99 +942,197 @@ export function AdminPage() {
       </div>
     </div>
   );
-
-  // ============================================================================
   // TAB: EVENTS
   // ============================================================================
-  const renderEvents = () => (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-2xl font-display font-bold" style={{ color: 'var(--text-main)' }}>Calendar Dates</h3>
-        <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Manage academic dates, events, subscriptions, and allowances</p>
-      </div>
+  const renderEvents = () => {
+    const filteredEvents = events.filter(e => 
+      e.title?.toLowerCase().includes(eventSearch.toLowerCase()) || 
+      e.description?.toLowerCase().includes(eventSearch.toLowerCase())
+    ).sort((a, b) => {
+      const dA = parseDate(a.date)?.getTime() || 0;
+      const dB = parseDate(b.date)?.getTime() || 0;
+      return dA - dB;
+    });
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        <div className="space-y-4">
-          <div className="rounded-2xl p-5 border space-y-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-            <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>{eventForm.id ? 'Edit Calendar Event' : 'Add Calendar Event'}</h4>
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Event Title</label>
-                <input type="text" placeholder="e.g. Final Exams Begin" value={eventForm.title} onChange={e => setEventForm(s => ({ ...s, title: e.target.value }))} className="py-2 px-3 rounded-xl text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Event Date</label>
-                <input type="date" value={eventForm.date} onChange={e => setEventForm(s => ({ ...s, date: e.target.value }))} className="py-2 px-3 rounded-xl text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Description</label>
-                <textarea placeholder="Event Description (optional)" value={eventForm.description} onChange={e => setEventForm(s => ({ ...s, description: e.target.value }))} className="py-2 px-3 rounded-xl min-h-[80px] text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-              </div>
-              <div className="flex gap-2 pt-1">
-                <button
-                  onClick={() => {
-                    const url = eventForm.id ? `/api/admin/events/${eventForm.id}` : '/api/admin/events';
-                    const method = eventForm.id ? 'PUT' : 'POST';
-                    handlePostWithMethod(url, method, eventForm, () => setEventForm({ id: undefined, title: '', date: '', description: '' }));
-                  }}
-                  className="flex-1 bg-[var(--color-imamu-blue)] text-white py-2 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-blue-light)] transition"
-                >
-                  {eventForm.id ? 'Update Event' : 'Add Event'}
-                </button>
-                {eventForm.id && <button onClick={() => setEventForm({ id: undefined, title: '', date: '', description: '' })} className="px-3 py-2 border rounded-xl text-sm font-medium transition hover:bg-[var(--bg-subtle)]" style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}>Cancel</button>}
-              </div>
-            </div>
+    const displayedEvents = filteredEvents.slice(0, eventLimit);
+
+    return (
+      <div className="space-y-6" dir="rtl">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-2xl font-display font-bold" style={{ color: 'var(--text-main)' }}>المواعيد والتقويم الأكاديمي ({events.length})</h3>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>إدارة المواعيد الرسمية، الاختبارات، الإجازات، وبداية ونهاية الفصول الدراسية</p>
           </div>
 
-          <div className="rounded-2xl p-4 border space-y-3" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-            <h4 className="font-semibold text-xs" style={{ color: 'var(--text-main)' }}>Calendar Feed Subscriptions</h4>
-            <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Users can sync using ICS format.</p>
-            <a href="/api/calendar.ics" download className="flex items-center justify-center gap-2 border font-medium py-1.5 rounded-xl text-xs w-full transition hover:bg-[var(--bg-subtle)]" style={{ borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>
-              <Download className="w-3.5 h-3.5" /> Download .ics Feed
-            </a>
+          <button
+            onClick={() => {
+              setEventForm({ 
+                id: undefined, title: '', date: '', description: '', isHoliday: false, isSemesterStart: false, isSemesterEnd: false 
+              });
+              setIsEventModalOpen(true);
+            }}
+            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl transition shadow-md shadow-blue-600/20 border border-blue-500/30 shrink-0 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>إضافة موعد / حدث جديد</span>
+          </button>
+        </div>
+
+        {/* Controls Bar: Search & Display Limit */}
+        <div className="rounded-2xl p-4 border flex flex-col sm:flex-row items-center justify-between gap-4 shadow-2xs" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+          <div className="relative w-full sm:w-80">
+            <input
+              type="text"
+              placeholder="ابحث عن موعد أو حدث..."
+              value={eventSearch}
+              onChange={e => setEventSearch(e.target.value)}
+              className="w-full py-2 px-4 rounded-xl text-xs sm:text-sm border outline-none font-medium"
+              style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
+            />
           </div>
 
-          <div className="rounded-2xl p-4 border space-y-3" style={{ background: 'rgba(16,185,129,0.05)', borderColor: 'rgba(16,185,129,0.2)' }}>
-            <h4 className="font-semibold text-xs text-emerald-500">Mokafaa Allowance Scheduler</h4>
-            <p className="text-[11px] text-emerald-400/80">Generates allowance dates on the 25th of every month for 12 months.</p>
-            <button
-              onClick={() => handlePost('/api/admin/events/generate-mokafaa', {}, () => { toast('success', 'Generated 12 Mokafaa events!'); fetchData(); })}
-              className="flex items-center justify-center gap-2 bg-emerald-600 text-white font-medium py-1.5 rounded-xl text-xs w-full hover:bg-emerald-700 transition"
+          <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+            <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
+              عرض {displayedEvents.length} من أصل {filteredEvents.length}
+            </span>
+            <select
+              value={eventLimit}
+              onChange={e => setEventLimit(Number(e.target.value))}
+              className="py-2 px-3 rounded-xl text-xs font-bold border outline-none cursor-pointer"
+              style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
             >
-              <Zap className="w-3.5 h-3.5" /> Generate Mokafaa Dates
-            </button>
+              <option value={20}>20 موعد</option>
+              <option value={50}>50 موعد</option>
+              <option value={100}>100 موعد</option>
+              <option value={1000}>الكل ({events.length})</option>
+            </select>
           </div>
         </div>
 
-        <div className="lg:col-span-2">
-          <div className="rounded-2xl border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-            <div className="px-5 py-4 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3" style={{ borderColor: 'var(--border-color)' }}>
-              <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>Upcoming Events ({events.length})</h4>
-              <input type="text" placeholder="Search events..." value={eventSearch} onChange={e => setEventSearch(e.target.value)} className="py-1.5 px-3 rounded-xl text-xs border w-full sm:w-48" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+          {/* Quick Actions Sidebar */}
+          <div className="space-y-4">
+            <div className="rounded-2xl p-5 border space-y-3 shadow-2xs" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+              <h4 className="font-bold text-xs" style={{ color: 'var(--text-main)' }}>اشتراكات تقويم Google / Apple (ICS)</h4>
+              <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>يستطيع الطلاب المزامنة مباشرة مع التقويم عبر رابط التغذية الرسمية.</p>
+              <a href="/api/calendar.ics" download className="flex items-center justify-center gap-2 border font-bold py-2 rounded-xl text-xs w-full transition hover:bg-[var(--bg-subtle)]" style={{ borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>
+                <Download className="w-4 h-4 text-blue-500" /> تحميل ملف التقويم (.ics)
+              </a>
             </div>
-            <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
-              {events.filter(e => e.title?.toLowerCase().includes(eventSearch.toLowerCase()) || e.description?.toLowerCase().includes(eventSearch.toLowerCase())).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).slice(0, eventLimit).map(e => (
-                <div key={e.id} className="py-3.5 px-5 flex items-center justify-between group transition hover:bg-[var(--bg-subtle)]">
-                  <div className="min-w-0 flex-1 pr-3">
-                    <div className="font-medium text-sm truncate" style={{ color: 'var(--text-main)' }}>{e.title}</div>
-                    <div className="text-xs mt-1 flex gap-2 flex-wrap" style={{ color: 'var(--text-muted)' }}>
-                      <span className="font-semibold text-[var(--color-imamu-blue)]">{format(new Date(e.date), 'MMM dd, yyyy')}</span>
-                      {e.description && (<><span style={{ color: 'var(--border-color)' }}>•</span><span className="truncate">{e.description}</span></>)}
+
+            <div className="rounded-2xl p-5 border space-y-3 shadow-2xs" style={{ background: 'rgba(16,185,129,0.05)', borderColor: 'rgba(16,185,129,0.2)' }}>
+              <h4 className="font-bold text-xs text-emerald-500">جدولة مواعيد المكافأة الجامعية</h4>
+              <p className="text-[11px] text-emerald-400/80 leading-relaxed">يولد مواعيد إيداع المكافأة تلقائياً يوم 27 من كل شهر ميلادي لـ 12 شهراً.</p>
+              <button
+                onClick={() => handlePost('/api/admin/events/generate-mokafaa', {}, () => { toast('success', 'تم توليد 12 موعداً للمكافأة الجامعية!'); fetchData(); })}
+                className="flex items-center justify-center gap-2 bg-emerald-600 text-white font-bold py-2 rounded-xl text-xs w-full hover:bg-emerald-700 transition cursor-pointer shadow-xs"
+              >
+                <Zap className="w-4 h-4" /> توليد مواعيد المكافأة
+              </button>
+            </div>
+          </div>
+
+          {/* Events Vertical List */}
+          <div className="lg:col-span-2 space-y-3">
+            <div className="rounded-2xl border divide-y overflow-hidden shadow-2xs" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+              {displayedEvents.map(e => {
+                const dateDisplay = e.date;
+
+                return (
+                  <div 
+                    key={e.id} 
+                    className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all duration-150 hover:bg-[var(--bg-subtle)] group"
+                    style={{ borderColor: 'var(--border-color)' }}
+                  >
+                    <div className="flex-1 min-w-0 space-y-1.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-sm sm:text-base leading-snug" style={{ color: 'var(--text-main)' }}>
+                          {e.title}
+                        </span>
+
+                        {e.isSemesterStart && <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30">🚀 بداية الفصل</span>}
+                        {e.isSemesterEnd && <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30">🏁 نهاية الفصل</span>}
+                        {e.isHoliday && <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">🌴 بداية إجازة</span>}
+                        {e.isHolidayEnd && <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-500/30">🔄 نهاية إجازة</span>}
+                        {e.isEid && <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">🌙 احتفال العيد</span>}
+                        {e.isNationalDay && <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 border border-emerald-600/40">🇸🇦 اليوم الوطني</span>}
+                      </div>
+
+                      {e.description && (
+                        <p className="text-xs leading-relaxed max-w-2xl" style={{ color: 'var(--text-muted)' }}>
+                          {e.description}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                      <div className="flex items-center gap-1.5 text-xs font-mono font-bold px-3 py-1.5 rounded-xl border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--color-imamu-blue)' }}>
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>{dateDisplay}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <button 
+                          onClick={() => {
+                            setEventForm({
+                              id: e.id,
+                              title: e.title || '',
+                              date: e.date || '',
+                              description: e.description || '',
+                              isHoliday: !!e.isHoliday,
+                              isHolidayEnd: !!e.isHolidayEnd,
+                              isSemesterStart: !!e.isSemesterStart,
+                              isSemesterEnd: !!e.isSemesterEnd,
+                              isEid: !!e.isEid,
+                              isNationalDay: !!e.isNationalDay
+                            });
+                            setIsEventModalOpen(true);
+                          }} 
+                          className="px-3 py-1.5 rounded-xl border text-xs font-bold transition hover:bg-[var(--bg-subtle)] cursor-pointer" 
+                          style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
+                        >
+                          تعديل
+                        </button>
+
+                        <button 
+                          onClick={() => handleDelete(`/api/admin/events/${e.id}`, e.title)} 
+                          className="p-2 rounded-xl transition hover:bg-red-500/10 cursor-pointer text-red-400"
+                          title="حذف الموعد"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button onClick={() => setEventForm(e)} className="px-2 py-1 rounded transition text-xs font-semibold hover:bg-[var(--bg-subtle)]" style={{ color: 'var(--text-muted)' }}>Edit</button>
-                    <button onClick={() => handleDelete(`/api/admin/events/${e.id}`, e.title)} className="p-1.5 rounded transition hover:bg-red-500/10"><Trash2 className="w-4 h-4 text-red-400" /></button>
-                  </div>
+                );
+              })}
+              {displayedEvents.length === 0 && (
+                <div className="py-16 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
+                  لا توجد مواعيد أكاديمية مطابقة للبحث.
                 </div>
-              ))}
-              {events.length === 0 && <div className="py-12 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No events scheduled.</div>}
+              )}
             </div>
           </div>
         </div>
+
+        {/* Create / Edit Calendar Event Modal Dialog Popup */}
+        <CreateEventModal 
+          isOpen={isEventModalOpen}
+          onClose={() => setIsEventModalOpen(false)}
+          eventForm={eventForm}
+          setEventForm={setEventForm}
+          onSave={() => {
+            const url = eventForm.id ? `/api/admin/events/${eventForm.id}` : '/api/admin/events';
+            const method = eventForm.id ? 'PUT' : 'POST';
+            handlePostWithMethod(url, method, eventForm, () => {
+              fetchData();
+            });
+          }}
+        />
       </div>
-    </div>
-  );
+    );
+  };
+
 
   // ============================================================================
   // TAB: SUBJECTS / COURSES
@@ -1312,19 +1378,6 @@ export function AdminPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl p-5 border space-y-3" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-            <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>Semester Countdowns</h4>
-            <div className="space-y-3">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Semester Start Date</label>
-                <input type="date" value={globalSettings.semesterStartDate || ''} onChange={e => setGlobalSettings((s: any) => ({ ...s, semesterStartDate: e.target.value }))} className="py-2 px-3 rounded-xl text-sm border w-full" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Semester End Date</label>
-                <input type="date" value={globalSettings.semesterEndDate || ''} onChange={e => setGlobalSettings((s: any) => ({ ...s, semesterEndDate: e.target.value }))} className="py-2 px-3 rounded-xl text-sm border w-full" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-              </div>
-            </div>
-          </div>
 
           <div className="rounded-2xl p-5 border space-y-3" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
             <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>External API Settings</h4>

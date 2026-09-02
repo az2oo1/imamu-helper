@@ -8,9 +8,11 @@ import { requireAuth, AuthRequest } from '../../middleware/auth';
 import { sendVerificationEmail } from '../../lib/mailer';
 import { normalizeUserIdentifier, formatStudentEmail, sanitizeUser } from '../../lib/auth-utils';
 import { JWT_SECRET } from '../../lib/config';
+import { downloadAndUploadToStorage } from '../../lib/storage';
 
 export function createAuthRouter(db: any) {
   const router = express.Router();
+
 
   // Auth: Send Code
   router.post(["/send-code", "/auth/send-code"], async (req, res): Promise<any> => {
@@ -57,12 +59,14 @@ export function createAuthRouter(db: any) {
         return res.json({
           success: true,
           code,
+          devCode: code,
           message: `تم إرسال رمز التحقق إلى ${email}`
         });
       } else {
         return res.json({
           success: true,
           code,
+          devCode: code,
           smtpError: true,
           message: `تم إنشاء رمز التحقق بنجاح [${code}] (تعذر الإرسال عبر البريد بسبب خطأ 535: يرجى تحديث كلمة مرور التطبيقات في الإعدادات)`
         });
@@ -93,6 +97,9 @@ export function createAuthRouter(db: any) {
 
       const existingEmail = await db.select().from(users).where(eq(users.email, email));
       if (existingEmail.length > 0) return res.status(400).json({ error: "Email already registered" });
+
+      const existingUserName = await db.select().from(users).where(sql`LOWER(${users.userName}) = LOWER(${userName})`);
+      if (existingUserName.length > 0) return res.status(400).json({ error: "Username already taken" });
 
       const codeRecords = await db.select().from(verification_codes).where(eq(verification_codes.email, email)).orderBy(desc(verification_codes.id));
       if (codeRecords.length === 0) return res.status(400).json({ error: "No verification code sent to this email" });
@@ -237,14 +244,56 @@ export function createAuthRouter(db: any) {
 
   // Check username availability
   router.get(["/check-username", "/auth/check-username"], requireAuth, async (req: AuthRequest, res): Promise<any> => {
-    res.json({ available: true });
+    try {
+      const requestedName = String(req.query.username || req.query.userName || req.query.name || '').trim();
+      if (!requestedName) {
+        return res.json({ available: true });
+      }
+
+      const records = await db.select().from(users).where(sql`LOWER(${users.userName}) = LOWER(${requestedName})`);
+      if (records.length === 0) {
+        return res.json({ available: true });
+      }
+
+      const currentUserUid = req.user?.uid;
+      const isSelf = records.every((u: any) => u.uid === currentUserUid);
+      if (isSelf) {
+        return res.json({ available: true });
+      }
+
+      return res.json({ available: false });
+    } catch (e: any) {
+      console.error("[Check Username Error]", e);
+      return res.status(500).json({ error: "Failed to check username" });
+    }
   });
 
   // Update user profile
   router.post(["/users/me", "/auth/users/me"], requireAuth, async (req: AuthRequest, res): Promise<any> => {
     try {
       if (!req.user) return res.status(401).json({ error: "No user" });
-      const { phone, major, currentGpa, finishedHours, completedCourses, profilePicUrl, userName } = req.body;
+      let { phone, major, currentGpa, finishedHours, completedCourses, profilePicUrl, userName } = req.body;
+
+      if (userName !== undefined && userName !== null) {
+        const trimmedUserName = String(userName).trim();
+        if (trimmedUserName) {
+          const existingUser = await db.select().from(users).where(
+            and(
+              sql`LOWER(${users.userName}) = LOWER(${trimmedUserName})`,
+              sql`${users.uid} != ${req.user.uid}`
+            )
+          );
+          if (existingUser.length > 0) {
+            return res.status(400).json({ error: "Username already taken" });
+          }
+          userName = trimmedUserName;
+        }
+      }
+
+      if (profilePicUrl && (profilePicUrl.startsWith('data:image/') || profilePicUrl.startsWith('http://') || profilePicUrl.startsWith('https://'))) {
+        const stored = await downloadAndUploadToStorage(profilePicUrl, 'user_pfp');
+        if (stored) profilePicUrl = stored;
+      }
 
       const result = await db.update(users).set({
         phone, major, currentGpa, finishedHours, completedCourses: completedCourses ? (typeof completedCourses === 'string' ? completedCourses : JSON.stringify(completedCourses)) : null, profilePicUrl, userName
@@ -255,6 +304,7 @@ export function createAuthRouter(db: any) {
       res.status(500).json({ error: "Failed to update user" });
     }
   });
+
 
   return router;
 }

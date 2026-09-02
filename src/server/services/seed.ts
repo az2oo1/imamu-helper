@@ -1,5 +1,92 @@
-import { tutorial_sections, tutorials, newbie_links } from '../../db/schema';
+import { tutorial_sections, tutorials, newbie_links, news_sources, news, course_resources, subjects, users } from '../../db/schema';
 import { eq } from 'drizzle-orm';
+import { downloadAndUploadToStorage } from '../../lib/storage';
+
+export async function syncExternalImagesToStorage(db: any) {
+  try {
+    console.log('[DB] Checking for external images/avatars/logos to save into Garage S3 Object Storage...');
+
+    // 1. news_sources profilePicUrl
+    const sources = await db.select().from(news_sources);
+    for (const s of sources) {
+      if (s.profilePicUrl && (s.profilePicUrl.startsWith('http://') || s.profilePicUrl.startsWith('https://'))) {
+        const storedUrl = await downloadAndUploadToStorage(s.profilePicUrl, 'tg_avatar');
+        if (storedUrl && storedUrl !== s.profilePicUrl) {
+          await db.update(news_sources).set({ profilePicUrl: storedUrl }).where(eq(news_sources.id, s.id));
+          console.log(`[Storage Sync] Saved news_source logo @${s.handle} to Garage S3: ${storedUrl}`);
+        }
+      }
+    }
+
+    // 2. news authorAvatar and imageUrl
+    const newsItems = await db.select().from(news);
+    for (const n of newsItems) {
+      const updates: any = {};
+      if (n.authorAvatar && (n.authorAvatar.startsWith('http://') || n.authorAvatar.startsWith('https://')) && !n.authorAvatar.includes('telesco.pe')) {
+        const storedAvatar = await downloadAndUploadToStorage(n.authorAvatar, 'tg_avatar');
+        if (storedAvatar && storedAvatar !== n.authorAvatar) updates.authorAvatar = storedAvatar;
+      }
+      if (n.imageUrl && (n.imageUrl.startsWith('http://') || n.imageUrl.startsWith('https://')) && !n.imageUrl.includes('telesco.pe')) {
+        const storedImg = await downloadAndUploadToStorage(n.imageUrl, 'tg_photo');
+        if (storedImg && storedImg !== n.imageUrl) updates.imageUrl = storedImg;
+      }
+      if (Object.keys(updates).length > 0) {
+        await db.update(news).set(updates).where(eq(news.id, n.id));
+        console.log(`[Storage Sync] Saved news item #${n.id} media to Garage S3`, updates);
+      }
+    }
+
+    // 3. course_resources avatarUrl and bannerUrl
+    const resources = await db.select().from(course_resources);
+    for (const r of resources) {
+      const updates: any = {};
+      if (r.avatarUrl && (r.avatarUrl.startsWith('http://') || r.avatarUrl.startsWith('https://') || r.avatarUrl.startsWith('data:image/'))) {
+        const stored = await downloadAndUploadToStorage(r.avatarUrl, 'wa_avatar');
+        if (stored && stored !== r.avatarUrl) updates.avatarUrl = stored;
+      }
+      if (r.bannerUrl && (r.bannerUrl.startsWith('http://') || r.bannerUrl.startsWith('https://') || r.bannerUrl.startsWith('data:image/'))) {
+        const stored = await downloadAndUploadToStorage(r.bannerUrl, 'banner');
+        if (stored && stored !== r.bannerUrl) updates.bannerUrl = stored;
+      }
+      if (Object.keys(updates).length > 0) {
+        await db.update(course_resources).set(updates).where(eq(course_resources.id, r.id));
+        console.log(`[Storage Sync] Saved course_resource #${r.id} avatar to Garage S3`, updates);
+      }
+    }
+
+    // 4. subjects avatarUrl and bannerUrl
+    const subjs = await db.select().from(subjects);
+    for (const sub of subjs) {
+      const updates: any = {};
+      if (sub.avatarUrl && (sub.avatarUrl.startsWith('http://') || sub.avatarUrl.startsWith('https://') || sub.avatarUrl.startsWith('data:image/'))) {
+        const stored = await downloadAndUploadToStorage(sub.avatarUrl, 'subj_avatar');
+        if (stored && stored !== sub.avatarUrl) updates.avatarUrl = stored;
+      }
+      if (sub.bannerUrl && (sub.bannerUrl.startsWith('http://') || sub.bannerUrl.startsWith('https://') || sub.bannerUrl.startsWith('data:image/'))) {
+        const stored = await downloadAndUploadToStorage(sub.bannerUrl, 'banner');
+        if (stored && stored !== sub.bannerUrl) updates.bannerUrl = stored;
+      }
+      if (Object.keys(updates).length > 0) {
+        await db.update(subjects).set(updates).where(eq(subjects.id, sub.id));
+        console.log(`[Storage Sync] Saved subject #${sub.id} avatar to Garage S3`, updates);
+      }
+    }
+
+    // 5. users profilePicUrl (including base64 data URLs)
+    const userRecs = await db.select().from(users);
+    for (const u of userRecs) {
+      if (u.profilePicUrl && (u.profilePicUrl.startsWith('http://') || u.profilePicUrl.startsWith('https://') || u.profilePicUrl.startsWith('data:image/'))) {
+        const stored = await downloadAndUploadToStorage(u.profilePicUrl, 'user_pfp');
+        if (stored && stored !== u.profilePicUrl) {
+          await db.update(users).set({ profilePicUrl: stored }).where(eq(users.id, u.id));
+          console.log(`[Storage Sync] Saved user #${u.id} profile pic to Garage S3: ${stored}`);
+        }
+      }
+    }
+  } catch (err: any) {
+    console.error('[Storage Sync] Error syncing external images to storage:', err.message || err);
+  }
+}
 
 export async function seedDefaults(db: any) {
   try {
@@ -106,81 +193,43 @@ export async function seedDefaults(db: any) {
           linkTitle: 'رفع الصورة الشخصية (Banner)'
         }
       ]);
-
-      // Seed newbie links
-      const existingLinks = await db.select().from(newbie_links);
-      if (existingLinks.length === 0) {
-        console.log('[DB] Seeding default newbie links...');
-        await db.insert(newbie_links).values([
-          {
-            title: 'بوابة الخدمات الذاتية (Banner)',
-            url: 'https://bstss.imamu.edu.sa/StudentSelfService',
-            description: 'البوابة الرسمية لتسجيل المقررات، إعداد الجداول، ومعرفة المعدل التراكمي والسجل الأكاديمي.'
-          },
-          {
-            title: 'نظام التعليم الإلكتروني (Blackboard)',
-            url: 'https://lms.imamu.edu.sa',
-            description: 'منصة التعليم الإلكتروني الرسمية لحضور المحاضرات الافتراضية، وحل الواجبات، ومتابعة الاختبارات.'
-          },
-          {
-            title: 'بوابة البريد الإلكتروني الجامعي',
-            url: 'https://mail.imamu.edu.sa/imamowa/',
-            description: 'الوصول لبريدك الأكاديمي الرسمي وتفعيل الحساب الجامعي واستقبال الإعلانات الهامة.'
-          },
-          {
-            title: 'الموقع الرسمي لجامعة الإمام',
-            url: 'https://imamu.edu.sa',
-            description: 'موقع الجامعة الإلكتروني للاطلاع على أخبار العمادات، الكليات، والتقويم الدراسي المعتمد.'
-          }
-        ]);
-      }
-
-      // Seed default academic calendar events (1448/1449 AH - 2026/2027 AD)
-      const { events } = await import('../../db/schema');
-      const existingEvents = await db.select().from(events);
-      if (existingEvents.length === 0) {
-        console.log('[DB] Seeding official academic calendar events...');
-        await db.insert(events).values([
-          { title: "التحويل بين الكليات والأقسام (غير الخدمات الذاتية) - الفصل الأول", date: "2026-07-19", description: "من الأحد 05/02/1448هـ (19/07/2026م) إلى السبت 18/02/1448هـ (01/08/2026م) - الفصل الدراسي الأول" },
-          { title: "إعادة القيد للمنتظمين غير المستجدين (غير الخدمات الذاتية) - الفصل الأول", date: "2026-07-19", description: "من الأحد 05/02/1448هـ (19/07/2026م) إلى السبت 09/03/1448هـ (22/08/2026م) - الفصل الدراسي الأول" },
-          { title: "تسجيل المقررات (غير الخدمات الذاتية) - الفصل الأول", date: "2026-07-26", description: "من الأحد 12/02/1448هـ (26/07/2026م) إلى السبت 25/02/1448هـ (08/08/2026م) - الفصل الدراسي الأول" },
-          { title: "تأجيل القبول في برامج الدراسات العليا - الفصل الأول", date: "2026-08-09", description: "من الأحد 26/02/1448هـ (09/08/2026م) إلى السبت 09/03/1448هـ (22/08/2026م) - الفصل الدراسي الأول" },
-          { title: "التأجيل لبرامج الدبلوم والبكالوريوس والدراسات العليا (عبر الخدمات الذاتية) - الفصل الأول", date: "2026-08-16", description: "من الأحد 03/03/1448هـ (16/08/2026م) إلى السبت 16/03/1448هـ (29/08/2026م) - الفصل الدراسي الأول" },
-          { title: "التسجيل الإلحاقي لمعالجة الحالات المتعثرة - الفصل الأول", date: "2026-08-20", description: "من الخميس 07/03/1448هـ (20/08/2026م) إلى السبت 09/03/1448هـ (22/08/2026م) - الفصل الدراسي الأول" },
-          { title: "بداية الدراسة وعودة أعضاء هيئة التدريس والمحاضرين والمعيدين - الفصل الأول", date: "2026-08-23", description: "الأحد 10/03/1448هـ (23/08/2026م) - الفصل الدراسي الأول" },
-          { title: "الاختبارات البديلة والتكميلية عن الفصل الثاني والصيفي", date: "2026-08-23", description: "من الأحد 10/03/1448هـ (23/08/2026م) إلى الخميس 14/03/1448هـ (27/08/2026م)" },
-          { title: "الاعتذار عن الفصل والانسحاب من مقرر أو مقررين (الدبلوم والبكالوريوس) - الفصل الأول", date: "2026-08-30", description: "من الأحد 17/03/1448هـ (30/08/2026م) إلى السبت 03/07/1448هـ (12/12/2026م) - الفصل الدراسي الأول" },
-          { title: "الاعتذار عن الفصل الدراسي في (الدراسات العليا) - الفصل الأول", date: "2026-08-30", description: "من الأحد 17/03/1448هـ (30/08/2026م) إلى السبت 10/07/1448هـ (19/12/2026م) - الفصل الدراسي الأول" },
-          { title: "إجازة اليوم الوطني", date: "2026-09-23", description: "الأربعاء والخميس 12-13/04/1448هـ (23-24/09/2026م)" },
-          { title: "بداية إجازة الخريف", date: "2026-11-19", description: "نهاية دوام يوم الخميس 09/06/1448هـ (19/11/2026م)" },
-          { title: "بداية الدراسة بعد إجازة الخريف", date: "2026-11-29", description: "الأحد 19/06/1448هـ (29/11/2026م)" },
-          { title: "بداية الاختبارات النهائية - الفصل الأول", date: "2026-12-27", description: "الأحد 18/07/1448هـ (27/12/2026م) - الفصل الدراسي الأول" },
-          { title: "إجازة منتصف العام الدراسي", date: "2027-01-07", description: "من نهاية دوام يوم الخميس 29/07/1448هـ (07/01/2027م) إلى السبت 08/08/1448هـ (16/01/2027م)" },
-          { title: "إعادة القيد للمنتظمين غير المستجدين (غير الخدمات الذاتية) - الفصل الثاني", date: "2026-12-20", description: "من الأحد 11/07/1448هـ (20/12/2026م) إلى السبت 08/08/1448هـ (16/01/2027م) - الفصل الدراسي الثاني" },
-          { title: "تسجيل المقررات (غير الخدمات الذاتية) - الفصل الثاني", date: "2026-12-20", description: "من الأحد 11/07/1448هـ (20/12/2026م) إلى السبت 24/07/1448هـ (02/01/2027م) - الفصل الدراسي الثاني" },
-          { title: "التحويل بين الكليات والأقسام (غير الخدمات الذاتية) - الفصل الثاني", date: "2026-12-27", description: "من الأحد 18/07/1448هـ (27/12/2026م) إلى السبت 01/08/1448هـ (09/01/2027م) - الفصل الدراسي الثاني" },
-          { title: "تأجيل القبول في برامج الدراسات العليا - الفصل الثاني", date: "2027-01-03", description: "من الأحد 25/07/1448هـ (03/01/2027م) إلى السبت 08/08/1448هـ (16/01/2027م) - الفصل الدراسي الثاني" },
-          { title: "التأجيل لبرامج الدبلوم والبكالوريوس والدراسات العليا (عبر الخدمات الذاتية) - الفصل الثاني", date: "2027-01-10", description: "من الأحد 02/08/1448هـ (10/01/2027م) إلى السبت 15/08/1448هـ (23/01/2027م) - الفصل الدراسي الثاني" },
-          { title: "التسجيل الإلحاقي لمعالجة الحالات المتعثرة - الفصل الثاني", date: "2027-01-14", description: "من الخميس 06/08/1448هـ (14/01/2027م) إلى السبت 08/08/1448هـ (16/01/2027م) - الفصل الدراسي الثاني" },
-          { title: "بداية الدراسة - الفصل الثاني", date: "2027-01-17", description: "الأحد 09/08/1448هـ (17/01/2027م) - الفصل الدراسي الثاني" },
-          { title: "الاختبارات البديلة والتكميلية عن الفصل الدراسي الأول", date: "2027-01-17", description: "من الأحد 09/08/1448هـ (17/01/2027م) إلى الخميس 15/08/1448هـ (21/01/2027م)" },
-          { title: "الاعتذار عن الفصل والانسحاب من مقرر أو مقررين (الدبلوم والبكالوريوس) - الفصل الثاني", date: "2027-01-24", description: "من الأحد 16/08/1448هـ (24/01/2027م) إلى السبت 16/12/1448هـ (22/05/2027م) - الفصل الدراسي الثاني" },
-          { title: "الاعتذار عن الفصل الدراسي في (الدراسات العليا) - الفصل الثاني", date: "2027-01-24", description: "من الأحد 16/08/1448هـ (24/01/2027م) إلى السبت 23/12/1448هـ (29/05/2027م) - الفصل الدراسي الثاني" },
-          { title: "إجازة يوم التأسيس", date: "2027-02-21", description: "الأحد والإثنين 14-15/09/1448هـ (21-22/02/2027م)" },
-          { title: "بداية إجازة عيد الفطر", date: "2027-02-25", description: "نهاية دوام يوم الخميس 18/09/1448هـ (25/02/2027م)" },
-          { title: "بداية الدراسة بعد إجازة عيد الفطر", date: "2027-03-14", description: "الأحد 06/10/1448هـ (14/03/2027م)" },
-          { title: "بداية إجازة عيد الأضحى", date: "2027-05-06", description: "نهاية دوام يوم الخميس 29/11/1448هـ (06/05/2027م)" },
-          { title: "بداية الدراسة بعد إجازة عيد الأضحى", date: "2027-05-23", description: "الأحد 11/12/1448هـ (23/05/2027م)" },
-          { title: "بداية الاختبارات النهائية - الفصل الثاني", date: "2027-06-06", description: "الأحد 01/01/1449هـ (06/06/2027م) - الفصل الدراسي الثاني" },
-          { title: "بداية إجازة نهاية العام الدراسي للطلاب والطالبات", date: "2027-06-17", description: "نهاية دوام يوم الخميس 12/01/1449هـ (17/06/2027م)" },
-          { title: "بداية إجازة نهاية العام الدراسي لأعضاء هيئة التدريس والمحاضرين والمعيدين", date: "2027-06-24", description: "نهاية دوام يوم الخميس 19/01/1449هـ (24/06/2027م)" },
-          { title: "التحويل الخارجي من الجامعات الأخرى إلى الجامعة للعام 1449/1450هـ", date: "2027-07-04", description: "من الأحد 29/01/1449هـ (04/07/2027م) إلى السبت 06/02/1449هـ (10/07/2027م)" },
-          { title: "بداية الدراسة وعودة أعضاء هيئة التدريس للعام 1449/1450هـ", date: "2027-08-22", description: "الأحد 20/03/1449هـ (22/08/2027م)" }
-        ]);
-      }
-
-      console.log('[DB] Seeding completed.');
     }
+
+    // Seed newbie links
+    const existingLinks = await db.select().from(newbie_links);
+    if (existingLinks.length === 0) {
+      console.log('[DB] Seeding default newbie links...');
+      await db.insert(newbie_links).values([
+        {
+          title: 'بوابة الخدمات الذاتية (Banner)',
+          url: 'https://bstss.imamu.edu.sa/StudentSelfService',
+          description: 'البوابة الرسمية لتسجيل المقررات، إعداد الجداول، ومعرفة المعدل التراكمي والسجل الأكاديمي.'
+        },
+        {
+          title: 'نظام التعليم الإلكتروني (Blackboard)',
+          url: 'https://lms.imamu.edu.sa',
+          description: 'منصة التعليم الإلكتروني الرسمية لحضور المحاضرات الافتراضية، وحل الواجبات، ومتابعة الاختبارات.'
+        },
+        {
+          title: 'بوابة البريد الإلكتروني الجامعي',
+          url: 'https://mail.imamu.edu.sa/imamowa/',
+          description: 'الوصول لبريدك الأكاديمي الرسمي وتفعيل الحساب الجامعي واستقبال الإعلانات الهامة.'
+        },
+        {
+          title: 'الموقع الرسمي لجامعة الإمام',
+          url: 'https://imamu.edu.sa',
+          description: 'موقع الجامعة الإلكتروني للاطلاع على أخبار العمادات، الكليات، والتقويم الدراسي المعتمد.'
+        }
+      ]);
+    }
+
+    // Run external image sync asynchronously in the background so server boot is not blocked
+    setImmediate(() => {
+      syncExternalImagesToStorage(db).catch((err: any) => {
+        console.error('[Storage Sync Error]', err.message || err);
+      });
+    });
+
   } catch (e: any) {
     console.error('[DB] Seeding failed, likely due to migration in progress:', e.message || e);
   }

@@ -22,6 +22,12 @@ import {
   SpotlightCard, 
   TextEffect
 } from '../components/ui';
+import { 
+  parseDate, 
+  getCountdown, 
+  calculateMokafaaDate, 
+  calculateProgressPercent 
+} from '../lib/date-utils';
 
 const DynamicConfetti = dynamic(() => import('react-confetti').then((mod) => mod.default || mod), { ssr: false });
 
@@ -78,46 +84,67 @@ function useCurrentTime() {
 }
 
 function getCountdownValues(now: Date, targetDate: Date | null) {
-  if (!targetDate) return { days: 0, hours: 0, minutes: 0, seconds: 0, isPast: false, isToday: false };
-  const difference = targetDate.getTime() - now.getTime();
-  const isToday = now.getFullYear() === targetDate.getFullYear() && 
-                  now.getMonth() === targetDate.getMonth() && 
-                  now.getDate() === targetDate.getDate();
-
-  if (difference <= 0) {
-    return { days: 0, hours: 0, minutes: 0, seconds: 0, isPast: true, isToday };
-  } else {
-    return {
-      days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-      hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
-      minutes: Math.floor((difference / 1000 / 60) % 60),
-      seconds: Math.floor((difference / 1000) % 60),
-      isPast: false,
-      isToday
-    };
-  }
+  return getCountdown(targetDate, now);
 }
 
-const CountdownBox = memo(function CountdownBox({ value, label }: { value: number, label: string }) {
+const CountdownBox = memo(function CountdownBox({ value, label, hoverBorderClass = 'hover:border-amber-500/40' }: { value: number, label: string, hoverBorderClass?: string }) {
   return (
-    <div className="flex flex-col items-center justify-center bg-slate-100/90 dark:bg-zinc-900/90 border border-slate-200/80 dark:border-zinc-800/80 backdrop-blur-md rounded-2xl py-3 px-2 sm:py-3.5 sm:px-4 flex-1 min-w-[56px] sm:min-w-[76px] shadow-2xs transition-all duration-300 hover:border-blue-500/40">
-      <span className="text-xl sm:text-3xl font-display font-extrabold text-slate-900 dark:text-white tracking-tight">
+    <div className={`flex flex-col items-center justify-center bg-slate-100/90 dark:bg-zinc-900/90 border border-slate-200/80 dark:border-zinc-800/80 backdrop-blur-md rounded-2xl py-2.5 px-1.5 sm:py-3 sm:px-3 flex-1 min-w-[50px] sm:min-w-[70px] shadow-2xs transition-all duration-300 ${hoverBorderClass}`}>
+      <span className="text-lg sm:text-2xl font-display font-extrabold text-slate-900 dark:text-white tracking-tight">
         <AnimatedNumber value={value} padZeroes={2} />
       </span>
-      <span className="text-[10px] sm:text-xs text-slate-500 dark:text-zinc-400 font-semibold tracking-wider mt-0.5 sm:mt-1">{label}</span>
+      <span className="text-[10px] sm:text-xs text-slate-500 dark:text-zinc-400 font-semibold tracking-wider mt-0.5">{label}</span>
     </div>
   );
 });
 
-const LiveCountdownBoxes = memo(function LiveCountdownBoxes({ targetDate }: { targetDate: Date | null }) {
+const LiveCountdownBoxes = memo(function LiveCountdownBoxes({ targetDate, hoverBorderClass }: { targetDate: Date | null, hoverBorderClass?: string }) {
   const now = useCurrentTime();
-  const time = getCountdownValues(now, targetDate);
+  const time = getCountdown(targetDate, now);
   return (
-    <div className="flex w-full justify-center gap-1.5 sm:gap-3 px-1" dir="rtl">
-      <CountdownBox value={time.days} label="أيام" />
-      <CountdownBox value={time.hours} label="ساعات" />
-      <CountdownBox value={time.minutes} label="دقائق" />
-      <CountdownBox value={time.seconds} label="ثواني" />
+    <div className="flex w-full justify-center gap-1 sm:gap-2.5 px-1" dir="rtl">
+      <CountdownBox value={time.days} label="أيام" hoverBorderClass={hoverBorderClass} />
+      <CountdownBox value={time.hours} label="ساعات" hoverBorderClass={hoverBorderClass} />
+      <CountdownBox value={time.minutes} label="دقائق" hoverBorderClass={hoverBorderClass} />
+      <CountdownBox value={time.seconds} label="ثواني" hoverBorderClass={hoverBorderClass} />
+    </div>
+  );
+});
+
+const VerticalLinesProgressBar = memo(function VerticalLinesProgressBar({ 
+  percent, 
+  activeColorClass = 'bg-blue-500 shadow-blue-500/40',
+  lineCount = 30
+}: { 
+  percent: number; 
+  activeColorClass?: string;
+  lineCount?: number;
+}) {
+  const normalizedPercent = Math.min(100, Math.max(0, percent));
+  const activeLines = Math.round((normalizedPercent / 100) * lineCount);
+
+  return (
+    <div className="w-full mt-3 sm:mt-4 flex flex-col gap-1 px-0.5" dir="rtl">
+      <div className="flex items-center gap-2 w-full">
+        <span className="font-mono text-[11px] font-extrabold text-slate-500 dark:text-zinc-400 shrink-0 -mb-0.5">
+          {Math.round(normalizedPercent)}%
+        </span>
+        <div className="flex items-center gap-[2px] flex-1 h-[14px] sm:h-[16px]">
+          {Array.from({ length: lineCount }).map((_, idx) => {
+            const isActive = idx < activeLines;
+            return (
+              <div
+                key={idx}
+                className={`flex-1 h-full rounded-[2px] transition-all duration-300 ${
+                  isActive 
+                    ? `${activeColorClass} shadow-xs scale-y-100` 
+                    : 'bg-slate-200 dark:bg-zinc-800 scale-y-80 opacity-50'
+                }`}
+              />
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 });
@@ -125,6 +152,7 @@ const LiveCountdownBoxes = memo(function LiveCountdownBoxes({ targetDate }: { ta
 function CountdownsSection() {
   const [settings, setSettings] = useState<{semesterStartDate?: string, semesterEndDate?: string} | null>(null);
   const [nextMokafaaDate, setNextMokafaaDate] = useState<Date | null>(null);
+  const [nextHoliday, setNextHoliday] = useState<{ title: string; date: Date; description?: string } | null>(null);
   const [isMokafaaToday, setIsMokafaaToday] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
 
@@ -149,58 +177,153 @@ function CountdownsSection() {
       setSettings(s);
       
       const now = new Date();
-      now.setHours(0,0,0,0);
+      const todayStart = new Date();
+      todayStart.setHours(0,0,0,0);
       
+      // Mokafaa Calculation
       const mokafaaEvents = events
         .filter((e: any) => e.title.toLowerCase().includes('mokafaa') || e.title.includes('مكافأة') || e.title.includes('المكافأة'))
-        .map((e: any) => new Date(e.date))
+        .map((e: any) => parseDate(e.date))
+        .filter((d: Date | null): d is Date => d !== null)
         .sort((a: Date, b: Date) => a.getTime() - b.getTime());
 
-      let upcomingMokafaa = mokafaaEvents.find((d: Date) => d >= now);
+      let upcomingMokafaa = mokafaaEvents.find((d: Date) => d >= todayStart);
       
       if (!upcomingMokafaa) {
-        upcomingMokafaa = new Date(now.getFullYear(), now.getMonth(), 25);
-        if (upcomingMokafaa < now) {
-          upcomingMokafaa.setMonth(upcomingMokafaa.getMonth() + 1);
+        upcomingMokafaa = calculateMokafaaDate(now.getFullYear(), now.getMonth());
+        if (upcomingMokafaa < todayStart) {
+          upcomingMokafaa = calculateMokafaaDate(now.getFullYear(), now.getMonth() + 1);
         }
       }
 
       setNextMokafaaDate(upcomingMokafaa);
       
-      const today = new Date();
       if (upcomingMokafaa && 
-          today.getFullYear() === upcomingMokafaa.getFullYear() && 
-          today.getMonth() === upcomingMokafaa.getMonth() && 
-          today.getDate() === upcomingMokafaa.getDate()) {
+          now.getFullYear() === upcomingMokafaa.getFullYear() && 
+          now.getMonth() === upcomingMokafaa.getMonth() && 
+          now.getDate() === upcomingMokafaa.getDate()) {
         setIsMokafaaToday(true);
         setShowConfetti(true);
       }
+
+      // Next Holiday Calculation (strictly relying on database flags)
+      const holidayEvents = events
+        .filter((e: any) => e.isHoliday || e.isHolidayEnd || e.isEid || e.isNationalDay)
+        .map((e: any) => ({
+          title: e.title,
+          date: parseDate(e.date),
+          description: e.description,
+          isEid: !!e.isEid,
+          isNationalDay: !!e.isNationalDay,
+          isHolidayEnd: !!e.isHolidayEnd
+        }))
+        .filter((e: any): e is { title: string; date: Date; description?: string; isEid: boolean; isNationalDay: boolean; isHolidayEnd: boolean } => e.date !== null && e.date >= todayStart)
+        .sort((a, b) => a.date.getTime() - b.date.getTime());
+
+      if (holidayEvents.length > 0) {
+        setNextHoliday(holidayEvents[0]);
+      } else {
+        setNextHoliday(null);
+      }
+
+      // Check for Active Celebration (National Day or Eid) strictly by boolean flags
+      const hasNationalDay = events.some((e: any) => {
+        const d = parseDate(e.date);
+        return e.isNationalDay && d && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+      });
+
+      const hasEid = events.some((e: any) => {
+        const d = parseDate(e.date);
+        return e.isEid && d && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+      });
+
+      if (hasNationalDay) setIsNationalDayToday(true);
+      if (hasEid) setIsEidToday(true);
+      if (hasNationalDay || hasEid) setShowConfetti(true);
+
+      // Semester Start & End Dates Calculation directly from Events table flags
+      const startEvents = events
+        .filter((e: any) => e.isSemesterStart)
+        .map((e: any) => parseDate(e.date))
+        .filter((d: Date | null): d is Date => d !== null)
+        .sort((a: Date, b: Date) => a.getTime() - b.getTime());
+
+      const endEvents = events
+        .filter((e: any) => e.isSemesterEnd)
+        .map((e: any) => parseDate(e.date))
+        .filter((d: Date | null): d is Date => d !== null)
+        .sort((a: Date, b: Date) => a.getTime() - b.getTime());
+
+      // Determine active semester vs break period
+      const lastStart = [...startEvents].reverse().find((d: Date) => d <= todayStart) || null;
+      const upcomingEnd = endEvents.find((d: Date) => d >= todayStart) || null;
+      const upcomingStart = startEvents.find((d: Date) => d > todayStart) || null;
+
+      let calcStart: Date | null = null;
+      let calcTarget: Date | null = null;
+      let calcLabel = "يبدأ الفصل الدراسي خلال";
+
+      if (lastStart && upcomingEnd && lastStart <= upcomingEnd) {
+        // Active Semester: Today is between a start and an end
+        calcStart = lastStart;
+        calcTarget = upcomingEnd;
+        calcLabel = "ينتهي الفصل الدراسي خلال";
+      } else if (upcomingStart) {
+        // Break Period: Today is between an end and a start
+        calcStart = [...endEvents].reverse().find((d: Date) => d < upcomingStart) || null;
+        calcTarget = upcomingStart;
+        calcLabel = "يبدأ الفصل الدراسي خلال";
+      } else if (upcomingEnd) {
+        calcTarget = upcomingEnd;
+        calcLabel = "ينتهي الفصل الدراسي خلال";
+      }
+
+      setSemesterInfo({ start: calcStart, target: calcTarget, label: calcLabel });
     }).catch(() => {});
   }, []);
 
-  let semesterTargetDate: Date | null = null;
-  let semesterLabel = "يبدأ الفصل الدراسي خلال";
-  
-  if (settings?.semesterStartDate || settings?.semesterEndDate) {
-    const start = settings.semesterStartDate ? new Date(settings.semesterStartDate) : null;
-    const end = settings.semesterEndDate ? new Date(settings.semesterEndDate) : null;
-    const today = new Date();
-    
-    if (start && today < start) {
-      semesterTargetDate = start;
-      semesterLabel = "يبدأ الفصل الدراسي خلال";
-    } else if (end && today <= end) {
-      semesterTargetDate = end;
-      semesterLabel = "ينتهي الفصل الدراسي خلال";
-    } else if (start && !end && today >= start) {
-      semesterLabel = "بدأ الفصل الدراسي";
-    } else if (end && today > end) {
-      semesterLabel = "انتهى الفصل الدراسي";
-    }
+  const [semesterInfo, setSemesterInfo] = useState<{ start: Date | null; target: Date | null; label: string }>({ 
+    start: null, 
+    target: null, 
+    label: "ينتهي الفصل الدراسي خلال" 
+  });
+  const [isNationalDayToday, setIsNationalDayToday] = useState(false);
+  const [isEidToday, setIsEidToday] = useState(false);
+
+  const semesterTargetDate: Date | null = semesterInfo.target;
+  const semesterLabel: string = semesterInfo.label;
+  const semesterStartDateObj: Date | null = semesterInfo.start;
+
+  // Calculate Progress Percentages for the Vertical Line Progress Bars
+  const nowTime = new Date();
+
+  // 1. Mokafaa Percent (Monthly Payout progress e.g. from 27th of prev month to 27th of target month)
+  let mokafaaPercent = 0;
+  if (nextMokafaaDate) {
+    const prevMokafaaDate = calculateMokafaaDate(nextMokafaaDate.getFullYear(), nextMokafaaDate.getMonth() - 1);
+    mokafaaPercent = calculateProgressPercent(prevMokafaaDate, nextMokafaaDate, nowTime);
+  }
+
+  // 2. Semester Percent
+  let semesterPercent = 0;
+  if (semesterStartDateObj && semesterTargetDate) {
+    semesterPercent = calculateProgressPercent(semesterStartDateObj, semesterTargetDate, nowTime);
+  } else if (semesterTargetDate) {
+    // Fallback: estimate progress relative to a 100-day term
+    const defaultStart = new Date(semesterTargetDate.getTime() - 100 * 24 * 60 * 60 * 1000);
+    semesterPercent = calculateProgressPercent(defaultStart, semesterTargetDate, nowTime);
+  }
+
+  // 3. Holiday Percent
+  let holidayPercent = 0;
+  if (nextHoliday) {
+    const holidayTargetTime = nextHoliday.date;
+    const holidayStartTime = new Date(holidayTargetTime.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days window
+    holidayPercent = calculateProgressPercent(holidayStartTime, holidayTargetTime, nowTime);
   }
 
   return (
-    <InView preset="fade-up" delay={0.15} className="w-full max-w-5xl px-4 mt-24 sm:mt-36 flex flex-col gap-8 sm:gap-10 relative">
+    <InView preset="fade-up" delay={0.15} className="w-full max-w-6xl px-4 mt-24 sm:mt-36 flex flex-col gap-8 sm:gap-10 relative">
       {showConfetti && (
         <DynamicConfetti 
           width={windowSize.width} 
@@ -211,57 +334,143 @@ function CountdownsSection() {
           style={{ position: 'fixed', top: 0, left: 0, zIndex: 9999, pointerEvents: 'none' }}
         />
       )}
+
+      {/* Saudi National Day Celebration Banner */}
+      {isNationalDayToday && (
+        <div className="w-full bg-gradient-to-r from-emerald-950/90 via-emerald-900/90 to-emerald-950/90 border border-emerald-500/40 rounded-3xl p-5 sm:p-6 text-center text-white shadow-xl relative overflow-hidden flex flex-col items-center justify-center gap-2 animate-[fadeIn_0.5s_ease-out]">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl sm:text-4xl animate-bounce">🇸🇦</span>
+            <h2 className="text-lg sm:text-xl font-display font-black text-emerald-300 tracking-wide">
+              نعتز بنهضتنا وهويتنا - نحتفي باليوم الوطني السعودي! 🇸🇦
+            </h2>
+          </div>
+          <p className="text-xs sm:text-sm text-emerald-100 font-medium max-w-xl leading-relaxed">
+            دمت يا وطني شامخاً عزيزاً، وكل عام والمملكة العربية السعودية وشعبها المعطاء في عزة وازدهار.
+          </p>
+        </div>
+      )}
+
+      {/* Eid Celebration Banner */}
+      {isEidToday && (
+        <div className="w-full bg-gradient-to-r from-amber-950/90 via-amber-900/90 to-amber-950/90 border border-amber-500/40 rounded-3xl p-5 sm:p-6 text-center text-white shadow-xl relative overflow-hidden flex flex-col items-center justify-center gap-2 animate-[fadeIn_0.5s_ease-out]">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl sm:text-4xl">🌙</span>
+            <h2 className="text-lg sm:text-xl font-display font-black text-amber-300 tracking-wide">
+              تقبل الله منا ومنكم صالح الأعمال - عيد مبارك! ✨
+            </h2>
+          </div>
+          <p className="text-xs sm:text-sm text-amber-100 font-medium max-w-xl leading-relaxed">
+            أسعد الله أيامكم، وكل عام وأنتم وعائلاتكم بألف خير وسعادة.
+          </p>
+        </div>
+      )}
       
-      <div className="flex flex-col md:flex-row gap-6 sm:gap-8 w-full" dir="rtl">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-6 w-full" dir="rtl">
+
+        
         {/* Mokafaa Countdown */}
         {nextMokafaaDate && (
           <SpotlightCard 
             spotlightColor="rgba(245, 158, 11, 0.12)"
-            className="flex-1 bg-white/80 dark:bg-zinc-900/90 backdrop-blur-xl border border-slate-200/80 dark:border-zinc-800/80 rounded-3xl p-5 sm:p-7 shadow-sm flex flex-col items-center justify-center text-center relative overflow-hidden w-full"
+            className="flex-1 bg-white/80 dark:bg-zinc-900/90 backdrop-blur-xl border border-slate-200/80 dark:border-zinc-800/80 rounded-3xl p-5 sm:p-6 shadow-sm flex flex-col items-center justify-between text-center relative overflow-hidden w-full"
           >
-            <div className="flex items-center justify-center gap-2.5 mb-4 sm:mb-5 w-full">
-              <div className="p-2 sm:p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-amber-600 dark:text-amber-400 shrink-0">
-                <Clock className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
+            <div className="w-full">
+              <div className="flex items-center justify-center gap-2.5 mb-4 w-full">
+                <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-amber-600 dark:text-amber-400 shrink-0">
+                  <Clock className="w-4.5 h-4.5" />
+                </div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">موعد المكافأة القادمة</h3>
               </div>
-              <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">موعد المكافأة القادمة</h3>
+              
+              {isMokafaaToday ? (
+                <div className="bg-emerald-500/10 border border-emerald-500/20 px-4 py-4 rounded-2xl shadow-2xs relative overflow-hidden flex flex-col items-center justify-center w-full">
+                  <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400 z-10 flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-emerald-500 animate-pulse" />
+                    اليوم نزلت المكافأة!
+                  </span>
+                  <p className="text-[11px] text-emerald-600 dark:text-emerald-300 mt-1 font-medium z-10 text-center leading-relaxed">
+                    تفقّد حسابك البنكي، تم إيداع المكافأة الرسمية!
+                  </p>
+                </div>
+              ) : (
+                <LiveCountdownBoxes targetDate={nextMokafaaDate} hoverBorderClass="hover:border-amber-500/40" />
+              )}
             </div>
-            
-            {isMokafaaToday ? (
-              <div className="bg-emerald-500/10 border border-emerald-500/20 px-6 py-5 rounded-2xl shadow-2xs relative overflow-hidden flex flex-col items-center justify-center max-w-sm">
-                <span className="text-base font-bold text-emerald-700 dark:text-emerald-400 z-10 flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-emerald-500 animate-pulse" />
-                  اليوم نزلت المكافأة!
-                </span>
-                <p className="text-xs text-emerald-600 dark:text-emerald-300 mt-1 font-medium z-10 text-center leading-relaxed">
-                  تفقّد حسابك البنكي، تم إيداع المكافأة الرسمية!
-                </p>
-              </div>
-            ) : (
-              <LiveCountdownBoxes targetDate={nextMokafaaDate} />
-            )}
+
+            {/* Vertical Lines Progress Bar for Mokafaa */}
+            <VerticalLinesProgressBar 
+              percent={mokafaaPercent} 
+              activeColorClass="bg-amber-500 shadow-amber-500/40"
+              lineCount={30}
+            />
           </SpotlightCard>
         )}
 
         {/* Semester Countdown */}
         <SpotlightCard 
           spotlightColor="rgba(37, 99, 235, 0.12)"
-          className="flex-1 bg-white/80 dark:bg-zinc-900/90 backdrop-blur-xl border border-slate-200/80 dark:border-zinc-800/80 rounded-3xl p-5 sm:p-7 shadow-sm flex flex-col items-center justify-center text-center relative overflow-hidden w-full"
+          className="flex-1 bg-white/80 dark:bg-zinc-900/90 backdrop-blur-xl border border-slate-200/80 dark:border-zinc-800/80 rounded-3xl p-5 sm:p-6 shadow-sm flex flex-col items-center justify-between text-center relative overflow-hidden w-full"
         >
-          <div className="flex items-center justify-center gap-2.5 mb-4 sm:mb-5 w-full">
-            <div className="p-2 sm:p-2.5 bg-blue-500/10 border border-blue-500/20 rounded-2xl text-blue-600 dark:text-blue-400 shrink-0">
-              <Calendar className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
+          <div className="w-full">
+            <div className="flex items-center justify-center gap-2.5 mb-4 w-full">
+              <div className="p-2 bg-blue-500/10 border border-blue-500/20 rounded-2xl text-blue-600 dark:text-blue-400 shrink-0">
+                <Calendar className="w-4.5 h-4.5" />
+              </div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate" title={semesterTargetDate ? semesterLabel : "العد التنازلي للفصل الدراسي"}>
+                {semesterTargetDate ? semesterLabel : "العد التنازلي للفصل الدراسي"}
+              </h3>
             </div>
-            <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">{semesterTargetDate ? semesterLabel : "العد التنازلي للفصل الدراسي"}</h3>
+            {semesterTargetDate ? (
+              <LiveCountdownBoxes targetDate={semesterTargetDate} hoverBorderClass="hover:border-blue-500/40" />
+            ) : (
+              <p className="text-xs text-slate-500 dark:text-zinc-400 font-medium py-3">
+                {semesterLabel === "يبدأ الفصل الدراسي خلال" && !semesterTargetDate ? "لم يتم تحديد المواعيد الأكاديمية بعد." : semesterLabel}
+              </p>
+            )}
           </div>
-          {semesterTargetDate ? (
-            <LiveCountdownBoxes targetDate={semesterTargetDate} />
-          ) : (
-            <p className="text-sm text-slate-500 dark:text-zinc-400 font-medium">
-              {semesterLabel === "يبدأ الفصل الدراسي خلال" && !semesterTargetDate ? "لم يتم تحديد المواعيد الأكاديمية بعد." : semesterLabel}
-            </p>
-          )}
+
+          {/* Vertical Lines Progress Bar for Semester */}
+          <VerticalLinesProgressBar 
+            percent={semesterPercent} 
+            activeColorClass="bg-blue-500 shadow-blue-500/40"
+            lineCount={30}
+          />
         </SpotlightCard>
+
+        {/* Next Holiday Countdown Card */}
+        <SpotlightCard 
+          spotlightColor="rgba(16, 185, 129, 0.12)"
+          className="flex-1 bg-white/80 dark:bg-zinc-900/90 backdrop-blur-xl border border-slate-200/80 dark:border-zinc-800/80 rounded-3xl p-5 sm:p-6 shadow-sm flex flex-col items-center justify-between text-center relative overflow-hidden w-full"
+        >
+          <div className="w-full">
+            <div className="flex items-center justify-center gap-2.5 mb-4 w-full">
+              <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-600 dark:text-emerald-400 shrink-0">
+                <Sparkles className="w-4.5 h-4.5" />
+              </div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate" title={nextHoliday?.title || "موعد الإجازة القادمة"}>
+                {nextHoliday?.title || "موعد الإجازة القادمة"}
+              </h3>
+            </div>
+            {nextHoliday?.date ? (
+              <LiveCountdownBoxes targetDate={nextHoliday.date} hoverBorderClass="hover:border-emerald-500/40" />
+            ) : (
+              <p className="text-xs text-slate-500 dark:text-zinc-400 font-medium py-3">
+                لم يتم تحديد موعد الإجازة القادمة في التقويم بعد.
+              </p>
+            )}
+          </div>
+
+          {/* Vertical Lines Progress Bar for Next Holiday */}
+          <VerticalLinesProgressBar 
+            percent={holidayPercent} 
+            activeColorClass="bg-emerald-500 shadow-emerald-500/40"
+            lineCount={30}
+          />
+        </SpotlightCard>
+
       </div>
+
+
 
       {/* External Student Platforms */}
       <SpotlightCard 

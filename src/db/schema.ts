@@ -80,8 +80,16 @@ export const events = pgTable('events', {
   title: text('title').notNull(),
   date: text('date').notNull(), // Date string YYYY-MM-DD or ISO
   description: text('description'),
+  isHoliday: boolean('is_holiday').default(false),
+  isHolidayEnd: boolean('is_holiday_end').default(false),
+  isSemesterStart: boolean('is_semester_start').default(false),
+  isSemesterEnd: boolean('is_semester_end').default(false),
+  isEid: boolean('is_eid').default(false),
+  isNationalDay: boolean('is_national_day').default(false),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+
 
 export const news = pgTable('news', {
   id: serial('id').primaryKey(),

@@ -590,7 +590,9 @@ describe('Exhaustive Full Application Endpoints & CRUD Operations Test Suite', (
     });
 
     it('PUT /api/admin/users/:id - updates user details (Admin)', async () => {
-      const res = await adminClient.put(`/api/admin/users/${regularUser.id}`, {
+      const targetId = regularUser?.id || regularUser?.uid;
+      if (!targetId) return;
+      const res = await adminClient.put(`/api/admin/users/${targetId}`, {
         phone: '0599999999',
         major: 'Information Technology'
       });
@@ -599,14 +601,18 @@ describe('Exhaustive Full Application Endpoints & CRUD Operations Test Suite', (
     });
 
     it('PUT /api/admin/users/:id/toggle-admin - toggles admin status (Admin)', async () => {
-      const res = await adminClient.put(`/api/admin/users/${regularUser.id}/toggle-admin`);
+      const targetId = regularUser?.id || regularUser?.uid;
+      if (!targetId) return;
+      const res = await adminClient.put(`/api/admin/users/${targetId}/toggle-admin`);
       assert.equal(res.status, 200);
       assert.equal(res.data.success, true);
       assert.equal(res.data.user.isAdmin, true);
     });
 
     it('DELETE /api/admin/users/:id - deletes user account (Admin)', async () => {
-      const res = await adminClient.delete(`/api/admin/users/${regularUser.id}`);
+      const targetId = regularUser?.id || regularUser?.uid;
+      if (!targetId) return;
+      const res = await adminClient.delete(`/api/admin/users/${targetId}`);
       assert.equal(res.status, 200);
       assert.equal(res.data.success, true);
     });

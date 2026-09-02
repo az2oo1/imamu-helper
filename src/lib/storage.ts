@@ -73,20 +73,31 @@ export async function ensureBucketExists(): Promise<void> {
     bucketInitialized = true;
     console.log(`[Storage] S3 Bucket "${bucketName}" exists and is ready.`);
   } catch (err: any) {
-    if (err.name === 'NotFound' || err.$metadata?.httpStatusCode === 404) {
+    bucketInitialized = true;
+    const name = err.name || err.code;
+    const status = err.$metadata?.httpStatusCode;
+
+    if (name === 'NotFound' || status === 404) {
       console.log(`[Storage] S3 Bucket "${bucketName}" does not exist. Creating...`);
       try {
         await client.send(new CreateBucketCommand({ Bucket: bucketName }));
-        bucketInitialized = true;
         console.log(`[Storage] Successfully created S3 Bucket "${bucketName}".`);
       } catch (createErr: any) {
-        console.error(`[Storage] Could not create bucket "${bucketName}":`, createErr.message || createErr);
+        const cName = createErr.name || createErr.code;
+        if (cName === 'BucketAlreadyOwnedByYou' || cName === 'BucketAlreadyExists') {
+          console.log(`[Storage] S3 Bucket "${bucketName}" already exists.`);
+        } else {
+          console.warn(`[Storage] Could not create bucket "${bucketName}":`, createErr.message || createErr);
+        }
       }
+    } else if (name === 'BucketAlreadyOwnedByYou' || name === 'BucketAlreadyExists') {
+      console.log(`[Storage] S3 Bucket "${bucketName}" already exists.`);
     } else {
-      console.warn(`[Storage] Warning checking bucket "${bucketName}":`, err.message || err);
+      console.warn(`[Storage] Notice checking S3 bucket "${bucketName}":`, err.message || err);
     }
   }
 }
+
 
 /**
  * Uploads a file to RustFS Object Storage (or local disk fallback).
@@ -218,3 +229,73 @@ export async function deleteFileFromStorage(filename: string): Promise<void> {
     } catch (e) {}
   }
 }
+
+/**
+ * Downloads an external image URL (or decodes base64 image data)
+ * and uploads it directly to Garage S3 Object Storage (or local disk fallback).
+ */
+export async function downloadAndUploadToStorage(
+  rawUrl: string,
+  prefix: string = 'img'
+): Promise<string | null> {
+  if (!rawUrl || typeof rawUrl !== 'string') return null;
+  const trimmed = rawUrl.trim();
+
+  // If already saved in local/S3 uploads, return as is
+  if (trimmed.startsWith('/uploads/') || trimmed.startsWith('uploads/')) {
+    return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  }
+
+  try {
+    let buffer: Buffer;
+    let mimeType = 'image/jpeg';
+    let ext = 'jpg';
+
+    if (trimmed.startsWith('data:image/')) {
+      const match = trimmed.match(/^data:(image\/([a-zA-Z0-9+-]+));base64,(.+)$/);
+      if (!match) return null;
+      mimeType = match[1];
+      ext = match[2] === 'jpeg' ? 'jpg' : match[2];
+      buffer = Buffer.from(match[3], 'base64');
+    } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      const resp = await fetch(trimmed, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
+        }
+      });
+
+      if (!resp.ok) {
+        // Silently return null for external CDN URLs (e.g. telesco.pe) that return 404 or expire
+        return null;
+      }
+
+      contentTypeHeader(resp.headers.get('content-type'));
+      function contentTypeHeader(ct: string | null) {
+        if (ct) {
+          mimeType = ct.split(';')[0].trim();
+          if (mimeType.includes('png')) ext = 'png';
+          else if (mimeType.includes('webp')) ext = 'webp';
+          else if (mimeType.includes('gif')) ext = 'gif';
+          else if (mimeType.includes('svg')) ext = 'svg';
+          else ext = 'jpg';
+        }
+      }
+
+      const arrayBuffer = await resp.arrayBuffer();
+      buffer = Buffer.from(arrayBuffer);
+    } else {
+      return null;
+    }
+
+    if (!buffer || buffer.length === 0) return null;
+
+    const filename = `${prefix}_${Date.now()}_${crypto.randomUUID().slice(0, 8)}.${ext}`;
+    const result = await uploadFileToStorage(buffer, filename, mimeType);
+    return result.url;
+  } catch (err: any) {
+    console.error(`[Storage] Error downloading and storing image from "${rawUrl}":`, err.message || err);
+    return null;
+  }
+}
+

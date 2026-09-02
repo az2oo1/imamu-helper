@@ -234,43 +234,35 @@ export function ProfilePage() {
               id="pfp-upload"
               accept="image/*"
               className="hidden"
-              onChange={(e) => {
+              onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (file) {
-                  const reader = new FileReader();
-                  reader.onload = (ev) => {
-                    const img = new Image();
-                    img.onload = () => {
-                      const canvas = document.createElement('canvas');
-                      const MAX_SIZE = 250;
-                      let width = img.width;
-                      let height = img.height;
-                      if (width > height) {
-                        if (width > MAX_SIZE) {
-                          height *= MAX_SIZE / width;
-                          width = MAX_SIZE;
-                        }
-                      } else {
-                        if (height > MAX_SIZE) {
-                          width *= MAX_SIZE / height;
-                          height = MAX_SIZE;
-                        }
+                  try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('files', file);
+                    const token = user ? await user.getIdToken() : (localStorage.getItem('token') || localStorage.getItem('imamu_token') || '');
+                    const res = await fetch('/api/upload', {
+                      method: 'POST',
+                      headers: token ? { Authorization: `Bearer ${token}` } : {},
+                      body: formData
+                    });
+                    if (res.ok) {
+                      const data = await res.json().catch(() => ({}));
+                      const newPicUrl = data.url || data.urls?.[0];
+                      if (newPicUrl) {
+                        setProfileForm(p => ({ ...p, profilePicUrl: newPicUrl }));
+                        saveProfile({ profilePicUrl: newPicUrl });
                       }
-                      canvas.width = width;
-                      canvas.height = height;
-                      const ctx = canvas.getContext('2d');
-                      ctx?.drawImage(img, 0, 0, width, height);
-                      const newPicUrl = canvas.toDataURL('image/jpeg', 0.85);
-                      setProfileForm(p => ({ ...p, profilePicUrl: newPicUrl }));
-                      saveProfile({ profilePicUrl: newPicUrl });
-                    };
-                    img.src = ev.target?.result as string;
-                  };
-                  reader.readAsDataURL(file);
+                    }
+                  } catch (uploadErr) {
+                    console.error('Failed to upload profile picture to storage:', uploadErr);
+                  }
                 }
               }}
             />
           </div>
+
 
           <button 
             type="button"

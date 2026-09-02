@@ -96,8 +96,16 @@ const SCHEMA_VERIFICATION_STATEMENTS = [
     icon text,
     category text,
     created_at timestamp DEFAULT now()
-  )`
+  )`,
+  `ALTER TABLE events ADD COLUMN IF NOT EXISTS is_holiday boolean DEFAULT false`,
+  `ALTER TABLE events ADD COLUMN IF NOT EXISTS is_holiday_end boolean DEFAULT false`,
+  `ALTER TABLE events ADD COLUMN IF NOT EXISTS is_semester_start boolean DEFAULT false`,
+  `ALTER TABLE events ADD COLUMN IF NOT EXISTS is_semester_end boolean DEFAULT false`,
+  `ALTER TABLE events ADD COLUMN IF NOT EXISTS is_eid boolean DEFAULT false`,
+  `ALTER TABLE events ADD COLUMN IF NOT EXISTS is_national_day boolean DEFAULT false`
 ];
+
+
 
 async function applySchemaVerifications(runner: (sql: string) => Promise<any>) {
   for (const stmt of SCHEMA_VERIFICATION_STATEMENTS) {

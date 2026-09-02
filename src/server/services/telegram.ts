@@ -1,6 +1,7 @@
 import { eq, or, inArray } from 'drizzle-orm';
 import { news, news_sources, activity_logs } from '../../db/schema';
 import { logger } from '../../middleware/logger';
+import { downloadAndUploadToStorage } from '../../lib/storage';
 
 /**
  * Clean Telegram Channel Handle or URL:
@@ -193,6 +194,9 @@ export async function extractTelegramChannelPosts(
     throw new Error(`لم يتم العثور على أي منشورات عامة في قناة التليقرام @${channelHandle}. يرجى التأكد من أن القناة عامة وليست خاصة.`);
   }
 
+  // Use direct raw Telegram Channel Avatar URL (avoid server-side 404 HTTP downloads)
+  const finalChannelAvatarUrl = channelAvatarUrl || null;
+
   // 1. Insert/Update channel source in news_sources
   const existingSource = await db.select().from(news_sources).where(
     or(eq(news_sources.handle, channelHandle), eq(news_sources.handle, `@${channelHandle}`))
@@ -201,14 +205,14 @@ export async function extractTelegramChannelPosts(
   if (existingSource.length > 0) {
     await db.update(news_sources).set({
       handle: channelHandle,
-      profilePicUrl: channelAvatarUrl || existingSource[0].profilePicUrl,
+      profilePicUrl: finalChannelAvatarUrl || existingSource[0].profilePicUrl,
       lastFetched: new Date(),
       isActive: true
     }).where(eq(news_sources.id, existingSource[0].id));
   } else {
     await db.insert(news_sources).values({
       handle: channelHandle,
-      profilePicUrl: channelAvatarUrl,
+      profilePicUrl: finalChannelAvatarUrl,
       isActive: true,
       lastFetched: new Date()
     });
@@ -226,13 +230,15 @@ export async function extractTelegramChannelPosts(
   let insertedCount = 0;
   for (const post of newPostsToInsert) {
     const postContent = post.text || (post.photoUrl ? '[صورة من التليقرام]' : '[منشور من التليقرام]');
+    const finalPhotoUrl = post.photoUrl || null;
+
     await db.insert(news).values({
       content: postContent,
       source: channelHandle,
       authorName: channelTitle || channelHandle,
       authorHandle: `@${channelHandle}`,
-      authorAvatar: channelAvatarUrl,
-      imageUrl: post.photoUrl || null,
+      authorAvatar: finalChannelAvatarUrl,
+      imageUrl: finalPhotoUrl,
       videoUrl: post.videoUrl || null,
       date: post.date,
       tweetId: post.tweetId,
@@ -240,6 +246,7 @@ export async function extractTelegramChannelPosts(
     });
     insertedCount++;
   }
+
 
   // Log activity
   try {

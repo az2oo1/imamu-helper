@@ -1,13 +1,14 @@
 import React from 'react';
 import { AuthProvider } from '../src/lib/AuthContext';
 import { ThemeProvider } from '../src/lib/ThemeContext';
-import { TopBar } from '../src/components/TopBar';
 import '../src/index.css';
 
 export const metadata = {
   title: 'مساعد الإمام - المنصة الطلابية الشاملة',
   description: 'المساعد الأكاديمي والطلابي الشامل لطلاب جامعة الإمام محمد بن سعود الإسلامية',
 };
+
+import { TopBar } from '../src/components/TopBar';
 
 export default function RootLayout({
   children,
@@ -26,9 +27,9 @@ export default function RootLayout({
           <AuthProvider>
             <div className="min-h-screen flex flex-col font-sans relative z-0">
               <TopBar />
-              <main className="flex-1 flex flex-col">
+              <div className="flex-1 flex flex-col">
                 {children}
-              </main>
+              </div>
             </div>
           </AuthProvider>
         </ThemeProvider>

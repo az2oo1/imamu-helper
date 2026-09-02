@@ -68,7 +68,8 @@ async function startServer() {
 
   // Next.js SSR request handling
   if (process.env.NODE_ENV !== "test") {
-    const dev = process.env.NODE_ENV !== "production";
+    const isProd = process.env.NODE_ENV === "production" || (typeof process !== 'undefined' && process.argv[1]?.endsWith('server.cjs'));
+    const dev = !isProd;
     const nextApp = next({ dev });
     const handle = nextApp.getRequestHandler();
     await nextApp.prepare();

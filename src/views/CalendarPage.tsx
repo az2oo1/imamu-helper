@@ -8,6 +8,7 @@ import {
   isSameDay, isToday, addWeeks, subWeeks, isAfter, startOfDay
 } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { parseDate, formatDate, formatHijriDate, getCountdown, getEventCategoryMeta } from '../lib/date-utils';
 
 export function CalendarPage() {
   const [events, setEvents] = useState<any[]>([]);
@@ -29,7 +30,7 @@ export function CalendarPage() {
       })
       .then(data => {
         if(Array.isArray(data)) {
-          data.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+          data.sort((a, b) => (parseDate(a.date)?.getTime() || 0) - (parseDate(b.date)?.getTime() || 0));
           setEvents(data);
         }
       }).catch(err => {
@@ -127,10 +128,16 @@ export function CalendarPage() {
   const isTodayDate = isToday(currentDate);
 
   const getEventsForDay = (day: Date) => {
-    return events.filter(e => isSameDay(parseISO(e.date), day));
+    return events.filter(e => {
+      const d = parseDate(e.date);
+      return d ? isSameDay(d, day) : false;
+    });
   };
 
-  const upcomingEvents = events.filter(e => isAfter(parseISO(e.date), startOfDay(new Date()))).slice(0, 5);
+  const upcomingEvents = events.filter(e => {
+    const d = parseDate(e.date);
+    return d ? isAfter(d, startOfDay(new Date())) : false;
+  }).slice(0, 5);
 
   const webcalUrl = typeof window !== 'undefined' 
     ? `webcal://${window.location.host}/api/calendar.ics` 
@@ -187,14 +194,29 @@ export function CalendarPage() {
               >
                 <X className="w-4 h-4" />
               </button>
-              <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                <Info className="w-3.5 h-3.5" /> تفاصيل الموعد
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Info className="w-3.5 h-3.5" /> تفاصيل الموعد
+                </div>
+                {(() => {
+                  const meta = getEventCategoryMeta(selectedEvent);
+                  return meta ? (
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${meta.badgeClass}`}>
+                      {meta.label}
+                    </span>
+                  ) : null;
+                })()}
               </div>
               <h3 className="font-bold text-slate-900 dark:text-white text-sm mb-1.5 leading-snug" dir="auto">{selectedEvent.title}</h3>
-              <p className="text-[11px] text-slate-500 dark:text-zinc-400 mb-3 flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 inline text-blue-500" />
-                <span>{format(parseISO(selectedEvent.date), 'EEEE، d MMMM yyyy • h:mm a', { locale: ar })}</span>
-              </p>
+              <div className="text-[11px] text-slate-500 dark:text-zinc-400 mb-3 flex flex-col gap-0.5">
+                <div className="flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 inline text-blue-500" />
+                  <span>{formatDate(selectedEvent.date, 'ar-full')}</span>
+                </div>
+                <div className="text-[10px] text-slate-400 dark:text-zinc-500 mr-5">
+                  {formatHijriDate(selectedEvent.date)}
+                </div>
+              </div>
               {selectedEvent.description ? (
                 <div className="text-xs text-slate-700 dark:text-zinc-300 bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl p-3 leading-relaxed max-h-40 overflow-y-auto mb-3 text-right" dir="auto">
                   {selectedEvent.description}

@@ -1,24 +1,24 @@
 import express from 'express';
 import multer from 'multer';
 import path from 'path';
-import fs from 'fs';
 import AdmZip from 'adm-zip';
-import { eq, desc, and, or, sql, inArray } from 'drizzle-orm';
+import { eq, desc, or, sql } from 'drizzle-orm';
 import { 
   users, majors, subjects, course_resources, events, news, majorCourses, 
   news_sources, global_settings, tutorial_sections, tutorials, tutorial_feedback, 
-  feedback_comments, activity_logs, newbie_links, tools, newsLikes, newsComments
+  activity_logs, newbie_links, tools, newsLikes, newsComments
 } from '../../db/schema';
 import { requireAuth, AuthRequest } from '../../middleware/auth';
 import { matchId } from '../../lib/auth-utils';
 import { logger } from '../../middleware/logger';
-import { uploadFileToStorage, getFileFromStorage, deleteFileFromStorage, isS3Configured } from '../../lib/storage';
-import { GoogleGenAI, Type } from '@google/genai';
+import { uploadFileToStorage, isS3Configured } from '../../lib/storage';
+import { GoogleGenAI } from '@google/genai';
 import { importMsariData } from '../services/msari';
 import { extractTelegramChannelPosts } from '../services/telegram';
+import { syncExternalImagesToStorage } from '../services/seed';
+import { calculateMokafaaDate, formatDate, parseDate } from '../../lib/date-utils';
 
 import { getDb } from '../../db/index';
-import { sendCustomEmail } from '../../lib/mailer';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -27,11 +27,6 @@ const storage = multer.memoryStorage();
 const uploadStorage = multer({
   storage: storage,
   limits: { fileSize: 10 * 1024 * 1024 }
-});
-
-const importUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 100 * 1024 * 1024 }
 });
 
 async function checkAdmin(req: AuthRequest, db?: any): Promise<boolean> {
@@ -184,7 +179,7 @@ export function createAdminRouter(db: any) {
       let icsContent = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//IMAMU Helper Calendar//AR\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nX-WR-CALNAME:التقويم الأكاديمي - جامعة الإمام\r\n";
 
       for (const ev of allEvents) {
-        const cleanDate = ev.date ? ev.date.replace(/-/g, '') : '';
+        const cleanDate = formatDate(ev.date, 'iso-date').replace(/-/g, '');
         if (cleanDate.length === 8) {
           icsContent += "BEGIN:VEVENT\r\n";
           icsContent += `SUMMARY:${ev.title}\r\n`;
@@ -418,6 +413,18 @@ export function createAdminRouter(db: any) {
   router.post("/admin/upload", requireAuth, uploadStorage.any(), handleUpload as any);
   router.post("/upload", requireAuth, uploadStorage.any(), handleUpload as any);
 
+  // Sync external images to Garage S3 Storage manually
+  router.post("/admin/storage/sync-images", requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
+    try {
+      await syncExternalImagesToStorage(db);
+      res.json({ success: true, message: "External images migrated to Garage S3 Storage successfully" });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Failed to sync images to storage" });
+    }
+  });
+
+
   // Fetch WhatsApp Group Avatar ONCE, Upload to S3 (Garage Storage), and return saved S3 URL
   router.post("/admin/fetch-whatsapp-avatar", requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
     if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
@@ -493,7 +500,7 @@ export function createAdminRouter(db: any) {
       }
 
       let removedCount = 0;
-      for (const [code, items] of codeMap.entries()) {
+      for (const [, items] of codeMap.entries()) {
         if (items.length > 1) {
           items.sort((a, b) => b.id - a.id);
           const keep = items[0];
@@ -635,9 +642,10 @@ export function createAdminRouter(db: any) {
       const idRaw = String(req.params.id || '').trim();
 
       // 1. First attempt direct deletion from course_resources by primary key using string/sql casting
-      const deleted = await db.delete(course_resources).where(matchId(course_resources.id, idRaw)).returning();
-      if (deleted.length > 0) {
-        return res.json({ success: true, deletedCount: deleted.length });
+      const [existingRes] = await db.select().from(course_resources).where(matchId(course_resources.id, idRaw));
+      if (existingRes) {
+        await db.delete(course_resources).where(matchId(course_resources.id, idRaw));
+        return res.json({ success: true, deletedCount: 1 });
       }
 
       // 2. Check for synthetic subject resource deletion
@@ -765,14 +773,52 @@ export function createAdminRouter(db: any) {
   router.post("/admin/events", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
     try {
-      const { title, date, description } = req.body;
-      const [ev] = await db.insert(events).values({ title, date, description }).returning();
+      const { title, date, description, isHoliday, isHolidayEnd, isSemesterStart, isSemesterEnd, isEid, isNationalDay } = req.body;
+      const [ev] = await db.insert(events).values({ 
+        title, 
+        date, 
+        description,
+        isHoliday: !!isHoliday,
+        isHolidayEnd: !!isHolidayEnd,
+        isSemesterStart: !!isSemesterStart,
+        isSemesterEnd: !!isSemesterEnd,
+        isEid: !!isEid,
+        isNationalDay: !!isNationalDay
+      }).returning();
       res.json(ev);
     } catch (e) {
       console.error(e);
       res.status(500).json({ error: "Server error" });
     }
   });
+
+  router.put("/admin/events/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
+    try {
+      const idRaw = req.params.id;
+      const { title, date, description, isHoliday, isHolidayEnd, isSemesterStart, isSemesterEnd, isEid, isNationalDay } = req.body;
+      const [ev] = await db.update(events)
+        .set({ 
+          title, 
+          date, 
+          description,
+          isHoliday: !!isHoliday,
+          isHolidayEnd: !!isHolidayEnd,
+          isSemesterStart: !!isSemesterStart,
+          isSemesterEnd: !!isSemesterEnd,
+          isEid: !!isEid,
+          isNationalDay: !!isNationalDay
+        })
+        .where(matchId(events.id, idRaw))
+        .returning();
+      res.json(ev);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+
 
   router.post("/admin/events/generate-mokafaa", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
@@ -781,12 +827,8 @@ export function createAdminRouter(db: any) {
       const currentYear = now.getFullYear();
       let added = 0;
       for (let month = 0; month < 12; month++) {
-        let dateObj = new Date(currentYear, month, 27);
-        const day = dateObj.getDay();
-        if (day === 5) dateObj.setDate(26); // Friday -> Thursday
-        else if (day === 6) dateObj.setDate(28); // Saturday -> Sunday
-
-        const dateStr = dateObj.toISOString().split('T')[0];
+        const dateObj = calculateMokafaaDate(currentYear, month);
+        const dateStr = formatDate(dateObj, 'iso-date');
         const title = `إيداع المكافأة الجامعية - شهر ${month + 1}`;
         const existing = await db.select().from(events).where(eq(events.date, dateStr));
         if (existing.length === 0) {
@@ -1016,7 +1058,7 @@ export function createAdminRouter(db: any) {
   router.post("/admin/ai_parse", requireAuth, uploadStorage.single("file"), async (req: AuthRequest & { file?: Express.Multer.File }, res): Promise<any> => {
     if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
     try {
-      const { prompt, type } = req.body;
+      const { prompt } = req.body;
       const file = req.file;
 
       if (!file) return res.status(400).json({ error: "File required" });
@@ -1039,7 +1081,7 @@ export function createAdminRouter(db: any) {
             responseMimeType: "application/json",
           }
         });
-      } catch (primaryErr: any) {
+      } catch {
         response = await ai.models.generateContent({
           model: "gemini-1.5-flash",
           contents,

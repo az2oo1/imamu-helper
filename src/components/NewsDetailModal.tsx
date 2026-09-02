@@ -7,6 +7,7 @@ import {
   Trash2, ChevronLeft, ChevronRight, Maximize2, Sparkles, Newspaper
 } from 'lucide-react';
 import { FormattedNewsContent } from './FormattedNewsContent';
+import { formatDate } from '../lib/date-utils';
 
 export interface CommentItem {
   id: number;
@@ -243,7 +244,7 @@ export function NewsDetailModal({
 
               <span className="text-[11px] text-slate-400 dark:text-zinc-500 flex items-center gap-1 pl-8">
                 <Clock className="w-3 h-3" />
-                {new Date(item.createdAt).toLocaleDateString('ar-SA')}
+                {formatDate(item.createdAt, 'ar-display')}
               </span>
             </div>
 
@@ -327,7 +328,7 @@ export function NewsDetailModal({
                                 @{c.userName || 'طالب'}
                               </span>
                               <span className="text-[10px] text-slate-400 dark:text-zinc-500 mr-1">
-                                {new Date(c.createdAt).toLocaleDateString('ar-SA')}
+                                {formatDate(c.createdAt, 'ar-display')}
                               </span>
                             </div>
 
