@@ -747,7 +747,7 @@ export function AdminPage() {
                       <div className="text-xs mt-1 flex gap-2 flex-wrap" style={{ color: 'var(--text-muted)' }}>
                         <span className="font-medium px-2 py-0.5 rounded" style={{ background: 'var(--bg-subtle)' }}>{s.newsCount || 0} posts</span>
                         <span style={{ color: 'var(--border-color)' }}>•</span>
-                        <span>Last fetched: {s.lastFetched ? new Date(s.lastFetched).toLocaleString() : 'Never'}</span>
+                        <span>Last fetched: {s.lastFetched ? (isNaN(new Date(s.lastFetched).getTime()) ? String(s.lastFetched) : new Date(s.lastFetched).toLocaleString()) : 'Never'}</span>
                       </div>
                     </div>
                   </div>

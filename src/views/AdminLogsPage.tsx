@@ -220,7 +220,7 @@ export function AdminLogsPage() {
           <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-slate-200/80 dark:border-zinc-800 shadow-sm flex flex-col justify-between">
             <span className="text-xs font-semibold text-slate-500 dark:text-zinc-400">إجمالي الأحداث المسجلة</span>
             <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white mt-2">
-              {stats.total.toLocaleString()}
+              {(stats?.total ?? 0).toLocaleString()}
             </div>
           </div>
 
@@ -229,7 +229,7 @@ export function AdminLogsPage() {
               <Lock className="w-3.5 h-3.5" /> أحداث المصادقة (Auth)
             </span>
             <div className="text-2xl sm:text-3xl font-extrabold text-purple-600 dark:text-purple-400 mt-2">
-              {stats.auth.toLocaleString()}
+              {(stats?.auth ?? 0).toLocaleString()}
             </div>
           </div>
 
@@ -238,7 +238,7 @@ export function AdminLogsPage() {
               <Server className="w-3.5 h-3.5" /> عمليات المزامنة
             </span>
             <div className="text-2xl sm:text-3xl font-extrabold text-blue-600 dark:text-blue-400 mt-2">
-              {stats.sync.toLocaleString()}
+              {(stats?.sync ?? 0).toLocaleString()}
             </div>
           </div>
 
@@ -247,7 +247,7 @@ export function AdminLogsPage() {
               <ShieldAlert className="w-3.5 h-3.5" /> أحداث الإدارة
             </span>
             <div className="text-2xl sm:text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-2">
-              {stats.admin.toLocaleString()}
+              {(stats?.admin ?? 0).toLocaleString()}
             </div>
           </div>
 
@@ -256,7 +256,7 @@ export function AdminLogsPage() {
               <AlertCircle className="w-3.5 h-3.5" /> الأخطاء والتحذيرات
             </span>
             <div className="text-2xl sm:text-3xl font-extrabold text-red-600 dark:text-red-400 mt-2">
-              {stats.errors.toLocaleString()}
+              {(stats?.errors ?? 0).toLocaleString()}
             </div>
           </div>
         </div>
@@ -328,7 +328,7 @@ export function AdminLogsPage() {
                     className="hover:bg-blue-50/30 dark:hover:bg-zinc-800/40 transition-colors"
                   >
                     <td className="py-3.5 px-4 whitespace-nowrap text-slate-500 dark:text-zinc-400 text-xs font-mono" dir="ltr">
-                      {new Date(log.createdAt).toLocaleString('ar-SA')}
+                      {log?.createdAt ? (isNaN(new Date(log.createdAt).getTime()) ? String(log.createdAt) : new Date(log.createdAt).toLocaleString('ar-SA')) : '-'}
                     </td>
                     <td className="py-3.5 px-4 whitespace-nowrap">
                       {getLevelBadge(log.level)}
@@ -406,7 +406,9 @@ export function AdminLogsPage() {
                   <div className="grid grid-cols-2 gap-3 text-xs">
                     <div className="p-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl">
                       <span className="text-slate-400 dark:text-zinc-500 font-bold block mb-1">وقت الحدث</span>
-                      <span className="font-mono text-slate-800 dark:text-zinc-200">{new Date(selectedLog.createdAt).toLocaleString('ar-SA')}</span>
+                      <span className="font-mono text-slate-800 dark:text-zinc-200">
+                        {selectedLog?.createdAt ? (isNaN(new Date(selectedLog.createdAt).getTime()) ? String(selectedLog.createdAt) : new Date(selectedLog.createdAt).toLocaleString('ar-SA')) : '-'}
+                      </span>
                     </div>
                     <div className="p-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl">
                       <span className="text-slate-400 dark:text-zinc-500 font-bold block mb-1">عنوان IP</span>

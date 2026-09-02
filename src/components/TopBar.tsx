@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../lib/AuthContext';
 import { useTheme } from '../lib/ThemeContext';
-import { LogIn, LogOut, Settings, GraduationCap, Menu, X, UserCircle2, Home, Calculator, BookOpen, Calendar, Newspaper, HelpCircle, Sun, Moon, Activity } from 'lucide-react';
+import { LogIn, LogOut, Settings, GraduationCap, Menu, X, UserCircle2, Home, Calculator, BookOpen, Calendar, Newspaper, HelpCircle, Sun, Moon, Activity, Shield } from 'lucide-react';
 import clsx from 'clsx';
 import { motion, AnimatePresence, LayoutGroup } from 'motion/react';
 
@@ -108,25 +108,6 @@ export function TopBar() {
               )}
             </button>
 
-            {isAdmin && (
-              <>
-                <Link 
-                  href="/admin/logs" 
-                  className="hidden md:flex w-9 h-9 items-center justify-center text-slate-500 dark:text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors rounded-full hover:bg-slate-100 dark:hover:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800/80"
-                  title="سجلات أحداث النظام"
-                >
-                  <Activity className="w-4.5 h-4.5 text-emerald-500" />
-                </Link>
-                <Link 
-                  href="/admin" 
-                  className="hidden md:flex w-9 h-9 items-center justify-center text-slate-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors rounded-full hover:bg-slate-100 dark:hover:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800/80"
-                  title="لوحة تحكم المسؤول"
-                >
-                  <Settings className="w-4.5 h-4.5" />
-                </Link>
-              </>
-            )}
-
             {user ? (
               <div className="relative">
                 <button 
@@ -167,19 +148,30 @@ export function TopBar() {
                           className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 transition text-right"
                           dir="rtl"
                         >
-                          <Settings className="w-4 h-4 text-slate-400 dark:text-zinc-400" />
+                          <UserCircle2 className="w-4 h-4 text-slate-400 dark:text-zinc-400" />
                           إعدادات الملف الشخصي
                         </Link>
                         {isAdmin && (
-                          <Link 
-                            href="/admin/logs" 
-                            onClick={() => setProfileMenuOpen(false)}
-                            className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:bg-slate-50 dark:hover:bg-zinc-800 transition text-right"
-                            dir="rtl"
-                          >
-                            <Activity className="w-4 h-4 text-emerald-500" />
-                            سجلات أحداث النظام
-                          </Link>
+                          <>
+                            <Link 
+                              href="/admin" 
+                              onClick={() => setProfileMenuOpen(false)}
+                              className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-slate-50 dark:hover:bg-zinc-800 transition text-right"
+                              dir="rtl"
+                            >
+                              <Shield className="w-4 h-4 text-blue-500" />
+                              لوحة تحكم المسؤول
+                            </Link>
+                            <Link 
+                              href="/admin/logs" 
+                              onClick={() => setProfileMenuOpen(false)}
+                              className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:bg-slate-50 dark:hover:bg-zinc-800 transition text-right"
+                              dir="rtl"
+                            >
+                              <Activity className="w-4 h-4 text-emerald-500" />
+                              سجلات أحداث النظام
+                            </Link>
+                          </>
                         )}
                         <hr className="my-1 border-slate-100 dark:border-zinc-800" />
                         <button

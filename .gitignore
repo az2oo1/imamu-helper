@@ -30,6 +30,11 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Scripts & Uploads
+/scripts/
+uploads/
+/public/uploads/
+
 # Environment files
 .env
 .env*.local
@@ -43,3 +48,8 @@ Thumbs.db
 
 # Vercel
 .vercel
+public/patterns/math_pattern.png
+public/math_chalkboard_pattern.png
+public/patterns/cs_pattern.png
+tsconfig.tsbuildinfo
+tsconfig.tsbuildinfo

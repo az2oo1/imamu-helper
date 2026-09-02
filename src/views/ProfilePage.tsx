@@ -108,10 +108,20 @@ export function ProfilePage() {
     userName: dbUser?.userName || '',
   });
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'progress'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'progress'>('progress');
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
   const [phoneEditable, setPhoneEditable] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      if (tabParam === 'profile' || tabParam === 'progress') {
+        setActiveTab(tabParam);
+      }
+    }
+  }, []);
 
   // Username check removed as display names are non-unique
 
