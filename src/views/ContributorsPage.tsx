@@ -155,62 +155,63 @@ export function ContributorsPage() {
               <SpotlightCard
                 key={item.id}
                 onClick={() => setSelectedContributor(item)}
-                className="cursor-pointer border border-slate-300 dark:border-zinc-700/80 bg-white dark:bg-zinc-900/90 p-6 hover:border-amber-500/60 dark:hover:border-amber-500/50 transition duration-300 shadow-sm hover:shadow-md flex flex-col justify-between rounded-3xl"
+                className="cursor-pointer border border-slate-300 dark:border-zinc-700/80 bg-white dark:bg-zinc-900/90 p-6 hover:border-amber-500/60 dark:hover:border-amber-500/50 transition duration-300 shadow-sm hover:shadow-md h-full rounded-3xl"
               >
-                <div>
-                  {/* Top Avatar & Category Badge */}
-                  <div className="flex items-start justify-between gap-4 mb-4">
-                    <ContributorAvatar
-                      src={item.photoUrl}
-                      alt={item.name}
-                      className="w-16 h-16 rounded-2xl"
-                    />
+                <div className="flex flex-col justify-between h-full">
+                  <div>
+                    {/* Header: Avatar NEXT TO Name & Subtitle */}
+                    <div className="flex items-center gap-4 mb-3.5">
+                      <ContributorAvatar
+                        src={item.photoUrl}
+                        alt={item.name}
+                        className="w-16 h-16 rounded-2xl"
+                      />
 
-                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-500/10 text-[var(--color-imamu-accent)] border border-amber-500/30 shrink-0">
-                      {item.category === 'founder' ? '👑 المؤسس' : item.category === 'resources' ? '📚 فريق المصادر' : item.category === 'tools' ? '🛠️ مطور أدوات' : item.category === 'dalilah' ? '💡 فريق الدليلة' : '🌟 مساهم'}
-                    </span>
-                  </div>
+                      <div>
+                        {/* Name */}
+                        <h3 className="text-base font-bold text-slate-900 dark:text-white mb-0.5">
+                          {item.name}
+                        </h3>
 
-                  {/* Standalone Name */}
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1">
-                    {item.name}
-                  </h3>
+                        {/* Sub-line under Name: Position • Major */}
+                        <div className="text-xs font-semibold text-[var(--color-imamu-accent)] flex items-center gap-2 flex-wrap">
+                          <span>{item.role}</span>
+                          {item.linkedMajor && (
+                            <>
+                              <span className="text-slate-400 dark:text-zinc-500 font-normal text-xs">•</span>
+                              <span className="text-slate-600 dark:text-zinc-400 font-medium flex items-center gap-1">
+                                <GraduationCap className="w-3.5 h-3.5 text-slate-400" />
+                                <span>{item.linkedMajor}</span>
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
 
-                  {/* Sub-line under Name: Position • Major */}
-                  <div className="text-xs font-semibold text-[var(--color-imamu-accent)] mb-3 flex items-center gap-2 flex-wrap">
-                    <span>{item.role}</span>
-                    {item.linkedMajor && (
-                      <>
-                        <span className="text-slate-400 dark:text-zinc-500 font-normal text-xs">•</span>
-                        <span className="text-slate-600 dark:text-zinc-400 font-medium flex items-center gap-1">
-                          <GraduationCap className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{item.linkedMajor}</span>
-                        </span>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Tool Tags directly under Line 2 */}
-                  {item.linkedTools && item.linkedTools.length > 0 && (
+                    {/* Tags: Category badge FIRST, then Tool Tags */}
                     <div className="flex flex-wrap gap-1.5 mb-3.5">
-                      {item.linkedTools.map((t, idx) => (
+                      <span className="px-2.5 py-1 rounded-xl bg-amber-500/10 text-[var(--color-imamu-accent)] border border-amber-500/30 text-[11px] font-bold flex items-center gap-1 shadow-2xs">
+                        {item.category === 'founder' ? '👑 المؤسس' : item.category === 'resources' ? '📚 فريق المصادر' : item.category === 'tools' ? '🛠️ مطور أدوات' : item.category === 'dalilah' ? '💡 فريق الدليلة' : '🌟 مساهم'}
+                      </span>
+
+                      {item.linkedTools && item.linkedTools.length > 0 && item.linkedTools.map((t, idx) => (
                         <span key={idx} className="px-2.5 py-1 rounded-xl bg-stone-100 dark:bg-zinc-800/90 text-[#D49A6A] dark:text-[#E2A676] text-[11px] font-bold flex items-center gap-1 border border-amber-300/60 dark:border-zinc-700/80 shadow-2xs">
                           <Wrench className="w-3 h-3 text-[#D49A6A] dark:text-[#E2A676]" />
                           <span>{t}</span>
                         </span>
                       ))}
                     </div>
-                  )}
 
-                  {item.bio && (
-                    <p className="text-xs text-slate-600 dark:text-zinc-400 line-clamp-3 leading-relaxed mb-4">
-                      {item.bio}
-                    </p>
-                  )}
-                </div>
+                    {item.bio && (
+                      <p className="text-xs text-slate-600 dark:text-zinc-400 line-clamp-3 leading-relaxed mb-4">
+                        {item.bio}
+                      </p>
+                    )}
+                  </div>
 
-                {/* Footer: Social Icons & Contributions summary */}
-                <div className="pt-4 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between">
+                  {/* Footer: Social Icons & Contributions summary */}
+                  <div className="pt-4 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between mt-auto">
                   <div className="flex items-center gap-2.5 text-slate-400">
                     {item.socialLinks?.linkedin && (
                       <a 
@@ -277,7 +278,8 @@ export function ContributorsPage() {
                     <ChevronLeft className="w-3.5 h-3.5 text-[#C48B57] dark:text-[#E2A676]" />
                   </button>
                 </div>
-              </SpotlightCard>
+              </div>
+            </SpotlightCard>
             ))}
           </div>
         )}
@@ -321,17 +323,19 @@ export function ContributorsPage() {
                     )}
                   </div>
 
-                  {/* Tool Tags directly under Line 2 */}
-                  {selectedContributor.linkedTools && selectedContributor.linkedTools.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedContributor.linkedTools.map((tool, idx) => (
-                        <span key={idx} className="px-2.5 py-1 rounded-xl bg-stone-100 dark:bg-zinc-800/90 text-[#D49A6A] dark:text-[#E2A676] text-[11px] font-bold flex items-center gap-1 border border-amber-300/60 dark:border-zinc-700/80 shadow-2xs">
-                          <Wrench className="w-3.5 h-3.5 text-[#D49A6A] dark:text-[#E2A676]" />
-                          <span>{tool}</span>
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  {/* Tags: Category tag FIRST, then Tool Tags */}
+                  <div className="flex flex-wrap gap-1.5">
+                    <span className="px-2.5 py-1 rounded-xl bg-amber-500/10 text-[var(--color-imamu-accent)] border border-amber-500/30 text-[11px] font-bold flex items-center gap-1 shadow-2xs">
+                      {selectedContributor.category === 'founder' ? '👑 المؤسس' : selectedContributor.category === 'resources' ? '📚 فريق المصادر' : selectedContributor.category === 'tools' ? '🛠️ مطور أدوات' : selectedContributor.category === 'dalilah' ? '💡 فريق الدليلة' : '🌟 مساهم'}
+                    </span>
+
+                    {selectedContributor.linkedTools && selectedContributor.linkedTools.map((tool, idx) => (
+                      <span key={idx} className="px-2.5 py-1 rounded-xl bg-stone-100 dark:bg-zinc-800/90 text-[#D49A6A] dark:text-[#E2A676] text-[11px] font-bold flex items-center gap-1 border border-amber-300/60 dark:border-zinc-700/80 shadow-2xs">
+                        <Wrench className="w-3.5 h-3.5 text-[#D49A6A] dark:text-[#E2A676]" />
+                        <span>{tool}</span>
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
               <button
