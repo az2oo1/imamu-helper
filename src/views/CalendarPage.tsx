@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight, LayoutGrid, List, X, Info, ExternalLink, Download, CalendarPlus } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight, LayoutGrid, List, X, Info, ExternalLink, Download, CalendarPlus, Search } from 'lucide-react';
 import { 
   format, parseISO, addMonths, subMonths, startOfWeek, endOfWeek, 
   startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, 
@@ -134,10 +134,20 @@ export function CalendarPage() {
     });
   };
 
-  const upcomingEvents = events.filter(e => {
-    const d = parseDate(e.date);
-    return d ? isAfter(d, startOfDay(new Date())) : false;
-  }).slice(0, 5);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const upcomingEvents = events
+    .map(e => ({ ...e, parsedDate: parseDate(e.date) }))
+    .filter(e => {
+      if (!e.parsedDate) return false;
+      const matchesSearch = !searchQuery.trim() || 
+        e.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        (e.description && e.description.toLowerCase().includes(searchQuery.toLowerCase()));
+      
+      if (searchQuery.trim()) return matchesSearch;
+      return isAfter(e.parsedDate, startOfDay(new Date())) || isSameDay(e.parsedDate, new Date());
+    })
+    .sort((a, b) => (a.parsedDate?.getTime() || 0) - (b.parsedDate?.getTime() || 0));
 
   const webcalUrl = typeof window !== 'undefined' 
     ? `webcal://${window.location.host}/api/calendar.ics` 
@@ -169,7 +179,7 @@ export function CalendarPage() {
               href={googleCalendarUrl}
               target="_blank" 
               rel="noopener noreferrer" 
-              className="btn-rise text-xs bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white px-3.5 py-2.5 rounded-xl font-bold inline-flex items-center justify-center gap-1.5 transition-all duration-200 shadow-sm cursor-pointer"
+              className="btn-rise text-xs bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white px-3.5 py-2.5 rounded-xl font-bold inline-flex items-center justify-center gap-1.5 transition-all duration-200 shadow-sm cursor-pointer border border-amber-700/30"
               title="مزامنة التقويم بالكامل مع تقويم Google"
             >
               <CalendarPlus className="w-4 h-4" /> ربط بـ تقويم Google
@@ -244,7 +254,30 @@ export function CalendarPage() {
             </div>
           )}
 
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500 mb-4 pr-1">المواعيد القادمة</h2>
+          <div className="mb-4 relative">
+            <div className="relative flex items-center">
+              <Search className="w-3.5 h-3.5 absolute right-3 text-slate-400 dark:text-zinc-500 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="ابحث في المواعيد أو الانتقال..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pr-8 pl-3 py-2 bg-slate-50 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:border-[var(--color-imamu-brown)] transition placeholder:text-slate-400 dark:placeholder:text-zinc-600"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute left-2.5 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded-full"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500 mb-4 pr-1">
+            {searchQuery ? `نتائج البحث (${upcomingEvents.length})` : 'المواعيد القادمة'}
+          </h2>
           
           <div className="relative border-r border-slate-200 dark:border-zinc-800 mr-2.5 pl-1 space-y-4">
             {upcomingEvents.map((ev, i) => {
@@ -253,6 +286,7 @@ export function CalendarPage() {
               const monthStr = format(d, 'MMM', { locale: ar });
               const timeStr = format(d, 'h:mm a', { locale: ar });
               const isSelected = selectedEvent && selectedEvent.title === ev.title && selectedEvent.date === ev.date;
+              const meta = getEventCategoryMeta(ev);
 
               return (
                 <div 
@@ -282,6 +316,15 @@ export function CalendarPage() {
                         {dayStr} {monthStr}
                       </span>
                     </div>
+
+                    {meta && (
+                      <div className="mb-1.5">
+                        <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold border inline-block ${meta.badgeClass}`}>
+                          {meta.label}
+                        </span>
+                      </div>
+                    )}
+
                     <div className="flex items-center gap-1 text-[10px] text-slate-500 dark:text-zinc-400 font-medium">
                       <Clock className="w-3 h-3 text-slate-400 dark:text-zinc-500" />
                       <span>{timeStr}</span>
@@ -303,9 +346,9 @@ export function CalendarPage() {
       {/* Main Calendar Section */}
       <div className="flex-1 flex flex-col h-full max-w-full overflow-hidden bg-white dark:bg-zinc-950">
         
-        {/* Calendar Navigation Header */}
+        {/* Calendar Navigation Header & Filter Bar */}
         <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 shrink-0">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
             <h2 className="text-xl sm:text-2xl font-serif font-extrabold text-slate-900 dark:text-white min-w-[200px]">
               {viewState === 'month' 
                 ? format(currentDate, 'MMMM yyyy', { locale: ar }) 
@@ -434,6 +477,11 @@ export function CalendarPage() {
                         }`}
                         title="انقر لعرض تفاصيل الفعالية"
                       >
+                        {meta && (
+                          <div className="text-[9px] font-extrabold mb-0.5 opacity-90 truncate">
+                            {meta.label}
+                          </div>
+                        )}
                         <div className="font-bold truncate text-[11px] leading-relaxed text-slate-900 dark:text-white">{ev.title}</div>
                         <div className="opacity-80 truncate text-[9px] flex items-center gap-1 mt-0.5 text-slate-600 dark:text-zinc-300">
                           <Clock className="w-2.5 h-2.5 inline text-slate-500 dark:text-zinc-300" />

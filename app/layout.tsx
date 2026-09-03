@@ -8,6 +8,8 @@ export const metadata = {
   description: 'المساعد الأكاديمي والطلابي الشامل لطلاب جامعة الإمام محمد بن سعود الإسلامية',
 };
 
+export const dynamic = 'force-dynamic';
+
 import { TopBar } from '../src/components/TopBar';
 import { Footer } from '../src/components/Footer';
 

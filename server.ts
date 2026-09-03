@@ -25,10 +25,14 @@ async function startServer() {
   app.use(compression());
   const PORT = Number(process.env.PORT) || 3000;
 
-  // Make sure public/uploads folder exists for local fallback
-  const uploadsDir = path.join(process.cwd(), 'public/uploads');
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
+  // Make sure persistent uploads folder exists outside public/ so Next.js builds won't clear it
+  const persistentUploadsDir = path.join(process.cwd(), 'uploads');
+  const legacyUploadsDir = path.join(process.cwd(), 'public/uploads');
+  if (!fs.existsSync(persistentUploadsDir)) {
+    fs.mkdirSync(persistentUploadsDir, { recursive: true });
+  }
+  if (!fs.existsSync(legacyUploadsDir)) {
+    fs.mkdirSync(legacyUploadsDir, { recursive: true });
   }
 
   // Serve uploaded files from Object Storage or local disk fallback
@@ -43,7 +47,8 @@ async function startServer() {
     } catch (e) {}
     next();
   });
-  app.use('/uploads', express.static(uploadsDir));
+  app.use('/uploads', express.static(persistentUploadsDir));
+  app.use('/uploads', express.static(legacyUploadsDir));
 
   app.use(express.json({ limit: '50mb' }));
 

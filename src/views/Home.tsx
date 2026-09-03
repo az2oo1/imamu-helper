@@ -29,7 +29,7 @@ import {
   calculateProgressPercent 
 } from '../lib/date-utils';
 
-const DynamicConfetti = dynamic(() => import('react-confetti').then((mod) => mod.default || mod), { ssr: false });
+const DynamicConfetti = dynamic(() => import('react-confetti'), { ssr: false });
 
 const features = [
   {

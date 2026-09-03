@@ -503,13 +503,13 @@ export function ProfilePage() {
                             اجتزت <AnimatedNumber value={progressData.totalFinishedInReq} /> من {progressData.totalReq} مقرر (إجمالي <AnimatedNumber value={progressData.totalFinishedHours} /> ساعة معتمدة)
                           </span>
                         </div>
-                        <span className="text-[#C48B57] dark:text-[#E2A676] font-black text-2xl"><AnimatedNumber value={progressData.percentFinished} />%</span>
+                        <span className="text-[var(--color-imamu-accent)] font-black text-2xl"><AnimatedNumber value={progressData.percentFinished} />%</span>
                       </div>
 
                       {/* Solid Color Progress Bar (No Gradient) */}
                       <div className="w-full bg-slate-200/80 dark:bg-zinc-800 rounded-full h-3 overflow-hidden">
                         <motion.div 
-                          className="bg-[#B87D4B] dark:bg-[#C48B57] h-full rounded-full"
+                          className="bg-[var(--color-imamu-accent)] h-full rounded-full"
                           initial={{ width: 0 }}
                           animate={{ width: `${progressData.percentFinished}%` }}
                           transition={{ duration: 0.8, ease: "easeOut" }}

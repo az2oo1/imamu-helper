@@ -195,8 +195,8 @@ export default function CreateResourceModal({
           <div className="p-6 bg-slate-50/80 dark:bg-zinc-900/90 border-b border-slate-200/80 dark:border-zinc-800 relative shrink-0">
             <div className="flex items-center justify-between gap-4 mb-6">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-2xl bg-stone-50 dark:bg-stone-950/60 border border-amber-200 dark:border-stone-900/50 text-[var(--color-imamu-accent)] shadow-xs">
-                  <Folder className="w-5 h-5" />
+                <div className="p-2.5 rounded-2xl bg-stone-50 dark:bg-stone-950/60 border border-amber-200 dark:border-stone-900/50 text-white shadow-xs">
+                  <Folder className="w-5 h-5 text-white" />
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-slate-900 dark:text-white leading-tight">

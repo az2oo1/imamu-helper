@@ -508,7 +508,7 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
             className="space-y-4"
           >
             <h3 className="text-xs font-bold text-slate-400 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Folder className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
+              <Folder className="w-3.5 h-3.5 text-white" />
               الملفات ({fileList.length})
             </h3>
             {fileList.length === 0 ? (
@@ -525,8 +525,8 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
                     rel="noreferrer"
                     className="flex items-center gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/50 hover:bg-stone-50 dark:hover:bg-stone-950/40 border border-slate-200/80 dark:border-zinc-800 hover:border-amber-200 dark:hover:border-amber-900/60 transition-all duration-200 group cursor-pointer"
                   >
-                    <div className="p-2.5 rounded-xl bg-stone-100 dark:bg-stone-900/50 text-[var(--color-imamu-accent)] shrink-0">
-                      <Folder className="w-5 h-5" />
+                    <div className="p-2.5 rounded-xl bg-stone-100 dark:bg-stone-900/50 text-white shrink-0">
+                      <Folder className="w-5 h-5 text-white" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1">

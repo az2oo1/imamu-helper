@@ -99,6 +99,14 @@ export async function ensureBucketExists(): Promise<void> {
 }
 
 
+export function getPersistentUploadsDir(): string {
+  const uploadsDir = path.join(process.cwd(), 'uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+  return uploadsDir;
+}
+
 /**
  * Uploads a file to RustFS Object Storage (or local disk fallback).
  */
@@ -126,7 +134,6 @@ export async function uploadFileToStorage(
 
       console.log(`[Storage] Uploaded "${key}" to RustFS S3 bucket "${bucketName}".`);
 
-      // If a custom public URL base is configured, use it. Otherwise use the standard app endpoint
       if (process.env.S3_PUBLIC_URL) {
         const publicBaseUrl = process.env.S3_PUBLIC_URL.replace(/\/$/, '');
         return { url: `${publicBaseUrl}/${key}`, key };
@@ -134,19 +141,25 @@ export async function uploadFileToStorage(
 
       return { url: `/uploads/${key}`, key };
     } catch (s3Err: any) {
-      console.warn(`[Storage] S3 upload failed, falling back to local disk storage:`, s3Err.message || s3Err);
+      console.warn(`[Storage] S3 upload failed, falling back to local persistent disk storage:`, s3Err.message || s3Err);
     }
   }
 
-  // Local disk fallback
-  const uploadsDir = path.join(process.cwd(), 'public/uploads');
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-  }
-
+  // Local persistent disk fallback (stored in /uploads outside public/ so next build/rebuild won't wipe it)
+  const uploadsDir = getPersistentUploadsDir();
   const filePath = path.join(uploadsDir, filename);
   fs.writeFileSync(filePath, fileBuffer);
-  console.log(`[Storage] Uploaded "${filename}" to local disk storage.`);
+
+  // Copy to public/uploads as well for immediate static serving if needed
+  try {
+    const legacyPublicDir = path.join(process.cwd(), 'public/uploads');
+    if (!fs.existsSync(legacyPublicDir)) {
+      fs.mkdirSync(legacyPublicDir, { recursive: true });
+    }
+    fs.writeFileSync(path.join(legacyPublicDir, filename), fileBuffer);
+  } catch (e) {}
+
+  console.log(`[Storage] Uploaded "${filename}" to persistent disk storage.`);
 
   return { url: `/uploads/${filename}`, key: filename };
 }
@@ -179,23 +192,34 @@ export async function getFileFromStorage(
       };
     } catch (err: any) {
       console.error(`[Storage] Error fetching "${filename}" from S3:`, err.message || err);
-      // Fallback to local disk in case it was stored locally previously
-      const uploadsDir = path.join(process.cwd(), 'public/uploads');
+      // Fallback to persistent disk
+      const uploadsDir = getPersistentUploadsDir();
       const filePath = path.join(uploadsDir, filename);
       if (fs.existsSync(filePath)) {
         const buffer = fs.readFileSync(filePath);
         return { buffer };
       }
+      const legacyPath = path.join(process.cwd(), 'public/uploads', filename);
+      if (fs.existsSync(legacyPath)) {
+        const buffer = fs.readFileSync(legacyPath);
+        return { buffer };
+      }
       return null;
     }
   } else {
-    // Read from local disk
-    const uploadsDir = path.join(process.cwd(), 'public/uploads');
+    // Read from persistent local disk
+    const uploadsDir = getPersistentUploadsDir();
     const filePath = path.join(uploadsDir, filename);
-    if (!fs.existsSync(filePath)) return null;
-
-    const buffer = fs.readFileSync(filePath);
-    return { buffer };
+    if (fs.existsSync(filePath)) {
+      const buffer = fs.readFileSync(filePath);
+      return { buffer };
+    }
+    const legacyPath = path.join(process.cwd(), 'public/uploads', filename);
+    if (fs.existsSync(legacyPath)) {
+      const buffer = fs.readFileSync(legacyPath);
+      return { buffer };
+    }
+    return null;
   }
 }
 
@@ -220,13 +244,15 @@ export async function deleteFileFromStorage(filename: string): Promise<void> {
     }
   }
 
-  // Also clean up local file if it exists
-  const uploadsDir = path.join(process.cwd(), 'public/uploads');
+  // Clean up persistent local files if present
+  const uploadsDir = getPersistentUploadsDir();
   const filePath = path.join(uploadsDir, filename);
   if (fs.existsSync(filePath)) {
-    try {
-      fs.unlinkSync(filePath);
-    } catch (e) {}
+    try { fs.unlinkSync(filePath); } catch (e) {}
+  }
+  const legacyPath = path.join(process.cwd(), 'public/uploads', filename);
+  if (fs.existsSync(legacyPath)) {
+    try { fs.unlinkSync(legacyPath); } catch (e) {}
   }
 }
 
