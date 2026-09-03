@@ -1,10 +1,17 @@
 'use client';
 
 import React from 'react';
+import { usePathname } from 'next/navigation';
 
 export function Footer() {
+  const pathname = usePathname();
+  
+  if (pathname === '/calendar') {
+    return null;
+  }
+
   return (
-    <footer className="mt-8 sm:mt-12 w-full border-t border-slate-200/80 dark:border-zinc-800/80 bg-transparent shrink-0">
+    <footer className="w-full border-t border-slate-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-950 shrink-0">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 dark:text-zinc-400">
         <div className="flex items-center gap-2.5">
           <img src="/logo_dark.png" alt="مساعد الإمام" className="h-7 sm:h-8 w-auto object-contain dark:hidden" />

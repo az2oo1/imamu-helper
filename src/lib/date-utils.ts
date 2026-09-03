@@ -169,6 +169,18 @@ export function formatHijriDate(input: DateInput, options?: Intl.DateTimeFormatO
 }
 
 /**
+ * Compact Hijri Month & Day Formatter (e.g. "١٢ ربيع الآخر")
+ */
+export function formatHijriMonthDay(input: DateInput): string {
+  const d = parseDate(input);
+  if (!d) return '-';
+  return new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', {
+    day: 'numeric',
+    month: 'long'
+  }).format(d);
+}
+
+/**
  * 4. Unified Countdown Calculator
  */
 export function getCountdown(targetDateInput: DateInput, nowInput: DateInput = new Date()): CountdownResult {
@@ -233,7 +245,10 @@ export function calculateProgressPercent(startInput: DateInput, endInput: DateIn
 /**
  * 7. Category Descriptor Badge Helper
  */
-export function getEventCategoryMeta(flags: AcademicEventFlags): { label: string; icon: string; badgeClass: string } | null {
+export function getEventCategoryMeta(flags: AcademicEventFlags & { title?: string }): { label: string; icon: string; badgeClass: string } | null {
+  if (flags.title?.includes('مكافأة') || flags.title?.includes('المكافأة') || flags.title?.includes('إيداع')) {
+    return { label: '💰 إيداع المكافأة', icon: '💰', badgeClass: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30' };
+  }
   if (flags.isSemesterStart) return { label: '🚀 بداية الفصل', icon: '🚀', badgeClass: 'bg-[var(--color-imamu-brown)/15] text-[var(--color-imamu-accent)] border-amber-700/30' };
   if (flags.isSemesterEnd) return { label: '🏁 نهاية الفصل', icon: '🏁', badgeClass: 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30' };
   if (flags.isHoliday) return { label: '🌴 بداية إجازة', icon: '🌴', badgeClass: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' };

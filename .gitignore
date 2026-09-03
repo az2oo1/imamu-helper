@@ -18,11 +18,13 @@
 # Agent Workspaces
 /.agents/
 
-# Scratch & Temporary Files
+# Scratch, Debug Scripts & Temporary Files
+scratch/
+/scratch/
+scratch_*
 temp.txt
 dummy.pdf
 fetch_tweet.py
-scratch_*
 *.tmp
 *.temp
 *.log
@@ -44,13 +46,17 @@ uploads/
 .DS_Store
 Thumbs.db
 *.pem
-*.tsbuildinfo
 
-# Vercel
-.vercel
+# TypeScript Build Cache
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Duplicate/Temporary Assets
+public/darkmood.png
+public/lightmood.png
 public/patterns/math_pattern.png
 public/math_chalkboard_pattern.png
 public/patterns/cs_pattern.png
-tsconfig.tsbuildinfo
-tsconfig.tsbuildinfo
-tsconfig.tsbuildinfo
+
+# Vercel
+.vercel
