@@ -139,7 +139,11 @@ const SCHEMA_VERIFICATION_STATEMENTS = [
   `ALTER TABLE events ADD COLUMN IF NOT EXISTS is_national_day boolean DEFAULT false`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS admin_permissions text`,
   `ALTER TABLE news_likes ALTER COLUMN news_id TYPE bigint`,
-  `ALTER TABLE news_comments ALTER COLUMN news_id TYPE bigint`
+  `ALTER TABLE news_comments ALTER COLUMN news_id TYPE bigint`,
+  `ALTER TABLE tutorials ALTER COLUMN section_id TYPE bigint`,
+  `ALTER TABLE tutorial_feedback ALTER COLUMN tutorial_id TYPE bigint`,
+  `ALTER TABLE feedback_comments ALTER COLUMN feedback_id TYPE bigint`,
+  `ALTER TABLE tutorial_comments ALTER COLUMN tutorial_id TYPE bigint`
 ];
 
 function isConnectionError(err: any): boolean {

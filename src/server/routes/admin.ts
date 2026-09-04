@@ -10,7 +10,7 @@ import {
   contributors
 } from '../../db/schema';
 import { requireAuth, AuthRequest } from '../../middleware/auth';
-import { matchId } from '../../lib/auth-utils';
+import { matchId, matchSubjectIds } from '../../lib/auth-utils';
 import { logger } from '../../middleware/logger';
 import { uploadFileToStorage, isS3Configured } from '../../lib/storage';
 import { GoogleGenAI } from '@google/genai';
@@ -129,15 +129,34 @@ export function createAdminRouter(db: any) {
     if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
     try {
       const { sectionId, title, description, text, steps, videoUrl, imageUrl, linkUrl, linkTitle } = req.body;
+      
+      // Safely resolve valid sectionId (handles 64-bit BigInt IDs & fallback)
+      const allSections = await db.select().from(tutorial_sections);
+      let targetSectionId: any = sectionId;
+      if (allSections.length === 0) {
+        const [newSec] = await db.insert(tutorial_sections).values({
+          title: 'الشروحات العامة',
+          icon: 'GraduationCap',
+          color: 'text-[var(--color-imamu-accent)] bg-stone-50 border-stone-100/50'
+        }).returning();
+        targetSectionId = newSec.id;
+      } else if (sectionId != null && sectionId !== '') {
+        const matched = allSections.find((s: any) => matchSubjectIds(s.id, sectionId));
+        if (matched) targetSectionId = matched.id;
+        else targetSectionId = allSections[0].id;
+      } else {
+        targetSectionId = allSections[0].id;
+      }
+
       const stepsJson = Array.isArray(steps) ? JSON.stringify(steps) : (steps ? String(steps) : '[]');
       const [tut] = await db.insert(tutorials).values({
-        sectionId, title, description, text: text || '', steps: stepsJson, videoUrl, imageUrl, linkUrl, linkTitle
+        sectionId: targetSectionId, title: title || 'شرح جديد', description: description || '', text: text || '', steps: stepsJson, videoUrl, imageUrl, linkUrl, linkTitle
       }).returning();
       let parsedSteps: any[] = [];
       try { parsedSteps = JSON.parse(tut.steps || '[]'); } catch(_e) { parsedSteps = []; }
       res.json({ ...tut, steps: parsedSteps });
     } catch (e) {
-      console.error(e);
+      console.error("[Create Tutorial Error]", e);
       res.status(500).json({ error: "Server error" });
     }
   });
@@ -148,15 +167,33 @@ export function createAdminRouter(db: any) {
     try {
       const idRaw = req.params.id;
       const { sectionId, title, description, text, steps, videoUrl, imageUrl, linkUrl, linkTitle } = req.body;
+      
+      const allSections = await db.select().from(tutorial_sections);
+      let targetSectionId: any = sectionId;
+      if (allSections.length === 0) {
+        const [newSec] = await db.insert(tutorial_sections).values({
+          title: 'الشروحات العامة',
+          icon: 'GraduationCap',
+          color: 'text-[var(--color-imamu-accent)] bg-stone-50 border-stone-100/50'
+        }).returning();
+        targetSectionId = newSec.id;
+      } else if (sectionId != null && sectionId !== '') {
+        const matched = allSections.find((s: any) => matchSubjectIds(s.id, sectionId));
+        if (matched) targetSectionId = matched.id;
+        else targetSectionId = allSections[0].id;
+      } else {
+        targetSectionId = allSections[0].id;
+      }
+
       const stepsJson = Array.isArray(steps) ? JSON.stringify(steps) : (steps ? String(steps) : '[]');
       const [tut] = await db.update(tutorials).set({
-        sectionId, title, description, text: text || '', steps: stepsJson, videoUrl, imageUrl, linkUrl, linkTitle
+        sectionId: targetSectionId, title: title || 'شرح جديد', description: description || '', text: text || '', steps: stepsJson, videoUrl, imageUrl, linkUrl, linkTitle
       }).where(matchId(tutorials.id, idRaw)).returning();
       let parsedSteps: any[] = [];
       try { parsedSteps = JSON.parse(tut.steps || '[]'); } catch(_e) { parsedSteps = []; }
       res.json({ ...tut, steps: parsedSteps });
     } catch (e) {
-      console.error(e);
+      console.error("[Update Tutorial Error]", e);
       res.status(500).json({ error: "Server error" });
     }
   });

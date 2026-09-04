@@ -15,6 +15,7 @@ import { createNewsRouter } from './src/server/routes/news';
 import { createTutorialsRouter } from './src/server/routes/tutorials';
 import { createAdminRouter } from './src/server/routes/admin';
 import { createContributorsRouter } from './src/server/routes/contributors';
+import { createSeoRouter } from './src/server/routes/seo';
 
 async function startServer() {
   // Wait for DB to be fully initialized (PGlite WASM or CockroachDB / PostgreSQL)
@@ -115,6 +116,9 @@ async function startServer() {
   app.use("/api", createTutorialsRouter(db));
   app.use("/api", createAdminRouter(db));
   app.use("/api", createContributorsRouter(db));
+
+  // Dynamic SEO Router (/sitemap.xml & /robots.txt)
+  app.use("/", createSeoRouter(db));
 
   // JSON 404 fallback for unmatched /api routes (prevents Next.js HTML 404 rendering)
   app.all("/api/*", (req, res) => {

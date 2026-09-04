@@ -167,7 +167,7 @@ export const tutorial_sections = pgTable('tutorial_sections', {
 
 export const tutorials = pgTable('tutorials', {
   id: serial('id').primaryKey(),
-  sectionId: integer('section_id').references(() => tutorial_sections.id, { onDelete: 'cascade' }).notNull(),
+  sectionId: bigint('section_id', { mode: 'number' }).references(() => tutorial_sections.id, { onDelete: 'cascade' }).notNull(),
   title: text('title').notNull(),
   description: text('description').notNull(),
   text: text('text').notNull(),
@@ -181,7 +181,7 @@ export const tutorials = pgTable('tutorials', {
 
 export const tutorial_feedback = pgTable('tutorial_feedback', {
   id: serial('id').primaryKey(),
-  tutorialId: integer('tutorial_id').references(() => tutorials.id, { onDelete: 'cascade' }).notNull(),
+  tutorialId: bigint('tutorial_id', { mode: 'number' }).references(() => tutorials.id, { onDelete: 'cascade' }).notNull(),
   userId: text('user_id').notNull(),
   isHelpful: boolean('is_helpful').notNull(),
   comment: text('comment'),
@@ -190,7 +190,7 @@ export const tutorial_feedback = pgTable('tutorial_feedback', {
 
 export const feedback_comments = pgTable('feedback_comments', {
   id: serial('id').primaryKey(),
-  feedbackId: integer('feedback_id').references(() => tutorial_feedback.id, { onDelete: 'cascade' }).notNull(),
+  feedbackId: bigint('feedback_id', { mode: 'number' }).references(() => tutorial_feedback.id, { onDelete: 'cascade' }).notNull(),
   userId: text('user_id').notNull(),
   userName: text('user_name'),
   content: text('content').notNull(),
@@ -207,7 +207,7 @@ export const newbie_links = pgTable('newbie_links', {
 
 export const tutorial_comments = pgTable('tutorial_comments', {
   id: serial('id').primaryKey(),
-  tutorialId: integer('tutorial_id').references(() => tutorials.id, { onDelete: 'cascade' }).notNull(),
+  tutorialId: bigint('tutorial_id', { mode: 'number' }).references(() => tutorials.id, { onDelete: 'cascade' }).notNull(),
   userId: text('user_id').notNull(),
   userName: text('user_name'),
   content: text('content').notNull(),
