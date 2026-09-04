@@ -56,19 +56,19 @@ export function createNewsRouter(db: any) {
         .limit(limit)
         .offset(offset);
 
-      const recordIds = records.map((r: any) => Number(r.id)).filter((id: number) => !isNaN(id));
+      const recordIds = records.map((r: any) => r.id).filter(Boolean);
       let allLikes: any[] = [];
       let allComments: any[] = [];
 
       if (recordIds.length > 0) {
-        allLikes = await db.select().from(newsLikes).where(inArray(newsLikes.newsId, recordIds));
-        allComments = await db.select().from(newsComments).where(inArray(newsComments.newsId, recordIds));
+        allLikes = await db.select().from(newsLikes).where(inArray(newsLikes.newsId, recordIds as any));
+        allComments = await db.select().from(newsComments).where(inArray(newsComments.newsId, recordIds as any));
       }
 
       const mapped = records.map((record: any) => {
-        const recIdNum = Number(record.id);
-        const likes = allLikes.filter((l: any) => Number(l.newsId) === recIdNum);
-        const comments = allComments.filter((c: any) => Number(c.newsId) === recIdNum);
+        const recIdStr = String(record.id).trim();
+        const likes = allLikes.filter((l: any) => String(l.newsId).trim() === recIdStr);
+        const comments = allComments.filter((c: any) => String(c.newsId).trim() === recIdStr);
         const userLiked = currentUserId ? likes.some((l: any) => l.userId === currentUserId) : false;
         const effectiveAvatar = record.profilePicUrl || record.authorAvatar || null;
 
@@ -103,20 +103,20 @@ export function createNewsRouter(db: any) {
   // Like news item
   router.post("/news/:id/like", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     try {
-      const newsIdNum = Number(req.params.id);
-      if (isNaN(newsIdNum)) return res.status(400).json({ error: "Invalid news ID" });
+      const newsIdRaw = req.params.id;
+      if (!newsIdRaw) return res.status(400).json({ error: "Invalid news ID" });
       const userId = req.user.uid;
 
-      const existing = await db.select().from(newsLikes).where(and(eq(newsLikes.userId, userId), eq(newsLikes.newsId, newsIdNum)));
+      const existing = await db.select().from(newsLikes).where(and(eq(newsLikes.userId, userId), matchId(newsLikes.newsId, newsIdRaw)));
       if (existing.length > 0) {
         await db.delete(newsLikes).where(eq(newsLikes.id, existing[0].id));
         return res.json({ liked: false });
       } else {
-        await db.insert(newsLikes).values({ userId, newsId: newsIdNum });
+        await db.insert(newsLikes).values({ userId, newsId: newsIdRaw as any });
         return res.json({ liked: true });
       }
     } catch (e) {
-      console.error(e);
+      console.error("[Like Error]", e);
       res.status(500).json({ error: "Server error" });
     }
   });
@@ -124,8 +124,8 @@ export function createNewsRouter(db: any) {
   // Get comments for news item
   router.get("/news/:id/comments", async (req, res) => {
     try {
-      const newsIdNum = Number(req.params.id);
-      if (isNaN(newsIdNum)) return res.status(400).json({ error: "Invalid news ID" });
+      const newsIdRaw = req.params.id;
+      if (!newsIdRaw) return res.status(400).json({ error: "Invalid news ID" });
       const comments = await db.select({
           id: newsComments.id,
           content: newsComments.content,
@@ -135,11 +135,12 @@ export function createNewsRouter(db: any) {
           profilePic: users.profilePicUrl
         })
         .from(newsComments)
-        .where(eq(newsComments.newsId, newsIdNum))
+        .where(matchId(newsComments.newsId, newsIdRaw))
         .leftJoin(users, eq(users.uid, newsComments.userId))
         .orderBy(desc(newsComments.createdAt));
       res.json(comments);
     } catch (e) {
+      console.error("[Get Comments Error]", e);
       res.status(500).json({ error: "Server error" });
     }
   });
@@ -147,13 +148,13 @@ export function createNewsRouter(db: any) {
   // Post comment to news item
   router.post("/news/:id/comments", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     try {
-      const newsIdNum = Number(req.params.id);
-      if (isNaN(newsIdNum)) return res.status(400).json({ error: "Invalid news ID" });
+      const newsIdRaw = req.params.id;
+      if (!newsIdRaw) return res.status(400).json({ error: "Invalid news ID" });
       const userId = req.user.uid;
       const { content } = req.body;
       if (!content || !content.trim()) return res.status(400).json({ error: "Empty comment" });
 
-      const [newComment] = await db.insert(newsComments).values({ userId, newsId: newsIdNum, content: content.trim() }).returning();
+      const [newComment] = await db.insert(newsComments).values({ userId, newsId: newsIdRaw as any, content: content.trim() }).returning();
       const userRec = await db.select().from(users).where(eq(users.uid, userId));
 
       res.json({
@@ -165,6 +166,7 @@ export function createNewsRouter(db: any) {
         profilePic: userRec[0]?.profilePicUrl || null
       });
     } catch (e) {
+      console.error("[Post Comment Error]", e);
       res.status(500).json({ error: "Server error" });
     }
   });

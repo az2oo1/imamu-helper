@@ -13,7 +13,25 @@ import fs from 'fs';
 let fallbackDb: any = null;
 let activeDb: any = null;
 let primaryDb: any = null;
+let primaryPool: Pool | null = null;
 let usingPrimary = false;
+let healthCheckTimer: NodeJS.Timeout | null = null;
+
+function startHealthCheck() {
+  if (healthCheckTimer) return;
+  healthCheckTimer = setInterval(async () => {
+    if (!usingPrimary && primaryDb && primaryPool) {
+      try {
+        await primaryPool.query('SELECT 1');
+        console.log('[DB Resilience] Primary DB connection restored! Re-activating primary database connection.');
+        usingPrimary = true;
+        activeDb = primaryDb;
+      } catch (_err) {
+        // Primary DB still unreachable, will retry on next interval
+      }
+    }
+  }, 10000);
+}
 
 let resolveDbReady!: () => void;
 const dbReadyPromise = new Promise<void>((resolve) => {
@@ -119,10 +137,44 @@ const SCHEMA_VERIFICATION_STATEMENTS = [
   `ALTER TABLE events ADD COLUMN IF NOT EXISTS is_semester_end boolean DEFAULT false`,
   `ALTER TABLE events ADD COLUMN IF NOT EXISTS is_eid boolean DEFAULT false`,
   `ALTER TABLE events ADD COLUMN IF NOT EXISTS is_national_day boolean DEFAULT false`,
-  `ALTER TABLE users ADD COLUMN IF NOT EXISTS admin_permissions text`
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS admin_permissions text`,
+  `ALTER TABLE news_likes ALTER COLUMN news_id TYPE bigint`,
+  `ALTER TABLE news_comments ALTER COLUMN news_id TYPE bigint`
 ];
 
-
+function isConnectionError(err: any): boolean {
+  if (!err) return false;
+  const code = err.code || err?.cause?.code;
+  if (code && typeof code === 'string') {
+    if (
+      code.startsWith('22') || // Data Exception (e.g. 22003 out of range)
+      code.startsWith('23') || // Integrity Constraint (e.g. 23505 unique)
+      code.startsWith('42') || // Syntax / Access Rule
+      code.startsWith('02')    // No Data
+    ) {
+      return false;
+    }
+  }
+  const msg = (err.message || err.toString() || err?.cause?.message || '').toLowerCase();
+  return (
+    msg.includes('econnaborted') ||
+    msg.includes('econnrefused') ||
+    msg.includes('econnreset') ||
+    msg.includes('etimedout') ||
+    msg.includes('connection terminated') ||
+    msg.includes('connection closed') ||
+    msg.includes('connection timeout') ||
+    msg.includes('failed to connect') ||
+    msg.includes('could not connect') ||
+    msg.includes('terminating connection') ||
+    code === '57P01' || // admin_shutdown
+    code === '57P02' || // crash_shutdown
+    code === '57P03' || // cannot_connect_now
+    code === '08000' || // connection_exception
+    code === '08003' || // connection_does_not_exist
+    code === '08006'    // connection_failure
+  );
+}
 
 async function applySchemaVerifications(runner: (sql: string) => Promise<any>) {
   for (const stmt of SCHEMA_VERIFICATION_STATEMENTS) {
@@ -150,9 +202,13 @@ function createResilientProxy() {
                     try {
                       return await primaryDb.query[tableProp][methodProp](...args);
                     } catch (err: any) {
-                      console.warn(`[DB Resilience] Primary DB query.${String(tableProp)}.${String(methodProp)} failed, falling back to PGlite:`, err.message || err);
-                      usingPrimary = false;
-                      activeDb = fallbackDb;
+                      if (isConnectionError(err)) {
+                        console.warn(`[DB Resilience] Primary DB connection lost, falling back to PGlite:`, err.message || err);
+                        usingPrimary = false;
+                        activeDb = fallbackDb;
+                      } else {
+                        throw err;
+                      }
                     }
                   }
                   return await fallbackDb.query[tableProp][methodProp](...args);
@@ -169,9 +225,13 @@ function createResilientProxy() {
             try {
               return await primaryDb.execute(...args);
             } catch (err: any) {
-              console.warn('[DB Resilience] Primary DB execute failed, falling back to PGlite:', err.message || err);
-              usingPrimary = false;
-              activeDb = fallbackDb;
+              if (isConnectionError(err)) {
+                console.warn('[DB Resilience] Primary DB connection lost, falling back to PGlite:', err.message || err);
+                usingPrimary = false;
+                activeDb = fallbackDb;
+              } else {
+                throw err;
+              }
             }
           }
           return await fallbackDb.execute(...args);
@@ -184,9 +244,13 @@ function createResilientProxy() {
             try {
               return await primaryDb.transaction(...args);
             } catch (err: any) {
-              console.warn('[DB Resilience] Primary DB transaction failed, falling back to PGlite:', err.message || err);
-              usingPrimary = false;
-              activeDb = fallbackDb;
+              if (isConnectionError(err)) {
+                console.warn('[DB Resilience] Primary DB connection lost, falling back to PGlite:', err.message || err);
+                usingPrimary = false;
+                activeDb = fallbackDb;
+              } else {
+                throw err;
+              }
             }
           }
           return await fallbackDb.transaction(...args);
@@ -222,9 +286,13 @@ function createChainBuilder(initialMethod: string, initialArgs: any[]) {
                 }
                 return await current;
               } catch (err: any) {
-                console.warn('[DB Resilience] Primary DB operation failed, falling back to PGlite:', err.message || err);
-                usingPrimary = false;
-                activeDb = fallbackDb;
+                if (isConnectionError(err)) {
+                  console.warn('[DB Resilience] Primary DB connection lost, falling back to PGlite:', err.message || err);
+                  usingPrimary = false;
+                  activeDb = fallbackDb;
+                } else {
+                  throw err;
+                }
               }
             }
 
@@ -452,8 +520,10 @@ async function initializeDatabase() {
 
       // Swap activeDb to connected CockroachDB server
       primaryDb = pgDb;
+      primaryPool = connectedPool;
       activeDb = pgDb;
       usingPrimary = true;
+      startHealthCheck();
       console.log(`[DB] Swapped active DB reference to physical database.`);
     } else {
       console.log('[DB] All physical CockroachDB host connection attempts failed. Staying on embedded database (PGlite) fallback.');

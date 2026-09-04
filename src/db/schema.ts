@@ -1,4 +1,4 @@
-import { integer, pgTable, serial, text, timestamp, boolean, varchar, unique, index } from 'drizzle-orm/pg-core';
+import { integer, bigint, pgTable, serial, text, timestamp, boolean, varchar, unique, index } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 export const users = pgTable('users', {
@@ -126,7 +126,7 @@ export const global_settings = pgTable('global_settings', {
 export const newsLikes = pgTable('news_likes', {
   id: serial('id').primaryKey(),
   userId: text('user_id').notNull(),
-  newsId: integer('news_id').references(() => news.id, { onDelete: 'cascade' }).notNull(),
+  newsId: bigint('news_id', { mode: 'number' }).references(() => news.id, { onDelete: 'cascade' }).notNull(),
   createdAt: timestamp('created_at').defaultNow(),
 }, (t) => ({
   unq: unique().on(t.userId, t.newsId)
@@ -135,7 +135,7 @@ export const newsLikes = pgTable('news_likes', {
 export const newsComments = pgTable('news_comments', {
   id: serial('id').primaryKey(),
   userId: text('user_id').notNull(),
-  newsId: integer('news_id').references(() => news.id, { onDelete: 'cascade' }).notNull(),
+  newsId: bigint('news_id', { mode: 'number' }).references(() => news.id, { onDelete: 'cascade' }).notNull(),
   content: text('content').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
 });
