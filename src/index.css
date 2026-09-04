@@ -200,19 +200,33 @@ html.dark ::-webkit-scrollbar-thumb {
 
 /* Sleek Thin Custom Scrollbar */
 .custom-scrollbar::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--color-imamu-brown);
   border-radius: 9999px;
 }
-html.dark .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #3f3f46;
-  border-radius: 9999px;
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--color-imamu-brown-dark);
+}
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-imamu-brown) transparent;
+}
+
+/* Hide number input spinners (up and down arrows) */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 /* Form controls refinement for light and dark modes */
@@ -245,9 +259,9 @@ html.dark select {
 }
 
 input:focus, textarea:focus, select:focus {
-  border-color: var(--color-imamu-brown) !important;
-  box-shadow: 0 0 0 3px rgba(160, 109, 66, 0.18) !important;
-  outline: none !important;
+  border-color: var(--color-imamu-brown);
+  box-shadow: 0 0 0 2px rgba(160, 109, 66, 0.2);
+  outline: none;
 }
 
 /* Custom Selection */

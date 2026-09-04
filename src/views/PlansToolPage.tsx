@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../lib/AuthContext';
-import { FileText, ArrowLeft, GraduationCap, ExternalLink, Search, ArrowUpRight, Plus, Trash2, Download, Eye, Layers, X, BookOpen, Clock, Sparkles, ChevronDown, Check } from 'lucide-react';
+import { FileText, ArrowLeft, GraduationCap, ExternalLink, Search, ArrowUpRight, Plus, Trash2, Download, Eye, Layers, X, BookOpen, Clock, Sparkles, ChevronDown, Check, Upload } from 'lucide-react';
 import Link from 'next/link';
 
 interface PdfFileItem {
@@ -46,6 +46,9 @@ export function PlansToolPage() {
   const [isAddPdfOpen, setIsAddPdfOpen] = useState(false);
   const [newPdfTitle, setNewPdfTitle] = useState('');
   const [newPdfUrl, setNewPdfUrl] = useState('');
+  const [isUploadingPdf, setIsUploadingPdf] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const handleDownloadPdf = (pdf: PdfFileItem, e: React.MouseEvent) => {
@@ -67,6 +70,14 @@ export function PlansToolPage() {
   };
 
   useEffect(() => {
+    // Load local stored custom PDFs if available
+    try {
+      const saved = localStorage.getItem('imamu_plans_pdfs');
+      if (saved) {
+        setMajorPdfs(JSON.parse(saved));
+      }
+    } catch (e) {}
+
     Promise.all([
       fetch('/api/majors').then(r => r.ok ? r.json() : []),
       fetch('/api/subjects').then(r => r.ok ? r.json() : [])
@@ -106,7 +117,11 @@ export function PlansToolPage() {
           url: 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/examples/learning/helloworld.pdf'
         });
       }
-      setMajorPdfs(prev => ({ ...prev, [key]: initialPdfs }));
+      setMajorPdfs(prev => {
+        const next = { ...prev, [key]: initialPdfs };
+        try { localStorage.setItem('imamu_plans_pdfs', JSON.stringify(next)); } catch (e) {}
+        return next;
+      });
     }
     setOpenPdfIndex(0);
   }, [selectedMajor]);
@@ -127,6 +142,63 @@ export function PlansToolPage() {
   const totalCoursesCount = majorSubjectsList.length || (selectedMajor?.courses?.length || 45);
   const totalCreditHours = majorSubjectsList.reduce((acc: number, curr: any) => acc + (Number(curr.creditHours) || 0), 0) || 135;
 
+  const processFileUpload = async (file: File) => {
+    setIsUploadingPdf(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const token = user ? await user.getIdToken() : '';
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const fileUrl = data.url || (data.files && data.files[0]?.url);
+        if (fileUrl) {
+          setNewPdfUrl(fileUrl);
+          if (!newPdfTitle.trim()) {
+            setNewPdfTitle(file.name.replace(/\.pdf$/i, ''));
+          }
+        }
+      } else {
+        alert('فشل رفع الملف إلى وحدة التخزين (Object Storage)');
+      }
+    } catch (err) {
+      console.error('Failed to upload PDF to object storage', err);
+      alert('حدث خطأ أثناء رفع الملف إلى Object Storage');
+    } finally {
+      setIsUploadingPdf(false);
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processFileUpload(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'))) {
+      processFileUpload(file);
+    } else if (file) {
+      alert('الرجاء اختيار ملف بصيغة PDF فقط');
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
   const handleAddPdf = (e: React.FormEvent) => {
     e.preventDefault();
     if (!isAdmin || !selectedMajor || !newPdfUrl.trim()) return;
@@ -136,10 +208,11 @@ export function PlansToolPage() {
       title: newPdfTitle.trim() || `ملف خطة إضافي ${currentMajorPdfList.length + 1}`,
       url: newPdfUrl.trim()
     };
-    setMajorPdfs(prev => ({
-      ...prev,
-      [key]: [...(prev[key] || []), newItem]
-    }));
+    setMajorPdfs(prev => {
+      const next = { ...prev, [key]: [...(prev[key] || []), newItem] };
+      try { localStorage.setItem('imamu_plans_pdfs', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
     setOpenPdfIndex(currentMajorPdfList.length);
     setNewPdfTitle('');
     setNewPdfUrl('');
@@ -150,7 +223,11 @@ export function PlansToolPage() {
     if (!isAdmin || !selectedMajor) return;
     const key = String(selectedMajor.id);
     const updated = currentMajorPdfList.filter((_, idx) => idx !== indexToRemove);
-    setMajorPdfs(prev => ({ ...prev, [key]: updated }));
+    setMajorPdfs(prev => {
+      const next = { ...prev, [key]: updated };
+      try { localStorage.setItem('imamu_plans_pdfs', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
     setOpenPdfIndex(0);
   };
 
@@ -167,7 +244,7 @@ export function PlansToolPage() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">{selectedMajor.name}</h2>
-              <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 mt-1">استعرض ملفات الخطط الدراسية بجمالية عالية وقم بإضافة ملفات جديدة حسب الحاجة.</p>
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 mt-1">استعرض ملفات الخطط الدراسية بجمالية عالية وقم بإدارة الملفات حسب الحاجة.</p>
             </div>
 
             {/* Masari Platform Button */}
@@ -184,54 +261,43 @@ export function PlansToolPage() {
             </a>
           </div>
 
-          {/* Tags Section: Hours, Courses, PDF Files in a full line under description & masari button */}
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            {/* Total Hours Tag */}
-            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800/90 px-3 py-1.5 rounded-full border border-slate-200 dark:border-zinc-700/80">
-              <Clock className="w-3.5 h-3.5 text-emerald-500" />
-              <span>{totalCreditHours} ساعة معتمدة</span>
-            </span>
+          {/* Tags Section & Add PDF Button */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Total Hours Tag */}
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800/90 px-3 py-1.5 rounded-full border border-slate-200 dark:border-zinc-700/80">
+                <Clock className="w-3.5 h-3.5 text-emerald-500" />
+                <span>{totalCreditHours} ساعة معتمدة</span>
+              </span>
 
-            {/* Total Courses Tag */}
-            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800/90 px-3 py-1.5 rounded-full border border-slate-200 dark:border-zinc-700/80">
-              <BookOpen className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
-              <span>{totalCoursesCount} مادة دراسية</span>
-            </span>
+              {/* Total Courses Tag */}
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800/90 px-3 py-1.5 rounded-full border border-slate-200 dark:border-zinc-700/80">
+                <BookOpen className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
+                <span>{totalCoursesCount} مادة دراسية</span>
+              </span>
 
-            {/* PDF Files Tag */}
-            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800/90 px-3 py-1.5 rounded-full border border-slate-200 dark:border-zinc-700/80">
-              <FileText className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
-              <span>{currentMajorPdfList.length} ملفات PDF</span>
-            </span>
-          </div>
-        </div>
-
-        {/* PDF Viewer Body - List of PDF Files */}
-        <div className="p-6 md:p-8 flex-1 bg-slate-50/50 dark:bg-zinc-950/50 flex flex-col gap-6">
-          {/* Header Bar: Section Title & Add File Button */}
-          <div className="flex items-center justify-between gap-3 bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-2xs">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-stone-50 dark:bg-stone-950/60 text-[var(--color-imamu-accent)] flex items-center justify-center border border-amber-200/50 dark:border-stone-900/40 shrink-0">
-                <Layers className="w-4.5 h-4.5" />
-              </div>
-              <div>
-                <h3 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white">قائمة ملفات الخطة الدراسية</h3>
-                <p className="text-[11px] text-slate-500 dark:text-zinc-400">إجمالي {currentMajorPdfList.length} ملف PDF متاح</p>
-              </div>
+              {/* PDF Files Tag */}
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800/90 px-3 py-1.5 rounded-full border border-slate-200 dark:border-zinc-700/80">
+                <FileText className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
+                <span>{currentMajorPdfList.length} ملفات PDF</span>
+              </span>
             </div>
 
             {/* Add New PDF File Button (Admin Only) */}
             {isAdmin && (
               <button
                 onClick={() => setIsAddPdfOpen(true)}
-                className="btn-rise flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-xs font-bold transition shadow-2xs cursor-pointer shrink-0"
+                className="btn-rise flex items-center gap-1.5 px-4 py-2 rounded-full bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-xs font-bold transition shadow-2xs cursor-pointer shrink-0"
               >
                 <Plus className="w-4 h-4" />
                 <span>إضافة ملف PDF</span>
               </button>
             )}
           </div>
+        </div>
 
+        {/* PDF Viewer Body - List of PDF Files */}
+        <div className="p-6 md:p-8 flex-1 bg-slate-50/50 dark:bg-zinc-950/50 flex flex-col gap-6">
           {/* List of PDF File Cards */}
           {currentMajorPdfList.length > 0 ? (
             <div className="flex flex-col gap-4">
@@ -278,7 +344,7 @@ export function PlansToolPage() {
                           className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
                             downloadingId === (pdf.id || pdf.title)
                               ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 scale-105 shadow-2xs'
-                              : 'bg-stone-50 dark:bg-stone-950/50 border-amber-200 dark:border-stone-900/50 hover:bg-stone-100 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)]'
+                              : 'bg-stone-50 dark:bg-stone-950/50 border-amber-200/50 dark:border-stone-900/50 hover:bg-[var(--color-imamu-brown)] hover:text-white dark:hover:bg-[var(--color-imamu-brown)] dark:hover:text-white text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)]'
                           }`}
                           title="تحميل الملف"
                         >
@@ -295,7 +361,7 @@ export function PlansToolPage() {
                             </>
                           )}
                         </button>
-                        {isAdmin && currentMajorPdfList.length > 1 && (
+                        {isAdmin && (
                           <button
                             onClick={() => handleRemovePdf(idx)}
                             className="p-1.5 text-slate-400 hover:text-red-500 transition rounded-xl hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer"
@@ -312,9 +378,13 @@ export function PlansToolPage() {
                       <div className="relative w-full h-[760px] bg-slate-100 dark:bg-zinc-950">
                         <iframe
                           src={
-                            pdf.url?.startsWith('blob:') || pdf.url?.startsWith('data:') || pdf.url?.startsWith('/')
+                            !pdf.url
+                              ? ''
+                              : pdf.url.startsWith('blob:') || pdf.url.startsWith('data:')
                               ? pdf.url
-                              : `https://docs.google.com/viewer?url=${encodeURIComponent(pdf.url)}&embedded=true`
+                              : pdf.url.startsWith('/')
+                              ? (pdf.url.includes('#') ? pdf.url : `${pdf.url}#toolbar=0`)
+                              : `/api/pdf-proxy?url=${encodeURIComponent(pdf.url)}#toolbar=0`
                           }
                           className="w-full h-full border-0"
                           title={pdf.title}
@@ -447,7 +517,7 @@ export function PlansToolPage() {
               </div>
               <div>
                 <h3 className="font-bold text-slate-900 dark:text-white text-base">إضافة ملف PDF جديد</h3>
-                <p className="text-xs text-slate-500 dark:text-zinc-400">أضف رابط ملف PDF لخطة {selectedMajor?.name}</p>
+                <p className="text-xs text-slate-500 dark:text-zinc-400">حفظ الملف في Object Storage لخطة {selectedMajor?.name}</p>
               </div>
             </div>
 
@@ -464,16 +534,53 @@ export function PlansToolPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">رابط ملف الـ PDF (URL)</label>
+                <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-2">أرفع ملف PDF</label>
                 <input
-                  type="url"
-                  required
-                  placeholder="https://example.com/plan.pdf"
-                  value={newPdfUrl}
-                  onChange={e => setNewPdfUrl(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs sm:text-sm outline-none focus:border-[var(--color-imamu-brown)] text-slate-900 dark:text-white dir-ltr text-left"
-                  dir="ltr"
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  onChange={handleFileUpload}
+                  className="hidden"
                 />
+                
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 ${
+                    isDragging
+                      ? 'border-[var(--color-imamu-accent)] bg-amber-500/10 scale-[1.01]'
+                      : newPdfUrl
+                      ? 'border-emerald-400/80 bg-emerald-500/5 dark:bg-emerald-950/20'
+                      : 'border-slate-300 dark:border-zinc-700 hover:border-[var(--color-imamu-brown)] bg-slate-50/50 dark:bg-zinc-950/50 hover:bg-slate-100/50 dark:hover:bg-zinc-900/60'
+                  }`}
+                >
+                  {isUploadingPdf ? (
+                    <div className="flex flex-col items-center py-2 gap-2">
+                      <div className="w-8 h-8 border-3 border-[var(--color-imamu-accent)] border-t-transparent rounded-full animate-spin" />
+                      <p className="text-xs font-bold text-[var(--color-imamu-accent)] animate-pulse">جاري رفع الملف إلى وحدة التخزين...</p>
+                    </div>
+                  ) : newPdfUrl ? (
+                    <div className="flex flex-col items-center py-1 gap-1.5">
+                      <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                        <Check className="w-5 h-5" />
+                      </div>
+                      <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">تم رفع الملف بنجاح!</p>
+                      <p className="text-[11px] text-slate-400 dark:text-zinc-500">انقر هنا أو اسحب ملف آخر للتغيير</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center py-1 gap-2">
+                      <div className="w-10 h-10 rounded-2xl bg-amber-50 dark:bg-stone-950/60 border border-amber-200/50 dark:border-stone-900/40 text-[var(--color-imamu-accent)] flex items-center justify-center">
+                        <Upload className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-800 dark:text-zinc-200">سحب وإفلات ملف PDF هنا أو <span className="text-[var(--color-imamu-accent)] underline">اضغط للاختيار</span></p>
+                        <p className="text-[11px] text-slate-400 dark:text-zinc-500 mt-0.5">يدعم ملفات PDF فقط (حجم أقصى 10 ميجابايت)</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-zinc-800">
@@ -486,7 +593,8 @@ export function PlansToolPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-xs font-bold shadow-md shadow-[var(--color-imamu-brown)/20] transition cursor-pointer"
+                  disabled={isUploadingPdf || !newPdfUrl.trim()}
+                  className="px-5 py-2.5 rounded-xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-xs font-bold shadow-md shadow-[var(--color-imamu-brown)/20] transition cursor-pointer disabled:opacity-50"
                 >
                   إضافة الملف
                 </button>

@@ -27,8 +27,26 @@ interface ToolItem {
   category: string;
   icon: React.ReactNode;
   iconName?: string;
+  colorClass: string;
   link: string;
   isStatic: boolean;
+}
+
+function getToolColorClass(iconName?: string) {
+  switch (iconName) {
+    case 'Calculator':
+      return 'text-amber-600 dark:text-amber-400';
+    case 'FileText':
+      return 'text-emerald-600 dark:text-emerald-400';
+    case 'Sparkles':
+      return 'text-violet-600 dark:text-violet-400';
+    case 'Globe':
+      return 'text-cyan-600 dark:text-cyan-400';
+    case 'Link':
+      return 'text-indigo-600 dark:text-indigo-400';
+    default:
+      return 'text-blue-600 dark:text-blue-400';
+  }
 }
 
 function renderToolIcon(iconName?: string | React.ReactNode) {
@@ -92,6 +110,7 @@ export function Tools() {
       description: "حساب دقيق للمعدل الفصلي والتراكمي وفق سلم جامعة الإمام، ومعاينة التوقعات المستقبلية.",
       category: "الحسابات الأكاديمية",
       icon: <Calculator className="w-5 h-5 text-amber-600 dark:text-amber-400" />,
+      colorClass: "text-amber-600 dark:text-amber-400",
       link: "/tools/gpa",
       isStatic: true
     },
@@ -102,6 +121,7 @@ export function Tools() {
       description: "تصفح وتحميل الخطط الدراسية الرسمية والمستندات لكافة تخصصات الكليات.",
       category: "التخطيط والتسجيل",
       icon: <FileText className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />,
+      colorClass: "text-emerald-600 dark:text-emerald-400",
       link: "/tools/plans",
       isStatic: true
     }
@@ -204,6 +224,7 @@ export function Tools() {
       category: dt.category || 'خدمات إضافية',
       icon: renderToolIcon(dt.icon),
       iconName: dt.icon,
+      colorClass: getToolColorClass(dt.icon),
       link: dt.link,
       isStatic: false
     }))
@@ -293,7 +314,7 @@ export function Tools() {
                       </p>
                     </div>
 
-                    <div className="flex items-center text-xs font-bold text-[var(--color-imamu-accent)] group-hover:-translate-x-1 transition-transform border-t border-slate-100 dark:border-zinc-800/80 pt-3 mt-auto">
+                    <div className={`flex items-center justify-end text-xs font-bold ${tool.colorClass} group-hover:-translate-x-1 transition-transform border-t border-slate-100 dark:border-zinc-800/80 pt-3 mt-auto`}>
                       <span>دخول الأداة</span>
                       <ChevronLeft className="w-3.5 h-3.5 mr-1" />
                     </div>

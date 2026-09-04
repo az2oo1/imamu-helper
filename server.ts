@@ -35,20 +35,68 @@ async function startServer() {
     fs.mkdirSync(legacyUploadsDir, { recursive: true });
   }
 
+  // PDF Proxy Route to serve any remote PDF inline with guaranteed Content-Type & Content-Disposition
+  app.get('/api/pdf-proxy', async (req, res) => {
+    const targetUrl = req.query.url as string;
+    if (!targetUrl) return res.status(400).send('Missing url parameter');
+
+    try {
+      const response = await fetch(targetUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'application/pdf,*/*'
+        }
+      });
+
+      if (!response.ok) {
+        return res.status(response.status).send('Failed to fetch PDF');
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      return res.send(buffer);
+    } catch (err: any) {
+      console.error('[PDF Proxy Error]', err);
+      return res.status(500).send('Error proxying PDF');
+    }
+  });
+
   // Serve uploaded files from Object Storage or local disk fallback
   app.get('/uploads/:filename', async (req, res, next) => {
     const filename = req.params.filename;
     try {
       const file = await getFileFromStorage(filename);
       if (file) {
-        if (file.mimeType) res.setHeader('Content-Type', file.mimeType);
+        let mimeType = file.mimeType;
+        if (!mimeType || mimeType === 'application/octet-stream' || filename.toLowerCase().endsWith('.pdf')) {
+          if (filename.toLowerCase().endsWith('.pdf')) mimeType = 'application/pdf';
+          else if (filename.toLowerCase().endsWith('.png')) mimeType = 'image/png';
+          else if (filename.toLowerCase().endsWith('.jpg') || filename.toLowerCase().endsWith('.jpeg')) mimeType = 'image/jpeg';
+        }
+        if (mimeType) res.setHeader('Content-Type', mimeType);
+        res.setHeader('Content-Disposition', 'inline; filename="' + encodeURIComponent(filename) + '"');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
         return res.send(file.buffer);
       }
     } catch (e) {}
     next();
   });
-  app.use('/uploads', express.static(persistentUploadsDir));
-  app.use('/uploads', express.static(legacyUploadsDir));
+
+  const setInlineHeaders = (res: express.Response, filePath: string) => {
+    if (filePath.toLowerCase().endsWith('.pdf')) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+    }
+  };
+
+  app.use('/uploads', express.static(persistentUploadsDir, { setHeaders: setInlineHeaders }));
+  app.use('/uploads', express.static(legacyUploadsDir, { setHeaders: setInlineHeaders }));
 
   app.use(express.json({ limit: '50mb' }));
 
