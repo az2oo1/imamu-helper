@@ -238,7 +238,7 @@ export function GpaCalculator() {
   }, [courses, prevGpa, prevHours]);
 
   return (
-    <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/90 dark:border-zinc-800 shadow-sm overflow-hidden flex flex-col md:flex-row relative" dir="rtl">
+    <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/90 dark:border-zinc-800 shadow-sm flex flex-col md:flex-row relative z-10" dir="rtl">
       
       {/* Course Input Section */}
       <div className="p-6 sm:p-8 flex-1 border-b md:border-b-0 md:border-l border-slate-200/90 dark:border-zinc-800">
@@ -269,7 +269,7 @@ export function GpaCalculator() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.15, ease: "easeOut" }}
-                className="grid grid-cols-12 gap-2 items-center"
+                className="grid grid-cols-12 gap-2 items-center relative z-20 focus-within:z-40"
               >
                 <div className="col-span-6">
                   <input
