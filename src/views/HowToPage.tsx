@@ -11,6 +11,7 @@ import {
   CheckCircle, X, AlertCircle, ExternalLink, Compass
 } from 'lucide-react';
 import { InView, SpotlightCard } from '../components/ui';
+import { getSectionColorClasses } from '../lib/section-colors';
 
 interface Section {
   id: number;
@@ -30,6 +31,19 @@ interface Tutorial {
   imageUrl?: string;
   linkUrl?: string;
   linkTitle?: string;
+}
+
+function matchSubjectIds(id1: any, id2: any): boolean {
+  if (id1 == null || id2 == null || id1 === '' || id2 === '') return false;
+  const s1 = String(id1).trim();
+  const s2 = String(id2).trim();
+  if (s1 === s2) return true;
+  const n1 = Number(s1);
+  const n2 = Number(s2);
+  if (!isNaN(n1) && !isNaN(n2)) {
+    return Math.abs(n1 - n2) < 200;
+  }
+  return false;
 }
 
 interface Feedback {
@@ -256,9 +270,10 @@ export function HowToPage() {
             {/* Header Detail Card */}
             <div className="bg-white dark:bg-zinc-900 border border-slate-200/90 dark:border-zinc-800 rounded-2xl p-6 sm:p-8 shadow-2xs mb-8">
               {(() => {
-                const section = sections.find(s => s.id === selectedTutorial.sectionId);
+                const section = sections.find(s => matchSubjectIds(s.id, selectedTutorial.sectionId));
+                const colorClasses = getSectionColorClasses(section?.color);
                 return (
-                  <span className="text-xs font-bold px-3 py-1 rounded-lg bg-stone-50 dark:bg-stone-950/50 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] border border-amber-200 dark:border-stone-900/50 mb-4 inline-block">
+                  <span className={`text-xs font-bold px-3 py-1 rounded-lg border mb-4 inline-block ${colorClasses.badge}`}>
                     {section?.title || 'شرح'}
                   </span>
                 );
@@ -278,14 +293,22 @@ export function HowToPage() {
                   <h2 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
                     <CheckSquare className="w-4 h-4 text-[var(--color-imamu-accent)]" /> خطوات وتفاصيل الشرح:
                   </h2>
-                  <div className="relative border-r-2 border-slate-200 dark:border-zinc-800 mr-2.5 pr-6 space-y-6 mb-8 text-right">
-                    {selectedTutorial.steps.filter(s => s.trim().length > 0).map((step, index) => {
+                  <div className="space-y-6 mb-8 text-right" dir="rtl">
+                    {selectedTutorial.steps.filter(s => s.trim().length > 0).map((step, index, arr) => {
+                      const isLast = index === arr.length - 1;
                       return (
-                        <div key={index} className="relative flex flex-col gap-1">
-                          <span className="absolute -right-[33px] top-1 flex items-center justify-center shrink-0 w-5.5 h-5.5 rounded-full bg-[var(--color-imamu-brown)] text-white text-[10px] font-bold shadow-2xs z-10">
-                            {index + 1}
-                          </span>
-                          <p className="text-xs sm:text-sm text-slate-800 dark:text-zinc-200 font-normal leading-relaxed pt-0.5">{step}</p>
+                        <div key={index} className="relative flex items-start gap-4">
+                          <div className="relative flex flex-col items-center shrink-0 w-7">
+                            <span className="w-7 h-7 rounded-full bg-[var(--color-imamu-brown)] text-white text-xs font-bold flex items-center justify-center shadow-2xs z-10 shrink-0">
+                              {index + 1}
+                            </span>
+                            {!isLast && (
+                              <span className="absolute top-7 bottom-0 right-1/2 translate-x-1/2 w-0.5 bg-slate-200 dark:bg-zinc-800 -mb-6" />
+                            )}
+                          </div>
+                          <div className="flex-1 pt-0.5 min-w-0">
+                            <p className="text-xs sm:text-sm text-slate-800 dark:text-zinc-200 font-normal leading-relaxed">{step}</p>
+                          </div>
                         </div>
                       );
                     })}
@@ -420,24 +443,40 @@ export function HowToPage() {
             <div className="w-full max-w-4xl mx-auto">
               <div 
                 onClick={() => router.push('/newbie')}
-                className="w-full bg-gradient-to-r from-amber-900 via-amber-800 to-indigo-700 rounded-2xl p-6 sm:p-8 text-white shadow-md relative overflow-hidden cursor-pointer"
+                className="w-full relative overflow-hidden rounded-2xl p-6 sm:p-8 cursor-pointer border transition-all duration-300 group"
+                style={{
+                  background: 'var(--bg-card)',
+                  borderColor: 'var(--border-color)'
+                }}
               >
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-6 relative z-10">
                   <div className="flex items-center gap-5 text-center sm:text-right flex-col sm:flex-row">
-                    <div className="w-12 h-12 bg-white/15 backdrop-blur-md rounded-xl flex items-center justify-center shrink-0 border border-white/20 shadow-inner">
-                      <GraduationCap className="w-6 h-6 text-amber-300" />
+                    <div 
+                      className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border transition-transform duration-300 group-hover:scale-105"
+                      style={{
+                        background: 'color-mix(in srgb, var(--color-imamu-brown) 15%, transparent)',
+                        borderColor: 'color-mix(in srgb, var(--color-imamu-brown) 30%, transparent)',
+                        color: 'var(--color-imamu-accent)'
+                      }}
+                    >
+                      <GraduationCap className="w-6 h-6" />
                     </div>
                     <div>
-                      <span className="bg-white/20 text-white text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-wider">دليل المستجدين الأكاديمي</span>
-                      <h2 className="text-lg sm:text-xl font-bold mt-1.5 flex items-center gap-2 justify-center sm:justify-start">
-                        دليل الطلاب المستجدين (عش آل إمام) 🎓
+                      <h2 className="text-xl sm:text-2xl font-serif font-bold transition-colors" style={{ color: 'var(--text-main)' }}>
+                        دليل الطلاب المستجدين 🎓
                       </h2>
-                      <p className="text-xs text-stone-100 mt-1 max-w-lg leading-relaxed">
+                      <p className="text-xs mt-1.5 max-w-lg leading-relaxed font-normal transition-colors" style={{ color: 'var(--text-muted)' }}>
                         بوابتك الشاملة للتعرف على الأنظمة الأكاديمية، السكن، المكافآت، والمباني والتحضيري خطوة بخطوة.
                       </p>
                     </div>
                   </div>
-                  <span className="px-5 py-2.5 bg-white text-stone-900 font-bold text-xs rounded-xl shadow-md shrink-0">
+                  <span 
+                    className="px-5 py-2.5 font-bold text-xs rounded-xl shrink-0 transition-all duration-200 group-hover:scale-102"
+                    style={{
+                      background: 'var(--color-imamu-brown)',
+                      color: 'var(--btn-text-primary, #ffffff)'
+                    }}
+                  >
                     استكشف الدليل الأكاديمي
                   </span>
                 </div>
@@ -470,55 +509,112 @@ export function HowToPage() {
 
             {/* Categories & Lists */}
             <InView preset="fade-up" delay={0.1} className="w-full max-w-4xl mx-auto space-y-12">
-              {sections.map(section => {
-                const sectionTutorials = filteredTutorials.filter(t => t.sectionId === section.id);
-                if (sectionTutorials.length === 0) return null;
+              {(() => {
+                const matchedTutorialIds = new Set<any>();
 
-                const SectionIcon = (Icons[section.icon as keyof typeof Icons] || Icons.BookOpen) as React.ComponentType<any>;
+                const renderedSections = sections.map(section => {
+                  const sectionTutorials = filteredTutorials.filter(t => {
+                    const isMatch = matchSubjectIds(t.sectionId, section.id);
+                    if (isMatch) matchedTutorialIds.add(t.id);
+                    return isMatch;
+                  });
+                  if (sectionTutorials.length === 0) return null;
+
+                  const SectionIcon = (Icons[section.icon as keyof typeof Icons] || Icons.BookOpen) as React.ComponentType<any>;
+                  const colorClasses = getSectionColorClasses(section.color);
+
+                  return (
+                    <div key={section.id} className="space-y-5">
+                      {/* Section Header */}
+                      <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className={`w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 shadow-2xs ${colorClasses.container}`}>
+                            <SectionIcon className="w-4.5 h-4.5" />
+                          </div>
+                          <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">{section.title}</h2>
+                        </div>
+                        <span className={`text-xs font-bold border px-3 py-1 rounded-full ${colorClasses.badge}`}>
+                          {sectionTutorials.length} شروحات
+                        </span>
+                      </div>
+
+                      {/* Tutorial Cards Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {sectionTutorials.map((tutorial) => (
+                          <SpotlightCard
+                            key={tutorial.id}
+                            spotlightColor={colorClasses.spotlight}
+                            onClick={() => selectTutorial(tutorial)}
+                            className="cursor-pointer border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5"
+                          >
+                            <div className="flex items-start gap-4 h-full">
+                              <div className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${colorClasses.container}`}>
+                                <SectionIcon className="w-5 h-5" />
+                              </div>
+                              <div className="flex-1 min-w-0 text-right">
+                                <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white mb-1 leading-snug truncate">
+                                  {tutorial.title}
+                                </h3>
+                                <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed line-clamp-2">
+                                  {tutorial.description}
+                                </p>
+                              </div>
+                            </div>
+                          </SpotlightCard>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                });
+
+                const orphanTutorials = filteredTutorials.filter(t => !matchedTutorialIds.has(t.id));
 
                 return (
-                  <div key={section.id} className="space-y-5">
-                    {/* Section Header */}
-                    <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 shadow-2xs text-[var(--color-imamu-accent)] bg-stone-50 dark:bg-stone-950/50 border-amber-200 dark:border-stone-900/50">
-                          <SectionIcon className="w-4.5 h-4.5" />
-                        </div>
-                        <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">{section.title}</h2>
-                      </div>
-                      <span className="text-xs text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] font-bold bg-stone-50 dark:bg-stone-950/50 border border-amber-200 dark:border-stone-900/50 px-3 py-1 rounded-full">
-                        {sectionTutorials.length} شروحات
-                      </span>
-                    </div>
-
-                    {/* Tutorial Cards Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {sectionTutorials.map((tutorial) => (
-                        <SpotlightCard
-                          key={tutorial.id}
-                          spotlightColor="rgba(139, 94, 60, 0.12)"
-                          onClick={() => selectTutorial(tutorial)}
-                          className="cursor-pointer border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5"
-                        >
-                          <div className="flex items-start gap-4 h-full">
-                            <div className="w-10 h-10 rounded-xl bg-stone-50 dark:bg-stone-950/50 border border-amber-200 dark:border-stone-900/50 text-[var(--color-imamu-accent)] flex items-center justify-center shrink-0">
-                              <SectionIcon className="w-5 h-5" />
+                  <>
+                    {renderedSections}
+                    {orphanTutorials.length > 0 && (
+                      <div className="space-y-5">
+                        <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 shadow-2xs text-[var(--color-imamu-accent)] bg-stone-50 dark:bg-stone-950/50 border-amber-200 dark:border-stone-900/50">
+                              <GraduationCap className="w-4.5 h-4.5" />
                             </div>
-                            <div className="flex-1 min-w-0 text-right">
-                              <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white mb-1 leading-snug truncate">
-                                {tutorial.title}
-                              </h3>
-                              <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed line-clamp-2">
-                                {tutorial.description}
-                              </p>
-                            </div>
+                            <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">شروحات عامة وإضافية</h2>
                           </div>
-                        </SpotlightCard>
-                      ))}
-                    </div>
-                  </div>
+                          <span className="text-xs text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] font-bold bg-stone-50 dark:bg-stone-950/50 border border-amber-200 dark:border-stone-900/50 px-3 py-1 rounded-full">
+                            {orphanTutorials.length} شروحات
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {orphanTutorials.map((tutorial) => (
+                            <SpotlightCard
+                              key={tutorial.id}
+                              spotlightColor="rgba(139, 94, 60, 0.12)"
+                              onClick={() => selectTutorial(tutorial)}
+                              className="cursor-pointer border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5"
+                            >
+                              <div className="flex items-start gap-4 h-full">
+                                <div className="w-10 h-10 rounded-xl bg-stone-50 dark:bg-stone-950/50 border border-amber-200 dark:border-stone-900/50 text-[var(--color-imamu-accent)] flex items-center justify-center shrink-0">
+                                  <GraduationCap className="w-5 h-5" />
+                                </div>
+                                <div className="flex-1 min-w-0 text-right">
+                                  <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white mb-1 leading-snug truncate">
+                                    {tutorial.title}
+                                  </h3>
+                                  <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed line-clamp-2">
+                                    {tutorial.description}
+                                  </p>
+                                </div>
+                              </div>
+                            </SpotlightCard>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 );
-              })}
+              })()}
 
               {filteredTutorials.length === 0 && (
                 <div className="text-center py-20 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl flex flex-col items-center justify-center gap-3 text-slate-500 dark:text-zinc-400">
@@ -713,15 +809,25 @@ function renderTutorialContent(text: string) {
               if (block.type === 'steps') {
                 const steps = block.stepsItems || [];
                 return (
-                  <div key={blockIdx} className="relative border-r-2 border-slate-200 dark:border-zinc-800 mr-3 pr-6 space-y-6 my-6 text-right">
-                    {steps.map((step: string, index: number) => (
-                      <div key={index} className="relative flex flex-col gap-1">
-                        <span className="absolute -right-[35px] top-0.5 flex items-center justify-center shrink-0 w-6 h-6 rounded-full bg-[var(--color-imamu-brown)] text-white text-[10px] font-bold shadow-2xs">
-                          {index + 1}
-                        </span>
-                        <p className="text-xs sm:text-sm text-slate-800 dark:text-zinc-200 font-normal leading-relaxed pt-0.5">{step}</p>
-                      </div>
-                    ))}
+                  <div key={blockIdx} className="space-y-6 my-6 text-right" dir="rtl">
+                    {steps.map((step: string, index: number) => {
+                      const isLast = index === steps.length - 1;
+                      return (
+                        <div key={index} className="relative flex items-start gap-4">
+                          <div className="relative flex flex-col items-center shrink-0 w-7">
+                            <span className="w-7 h-7 rounded-full bg-[var(--color-imamu-brown)] text-white text-xs font-bold flex items-center justify-center shadow-2xs z-10 shrink-0">
+                              {index + 1}
+                            </span>
+                            {!isLast && (
+                              <span className="absolute top-7 bottom-0 right-1/2 translate-x-1/2 w-0.5 bg-slate-200 dark:bg-zinc-800 -mb-6" />
+                            )}
+                          </div>
+                          <div className="flex-1 pt-0.5 min-w-0">
+                            <p className="text-xs sm:text-sm text-slate-800 dark:text-zinc-200 font-normal leading-relaxed">{step}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 );
               }

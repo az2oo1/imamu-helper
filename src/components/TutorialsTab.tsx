@@ -8,6 +8,7 @@ import {
   Sparkles, FileText, Image, Video, Link, ArrowLeft, Upload, CheckSquare,
   Compass
 } from 'lucide-react';
+import { getSectionColorClasses, SECTION_COLOR_PRESETS } from '../lib/section-colors';
 
 interface Section {
   id: number;
@@ -62,7 +63,7 @@ export function TutorialsTab({
   // Section form state
   const [secTitle, setSecTitle] = useState('');
   const [secIcon, setSecIcon] = useState('GraduationCap');
-  const [secColor, setSecColor] = useState('text-[var(--color-imamu-accent)] bg-stone-950/40 border-stone-900/50');
+  const [secColor, setSecColor] = useState('brown');
   const [iconSearchQuery, setIconSearchQuery] = useState('');
 
   // Tutorial form states
@@ -76,12 +77,7 @@ export function TutorialsTab({
   const [uploadingBlockIdx, setUploadingBlockIdx] = useState<number | null>(null);
 
   // Section presets for easy selection
-  const colorOptions = [
-    { name: 'brown', label: 'بني', value: 'text-[var(--color-imamu-accent)] bg-stone-950/40 border border-stone-900/50' },
-    { name: 'amber', label: 'ذهبي', value: 'text-[var(--color-imamu-accent)] bg-amber-950/40 border border-amber-900/50' },
-    { name: 'emerald', label: 'أخضر', value: 'text-emerald-400 bg-emerald-950/40 border border-emerald-900/50' },
-    { name: 'purple', label: 'بنفسجي', value: 'text-purple-400 bg-purple-950/40 border border-purple-900/50' }
-  ];
+  const colorOptions = SECTION_COLOR_PRESETS;
 
   const curatedIcons = [
     'GraduationCap', 'BookOpen', 'FileText', 'Compass', 'HelpCircle', 'Phone', 'Mail', 
@@ -122,7 +118,7 @@ export function TutorialsTab({
     setEditingSection(null);
     setSecTitle('');
     setSecIcon('GraduationCap');
-    setSecColor('text-[var(--color-imamu-accent)] bg-stone-950/40 border border-stone-900/50');
+    setSecColor('brown');
     setIconSearchQuery('');
     setShowSectionForm(false);
   };
@@ -400,11 +396,14 @@ export function TutorialsTab({
                 <div className="p-5 rounded-2xl flex flex-col items-center justify-center space-y-3" style={{ background: 'var(--bg-subtle)' }}>
                   <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>معاينة التصنيف في الدليل</span>
                   <div className="w-full max-w-sm border rounded-xl p-4 flex items-start gap-3 text-right" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-                    <div className={`p-2 rounded-md shrink-0 border ${secColor.split(' ').slice(1).join(' ')}`}>
-                      <span className={secColor.split(' ')[0]}>
-                        {React.createElement((Icons as any)[secIcon] || HelpCircle, { className: "w-5 h-5" })}
-                      </span>
-                    </div>
+                    {(() => {
+                      const colorStyle = getSectionColorClasses(secColor);
+                      return (
+                        <div className={`p-2.5 rounded-xl border shrink-0 flex items-center justify-center ${colorStyle.container}`}>
+                          {React.createElement((Icons as any)[secIcon] || HelpCircle, { className: "w-5 h-5" })}
+                        </div>
+                      );
+                    })()}
                     <div className="flex-1 min-w-0 pr-1 text-right">
                       <h3 className="text-xs font-bold truncate" style={{ color: 'var(--text-main)' }}>
                         {secTitle || 'اسم التصنيف الجديد'}
@@ -429,27 +428,36 @@ export function TutorialsTab({
                   />
                 </div>
 
-                {/* 3. Color Slider */}
+                {/* 3. Color Picker Swatches */}
                 <div className="flex flex-col gap-2">
                   <div className="flex justify-between items-center">
-                    <label className="text-xs font-bold" style={{ color: 'var(--text-muted)' }}>لون التصنيف:</label>
+                    <label className="text-xs font-bold" style={{ color: 'var(--text-muted)' }}>لون التصنيف المميز:</label>
                     <span className="text-[10px] font-bold" style={{ color: 'var(--text-main)' }}>
-                      {colorOptions.find(o => o.value === secColor)?.label || 'بني'}
+                      {getSectionColorClasses(secColor).name}
                     </span>
                   </div>
-                  <div className="relative flex items-center p-4 rounded-2xl border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}>
-                    <input
-                      type="range"
-                      min="0"
-                      max="3"
-                      step="1"
-                      value={Math.max(0, colorOptions.findIndex(o => o.value === secColor))}
-                      onChange={(e) => {
-                        const idx = parseInt(e.target.value, 10);
-                        setSecColor(colorOptions[idx].value);
-                      }}
-                      className="w-full h-1.5 bg-gradient-to-r from-amber-700 via-amber-500 via-emerald-500 to-purple-500 rounded-lg appearance-none cursor-pointer outline-none"
-                    />
+                  <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 p-3.5 rounded-2xl border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}>
+                    {SECTION_COLOR_PRESETS.map((preset) => {
+                      const isSelected = getSectionColorClasses(secColor).id === preset.id;
+                      return (
+                        <button
+                          type="button"
+                          key={preset.id}
+                          onClick={() => setSecColor(preset.value)}
+                          className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-all ${
+                            isSelected 
+                              ? `bg-[var(--bg-card)] ${preset.swatchBorder} ring-2 ring-amber-500/30 scale-105 shadow-xs` 
+                              : 'border-transparent hover:bg-[var(--bg-card)]'
+                          }`}
+                          title={preset.name}
+                        >
+                          <div className={`w-5 h-5 rounded-full ${preset.swatchBg} border ${preset.swatchBorder} shadow-2xs`} />
+                          <span className="text-[9px] font-bold truncate max-w-full" style={{ color: isSelected ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                            {preset.name}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -542,33 +550,36 @@ export function TutorialsTab({
           <div className="space-y-4">
             <h4 className="font-bold text-sm pr-1" style={{ color: 'var(--text-main)' }}>قائمة التصنيفات ({sections.length})</h4>
             <div className="divide-y border rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-              {sections.map(sec => (
-                <div key={sec.id} className="p-4 flex items-center justify-between group hover:bg-[var(--bg-subtle)] transition">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8.5 h-8.5 rounded-lg flex items-center justify-center shrink-0 border ${sec.color.split(' ').slice(1).join(' ')}`}>
-                      <span className={sec.color.split(' ')[0]}>{getDynamicIcon(sec.icon)}</span>
+              {sections.map(sec => {
+                const colorStyle = getSectionColorClasses(sec.color);
+                return (
+                  <div key={sec.id} className="p-4 flex items-center justify-between group hover:bg-[var(--bg-subtle)] transition">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8.5 h-8.5 rounded-lg flex items-center justify-center shrink-0 border ${colorStyle.container}`}>
+                        {getDynamicIcon(sec.icon)}
+                      </div>
+                      <div>
+                        <div className="font-bold text-xs" style={{ color: 'var(--text-main)' }}>{sec.title}</div>
+                        <div className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>{tutorials.filter(t => t.sectionId === sec.id).length} شروحات</div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="font-bold text-xs" style={{ color: 'var(--text-main)' }}>{sec.title}</div>
-                      <div className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>{tutorials.filter(t => t.sectionId === sec.id).length} شروحات</div>
+                    <div className="flex gap-1.5 opacity-80 group-hover:opacity-100 transition">
+                      <button
+                        onClick={() => startEditSection(sec)}
+                        className="p-1 hover:text-[var(--color-imamu-accent)] rounded border border-transparent hover:border-[var(--border-color)]"
+                      >
+                        <Edit className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteSection(sec.id)}
+                        className="p-1 hover:text-red-400 rounded border border-transparent hover:border-[var(--border-color)]"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-red-400 opacity-70 hover:opacity-100" />
+                      </button>
                     </div>
                   </div>
-                  <div className="flex gap-1.5 opacity-80 group-hover:opacity-100 transition">
-                    <button
-                      onClick={() => startEditSection(sec)}
-                      className="p-1 hover:text-[var(--color-imamu-accent)] rounded border border-transparent hover:border-[var(--border-color)]"
-                    >
-                      <Edit className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteSection(sec.id)}
-                      className="p-1 hover:text-red-400 rounded border border-transparent hover:border-[var(--border-color)]"
-                    >
-                      <Trash2 className="w-3.5 h-3.5 text-red-400 opacity-70 hover:opacity-100" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               {sections.length === 0 && (
                 <div className="p-8 text-center text-xs italic" style={{ color: 'var(--text-muted)' }}>لا توجد تصنيفات بعد.</div>
               )}
@@ -586,7 +597,9 @@ export function TutorialsTab({
                 return (
                   <div key={sec.id} className="space-y-2.5">
                     <div className="text-[10px] uppercase tracking-wider font-bold flex items-center gap-1.5 pr-1" style={{ color: 'var(--text-muted)' }}>
-                      <span className={sec.color.split(' ')[0]}>{getDynamicIcon(sec.icon)}</span>
+                      <span className={`p-1 rounded-md border ${getSectionColorClasses(sec.color).container}`}>
+                        {getDynamicIcon(sec.icon)}
+                      </span>
                       <span>{sec.title}</span>
                     </div>
                     
@@ -1273,9 +1286,10 @@ export function TutorialsTab({
             <div className="mb-6">
               {(() => {
                 const section = sections.find(s => s.id === Number(tutSectionId));
+                const colorStyle = getSectionColorClasses(section?.color);
                 return (
-                  <span className={`text-[9px] font-bold px-2.5 py-0.5 rounded-md uppercase tracking-wider mb-4 inline-block ${section ? section.color : 'border'}`} style={!section ? { background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-muted)' } : {}}>
-                    {section?.title || 'التصنيف المختير'}
+                  <span className={`text-[9px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider mb-4 inline-block border ${colorStyle.badge}`}>
+                    {section?.title || 'التصنيف المختار'}
                   </span>
                 );
               })()}
@@ -1298,15 +1312,25 @@ export function TutorialsTab({
                   if (block.type === 'steps') {
                     const stepsItems = block.stepsItems || [];
                     return (
-                      <div key={blockIdx} className="relative border-r-2 mr-3 pr-6 space-y-6 my-6 text-right" style={{ borderColor: 'var(--border-color)' }}>
-                        {stepsItems.map((step, sIdx) => (
-                          <div key={sIdx} className="relative flex flex-col gap-1">
-                            <span className="absolute -right-[35px] top-0.5 flex items-center justify-center shrink-0 w-6 h-6 rounded-full bg-[var(--color-imamu-brown)] text-white text-[10px] font-bold shadow-sm z-10">
-                              {sIdx + 1}
-                            </span>
-                            <p className="text-xs sm:text-sm font-normal leading-relaxed pt-0.5" style={{ color: 'var(--text-main)' }}>{step || 'محتوى الخطوة فارغ...'}</p>
-                          </div>
-                        ))}
+                      <div key={blockIdx} className="space-y-6 my-6 text-right" dir="rtl">
+                        {stepsItems.map((step, sIdx) => {
+                          const isLast = sIdx === stepsItems.length - 1;
+                          return (
+                            <div key={sIdx} className="relative flex items-start gap-4">
+                              <div className="relative flex flex-col items-center shrink-0 w-7">
+                                <span className="w-7 h-7 rounded-full bg-[var(--color-imamu-brown)] text-white text-xs font-bold flex items-center justify-center shadow-xs z-10 shrink-0">
+                                  {sIdx + 1}
+                                </span>
+                                {!isLast && (
+                                  <span className="absolute top-7 bottom-0 right-1/2 translate-x-1/2 w-0.5 -mb-6" style={{ background: 'var(--border-color)' }} />
+                                )}
+                              </div>
+                              <div className="flex-1 pt-0.5 min-w-0">
+                                <p className="text-xs sm:text-sm font-normal leading-relaxed" style={{ color: 'var(--text-main)' }}>{step || 'محتوى الخطوة فارغ...'}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     );
                   }

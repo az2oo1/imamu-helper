@@ -118,12 +118,12 @@
   --font-serif: "ThmanyahSerifText", ui-serif, Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
-  --color-imamu-brown: #A06D42;
-  --color-imamu-brown-light: #B78254;
-  --color-imamu-brown-dark: #88572D;
-  --color-imamu-accent: #925D31;    /* brand text — light mode */
-  --color-imamu-gold: #d97706;
-  --color-imamu-gold-light: #f59e0b;
+  --color-imamu-brown: #8C6239;
+  --color-imamu-brown-light: #9E7348;
+  --color-imamu-brown-dark: #6E4A28;
+  --color-imamu-accent: #8C6239;    /* brand text — light mode */
+  --color-imamu-gold: #B47820;
+  --color-imamu-gold-light: #D49232;
 }
 
 /* Default Light Theme Variables */

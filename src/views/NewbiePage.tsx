@@ -91,20 +91,30 @@ export function NewbiePage() {
       </button>
 
       {/* Hero Premium Banner */}
-      <div className="w-full bg-gradient-to-br from-amber-800 via-amber-900 to-indigo-700 rounded-3xl p-8 sm:p-10 text-white shadow-xl relative overflow-hidden mb-8 text-right border border-amber-700/30">
-        {/* Glowing absolute background accent */}
-        <div className="absolute -right-10 -top-10 w-96 h-96 bg-white/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute left-0 bottom-0 w-80 h-80 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
-        
+      <div 
+        className="w-full relative overflow-hidden rounded-3xl p-8 sm:p-10 mb-8 text-right border transition-all duration-300"
+        style={{
+          background: 'var(--bg-card)',
+          borderColor: 'var(--border-color)'
+        }}
+      >
         <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
           <div className="flex items-center gap-5 flex-col sm:flex-row text-center sm:text-right">
-            <div className="w-16 h-16 bg-white/15 backdrop-blur-md rounded-2xl flex items-center justify-center shrink-0 border border-white/25 shadow-inner transition duration-300">
-              <GraduationCap className="w-9 h-9 text-amber-300" />
+            <div 
+              className="w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 border transition-transform duration-300"
+              style={{
+                background: 'color-mix(in srgb, var(--color-imamu-brown) 15%, transparent)',
+                borderColor: 'color-mix(in srgb, var(--color-imamu-brown) 30%, transparent)',
+                color: 'var(--color-imamu-accent)'
+              }}
+            >
+              <GraduationCap className="w-9 h-9" />
             </div>
             <div>
-              <span className="bg-white/20 text-amber-300 text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-wider backdrop-blur-xs">دليل المستجدين الأكاديمي</span>
-              <h1 className="text-2xl sm:text-3xl font-serif font-bold mt-2">دليل الطلاب المستجدين (عش آل إمام) 🎓</h1>
-              <p className="text-xs text-stone-50 mt-1.5 font-medium max-w-2xl leading-relaxed">
+              <h1 className="text-2xl sm:text-3xl font-serif font-bold transition-colors" style={{ color: 'var(--text-main)' }}>
+                دليل الطلاب المستجدين 🎓
+              </h1>
+              <p className="text-xs mt-2 font-normal max-w-2xl leading-relaxed transition-colors" style={{ color: 'var(--text-muted)' }}>
                 مرحبًا بك في جامعة الإمام. دليل متكامل وموثق لمساعدتك في بدء رحلتك الجامعية وتفعيل كافة الأنظمة والبطاقات الأكاديمية والمصرفية بيسر وسهولة.
               </p>
             </div>
@@ -375,7 +385,7 @@ export function NewbiePage() {
                 <p className="text-[10px] text-slate-500 dark:text-zinc-400 mt-0.5">أرقام الكليات، العمادات، وخطوط الطوارئ والسلامة.</p>
               </div>
             </div>
-            <ChevronLeft className="w-4 h-4 text-slate-400 dark:text-zinc-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors rotate-180" />
+            <ChevronLeft className="w-4 h-4 text-slate-400 dark:text-zinc-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors" />
           </button>
 
           {/* 2. College Emails Directory Button */}
@@ -392,7 +402,7 @@ export function NewbiePage() {
                 <p className="text-[10px] text-slate-500 dark:text-zinc-400 mt-0.5">إيميلات شؤون الطلاب، العميد، ومسؤولي التخصصات.</p>
               </div>
             </div>
-            <ChevronLeft className="w-4 h-4 text-slate-400 dark:text-zinc-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors rotate-180" />
+            <ChevronLeft className="w-4 h-4 text-slate-400 dark:text-zinc-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
           </button>
         </div>
       </div>
@@ -422,7 +432,7 @@ export function NewbiePage() {
                       {link.title}
                     </h4>
                   </div>
-                  <ChevronLeft className="w-4.5 h-4.5 text-slate-400 dark:text-zinc-400 group-hover:text-[var(--color-imamu-accent)] dark:group-hover:text-[var(--color-imamu-accent)] transition-colors rotate-180" />
+                  <ChevronLeft className="w-4.5 h-4.5 text-slate-400 dark:text-zinc-400 group-hover:text-[var(--color-imamu-accent)] dark:group-hover:text-[var(--color-imamu-accent)] transition-colors" />
                 </div>
                 {link.description && (
                   <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
