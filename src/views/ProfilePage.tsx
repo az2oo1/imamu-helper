@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../lib/AuthContext';
+import { useTheme, COLOR_PRESETS } from '../lib/ThemeContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronDown, ChevronUp, UserCircle2, Mail, Phone, BookOpen, Calculator, Clock, CheckCircle2, AlertCircle, Loader2, Camera, GraduationCap, Settings, Sparkles, ArrowUpRight } from 'lucide-react';
+import { ChevronDown, ChevronUp, UserCircle2, Mail, Phone, BookOpen, Calculator, Clock, CheckCircle2, AlertCircle, Loader2, Camera, GraduationCap, Settings, Sparkles, ArrowUpRight, Palette, Check, Sun, Moon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AnimatedNumber } from '../components/ui';
 
@@ -85,6 +86,7 @@ function computeAcademicProgress(majors: any[], subjects: any[], majorName: stri
 
 export function ProfilePage() {
   const { user, dbUser, signOut, refreshToken, loading: authLoading } = useAuth();
+  const { theme, toggleTheme, colorPreset, setColorPreset } = useTheme();
   const router = useRouter();
   const [majors, setMajors] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
@@ -483,6 +485,67 @@ export function ProfilePage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Theme Appearance & Color Presets Section */}
+                <div className="space-y-5 pt-4 border-t border-slate-200/60 dark:border-zinc-800/60">
+                  <div className="flex items-center gap-2 pb-2 border-b border-slate-200/60 dark:border-zinc-800/60">
+                    <Palette className="w-5 h-5 text-[var(--color-imamu-accent)]" />
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">طابع الألوان والمظهر</h3>
+                  </div>
+
+                  {/* Dark Mode / Light Mode Switcher */}
+                  <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50/80 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-800">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-xl bg-slate-200/60 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300">
+                        {theme === 'dark' ? <Moon className="w-5 h-5 text-[var(--color-imamu-accent)]" /> : <Sun className="w-5 h-5 text-amber-600" />}
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xs font-bold text-slate-900 dark:text-white block">نمط الشاشة</span>
+                        <span className="text-[11px] text-slate-500 dark:text-zinc-400">النمط الحالي: {theme === 'dark' ? 'داكن' : 'فاتح'}</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={toggleTheme}
+                      className="px-4 py-2 rounded-xl text-xs font-bold bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-slate-800 dark:text-zinc-200 shadow-2xs hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+                    >
+                      {theme === 'dark' ? 'التحويل للوضع الفاتح' : 'التحويل للوضع الداكن'}
+                    </button>
+                  </div>
+
+                  {/* Color Presets Grid */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-3 text-right">اختر طابع لون الموقع المفضّل</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {COLOR_PRESETS.map((preset) => {
+                        const isSelected = preset.id === colorPreset;
+                        return (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            onClick={() => setColorPreset(preset.id)}
+                            className={`flex items-center justify-between p-3.5 rounded-2xl border text-xs font-bold transition-all cursor-pointer select-none text-right ${
+                              isSelected
+                                ? 'bg-[var(--color-imamu-brown)]/10 text-[var(--color-imamu-accent)] border-[var(--color-imamu-brown)] shadow-xs'
+                                : 'bg-slate-50/80 dark:bg-zinc-950/60 text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <div 
+                                className="w-4.5 h-4.5 rounded-full shadow-xs shrink-0 ring-1 ring-black/10 dark:ring-white/20" 
+                                style={{ background: preset.bgGradient }} 
+                              />
+                              <span>{preset.name}</span>
+                            </div>
+                            {isSelected && (
+                              <Check className="w-4 h-4 text-[var(--color-imamu-accent)] stroke-[3]" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -688,7 +751,7 @@ export function ProfilePage() {
                                                     ? 'bg-emerald-50/70 border-emerald-400 dark:bg-emerald-950/40 dark:border-emerald-700 shadow-xs cursor-pointer hover:bg-emerald-100/60 dark:hover:bg-emerald-900/50' 
                                                     : isLocked 
                                                       ? 'bg-slate-100/70 border-slate-200 dark:bg-zinc-950/70 dark:border-zinc-800/80 cursor-not-allowed opacity-75' 
-                                                      : 'bg-white border-slate-200/90 hover:border-amber-700 dark:bg-zinc-900 dark:border-zinc-800 dark:hover:border-zinc-700 cursor-pointer shadow-2xs hover:shadow-sm'
+                                                      : 'bg-white border-slate-200/90 hover:border-[var(--color-imamu-accent)] dark:bg-zinc-900 dark:border-zinc-800 dark:hover:border-zinc-700 cursor-pointer shadow-2xs hover:shadow-sm'
                                                 }`}
                                               >
                                                 <div className="flex items-start justify-between gap-2">

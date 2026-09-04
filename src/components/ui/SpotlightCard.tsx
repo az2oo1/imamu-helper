@@ -7,13 +7,15 @@ interface SpotlightCardProps {
   children: React.ReactNode;
   className?: string;
   spotlightColor?: string;
+  hoverBorderColor?: string;
   onClick?: () => void;
 }
 
 export function SpotlightCard({
   children,
   className = '',
-  spotlightColor = 'rgba(139, 94, 60, 0.12)',
+  spotlightColor,
+  hoverBorderColor,
   onClick,
 }: SpotlightCardProps) {
   const mouseX = useMotionValue(0);
@@ -28,7 +30,12 @@ export function SpotlightCard({
     mouseY.set(e.clientY - top);
   }
 
-  const background = useMotionTemplate`radial-gradient(350px circle at ${mouseX}px ${mouseY}px, ${spotlightColor}, transparent 80%)`;
+  // Use dynamic theme color if spotlightColor isn't explicitly set
+  const effectiveSpotlight = spotlightColor 
+    ? (spotlightColor.startsWith('var(') ? `color-mix(in srgb, ${spotlightColor} 15%, transparent)` : spotlightColor)
+    : 'color-mix(in srgb, var(--color-imamu-brown) 12%, transparent)';
+
+  const background = useMotionTemplate`radial-gradient(350px circle at ${mouseX}px ${mouseY}px, ${effectiveSpotlight}, transparent 80%)`;
 
   return (
     <motion.div
@@ -37,7 +44,7 @@ export function SpotlightCard({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={onClick}
-      whileHover={{ borderColor: 'rgba(139, 94, 60, 0.40)' }}
+      whileHover={{ borderColor: hoverBorderColor || 'var(--color-imamu-accent)' }}
       transition={{ duration: 0.2 }}
       className={`relative rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-2xs ${className}`}
     >

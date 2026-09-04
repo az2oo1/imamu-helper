@@ -140,10 +140,10 @@
 /* Dark Theme Variables */
 html.dark {
   color-scheme: dark;
-  --bg-canvas: #09090b;
-  --bg-card: #121217;
-  --bg-subtle: #181820;
-  --border-color: #27272a;
+  --bg-canvas: #000000;
+  --bg-card: #0d0b0a;
+  --bg-subtle: #141210;
+  --border-color: #221d18;
   --text-main: #f4f4f5;
   --text-muted: #a1a1aa;
   /* Light brand brown for dark mode */
@@ -151,6 +151,7 @@ html.dark {
   --color-imamu-brown-light: #B8804F;
   --color-imamu-brown-dark: #8B572B;
   --color-imamu-accent: #E0B285;    /* brand text — dark mode: warm tan, readable */
+  background-color: #000000 !important;
 }
 
 html {
@@ -160,6 +161,10 @@ html {
   color: var(--text-main);
   font-family: var(--font-sans);
   transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+html.dark body {
+  background-color: #000000 !important;
 }
 
 body {

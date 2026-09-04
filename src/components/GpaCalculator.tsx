@@ -228,7 +228,7 @@ export function GpaCalculator() {
               setTargetRowId(null);
               setIsSearchOpen(true);
             }}
-            className="btn-rise flex-1 w-full flex items-center justify-center gap-1.5 py-3 rounded-2xl bg-[#4A2B15] hover:bg-[#38200F] text-white border border-[#341D0D] font-bold text-xs transition cursor-pointer shadow-sm"
+            className="btn-rise flex-1 w-full flex items-center justify-center gap-1.5 py-3 rounded-2xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white border border-[var(--color-imamu-brown-dark)] font-bold text-xs transition cursor-pointer shadow-sm"
           >
             <Search className="w-4 h-4 text-white" />
             <span>البحث واختيار مقرر من الكتالوج</span>
@@ -374,7 +374,7 @@ export function GpaCalculator() {
                     <button
                       key={subj.id}
                       onClick={() => handleSelectSubject(subj)}
-                      className="w-full p-3.5 rounded-2xl bg-slate-50 hover:bg-amber-500/10 dark:bg-zinc-950/80 dark:hover:bg-amber-500/15 border border-slate-200 dark:border-zinc-800 hover:border-amber-500/40 text-right transition flex items-center justify-between group cursor-pointer"
+                      className="w-full p-3.5 rounded-2xl bg-slate-50 hover:bg-[var(--color-imamu-brown)]/10 dark:bg-zinc-950/80 dark:hover:bg-[var(--color-imamu-brown)]/15 border border-slate-200 dark:border-zinc-800 hover:border-[var(--color-imamu-accent)] text-right transition flex items-center justify-between group cursor-pointer"
                     >
                       <div>
                         <div className="flex items-center gap-2 mb-1">

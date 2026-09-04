@@ -317,7 +317,7 @@ export function NewsPage() {
             <SpotlightCard
               key={item.id}
               onClick={() => setSelectedNews(item)}
-              className="break-inside-avoid inline-block w-full cursor-pointer border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 hover:border-amber-700/40 transition duration-200 shadow-2xs"
+              className="break-inside-avoid inline-block w-full cursor-pointer border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 hover:border-[var(--color-imamu-accent)] transition duration-200 shadow-2xs"
             >
               <div>
                 <div className="flex items-center justify-between mb-4">

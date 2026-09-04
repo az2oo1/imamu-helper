@@ -87,7 +87,7 @@ function getCountdownValues(now: Date, targetDate: Date | null) {
   return getCountdown(targetDate, now);
 }
 
-const CountdownBox = memo(function CountdownBox({ value, label, hoverBorderClass = 'hover:border-amber-500/40' }: { value: number, label: string, hoverBorderClass?: string }) {
+const CountdownBox = memo(function CountdownBox({ value, label, hoverBorderClass = 'hover:border-[var(--color-imamu-accent)]' }: { value: number, label: string, hoverBorderClass?: string }) {
   return (
     <div className={`flex flex-col items-center justify-center bg-slate-100/90 dark:bg-zinc-900/90 border border-slate-200/80 dark:border-zinc-800/80 backdrop-blur-md rounded-2xl py-2.5 px-1.5 sm:py-3 sm:px-3 flex-1 min-w-[50px] sm:min-w-[70px] shadow-2xs transition-all duration-300 ${hoverBorderClass}`}>
       <span className="text-lg sm:text-2xl font-serif font-extrabold text-slate-900 dark:text-white tracking-tight">
@@ -98,7 +98,7 @@ const CountdownBox = memo(function CountdownBox({ value, label, hoverBorderClass
   );
 });
 
-const LiveCountdownBoxes = memo(function LiveCountdownBoxes({ targetDate, hoverBorderClass }: { targetDate: Date | null, hoverBorderClass?: string }) {
+const LiveCountdownBoxes = memo(function LiveCountdownBoxes({ targetDate, hoverBorderClass = 'hover:border-[var(--color-imamu-accent)]' }: { targetDate: Date | null, hoverBorderClass?: string }) {
   const now = useCurrentTime();
   const time = getCountdown(targetDate, now);
   return (
@@ -476,7 +476,7 @@ function CountdownsSection() {
 
       {/* External Student Platforms */}
       <SpotlightCard 
-        spotlightColor="rgba(99, 102, 241, 0.10)"
+        spotlightColor="color-mix(in srgb, var(--color-imamu-brown) 12%, transparent)"
         className="w-full bg-white/80 dark:bg-zinc-900/90 backdrop-blur-xl border border-slate-200/80 dark:border-zinc-800/80 rounded-3xl p-6 sm:p-7 shadow-sm text-right" 
       >
         <div className="flex items-center justify-between mb-5">
@@ -484,7 +484,7 @@ function CountdownsSection() {
             <ExternalLink className="w-4 h-4 text-[var(--color-imamu-accent)]" /> 
             منصات وأدوات خارجية تهمك
           </h4>
-          <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-[var(--color-imamu-brown)/10] text-[var(--color-imamu-accent)] border border-amber-700/20">
+          <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-[var(--color-imamu-brown)]/10 text-[var(--color-imamu-accent)] border border-[var(--color-imamu-brown)]/20">
             روابط سريعة
           </span>
         </div>
@@ -495,7 +495,7 @@ function CountdownsSection() {
             href="https://msari.vercel.app/index.html" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="group flex items-center justify-between gap-3 p-4 bg-slate-50/80 dark:bg-zinc-950/80 border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl hover:border-amber-700/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 text-right w-full"
+            className="group flex items-center justify-between gap-3 p-4 bg-slate-50/80 dark:bg-zinc-950/80 border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl hover:border-[var(--color-imamu-accent)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 text-right w-full"
           >
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-11 h-11 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0 p-2 shadow-2xs group-hover:border-emerald-500/50 transition-colors text-emerald-600 dark:text-emerald-400 font-black text-xs">
@@ -514,10 +514,10 @@ function CountdownsSection() {
             href="https://qeeem.com/" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="group flex items-center justify-between gap-3 p-4 bg-slate-50/80 dark:bg-zinc-950/80 border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl hover:border-amber-700/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 text-right w-full"
+            className="group flex items-center justify-between gap-3 p-4 bg-slate-50/80 dark:bg-zinc-950/80 border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl hover:border-[var(--color-imamu-accent)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 text-right w-full"
           >
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-11 h-11 rounded-xl bg-white dark:bg-zinc-900 flex items-center justify-center shrink-0 border border-slate-200 dark:border-zinc-800 p-2 shadow-2xs group-hover:border-amber-700/30 transition-colors">
+              <div className="w-11 h-11 rounded-xl bg-white dark:bg-zinc-900 flex items-center justify-center shrink-0 border border-slate-200 dark:border-zinc-800 p-2 shadow-2xs group-hover:border-[var(--color-imamu-accent)]/50 transition-colors">
                 <img src="https://qeeem.com/logo.svg" className="w-full h-full object-contain" alt="Qeeem Logo" />
               </div>
               <div className="text-right min-w-0">
@@ -533,10 +533,10 @@ function CountdownsSection() {
             href="https://trtebh.com/" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="group flex items-center justify-between gap-3 p-4 bg-slate-50/80 dark:bg-zinc-950/80 border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl hover:border-amber-700/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 text-right w-full"
+            className="group flex items-center justify-between gap-3 p-4 bg-slate-50/80 dark:bg-zinc-950/80 border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl hover:border-[var(--color-imamu-accent)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 text-right w-full"
           >
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-11 h-11 rounded-xl bg-white dark:bg-zinc-900 flex items-center justify-center shrink-0 border border-slate-200 dark:border-zinc-800 p-2 shadow-2xs group-hover:border-amber-700/30 transition-colors">
+              <div className="w-11 h-11 rounded-xl bg-white dark:bg-zinc-900 flex items-center justify-center shrink-0 border border-slate-200 dark:border-zinc-800 p-2 shadow-2xs group-hover:border-[var(--color-imamu-accent)]/50 transition-colors">
                 <img src="https://trtebh.com/brand/favicon-32x32.png" className="w-full h-full object-contain rounded" alt="Trtebh Logo" />
               </div>
               <div className="text-right min-w-0">
@@ -552,10 +552,10 @@ function CountdownsSection() {
             href="https://moqraraty.com/ar" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="group flex items-center justify-between gap-3 p-4 bg-slate-50/80 dark:bg-zinc-950/80 border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl hover:border-amber-700/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 text-right w-full"
+            className="group flex items-center justify-between gap-3 p-4 bg-slate-50/80 dark:bg-zinc-950/80 border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl hover:border-[var(--color-imamu-accent)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 text-right w-full"
           >
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-11 h-11 rounded-xl bg-white dark:bg-zinc-900 flex items-center justify-center shrink-0 border border-slate-200 dark:border-zinc-800 p-2 shadow-2xs group-hover:border-amber-700/30 transition-colors">
+              <div className="w-11 h-11 rounded-xl bg-white dark:bg-zinc-900 flex items-center justify-center shrink-0 border border-slate-200 dark:border-zinc-800 p-2 shadow-2xs group-hover:border-[var(--color-imamu-accent)]/50 transition-colors">
                 <img src="https://moqraraty.com/logo.png" className="w-full h-full object-contain rounded" alt="Moqraraty Logo" />
               </div>
               <div className="text-right min-w-0">
@@ -580,7 +580,7 @@ export function Home() {
         
         {/* Clean Eyebrow Title */}
         <InView preset="fade-down" delay={0.05}>
-          <span className="text-xs sm:text-sm font-semibold tracking-widest text-[var(--color-imamu-accent)] uppercase mb-5 block">
+          <span className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-zinc-400 mb-5 block">
             منصة طلابية مستقلة غير رسمية لطلاب جامعة الإمام
           </span>
         </InView>
@@ -606,15 +606,15 @@ export function Home() {
         <InView preset="scale-up" delay={0.35} className="flex flex-col sm:flex-row gap-4 justify-center items-center w-full max-w-md">
           <Link 
             href="/tools" 
-            className="px-6 py-3.5 rounded-2xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white font-bold text-sm sm:text-base shadow-md shadow-[var(--color-imamu-brown)/20] active:scale-95 transition-all duration-200 w-full sm:w-auto text-center flex items-center justify-center gap-2.5 whitespace-nowrap group border border-amber-700/30"
+            className="px-6.5 py-3.5 rounded-2xl bg-[var(--color-imamu-brown)] text-[var(--btn-text-primary)] hover:opacity-90 font-bold text-sm sm:text-base shadow-md active:scale-95 transition-all duration-200 w-full sm:w-auto text-center flex items-center justify-center gap-2.5 whitespace-nowrap group"
           >
-            <Calculator className="w-4 h-4 text-white shrink-0" />
+            <Calculator className="w-4.5 h-4.5 shrink-0" />
             <span>الأدوات وحاسبة المعدل</span>
             <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform shrink-0" />
           </Link>
           <Link 
             href="/resources" 
-            className="px-6 py-3.5 rounded-2xl bg-slate-100 dark:bg-zinc-900/90 hover:bg-slate-200/80 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-800 text-slate-800 dark:text-zinc-200 font-bold text-sm sm:text-base shadow-2xs backdrop-blur-md active:scale-95 transition-all duration-200 w-full sm:w-auto text-center flex items-center justify-center gap-2.5 whitespace-nowrap group"
+            className="px-6.5 py-3.5 rounded-2xl bg-slate-100/90 dark:bg-zinc-900/90 hover:bg-slate-200/80 dark:hover:bg-zinc-800/90 border border-slate-200 dark:border-zinc-800 text-slate-800 dark:text-zinc-200 font-bold text-sm sm:text-base shadow-2xs backdrop-blur-md active:scale-95 transition-all duration-200 w-full sm:w-auto text-center flex items-center justify-center gap-2.5 whitespace-nowrap group"
           >
             <BookOpen className="w-4 h-4 text-slate-500 dark:text-zinc-400 shrink-0" />
             <span>المصادر والتجميعات</span>
@@ -641,7 +641,7 @@ export function Home() {
             <Link key={feat.id} href={feat.path} className="block group">
               <SpotlightCard 
                 spotlightColor={feat.spotlight} 
-                className="h-full border border-slate-200/80 dark:border-zinc-800/80 bg-white/80 dark:bg-zinc-900/90 backdrop-blur-xl p-7 sm:p-8 hover:border-amber-700/40 transition-all duration-300"
+                className="h-full border border-slate-200/80 dark:border-zinc-800/80 bg-white/80 dark:bg-zinc-900/90 backdrop-blur-xl p-7 sm:p-8 hover:border-[var(--color-imamu-accent)] transition-all duration-300"
               >
                 <div className="flex justify-between items-start mb-6">
                   <div className={`w-12 h-12 rounded-2xl ${feat.color} border flex items-center justify-center shadow-2xs group-hover:scale-110 transition-transform duration-300`}>

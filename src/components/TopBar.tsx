@@ -5,7 +5,11 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../lib/AuthContext';
 import { useTheme } from '../lib/ThemeContext';
-import { LogIn, LogOut, Settings, GraduationCap, Menu, X, UserCircle2, Home, Calculator, BookOpen, Calendar, Newspaper, HelpCircle, Sun, Moon, Activity, Shield } from 'lucide-react';
+import { 
+  LogIn, LogOut, Menu, X, UserCircle2, 
+  Home, Calculator, BookOpen, Calendar, Newspaper, HelpCircle, 
+  Sun, Moon, Activity, Shield 
+} from 'lucide-react';
 import clsx from 'clsx';
 import { motion, AnimatePresence, LayoutGroup } from 'motion/react';
 
@@ -28,34 +32,50 @@ export function TopBar() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 w-full border-b border-slate-200/80 dark:border-zinc-800/80 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl transition-all" dir="rtl">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+      <header className="sticky top-0 z-50 w-full border-b border-slate-200/70 dark:border-zinc-800/80 bg-white/85 dark:bg-black/90 backdrop-blur-2xl transition-all shadow-xs pt-[env(safe-area-inset-top)]" dir="rtl">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-3 sm:px-6 lg:px-8 relative">
           
-          {/* Logo & Navigation */}
-          <div className="flex items-center gap-x-6 md:gap-x-10">
+          {/* Mobile Centered Larger Logo */}
+          <div className="md:hidden absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-auto">
+            <Link href="/" className="flex items-center py-1">
+              <img 
+                src="/logo_dark.png" 
+                alt="مساعد الإمام" 
+                className="h-11 sm:h-12 w-auto object-contain dark:hidden" 
+              />
+              <img 
+                src="/logo_light.png" 
+                alt="مساعد الإمام" 
+                className="h-11 sm:h-12 w-auto object-contain hidden dark:block" 
+              />
+            </Link>
+          </div>
+
+          {/* Right Section (in RTL): Menu Button on mobile, Logo & Nav on desktop */}
+          <div className="flex items-center gap-x-2 sm:gap-x-6 md:gap-x-10 min-w-0">
             <button 
-              className="md:hidden p-2 -mr-2 text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-900 transition"
+              className="md:hidden p-1.5 -mr-1 text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-900 transition shrink-0 cursor-pointer"
               onClick={() => setMobileMenuOpen(true)}
               aria-label="القائمة"
             >
               <Menu className="w-6 h-6" />
             </button>
 
-            {/* Brand Logo */}
-            <Link href="/" className="flex items-center group shrink-0 py-1">
+            {/* Desktop Brand Logo */}
+            <Link href="/" className="hidden md:flex items-center group shrink min-w-0 py-1">
               <img 
                 src="/logo_dark.png" 
                 alt="مساعد الإمام" 
-                className="h-12 sm:h-14 w-auto object-contain dark:hidden group-hover:scale-105 transition-transform duration-200" 
+                className="h-12 w-auto object-contain dark:hidden group-hover:scale-105 transition-transform duration-200" 
               />
               <img 
                 src="/logo_light.png" 
                 alt="مساعد الإمام" 
-                className="h-12 sm:h-14 w-auto object-contain hidden dark:block group-hover:scale-105 transition-transform duration-200" 
+                className="h-12 w-auto object-contain hidden dark:block group-hover:scale-105 transition-transform duration-200" 
               />
             </Link>
             
-            {/* Nav Tabs */}
+            {/* Desktop Nav Tabs */}
             <LayoutGroup id="topbar-nav">
               <motion.nav 
                 layoutRoot
@@ -80,7 +100,7 @@ export function TopBar() {
                         <motion.div
                           layoutId="active-topbar-pill"
                           initial={false}
-                          className="absolute inset-0 bg-[var(--color-imamu-brown)/10] dark:bg-[var(--color-imamu-brown)]/15 border border-amber-700/30 rounded-full -z-10"
+                          className="absolute inset-0 bg-[var(--color-imamu-brown)]/10 dark:bg-[var(--color-imamu-brown)]/15 border border-[var(--color-imamu-brown)]/30 rounded-full -z-10"
                           transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                         />
                       )}
@@ -91,12 +111,12 @@ export function TopBar() {
             </LayoutGroup>
           </div>
 
-          {/* Right Action Controls */}
-          <div className="flex items-center gap-2.5">
-            {/* Theme Toggle Button (Desktop only, mobile accesses via burger menu) */}
+          {/* Left Action Controls (Desktop Theme Switcher + User/Login Button) */}
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+            {/* Theme Toggle Button (Desktop only) */}
             <button
               onClick={toggleTheme}
-              className="hidden md:flex items-center justify-center w-9 h-9 rounded-full border border-slate-200/80 dark:border-zinc-800/80 bg-slate-50 dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 active:scale-95 transition-all"
+              className="hidden md:flex items-center justify-center w-9 h-9 rounded-full border border-slate-200/80 dark:border-zinc-800/80 bg-slate-50 dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 active:scale-95 transition-all cursor-pointer"
               title={theme === 'dark' ? 'التحويل إلى الوضع الفاتح' : 'التحويل إلى الوضع الداكن'}
               aria-label="Toggle Theme"
             >
@@ -181,7 +201,7 @@ export function TopBar() {
                           className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition text-right"
                           dir="rtl"
                         >
-                          <LogOut className="w-4 h-4 text-red-500" />
+                          <LogOut className="w-4 h-4" />
                           تسجيل الخروج
                         </button>
                       </motion.div>
@@ -190,13 +210,26 @@ export function TopBar() {
                 </AnimatePresence>
               </div>
             ) : (
-              <Link
-                href="/login"
-                className="flex items-center gap-2 rounded-full bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white px-5 py-2 text-xs font-bold transition-all shadow-md shadow-[var(--color-imamu-brown)/20] active:scale-95"
-              >
-                <LogIn className="w-4 h-4" />
-                <span>تسجيل الدخول</span>
-              </Link>
+              <>
+                {/* Mobile Login Button (Circular) */}
+                <Link
+                  href="/login"
+                  className="flex md:hidden items-center justify-center w-9.5 h-9.5 rounded-full bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white shadow-md active:scale-95 shrink-0"
+                  title="تسجيل الدخول"
+                  aria-label="تسجيل الدخول"
+                >
+                  <LogIn className="w-4.5 h-4.5" />
+                </Link>
+
+                {/* Desktop Login Button */}
+                <Link
+                  href="/login"
+                  className="hidden md:flex items-center gap-1.5 sm:gap-2 rounded-full bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white px-3 py-1.5 sm:px-5 sm:py-2 text-[11px] sm:text-xs font-bold transition-all shadow-md shadow-[var(--color-imamu-brown)/20] active:scale-95 whitespace-nowrap shrink-0"
+                >
+                  <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span>تسجيل الدخول</span>
+                </Link>
+              </>
             )}
           </div>
         </div>
@@ -218,25 +251,30 @@ export function TopBar() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', bounce: 0, duration: 0.35 }}
-              className="fixed inset-y-0 right-0 w-72 z-[70] bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl border-l border-slate-200 dark:border-zinc-800 shadow-2xl flex flex-col md:hidden"
+              className="fixed inset-y-0 right-0 w-72 z-[70] bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl border-l border-slate-200 dark:border-zinc-800 shadow-2xl flex flex-col md:hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
               dir="rtl"
             >
+              {/* Drawer Header: Logo on the RIGHT, Close button on the LEFT */}
               <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-zinc-800">
+                {/* Logo on the Right (First in RTL) */}
                 <Link href="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center py-1">
                   <img 
                     src="/logo_dark.png" 
                     alt="مساعد الإمام" 
-                    className="h-11 w-auto object-contain dark:hidden" 
+                    className="h-10 w-auto object-contain dark:hidden" 
                   />
                   <img 
                     src="/logo_light.png" 
                     alt="مساعد الإمام" 
-                    className="h-11 w-auto object-contain hidden dark:block" 
+                    className="h-10 w-auto object-contain hidden dark:block" 
                   />
                 </Link>
+
+                {/* Close Button on the Left (Second in RTL) */}
                 <button 
-                  className="p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-900"
+                  className="p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-900 transition cursor-pointer"
                   onClick={() => setMobileMenuOpen(false)}
+                  aria-label="إغلاق القائمة"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -253,7 +291,7 @@ export function TopBar() {
                       className={clsx(
                         "px-4 py-3 rounded-2xl flex items-center gap-3 text-sm font-semibold transition-all",
                         isActive 
-                          ? "bg-[var(--color-imamu-brown)/10] text-[var(--color-imamu-accent)] border border-amber-700/30 font-bold" 
+                          ? "bg-[var(--color-imamu-brown)]/10 text-[var(--color-imamu-accent)] border border-[var(--color-imamu-brown)]/30 font-bold" 
                           : "text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-900 hover:text-slate-900 dark:hover:text-white"
                       )}
                     >
@@ -265,17 +303,22 @@ export function TopBar() {
               </nav>
 
               <div className="p-4 border-t border-slate-100 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-900/50 flex flex-col gap-3">
+                {/* Dark Mode Switcher in Burger Menu */}
                 <button
+                  type="button"
                   onClick={toggleTheme}
-                  className="flex items-center justify-between w-full px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs font-bold text-slate-800 dark:text-zinc-200"
+                  className="flex items-center justify-between w-full px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs font-bold text-slate-800 dark:text-zinc-200 cursor-pointer hover:bg-slate-100 dark:hover:bg-zinc-800 transition"
                 >
-                  <span>النمط ({theme === 'dark' ? 'داكن' : 'فاتح'})</span>
-                  {theme === 'dark' ? <Sun className="w-4 h-4 text-[var(--color-imamu-accent)]" /> : <Moon className="w-4 h-4 text-slate-700" />}
+                  <span className="flex items-center gap-2">
+                    {theme === 'dark' ? <Moon className="w-4 h-4 text-[var(--color-imamu-accent)]" /> : <Sun className="w-4 h-4 text-amber-600" />}
+                    <span>النمط ({theme === 'dark' ? 'داكن' : 'فاتح'})</span>
+                  </span>
+                  <span className="text-[11px] font-semibold text-slate-400 dark:text-zinc-500">تبديل</span>
                 </button>
 
-                {user && (
+                {user ? (
                   <>
-                    <div className="flex items-center gap-3 mt-2">
+                    <div className="flex items-center gap-3 mt-1">
                       <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-200 dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 shrink-0">
                         {(dbUser as any)?.profilePicUrl ? (
                           <img src={(dbUser as any).profilePicUrl} alt="Profile" className="w-full h-full object-cover" />
@@ -290,12 +333,21 @@ export function TopBar() {
                     </div>
                     <button
                       onClick={() => { signOut(); setMobileMenuOpen(false); }}
-                      className="flex w-full justify-center items-center gap-2 rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40 px-4 py-2.5 text-xs font-bold text-red-600 dark:text-red-400 transition hover:bg-red-100"
+                      className="flex w-full justify-center items-center gap-2 rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40 px-4 py-2.5 text-xs font-bold text-red-600 dark:text-red-400 transition hover:bg-red-100 cursor-pointer"
                     >
                       <LogOut className="w-4 h-4" />
                       تسجيل الخروج
                     </button>
                   </>
+                ) : (
+                  <Link
+                    href="/login"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex w-full justify-center items-center gap-2 rounded-2xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white px-4 py-2.5 text-xs font-bold transition shadow-md active:scale-95 mt-1"
+                  >
+                    <LogIn className="w-4 h-4" />
+                    <span>تسجيل الدخول</span>
+                  </Link>
                 )}
               </div>
             </motion.div>

@@ -236,7 +236,7 @@ export function Tools() {
                   target={isExternal ? '_blank' : '_self'}
                   className="block h-full"
                 >
-                  <SpotlightCard className="h-full border border-slate-200/80 dark:border-zinc-800/80 bg-white/80 dark:bg-zinc-900/90 backdrop-blur-xl p-5 hover:border-amber-700/40 transition-all duration-250 flex flex-col justify-between">
+                  <SpotlightCard className="h-full border border-slate-200/80 dark:border-zinc-800/80 bg-white/80 dark:bg-zinc-900/90 backdrop-blur-xl p-5 transition-all duration-250 flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between mb-3.5">
                         <div className="w-10 h-10 rounded-xl bg-stone-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700/60 flex items-center justify-center group-hover:scale-105 transition-transform">
