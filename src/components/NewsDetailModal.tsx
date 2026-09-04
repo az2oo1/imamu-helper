@@ -247,7 +247,7 @@ export function NewsDetailModal({
                 </div>
               </div>
 
-              <span className="text-[11px] text-slate-400 dark:text-zinc-500 flex items-center gap-1 pl-8">
+              <span className="text-[11px] text-slate-400 dark:text-zinc-500 flex items-center gap-1 pl-14 sm:pl-16">
                 <Clock className="w-3 h-3" />
                 {formatDate(item.createdAt, 'ar-display')}
               </span>

@@ -64,7 +64,9 @@ export function NewsPage() {
 
   const fetchNews = async () => {
     try {
-      const res = await fetch('/api/news');
+      const token = user ? await user.getIdToken() : (localStorage.getItem('token') || localStorage.getItem('imamu_token') || '');
+      const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
+      const res = await fetch('/api/news', { headers });
       if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
         const data = await res.json().catch(() => null);
         if (Array.isArray(data)) {
@@ -78,7 +80,7 @@ export function NewsPage() {
 
   useEffect(() => {
     fetchNews();
-  }, []);
+  }, [user]);
 
   const handleLike = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -213,12 +215,14 @@ export function NewsPage() {
                   </span>
                 </div>
 
-                <h2 
-                  onClick={() => setSelectedNews(featuredItem)}
-                  className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-3 leading-snug cursor-pointer hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)] transition-colors"
-                >
-                  {featuredItem.title}
-                </h2>
+                {featuredItem.title && featuredItem.title !== featuredItem.author && (
+                  <h2 
+                    onClick={() => setSelectedNews(featuredItem)}
+                    className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-3 leading-snug cursor-pointer hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)] transition-colors"
+                  >
+                    {featuredItem.title}
+                  </h2>
+                )}
 
                 <div 
                   onClick={() => setSelectedNews(featuredItem)}
@@ -344,9 +348,11 @@ export function NewsPage() {
                   </span>
                 </div>
 
-                <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-2 leading-snug">
-                  {item.title}
-                </h4>
+                {item.title && item.title !== item.author && (
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-2 leading-snug">
+                    {item.title}
+                  </h4>
+                )}
 
                 <div className="mb-4">
                   <FormattedNewsContent 

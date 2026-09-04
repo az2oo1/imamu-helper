@@ -56,7 +56,7 @@ export function createNewsRouter(db: any) {
         .limit(limit)
         .offset(offset);
 
-      const recordIds = records.map((r: any) => r.id);
+      const recordIds = records.map((r: any) => Number(r.id)).filter((id: number) => !isNaN(id));
       let allLikes: any[] = [];
       let allComments: any[] = [];
 
@@ -66,15 +66,24 @@ export function createNewsRouter(db: any) {
       }
 
       const mapped = records.map((record: any) => {
-        const likes = allLikes.filter((l: any) => String(l.newsId) === String(record.id));
-        const comments = allComments.filter((c: any) => String(c.newsId) === String(record.id));
+        const recIdNum = Number(record.id);
+        const likes = allLikes.filter((l: any) => Number(l.newsId) === recIdNum);
+        const comments = allComments.filter((c: any) => Number(c.newsId) === recIdNum);
         const userLiked = currentUserId ? likes.some((l: any) => l.userId === currentUserId) : false;
         const effectiveAvatar = record.profilePicUrl || record.authorAvatar || null;
+
+        let postTitle = (record as any).title;
+        if (!postTitle && record.content) {
+          const firstLine = record.content.trim().split('\n')[0].replace(/^#+\s*/, '').trim();
+          if (firstLine && firstLine !== record.authorName) {
+            postTitle = firstLine.length > 90 ? firstLine.slice(0, 87) + '...' : firstLine;
+          }
+        }
 
         return {
           ...record,
           authorAvatar: effectiveAvatar,
-          title: record.authorName || `@${record.source}`,
+          title: postTitle || '',
           author: record.authorName || `@${record.source}`,
           likes: likes.length,
           likesCount: likes.length,
@@ -94,15 +103,16 @@ export function createNewsRouter(db: any) {
   // Like news item
   router.post("/news/:id/like", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     try {
-      const idRaw = req.params.id;
+      const newsIdNum = Number(req.params.id);
+      if (isNaN(newsIdNum)) return res.status(400).json({ error: "Invalid news ID" });
       const userId = req.user.uid;
 
-      const existing = await db.select().from(newsLikes).where(and(eq(newsLikes.userId, userId), matchId(newsLikes.newsId, idRaw)));
+      const existing = await db.select().from(newsLikes).where(and(eq(newsLikes.userId, userId), eq(newsLikes.newsId, newsIdNum)));
       if (existing.length > 0) {
-        await db.delete(newsLikes).where(matchId(newsLikes.id, existing[0].id));
+        await db.delete(newsLikes).where(eq(newsLikes.id, existing[0].id));
         return res.json({ liked: false });
       } else {
-        await db.insert(newsLikes).values({ userId, newsId: idRaw as any });
+        await db.insert(newsLikes).values({ userId, newsId: newsIdNum });
         return res.json({ liked: true });
       }
     } catch (e) {
@@ -114,7 +124,8 @@ export function createNewsRouter(db: any) {
   // Get comments for news item
   router.get("/news/:id/comments", async (req, res) => {
     try {
-      const idRaw = req.params.id;
+      const newsIdNum = Number(req.params.id);
+      if (isNaN(newsIdNum)) return res.status(400).json({ error: "Invalid news ID" });
       const comments = await db.select({
           id: newsComments.id,
           content: newsComments.content,
@@ -124,7 +135,7 @@ export function createNewsRouter(db: any) {
           profilePic: users.profilePicUrl
         })
         .from(newsComments)
-        .where(matchId(newsComments.newsId, idRaw))
+        .where(eq(newsComments.newsId, newsIdNum))
         .leftJoin(users, eq(users.uid, newsComments.userId))
         .orderBy(desc(newsComments.createdAt));
       res.json(comments);
@@ -136,12 +147,13 @@ export function createNewsRouter(db: any) {
   // Post comment to news item
   router.post("/news/:id/comments", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     try {
-      const idRaw = req.params.id;
+      const newsIdNum = Number(req.params.id);
+      if (isNaN(newsIdNum)) return res.status(400).json({ error: "Invalid news ID" });
       const userId = req.user.uid;
       const { content } = req.body;
       if (!content || !content.trim()) return res.status(400).json({ error: "Empty comment" });
 
-      const [newComment] = await db.insert(newsComments).values({ userId, newsId: idRaw as any, content: content.trim() }).returning();
+      const [newComment] = await db.insert(newsComments).values({ userId, newsId: newsIdNum, content: content.trim() }).returning();
       const userRec = await db.select().from(users).where(eq(users.uid, userId));
 
       res.json({
