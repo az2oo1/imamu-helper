@@ -470,15 +470,20 @@ export function HowToPage() {
                       </p>
                     </div>
                   </div>
-                  <span 
-                    className="px-5 py-2.5 font-bold text-xs rounded-xl shrink-0 transition-all duration-200 group-hover:scale-102"
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push('/newbie');
+                    }}
+                    className="btn-rise px-5 py-2.5 font-bold text-xs rounded-xl shrink-0 transition-all duration-200 cursor-pointer flex items-center gap-2 group/btn shadow-xs hover:shadow-md active:scale-95"
                     style={{
                       background: 'var(--color-imamu-brown)',
                       color: 'var(--btn-text-primary, #ffffff)'
                     }}
                   >
-                    استكشف الدليل الأكاديمي
-                  </span>
+                    <span>استكشف الدليل الأكاديمي</span>
+                    <ArrowLeft className="w-3.5 h-3.5 transition-transform duration-200 group-hover/btn:-translate-x-1" />
+                  </button>
                 </div>
               </div>
             </div>
