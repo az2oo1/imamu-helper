@@ -4,6 +4,7 @@ import { subjects, majors, majorCourses, course_resources } from '../../db/schem
 import { requireAuth } from '../../middleware/auth';
 import { matchId, matchSubjectIds } from '../../lib/auth-utils';
 import { cleanCourseName } from '../../lib/url-utils';
+import { listMajorPlansFromS3 } from '../../lib/storage';
 
 export function createSubjectsRouter(db: any) {
   const router = express.Router();
@@ -319,31 +320,46 @@ export function createSubjectsRouter(db: any) {
 
       if (!records || records.length === 0) {
         return res.json([
-          { id: 1, name: 'علوم الحاسب', pdfUrl: null, courseIds: [], courses: [] },
-          { id: 2, name: 'تقنية المعلومات', pdfUrl: null, courseIds: [], courses: [] },
-          { id: 3, name: 'نظم المعلومات', pdfUrl: null, courseIds: [], courses: [] }
+          { id: 1, name: 'علوم الحاسب', pdfUrl: null, plans: [], courseIds: [], courses: [] },
+          { id: 2, name: 'تقنية المعلومات', pdfUrl: null, plans: [], courseIds: [], courses: [] },
+          { id: 3, name: 'نظم المعلومات', pdfUrl: null, plans: [], courseIds: [], courses: [] }
         ]);
       }
 
-      const mapped = records.map((m: any) => {
+      const mapped = await Promise.all(records.map(async (m: any) => {
         const courseIds = allMajorCourses.filter((mc: any) => String(mc.majorId) === String(m.id)).map((mc: any) => String(mc.subjectId));
         const courses = allMajorCourses.filter((mc: any) => String(mc.majorId) === String(m.id)).map((mc: any) => ({
           subjectId: String(mc.subjectId), optionalGroup: mc.optionalGroup, optionalGroupReqCount: mc.optionalGroupReqCount, prereq: mc.prereq
         }));
+        const plans = await listMajorPlansFromS3(m.id, m.name, m.pdfUrl);
         return {
           ...m,
+          plans,
           courseIds,
           courses
         };
-      });
+      }));
       res.json(mapped);
     } catch (error) {
       console.error(error);
       res.json([
-        { id: 1, name: 'علوم الحاسب', pdfUrl: null, courseIds: [], courses: [] },
-        { id: 2, name: 'تقنية المعلومات', pdfUrl: null, courseIds: [], courses: [] },
-        { id: 3, name: 'نظم المعلومات', pdfUrl: null, courseIds: [], courses: [] }
+        { id: 1, name: 'علوم الحاسب', pdfUrl: null, plans: [], courseIds: [], courses: [] },
+        { id: 2, name: 'تقنية المعلومات', pdfUrl: null, plans: [], courseIds: [], courses: [] },
+        { id: 3, name: 'نظم المعلومات', pdfUrl: null, plans: [], courseIds: [], courses: [] }
       ]);
+    }
+  });
+
+  router.get("/majors/:id/plans", async (req: express.Request, res: express.Response): Promise<any> => {
+    try {
+      const { id } = req.params;
+      const allMajors = await db.select().from(majors);
+      const major = allMajors.find((m: any) => String(m.id) === String(id));
+      const plans = await listMajorPlansFromS3(id, major?.name, major?.pdfUrl);
+      res.json(plans);
+    } catch (error) {
+      console.error("Error fetching major plans:", error);
+      res.status(500).json({ error: "Failed to fetch major plans" });
     }
   });
 

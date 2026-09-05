@@ -12,7 +12,7 @@ import {
 import { requireAuth, AuthRequest } from '../../middleware/auth';
 import { matchId, matchSubjectIds } from '../../lib/auth-utils';
 import { logger } from '../../middleware/logger';
-import { uploadFileToStorage, isS3Configured } from '../../lib/storage';
+import { uploadFileToStorage, isS3Configured, listMajorPlansFromS3, uploadMajorPlanToStorage, deleteFileFromStorage } from '../../lib/storage';
 import { GoogleGenAI } from '@google/genai';
 import { importMsariData } from '../services/msari';
 import { extractTelegramChannelPosts } from '../services/telegram';
@@ -591,11 +591,27 @@ export function createAdminRouter(db: any) {
         return res.status(400).json({ error: "No files uploaded" });
       }
 
+      const category = (req.body?.category || req.query?.category || req.body?.type || req.query?.type || '').toString();
+
       const uploadedFiles: any[] = [];
       for (const file of req.files) {
-        const ext = path.extname(file.originalname);
-        const filename = `${Date.now()}_${crypto.randomUUID().slice(0, 8)}${ext}`;
-        const result = await uploadFileToStorage(file.buffer, filename, file.mimetype);
+        const ext = path.extname(file.originalname).toLowerCase();
+        const rawBase = path.basename(file.originalname, ext);
+
+        // Sanitize original filename preserving Arabic & English names while avoiding invalid URL chars
+        let cleanBase = rawBase
+          .normalize('NFC')
+          .replace(/[^\w\u0600-\u06FF\s-]/g, '')
+          .trim()
+          .replace(/[\s+]+/g, '_');
+
+        if (!cleanBase) {
+          cleanBase = category || 'file';
+        }
+
+        // Append short 4-character random suffix to ensure unique filenames without wiping original name
+        const filename = `${cleanBase}_${crypto.randomUUID().slice(0, 4)}${ext}`;
+        const result = await uploadFileToStorage(file.buffer, filename, file.mimetype, category);
         uploadedFiles.push(result);
       }
 
@@ -951,6 +967,74 @@ export function createAdminRouter(db: any) {
     } catch (e) {
       console.error(e);
       res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Admin Update Major
+  router.put("/admin/majors/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
+    try {
+      const idRaw = req.params.id;
+      const { name, pdfUrl } = req.body;
+      const updates: any = {};
+      if (name !== undefined) updates.name = name;
+      if (pdfUrl !== undefined) updates.pdfUrl = pdfUrl;
+      const [mjr] = await db.update(majors).set(updates).where(matchId(majors.id, idRaw)).returning();
+      if (!mjr) return res.status(404).json({ error: "Major not found" });
+      res.json(mjr);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Admin Upload Major Plan PDF to imamu-plans
+  router.post("/admin/majors/:id/plans", requireAuth, uploadStorage.any(), async (req: AuthRequest, res: express.Response): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Admin only" });
+    try {
+      const idRaw = req.params.id;
+      const files = req.files as Express.Multer.File[];
+      if (!files || files.length === 0) {
+        return res.status(400).json({ error: "No PDF file uploaded" });
+      }
+
+      const uploadedPlans: any[] = [];
+      for (const file of files) {
+        const result = await uploadMajorPlanToStorage(file.buffer, file.originalname, idRaw, file.mimetype);
+        uploadedPlans.push(result);
+      }
+
+      const allMajors = await db.select().from(majors);
+      const major = allMajors.find((m: any) => String(m.id) === String(idRaw));
+      const plans = await listMajorPlansFromS3(idRaw, major?.name, major?.pdfUrl);
+
+      res.json({ success: true, uploaded: uploadedPlans, plans });
+    } catch (e: any) {
+      console.error("[Admin Major Plan Upload Error]", e);
+      res.status(500).json({ error: e.message || "Failed to upload major plan" });
+    }
+  });
+
+  // Admin Delete Major Plan PDF from imamu-plans
+  router.delete("/admin/majors/:id/plans", requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Admin only" });
+    try {
+      const idRaw = req.params.id;
+      const key = String(req.query.key || '').trim();
+      if (!key) {
+        return res.status(400).json({ error: "Missing plan key" });
+      }
+
+      await deleteFileFromStorage(key, 'plan');
+
+      const allMajors = await db.select().from(majors);
+      const major = allMajors.find((m: any) => String(m.id) === String(idRaw));
+      const plans = await listMajorPlansFromS3(idRaw, major?.name, major?.pdfUrl);
+
+      res.json({ success: true, plans });
+    } catch (e: any) {
+      console.error("[Admin Major Plan Delete Error]", e);
+      res.status(500).json({ error: e.message || "Failed to delete major plan" });
     }
   });
 

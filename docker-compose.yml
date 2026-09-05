@@ -4,28 +4,30 @@ services:
   # Main Application Service
   app:
     image: ${APP_IMAGE:-ghcr.io/az2oo1/imamu-helper:latest}
-    build:
-      context: .
-      dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "3005:3000"
     environment:
       - PORT=3000
       - NODE_ENV=production
       # CockroachDB Database configuration
-      - SQL_HOST=${SQL_HOST:-100.70.48.23}
+      - SQL_HOST=${SQL_HOST:-cockroachdb}
       - SQL_BACKUP_HOST=${SQL_BACKUP_HOST}
       - SQL_PORT=${SQL_PORT:-26257}
       - SQL_USER=${SQL_USER:-root}
       - SQL_PASSWORD=${SQL_PASSWORD:-}
       - SQL_DB_NAME=${SQL_DB_NAME:-defaultdb}
       - SQL_SSL=${SQL_SSL:-false}
-      - DATABASE_URL=${DATABASE_URL:-postgresql://root@100.70.48.23:26257/defaultdb?sslmode=disable}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://root@cockroachdb:26257/defaultdb?sslmode=disable}
       # Garage S3 Object Storage configuration
-      - S3_ENDPOINT=${S3_ENDPOINT:-http://100.70.48.23:3900}
+      - S3_ENDPOINT=${S3_ENDPOINT:-http://garage:3900}
       - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-GKbb93a64d9b59553812b16ab7}
       - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-7019369bc02559db1603063931261ccb4fab61b2cc4ac32c239a35295cb57705}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME:-imamu-uploads}
+      - S3_BUCKET_PLANS=${S3_BUCKET_PLANS:-imamu-plans}
+      - S3_BUCKET_PFPS=${S3_BUCKET_PFPS:-imamu-pfps}
+      - S3_BUCKET_DALILAH=${S3_BUCKET_DALILAH:-imamu-dalilah}
+      - S3_BUCKET_RESOURCES=${S3_BUCKET_RESOURCES:-imamu-resources}
+      - S3_BUCKET_NEWS=${S3_BUCKET_NEWS:-imamu-news}
       - S3_REGION=${S3_REGION:-garage}
       - S3_FORCE_PATH_STYLE=${S3_FORCE_PATH_STYLE:-true}
       - S3_PUBLIC_URL=${S3_PUBLIC_URL:-/uploads}
@@ -44,7 +46,7 @@ services:
     command: start-single-node --insecure
     ports:
       - "26257:26257" # SQL Client Port
-      - "8080:8080"   # CockroachDB Admin Web Console UI
+      - "8082:8080"   # CockroachDB Admin Web Console UI
     volumes:
       - cockroach_data:/cockroach/cockroach-data
     healthcheck:
@@ -68,7 +70,8 @@ services:
         data_dir = "/var/lib/garage/data"
         db_engine = "sqlite"
 
-        replication_mode = "none"
+        replication_factor = 1
+        consistency_mode = "consistent"
 
         rpc_bind_addr = "0.0.0.0:3901"
         rpc_secret = "60fa6e1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
@@ -81,6 +84,11 @@ services:
         [s3_web]
         bind_addr = "0.0.0.0:3902"
         root_domain = ".web.garage"
+
+        [admin]
+        api_bind_addr = "0.0.0.0:3903"
+        admin_token = "60fa6e1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+        metrics_token = "60fa6e1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
         EOF
         echo "garage.toml generated successfully!"
     volumes:
@@ -88,15 +96,19 @@ services:
 
   # Garage S3-Compatible Object Storage Service
   garage:
-    image: dxflrs/garage:v1.0.1
+    image: dxflrs/garage:v2.1.0
     container_name: imamu_garage
     command: ["/garage", "-c", "/etc/garage/garage.toml", "server"]
     environment:
       - GARAGE_ALLOW_WORLD_READABLE_SECRETS=true
+      - GARAGE_ADMIN_API_BIND_ADDR=0.0.0.0:3903
+      - GARAGE_ADMIN_ADMIN_TOKEN=60fa6e1234567890abcdef1234567890abcdef1234567890abcdef1234567890
+      - GARAGE_ADMIN_METRICS_TOKEN=60fa6e1234567890abcdef1234567890abcdef1234567890abcdef1234567890
     ports:
       - "3900:3900" # S3 API Port
       - "3901:3901" # RPC Port
-      - "3902:3902" # Admin API Port
+      - "3902:3902" # S3 Web Port
+      - "3903:3903" # Admin API Port
     volumes:
       - garage_config:/etc/garage
       - garage_meta:/var/lib/garage/meta
@@ -104,6 +116,20 @@ services:
     depends_on:
       garage_init:
         condition: service_completed_successfully
+    restart: unless-stopped
+
+  # Garage Web UI (Noooste/garage-ui)
+  garage-ui:
+    image: noooste/garage-ui:latest
+    container_name: imamu_garage_ui
+    ports:
+      - "3904:8080" # Web UI Port
+    environment:
+      - GARAGE_UI_GARAGE_ENDPOINT=http://garage:3900
+      - GARAGE_UI_GARAGE_ADMIN_ENDPOINT=http://garage:3903
+      - GARAGE_UI_GARAGE_ADMIN_TOKEN=60fa6e1234567890abcdef1234567890abcdef1234567890abcdef1234567890
+    depends_on:
+      - garage
     restart: unless-stopped
 
 volumes:

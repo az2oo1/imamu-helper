@@ -272,7 +272,7 @@ export function TutorialsTab({
     });
 
     const payload = {
-      sectionId: Number(tutSectionId),
+      sectionId: tutSectionId,
       title: tutTitle.trim(),
       description: tutDescription.trim(),
       text: JSON.stringify(blocks),
@@ -552,6 +552,7 @@ export function TutorialsTab({
             <div className="divide-y border rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
               {sections.map(sec => {
                 const colorStyle = getSectionColorClasses(sec.color);
+                const count = tutorials.filter(t => String(t.sectionId) === String(sec.id)).length;
                 return (
                   <div key={sec.id} className="p-4 flex items-center justify-between group hover:bg-[var(--bg-subtle)] transition">
                     <div className="flex items-center gap-3">
@@ -560,7 +561,7 @@ export function TutorialsTab({
                       </div>
                       <div>
                         <div className="font-bold text-xs" style={{ color: 'var(--text-main)' }}>{sec.title}</div>
-                        <div className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>{tutorials.filter(t => t.sectionId === sec.id).length} شروحات</div>
+                        <div className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>{count} شروحات</div>
                       </div>
                     </div>
                     <div className="flex gap-1.5 opacity-80 group-hover:opacity-100 transition">
@@ -591,7 +592,7 @@ export function TutorialsTab({
             <h4 className="font-bold text-sm pr-1" style={{ color: 'var(--text-main)' }}>قائمة الشروحات المتوفرة ({tutorials.length})</h4>
             <div className="space-y-4">
               {sections.map(sec => {
-                const secTuts = tutorials.filter(t => t.sectionId === sec.id);
+                const secTuts = tutorials.filter(t => String(t.sectionId) === String(sec.id));
                 if (secTuts.length === 0) return null;
 
                 return (
@@ -631,6 +632,49 @@ export function TutorialsTab({
                   </div>
                 );
               })}
+
+              {/* Orphan / Uncategorized Tutorials */}
+              {(() => {
+                const orphanTuts = tutorials.filter(t => !sections.some(sec => String(sec.id) === String(t.sectionId)));
+                if (orphanTuts.length === 0) return null;
+
+                return (
+                  <div className="space-y-2.5">
+                    <div className="text-[10px] uppercase tracking-wider font-bold flex items-center gap-1.5 pr-1" style={{ color: 'var(--text-muted)' }}>
+                      <span className="p-1 rounded-md border bg-amber-500/10 text-amber-500 border-amber-500/20">
+                        <HelpCircle className="w-4 h-4" />
+                      </span>
+                      <span>شروحات عامة / غير مصنفة ({orphanTuts.length})</span>
+                    </div>
+
+                    <div className="divide-y border rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+                      {orphanTuts.map(tut => (
+                        <div key={tut.id} className="p-4 flex items-center justify-between hover:bg-[var(--bg-subtle)] transition gap-4">
+                          <div className="flex-1 min-w-0">
+                            <h5 className="font-bold text-xs truncate" style={{ color: 'var(--text-main)' }}>{tut.title}</h5>
+                            <p className="text-[11px] mt-1 line-clamp-1" style={{ color: 'var(--text-muted)' }}>{tut.description}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => startEditTutorial(tut)}
+                              className="px-3 py-1.5 border rounded-lg text-[10px] font-bold transition hover:bg-[var(--bg-subtle)]"
+                              style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
+                            >
+                              تعديل الشرح
+                            </button>
+                            <button
+                              onClick={() => handleDeleteTutorial(tut.id)}
+                              className="p-1.5 text-red-400 hover:bg-red-500/10 rounded-lg border border-transparent transition"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {tutorials.length === 0 && (
                 <div className="py-20 text-center border border-dashed rounded-2xl italic text-xs" style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}>

@@ -6,7 +6,7 @@ import fs from "fs";
 import next from "next";
 import { getDb } from "./src/db/index";
 import { requestLogger, logger } from "./src/middleware/logger";
-import { getFileFromStorage } from "./src/lib/storage";
+import { getFileFromStorage, ensureAllBucketsExist } from "./src/lib/storage";
 
 import { seedDefaults } from './src/server/services/seed';
 import { createAuthRouter } from './src/server/routes/auth';
@@ -68,8 +68,9 @@ async function startServer() {
   });
 
   // Serve uploaded files from Object Storage or local disk fallback
-  app.get('/uploads/:filename', async (req, res, next) => {
-    const filename = req.params.filename;
+  app.get('/uploads/*', async (req, res, next) => {
+    const filename = req.params[0];
+    if (!filename) return next();
     try {
       const file = await getFileFromStorage(filename);
       if (file) {
@@ -80,7 +81,7 @@ async function startServer() {
           else if (filename.toLowerCase().endsWith('.jpg') || filename.toLowerCase().endsWith('.jpeg')) mimeType = 'image/jpeg';
         }
         if (mimeType) res.setHeader('Content-Type', mimeType);
-        res.setHeader('Content-Disposition', 'inline; filename="' + encodeURIComponent(filename) + '"');
+        res.setHeader('Content-Disposition', 'inline; filename="' + encodeURIComponent(path.basename(filename)) + '"');
         res.setHeader('X-Content-Type-Options', 'nosniff');
         return res.send(file.buffer);
       }
@@ -100,6 +101,9 @@ async function startServer() {
   app.use('/uploads', express.static(legacyUploadsDir, { setHeaders: setInlineHeaders }));
 
   app.use(express.json({ limit: '50mb' }));
+
+  // Ensure all dedicated S3 buckets exist in Garage Object Storage
+  await ensureAllBucketsExist().catch(err => console.warn('[Storage] Bucket init notice:', err.message || err));
 
   // Seed default tutorials & newbie portal links if empty
   await seedDefaults(db);

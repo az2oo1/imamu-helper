@@ -15,19 +15,19 @@ const DEFAULT_FALLBACK_MAJORS = [
   {
     id: 1,
     name: 'علوم الحاسب',
-    pdfUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/examples/learning/helloworld.pdf',
+    pdfUrl: '',
     courses: []
   },
   {
     id: 2,
     name: 'تقنية المعلومات',
-    pdfUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/examples/learning/helloworld.pdf',
+    pdfUrl: '',
     courses: []
   },
   {
     id: 3,
     name: 'نظم المعلومات',
-    pdfUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/examples/learning/helloworld.pdf',
+    pdfUrl: '',
     courses: []
   }
 ];
@@ -70,14 +70,6 @@ export function PlansToolPage() {
   };
 
   useEffect(() => {
-    // Load local stored custom PDFs if available
-    try {
-      const saved = localStorage.getItem('imamu_plans_pdfs');
-      if (saved) {
-        setMajorPdfs(JSON.parse(saved));
-      }
-    } catch (e) {}
-
     Promise.all([
       fetch('/api/majors').then(r => r.ok ? r.json() : []),
       fetch('/api/subjects').then(r => r.ok ? r.json() : [])
@@ -85,6 +77,13 @@ export function PlansToolPage() {
       if (Array.isArray(m) && m.length > 0) {
         setMajors(m);
         setSelectedMajor(m[0]);
+        const initialMap: Record<string, PdfFileItem[]> = {};
+        m.forEach((mjr: any) => {
+          if (mjr.plans && Array.isArray(mjr.plans)) {
+            initialMap[String(mjr.id)] = mjr.plans;
+          }
+        });
+        setMajorPdfs(prev => ({ ...initialMap, ...prev }));
       } else {
         setMajors(DEFAULT_FALLBACK_MAJORS);
         setSelectedMajor(DEFAULT_FALLBACK_MAJORS[0]);
@@ -97,33 +96,25 @@ export function PlansToolPage() {
     });
   }, []);
 
-  // Initialize PDF list when selected major changes
+  // Fetch live PDF plans list from S3 when selected major changes
   useEffect(() => {
     if (!selectedMajor) return;
     const key = String(selectedMajor.id);
-    if (!majorPdfs[key]) {
-      const initialPdfs: PdfFileItem[] = [];
-      if (selectedMajor.pdfUrl) {
-        initialPdfs.push({
-          id: 'official-1',
-          title: selectedMajor.name,
-          url: selectedMajor.pdfUrl
-        });
-      }
-      if (initialPdfs.length === 0) {
-        initialPdfs.push({
-          id: 'default-1',
-          title: `خطة ${selectedMajor.name} (PDF)`,
-          url: 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/examples/learning/helloworld.pdf'
-        });
-      }
-      setMajorPdfs(prev => {
-        const next = { ...prev, [key]: initialPdfs };
-        try { localStorage.setItem('imamu_plans_pdfs', JSON.stringify(next)); } catch (e) {}
-        return next;
-      });
-    }
     setOpenPdfIndex(0);
+
+    fetch(`/api/majors/${selectedMajor.id}/plans`)
+      .then(r => r.ok ? r.json() : null)
+      .then(plans => {
+        if (Array.isArray(plans)) {
+          setMajorPdfs(prev => ({ ...prev, [key]: plans }));
+        } else if (selectedMajor.pdfUrl && (!majorPdfs[key] || majorPdfs[key].length === 0)) {
+          setMajorPdfs(prev => ({
+            ...prev,
+            [key]: [{ id: 'official-1', title: selectedMajor.name, url: selectedMajor.pdfUrl }]
+          }));
+        }
+      })
+      .catch(() => {});
   }, [selectedMajor]);
 
   const currentMajorPdfList = selectedMajor ? (majorPdfs[String(selectedMajor.id)] || []) : [];
@@ -142,26 +133,34 @@ export function PlansToolPage() {
   const totalCoursesCount = majorSubjectsList.length || (selectedMajor?.courses?.length || 45);
   const totalCreditHours = majorSubjectsList.reduce((acc: number, curr: any) => acc + (Number(curr.creditHours) || 0), 0) || 135;
 
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
   const processFileUpload = async (file: File) => {
+    if (!selectedMajor) return;
     setIsUploadingPdf(true);
     try {
       const formData = new FormData();
       formData.append('file', file);
       const token = user ? await user.getIdToken() : '';
-      const res = await fetch('/api/upload', {
+      
+      const res = await fetch(`/api/admin/majors/${selectedMajor.id}/plans`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
+
       if (res.ok) {
         const data = await res.json();
-        const fileUrl = data.url || (data.files && data.files[0]?.url);
-        if (fileUrl) {
-          setNewPdfUrl(fileUrl);
-          if (!newPdfTitle.trim()) {
-            setNewPdfTitle(file.name.replace(/\.pdf$/i, ''));
-          }
+        if (data.plans && Array.isArray(data.plans)) {
+          const key = String(selectedMajor.id);
+          setMajorPdfs(prev => ({ ...prev, [key]: data.plans }));
+          setOpenPdfIndex(data.plans.length - 1);
         }
+        setNewPdfUrl(data.uploaded?.[0]?.url || 'uploaded');
+        if (!newPdfTitle.trim()) {
+          setNewPdfTitle(file.name.replace(/\.pdf$/i, ''));
+        }
+        setSelectedFile(file);
       } else {
         alert('فشل رفع الملف إلى وحدة التخزين (Object Storage)');
       }
@@ -199,35 +198,60 @@ export function PlansToolPage() {
     setIsDragging(false);
   };
 
-  const handleAddPdf = (e: React.FormEvent) => {
+  const handleAddPdf = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isAdmin || !selectedMajor || !newPdfUrl.trim()) return;
-    const key = String(selectedMajor.id);
-    const newItem: PdfFileItem = {
-      id: Date.now().toString(),
-      title: newPdfTitle.trim() || `ملف خطة إضافي ${currentMajorPdfList.length + 1}`,
-      url: newPdfUrl.trim()
-    };
-    setMajorPdfs(prev => {
-      const next = { ...prev, [key]: [...(prev[key] || []), newItem] };
-      try { localStorage.setItem('imamu_plans_pdfs', JSON.stringify(next)); } catch (e) {}
-      return next;
-    });
-    setOpenPdfIndex(currentMajorPdfList.length);
+    if (!isAdmin || !selectedMajor) return;
+    
+    // Refresh plans list from server to ensure UI is completely updated
+    try {
+      const res = await fetch(`/api/majors/${selectedMajor.id}/plans`);
+      if (res.ok) {
+        const freshPlans = await res.json();
+        const key = String(selectedMajor.id);
+        setMajorPdfs(prev => ({ ...prev, [key]: freshPlans }));
+        setOpenPdfIndex(freshPlans.length - 1);
+      }
+    } catch (e) {}
+
     setNewPdfTitle('');
     setNewPdfUrl('');
+    setSelectedFile(null);
     setIsAddPdfOpen(false);
   };
 
-  const handleRemovePdf = (indexToRemove: number) => {
+  const handleRemovePdf = async (indexToRemove: number) => {
     if (!isAdmin || !selectedMajor) return;
+    const pdfToRemove = currentMajorPdfList[indexToRemove];
+    if (!pdfToRemove) return;
+
     const key = String(selectedMajor.id);
-    const updated = currentMajorPdfList.filter((_, idx) => idx !== indexToRemove);
-    setMajorPdfs(prev => {
-      const next = { ...prev, [key]: updated };
-      try { localStorage.setItem('imamu_plans_pdfs', JSON.stringify(next)); } catch (e) {}
-      return next;
-    });
+    const planKey = (pdfToRemove as any).key || pdfToRemove.id;
+
+    try {
+      const token = user ? await user.getIdToken() : '';
+      const res = await fetch(`/api/admin/majors/${selectedMajor.id}/plans?key=${encodeURIComponent(planKey)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.plans && Array.isArray(data.plans)) {
+          setMajorPdfs(prev => ({ ...prev, [key]: data.plans }));
+        } else {
+          setMajorPdfs(prev => ({
+            ...prev,
+            [key]: prev[key].filter((_, idx) => idx !== indexToRemove)
+          }));
+        }
+      }
+    } catch (err) {
+      console.error("Failed to delete plan file from S3:", err);
+      setMajorPdfs(prev => ({
+        ...prev,
+        [key]: prev[key].filter((_, idx) => idx !== indexToRemove)
+      }));
+    }
     setOpenPdfIndex(0);
   };
 

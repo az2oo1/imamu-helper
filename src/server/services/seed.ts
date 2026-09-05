@@ -10,7 +10,7 @@ export async function syncExternalImagesToStorage(db: any) {
     const sources = await db.select().from(news_sources);
     for (const s of sources) {
       if (s.profilePicUrl && (s.profilePicUrl.startsWith('http://') || s.profilePicUrl.startsWith('https://'))) {
-        const storedUrl = await downloadAndUploadToStorage(s.profilePicUrl, 'tg_avatar');
+        const storedUrl = await downloadAndUploadToStorage(s.profilePicUrl, `news_sources/${s.id}/avatar`, 'news');
         if (storedUrl && storedUrl !== s.profilePicUrl) {
           await db.update(news_sources).set({ profilePicUrl: storedUrl }).where(eq(news_sources.id, s.id));
           console.log(`[Storage Sync] Saved news_source logo @${s.handle} to Garage S3: ${storedUrl}`);
@@ -23,11 +23,11 @@ export async function syncExternalImagesToStorage(db: any) {
     for (const n of newsItems) {
       const updates: any = {};
       if (n.authorAvatar && (n.authorAvatar.startsWith('http://') || n.authorAvatar.startsWith('https://'))) {
-        const storedAvatar = await downloadAndUploadToStorage(n.authorAvatar, 'tg_avatar');
+        const storedAvatar = await downloadAndUploadToStorage(n.authorAvatar, `news/${n.id}/author`, 'news');
         if (storedAvatar && storedAvatar !== n.authorAvatar) updates.authorAvatar = storedAvatar;
       }
       if (n.imageUrl && (n.imageUrl.startsWith('http://') || n.imageUrl.startsWith('https://'))) {
-        const storedImg = await downloadAndUploadToStorage(n.imageUrl, 'tg_photo');
+        const storedImg = await downloadAndUploadToStorage(n.imageUrl, `news/${n.id}/image`, 'news');
         if (storedImg && storedImg !== n.imageUrl) updates.imageUrl = storedImg;
       }
       if (Object.keys(updates).length > 0) {
@@ -41,11 +41,11 @@ export async function syncExternalImagesToStorage(db: any) {
     for (const r of resources) {
       const updates: any = {};
       if (r.avatarUrl && (r.avatarUrl.startsWith('http://') || r.avatarUrl.startsWith('https://') || r.avatarUrl.startsWith('data:image/'))) {
-        const stored = await downloadAndUploadToStorage(r.avatarUrl, 'wa_avatar');
+        const stored = await downloadAndUploadToStorage(r.avatarUrl, `resources/${r.id}/avatar`, 'resources');
         if (stored && stored !== r.avatarUrl) updates.avatarUrl = stored;
       }
       if (r.bannerUrl && (r.bannerUrl.startsWith('http://') || r.bannerUrl.startsWith('https://') || r.bannerUrl.startsWith('data:image/'))) {
-        const stored = await downloadAndUploadToStorage(r.bannerUrl, 'banner');
+        const stored = await downloadAndUploadToStorage(r.bannerUrl, `resources/${r.id}/banner`, 'resources');
         if (stored && stored !== r.bannerUrl) updates.bannerUrl = stored;
       }
       if (Object.keys(updates).length > 0) {
@@ -59,11 +59,11 @@ export async function syncExternalImagesToStorage(db: any) {
     for (const sub of subjs) {
       const updates: any = {};
       if (sub.avatarUrl && (sub.avatarUrl.startsWith('http://') || sub.avatarUrl.startsWith('https://') || sub.avatarUrl.startsWith('data:image/'))) {
-        const stored = await downloadAndUploadToStorage(sub.avatarUrl, 'subj_avatar');
+        const stored = await downloadAndUploadToStorage(sub.avatarUrl, `subjects/${sub.id}/avatar`, 'resources');
         if (stored && stored !== sub.avatarUrl) updates.avatarUrl = stored;
       }
       if (sub.bannerUrl && (sub.bannerUrl.startsWith('http://') || sub.bannerUrl.startsWith('https://') || sub.bannerUrl.startsWith('data:image/'))) {
-        const stored = await downloadAndUploadToStorage(sub.bannerUrl, 'banner');
+        const stored = await downloadAndUploadToStorage(sub.bannerUrl, `subjects/${sub.id}/banner`, 'resources');
         if (stored && stored !== sub.bannerUrl) updates.bannerUrl = stored;
       }
       if (Object.keys(updates).length > 0) {
@@ -76,7 +76,7 @@ export async function syncExternalImagesToStorage(db: any) {
     const userRecs = await db.select().from(users);
     for (const u of userRecs) {
       if (u.profilePicUrl && (u.profilePicUrl.startsWith('http://') || u.profilePicUrl.startsWith('https://') || u.profilePicUrl.startsWith('data:image/'))) {
-        const stored = await downloadAndUploadToStorage(u.profilePicUrl, 'user_pfp');
+        const stored = await downloadAndUploadToStorage(u.profilePicUrl, `users/${u.id}/pfp`, 'pfp');
         if (stored && stored !== u.profilePicUrl) {
           await db.update(users).set({ profilePicUrl: stored }).where(eq(users.id, u.id));
           console.log(`[Storage Sync] Saved user #${u.id} profile pic to Garage S3: ${stored}`);
