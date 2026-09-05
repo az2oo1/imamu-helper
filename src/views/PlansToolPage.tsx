@@ -136,6 +136,8 @@ export function PlansToolPage() {
     try {
       const formData = new FormData();
       formData.append('file', file);
+      const titleToSend = newPdfTitle.trim() || file.name.replace(/\.pdf$/i, '');
+      formData.append('title', titleToSend);
       const token = user ? await user.getIdToken() : '';
       
       const res = await fetch(`/api/admin/majors/${selectedMajor.id}/plans`, {

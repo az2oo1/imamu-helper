@@ -459,12 +459,14 @@ export async function listMajorPlansFromS3(
             seenKeys.add(obj.Key);
 
             const rawFilename = path.basename(obj.Key);
-            const title = rawFilename
-              .replace(/\.pdf$/i, '')
-              .replace(/_/g, ' ')
-              .replace(/^[0-9]+_/, '')
-              .replace(/_[0-9a-f]{4,8}$/i, '')
-              .trim() || (majorName ? `خطة ${majorName}` : `خطة ${idStr}`);
+            let parsedTitle = rawFilename.replace(/\.pdf$/i, '');
+            parsedTitle = parsedTitle.replace(/[-_][0-9a-fA-F]{4,12}$/i, '');
+            if (/^[0-9a-fA-F\s-]+$/i.test(parsedTitle) && parsedTitle.length <= 12) {
+              parsedTitle = majorName ? `خطة ${majorName}` : `الخطة الدراسية`;
+            } else {
+              parsedTitle = parsedTitle.replace(/_/g, ' ').replace(/^[0-9]+_/, '').trim();
+            }
+            const title = parsedTitle || (majorName ? `خطة ${majorName}` : `خطة ${idStr}`);
 
             const url = obj.Key.startsWith('/') ? obj.Key : `/uploads/${obj.Key}`;
 
@@ -507,12 +509,14 @@ export async function listMajorPlansFromS3(
           if (isMatch) {
             seenKeys.add(obj.Key);
             const rawFilename = path.basename(obj.Key);
-            const title = rawFilename
-              .replace(/\.pdf$/i, '')
-              .replace(/_/g, ' ')
-              .replace(/^[0-9]+_/, '')
-              .replace(/_[0-9a-f]{4,8}$/i, '')
-              .trim() || `خطة ${majorName || idStr}`;
+            let parsedTitle = rawFilename.replace(/\.pdf$/i, '');
+            parsedTitle = parsedTitle.replace(/[-_][0-9a-fA-F]{4,12}$/i, '');
+            if (/^[0-9a-fA-F\s-]+$/i.test(parsedTitle) && parsedTitle.length <= 12) {
+              parsedTitle = majorName ? `خطة ${majorName}` : `الخطة الدراسية`;
+            } else {
+              parsedTitle = parsedTitle.replace(/_/g, ' ').replace(/^[0-9]+_/, '').trim();
+            }
+            const title = parsedTitle || `خطة ${majorName || idStr}`;
 
             const url = obj.Key.startsWith('/') ? obj.Key : `/uploads/${obj.Key}`;
 
@@ -562,10 +566,11 @@ export async function uploadMajorPlanToStorage(
   fileBuffer: Buffer,
   filename: string,
   majorId: string | number,
-  mimeType: string = 'application/pdf'
+  mimeType: string = 'application/pdf',
+  customTitle?: string
 ): Promise<{ url: string; key: string; bucket: string }> {
-  const rawBase = path.basename(filename, path.extname(filename));
-  const cleanName = rawBase
+  const baseTitle = (customTitle && customTitle.trim()) ? customTitle.trim() : path.basename(filename, path.extname(filename));
+  const cleanName = baseTitle
     .normalize('NFC')
     .replace(/[^\w\u0600-\u06FF\s-]/g, '')
     .trim()

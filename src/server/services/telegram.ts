@@ -239,7 +239,15 @@ export async function extractTelegramChannelPosts(
   let insertedCount = 0;
   for (const post of newPostsToInsert) {
     const postContent = post.text || (post.photoUrl ? '[صورة من التليقرام]' : '[منشور من التليقرام]');
-    const finalPhotoUrl = post.photoUrl || null;
+    let finalPhotoUrl = post.photoUrl || null;
+    if (finalPhotoUrl && (finalPhotoUrl.startsWith('http://') || finalPhotoUrl.startsWith('https://'))) {
+      try {
+        const stored = await downloadAndUploadToStorage(finalPhotoUrl, 'news_photo', 'news');
+        if (stored) finalPhotoUrl = stored;
+      } catch (e) {
+        console.warn('[Telegram Post Photo Download Error]', e);
+      }
+    }
 
     await db.insert(news).values({
       content: postContent,

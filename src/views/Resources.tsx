@@ -18,7 +18,7 @@ function matchSubjectIds(id1: any, id2: any): boolean {
   const n1 = Number(s1);
   const n2 = Number(s2);
   if (!isNaN(n1) && !isNaN(n2)) {
-    return Math.abs(n1 - n2) < 200;
+    return n1 === n2;
   }
   return false;
 }

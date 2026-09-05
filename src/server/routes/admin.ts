@@ -1010,9 +1010,10 @@ export function createAdminRouter(db: any) {
         return res.status(400).json({ error: "No PDF file uploaded" });
       }
 
+      const customTitle = req.body?.title || req.body?.name;
       const uploadedPlans: any[] = [];
       for (const file of files) {
-        const result = await uploadMajorPlanToStorage(file.buffer, file.originalname, idRaw, file.mimetype);
+        const result = await uploadMajorPlanToStorage(file.buffer, file.originalname, idRaw, file.mimetype, customTitle);
         uploadedPlans.push(result);
       }
 

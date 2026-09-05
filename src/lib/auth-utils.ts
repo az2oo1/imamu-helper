@@ -41,8 +41,7 @@ export function matchId(column: any, idRaw: string | number) {
   if (!isNaN(numId) && strId !== '') {
     return or(
       eq(column, numId),
-      sql`CAST(${column} AS TEXT) = ${strId}`,
-      sql`ABS(CAST(${column} AS NUMERIC) - ${numId}) < 200`
+      sql`CAST(${column} AS TEXT) = ${strId}`
     );
   }
   return sql`CAST(${column} AS TEXT) = ${strId}`;
@@ -56,7 +55,7 @@ export function matchSubjectIds(id1: any, id2: any): boolean {
   const n1 = Number(s1);
   const n2 = Number(s2);
   if (!isNaN(n1) && !isNaN(n2)) {
-    return Math.abs(n1 - n2) < 200;
+    return n1 === n2;
   }
   return false;
 }
