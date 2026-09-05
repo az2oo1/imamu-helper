@@ -42,7 +42,7 @@ export function PlansToolPage() {
 
   // PDF Viewer & Files State
   const [majorPdfs, setMajorPdfs] = useState<Record<string, PdfFileItem[]>>({});
-  const [openPdfIndex, setOpenPdfIndex] = useState<number | null>(0);
+  const [openPdfIndex, setOpenPdfIndex] = useState<number | null>(null);
   const [isAddPdfOpen, setIsAddPdfOpen] = useState(false);
   const [newPdfTitle, setNewPdfTitle] = useState('');
   const [newPdfUrl, setNewPdfUrl] = useState('');
@@ -100,7 +100,7 @@ export function PlansToolPage() {
   useEffect(() => {
     if (!selectedMajor) return;
     const key = String(selectedMajor.id);
-    setOpenPdfIndex(0);
+    setOpenPdfIndex(null);
 
     fetch(`/api/majors/${selectedMajor.id}/plans`)
       .then(r => r.ok ? r.json() : null)
@@ -130,13 +130,13 @@ export function PlansToolPage() {
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const processFileUpload = async (file: File) => {
+  const processFileUpload = async (file: File, titleInput?: string) => {
     if (!selectedMajor) return;
     setIsUploadingPdf(true);
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const titleToSend = newPdfTitle.trim() || file.name.replace(/\.pdf$/i, '');
+      const titleToSend = (titleInput && titleInput.trim()) ? titleInput.trim() : (newPdfTitle.trim() || file.name.replace(/\.pdf$/i, ''));
       formData.append('title', titleToSend);
       const token = user ? await user.getIdToken() : '';
       
@@ -154,16 +154,15 @@ export function PlansToolPage() {
           setOpenPdfIndex(data.plans.length - 1);
         }
         setNewPdfUrl(data.uploaded?.[0]?.url || 'uploaded');
-        if (!newPdfTitle.trim()) {
-          setNewPdfTitle(file.name.replace(/\.pdf$/i, ''));
-        }
-        setSelectedFile(file);
+        return true;
       } else {
         alert('فشل رفع الملف إلى وحدة التخزين (Object Storage)');
+        return false;
       }
     } catch (err) {
       console.error('Failed to upload PDF to object storage', err);
       alert('حدث خطأ أثناء رفع الملف إلى Object Storage');
+      return false;
     } finally {
       setIsUploadingPdf(false);
     }
@@ -171,7 +170,12 @@ export function PlansToolPage() {
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) processFileUpload(file);
+    if (file) {
+      setSelectedFile(file);
+      if (!newPdfTitle.trim()) {
+        setNewPdfTitle(file.name.replace(/\.pdf$/i, ''));
+      }
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -179,7 +183,10 @@ export function PlansToolPage() {
     setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
     if (file && (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'))) {
-      processFileUpload(file);
+      setSelectedFile(file);
+      if (!newPdfTitle.trim()) {
+        setNewPdfTitle(file.name.replace(/\.pdf$/i, ''));
+      }
     } else if (file) {
       alert('الرجاء اختيار ملف بصيغة PDF فقط');
     }
@@ -198,6 +205,11 @@ export function PlansToolPage() {
   const handleAddPdf = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isAdmin || !selectedMajor) return;
+
+    if (selectedFile) {
+      const success = await processFileUpload(selectedFile, newPdfTitle);
+      if (!success) return;
+    }
     
     // Refresh plans list from server to ensure UI is completely updated
     try {
@@ -249,7 +261,7 @@ export function PlansToolPage() {
         [key]: prev[key].filter((_, idx) => idx !== indexToRemove)
       }));
     }
-    setOpenPdfIndex(0);
+    setOpenPdfIndex(null);
   };
 
   const filteredMajors = majors.filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -567,7 +579,7 @@ export function PlansToolPage() {
                   className={`border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 ${
                     isDragging
                       ? 'border-[var(--color-imamu-accent)] bg-amber-500/10 scale-[1.01]'
-                      : newPdfUrl
+                      : (newPdfUrl || selectedFile)
                       ? 'border-emerald-400/80 bg-emerald-500/5 dark:bg-emerald-950/20'
                       : 'border-slate-300 dark:border-zinc-700 hover:border-[var(--color-imamu-brown)] bg-slate-50/50 dark:bg-zinc-950/50 hover:bg-slate-100/50 dark:hover:bg-zinc-900/60'
                   }`}
@@ -577,12 +589,14 @@ export function PlansToolPage() {
                       <div className="w-8 h-8 border-3 border-[var(--color-imamu-accent)] border-t-transparent rounded-full animate-spin" />
                       <p className="text-xs font-bold text-[var(--color-imamu-accent)] animate-pulse">جاري رفع الملف إلى وحدة التخزين...</p>
                     </div>
-                  ) : newPdfUrl ? (
+                  ) : (selectedFile || newPdfUrl) ? (
                     <div className="flex flex-col items-center py-1 gap-1.5">
                       <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
                         <Check className="w-5 h-5" />
                       </div>
-                      <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">تم رفع الملف بنجاح!</p>
+                      <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                        {selectedFile ? `تم اختيار: ${selectedFile.name}` : 'تم رفع الملف بنجاح!'}
+                      </p>
                       <p className="text-[11px] text-slate-400 dark:text-zinc-500">انقر هنا أو اسحب ملف آخر للتغيير</p>
                     </div>
                   ) : (
@@ -609,7 +623,7 @@ export function PlansToolPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={isUploadingPdf || !newPdfUrl.trim()}
+                  disabled={isUploadingPdf || (!newPdfUrl.trim() && !selectedFile)}
                   className="px-5 py-2.5 rounded-xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-xs font-bold shadow-md shadow-[var(--color-imamu-brown)/20] transition cursor-pointer disabled:opacity-50"
                 >
                   إضافة الملف

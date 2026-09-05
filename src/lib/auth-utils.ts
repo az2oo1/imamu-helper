@@ -52,10 +52,19 @@ export function matchSubjectIds(id1: any, id2: any): boolean {
   const s1 = String(id1).trim();
   const s2 = String(id2).trim();
   if (s1 === s2) return true;
-  const n1 = Number(s1);
-  const n2 = Number(s2);
-  if (!isNaN(n1) && !isNaN(n2)) {
-    return n1 === n2;
+
+  try {
+    const b1 = BigInt(s1);
+    const b2 = BigInt(s2);
+    if (b1 === b2) return true;
+    const diff = b1 > b2 ? b1 - b2 : b2 - b1;
+    if (diff < 100n) return true;
+  } catch (e) {
+    const n1 = Number(s1);
+    const n2 = Number(s2);
+    if (!isNaN(n1) && !isNaN(n2)) {
+      return n1 === n2;
+    }
   }
   return false;
 }

@@ -144,9 +144,9 @@ export function createAdminRouter(db: any) {
       } else if (sectionId != null && sectionId !== '') {
         const matched = allSections.find((s: any) => matchSubjectIds(s.id, sectionId));
         if (matched) targetSectionId = matched.id;
-        else targetSectionId = allSections[0].id;
+        else targetSectionId = sectionId;
       } else {
-        targetSectionId = allSections[0].id;
+        targetSectionId = allSections[0]?.id;
       }
 
       const stepsJson = Array.isArray(steps) ? JSON.stringify(steps) : (steps ? String(steps) : '[]');
@@ -181,9 +181,9 @@ export function createAdminRouter(db: any) {
       } else if (sectionId != null && sectionId !== '') {
         const matched = allSections.find((s: any) => matchSubjectIds(s.id, sectionId));
         if (matched) targetSectionId = matched.id;
-        else targetSectionId = allSections[0].id;
+        else targetSectionId = sectionId;
       } else {
-        targetSectionId = allSections[0].id;
+        targetSectionId = allSections[0]?.id;
       }
 
       const stepsJson = Array.isArray(steps) ? JSON.stringify(steps) : (steps ? String(steps) : '[]');
