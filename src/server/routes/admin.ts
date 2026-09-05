@@ -1,4 +1,5 @@
 import express from 'express';
+import crypto from 'crypto';
 import multer from 'multer';
 import path from 'path';
 import AdmZip from 'adm-zip';
@@ -593,8 +594,19 @@ export function createAdminRouter(db: any) {
 
       const category = (req.body?.category || req.query?.category || req.body?.type || req.query?.type || '').toString();
 
-      const uploadedFiles: any[] = [];
+      // Deduplicate incoming files by buffer content hash
+      const uniqueFiles: Express.Multer.File[] = [];
+      const seenHashes = new Set<string>();
       for (const file of req.files) {
+        const hash = crypto.createHash('md5').update(file.buffer).digest('hex');
+        if (!seenHashes.has(hash)) {
+          seenHashes.add(hash);
+          uniqueFiles.push(file);
+        }
+      }
+
+      const uploadedFiles: any[] = [];
+      for (const file of uniqueFiles) {
         const ext = path.extname(file.originalname).toLowerCase();
         const rawBase = path.basename(file.originalname, ext);
 

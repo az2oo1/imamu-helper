@@ -176,6 +176,22 @@ export function getPersistentUploadsDir(): string {
 }
 
 /**
+ * Resolves clean relative key path based on category if not already prefixed.
+ */
+function resolveStorageKey(filename: string, category?: string): string {
+  const cat = (category || '').toLowerCase().trim();
+  const file = filename.replace(/^\/+/, '');
+  if (file.includes('/')) return file; // Already has directory prefix
+
+  if (cat === 'pfp' || cat === 'avatar' || cat === 'user_pfp') return `pfp/${file}`;
+  if (cat === 'plan' || cat === 'study_plan' || cat === 'pdf') return `plans/${file}`;
+  if (cat === 'resource' || cat === 'resources' || cat === 'course') return `resources/${file}`;
+  if (cat === 'dalilah' || cat === 'guide') return `dalilah/${file}`;
+  if (cat === 'news' || cat === 'article') return `news/${file}`;
+  return file;
+}
+
+/**
  * Uploads a file to Garage Object Storage in its category-specific S3 Bucket (or local disk fallback).
  */
 export async function uploadFileToStorage(
@@ -186,11 +202,11 @@ export async function uploadFileToStorage(
 ): Promise<{ url: string; key: string; bucket: string }> {
   const client = getS3Client();
   const bucketName = getS3BucketName(category, filename, mimeType);
+  const key = resolveStorageKey(filename, category);
 
   if (client) {
     try {
       await ensureBucketExists(bucketName);
-      const key = filename;
 
       await client.send(
         new PutObjectCommand({
@@ -214,27 +230,26 @@ export async function uploadFileToStorage(
     }
   }
 
-  // Local persistent disk fallback (stored in /uploads outside public/ so next build/rebuild won't wipe it)
+  // Local persistent disk fallback
   const uploadsDir = getPersistentUploadsDir();
-  const filePath = path.join(uploadsDir, filename);
+  const filePath = path.join(uploadsDir, key);
   const fileDir = path.dirname(filePath);
   if (!fs.existsSync(fileDir)) {
     fs.mkdirSync(fileDir, { recursive: true });
   }
   fs.writeFileSync(filePath, fileBuffer);
 
-  // Copy to public/uploads as well for immediate static serving if needed
+  // Sync to public/uploads
   try {
-    const legacyPublicDir = path.join(process.cwd(), 'public/uploads', path.dirname(filename));
+    const legacyPublicDir = path.join(process.cwd(), 'public/uploads', path.dirname(key));
     if (!fs.existsSync(legacyPublicDir)) {
       fs.mkdirSync(legacyPublicDir, { recursive: true });
     }
-    fs.writeFileSync(path.join(process.cwd(), 'public/uploads', filename), fileBuffer);
+    fs.writeFileSync(path.join(process.cwd(), 'public/uploads', key), fileBuffer);
   } catch (e) {}
 
-  console.log(`[Storage] Uploaded "${filename}" to persistent disk storage.`);
-
-  return { url: `/uploads/${filename}`, key: filename, bucket: bucketName };
+  console.log(`[Storage] Uploaded "${key}" to persistent disk storage.`);
+  return { url: `/uploads/${key}`, key, bucket: bucketName };
 }
 
 /**
@@ -520,17 +535,20 @@ export async function listMajorPlansFromS3(
     }
   }
 
-  // 3. Fallback / DB pdfUrl check
+  // 3. Fallback / DB pdfUrl check (only add if file actually exists in storage/disk)
   if (fallbackPdfUrl && fallbackPdfUrl.trim()) {
     const cleanUrl = fallbackPdfUrl.trim();
     const key = cleanUrl.replace(/^\/uploads\//, '');
     if (!seenKeys.has(key) && !seenKeys.has(cleanUrl)) {
-      items.unshift({
-        id: 'official-db-pdf',
-        title: majorName ? `${majorName} (الخطة الرسمية)` : 'الخطة الرسمية',
-        url: cleanUrl,
-        key: key
-      });
+      const existingFile = await getFileFromStorage(key, 'plan');
+      if (existingFile) {
+        items.unshift({
+          id: 'official-db-pdf',
+          title: majorName ? `خطة ${majorName}` : 'الخطة الدراسية',
+          url: cleanUrl,
+          key: key
+        });
+      }
     }
   }
 

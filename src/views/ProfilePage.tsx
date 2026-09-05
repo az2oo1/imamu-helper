@@ -242,7 +242,7 @@ export function ProfilePage() {
                   try {
                     const formData = new FormData();
                     formData.append('file', file);
-                    formData.append('files', file);
+                    formData.append('category', 'pfp');
                     const token = user ? await user.getIdToken() : (localStorage.getItem('token') || localStorage.getItem('imamu_token') || '');
                     const res = await fetch('/api/upload', {
                       method: 'POST',

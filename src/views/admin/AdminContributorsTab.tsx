@@ -496,6 +496,7 @@ export default function AdminContributorsTab() {
                                 const token = localStorage.getItem('token') || localStorage.getItem('imamu_token') || '';
                                 const formData = new FormData();
                                 formData.append('file', file);
+                                formData.append('category', 'pfp');
                                 const res = await fetch('/api/admin/upload', {
                                   method: 'POST',
                                   headers: { Authorization: `Bearer ${token}` },

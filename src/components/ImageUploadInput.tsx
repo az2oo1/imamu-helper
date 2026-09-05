@@ -18,8 +18,8 @@ export default function ImageUploadInput({ label, value, onChange, type, uploadU
     if (!file) return;
 
     const formData = new FormData();
-    formData.append('files', file);
     formData.append('file', file);
+    formData.append('category', type === 'avatar' ? 'pfp' : 'resources');
 
     try {
       setIsUploading(true);

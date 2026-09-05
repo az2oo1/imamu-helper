@@ -107,11 +107,6 @@ export function PlansToolPage() {
       .then(plans => {
         if (Array.isArray(plans)) {
           setMajorPdfs(prev => ({ ...prev, [key]: plans }));
-        } else if (selectedMajor.pdfUrl && (!majorPdfs[key] || majorPdfs[key].length === 0)) {
-          setMajorPdfs(prev => ({
-            ...prev,
-            [key]: [{ id: 'official-1', title: selectedMajor.name, url: selectedMajor.pdfUrl }]
-          }));
         }
       })
       .catch(() => {});
@@ -352,11 +347,6 @@ export function PlansToolPage() {
                             <h4 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white truncate" title={pdf.title}>
                               {pdf.title}
                             </h4>
-                            {idx === 0 && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-stone-50 dark:bg-stone-950/80 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] border border-amber-200 dark:border-stone-900/50 shrink-0">
-                                الخطة الرئيسية
-                              </span>
-                            )}
                           </div>
                         </div>
                       </div>
