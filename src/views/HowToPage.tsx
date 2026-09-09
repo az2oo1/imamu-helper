@@ -8,7 +8,8 @@ import * as Icons from 'lucide-react';
 import { 
   HelpCircle, GraduationCap, Search, CheckSquare, 
   ArrowLeft, Video, ThumbsUp, ThumbsDown, MessageSquare, 
-  CheckCircle, X, AlertCircle, ExternalLink, Compass, Info
+  CheckCircle, X, AlertCircle, ExternalLink, Compass, Info,
+  Share2
 } from 'lucide-react';
 import { InView, SpotlightCard } from '../components/ui';
 import { getSectionColorClasses } from '../lib/section-colors';
@@ -91,7 +92,21 @@ export function HowToPage() {
       const secRes = await fetch('/api/tutorials/sections').then(r => r.ok && r.headers.get('content-type')?.includes('json') ? r.json() : []);
       const tutRes = await fetch('/api/tutorials').then(r => r.ok && r.headers.get('content-type')?.includes('json') ? r.json() : []);
       if (Array.isArray(secRes)) setSections(secRes);
-      if (Array.isArray(tutRes)) setTutorials(tutRes);
+      if (Array.isArray(tutRes)) {
+        setTutorials(tutRes);
+
+        // Auto-select tutorial if URL contains ?id=... or ?tutorial=...
+        if (typeof window !== 'undefined') {
+          const params = new URLSearchParams(window.location.search);
+          const targetId = params.get('id') || params.get('tutorial');
+          if (targetId) {
+            const matched = tutRes.find((t: any) => matchSubjectIds(t.id, targetId));
+            if (matched) {
+              selectTutorial(matched, false);
+            }
+          }
+        }
+      }
     } catch (e) {
       console.error("Failed to load guide data:", e);
     }
@@ -101,8 +116,33 @@ export function HowToPage() {
     loadData();
   }, []);
 
-  const selectTutorial = async (tut: Tutorial) => {
+  // Listen to browser navigation (back/forward)
+  useEffect(() => {
+    const handlePopState = () => {
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const targetId = params.get('id') || params.get('tutorial');
+        if (targetId) {
+          const matched = tutorials.find(t => matchSubjectIds(t.id, targetId));
+          if (matched) {
+            selectTutorial(matched, false);
+            return;
+          }
+        }
+        setSelectedTutorial(null);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [tutorials]);
+
+  const selectTutorial = async (tut: Tutorial, updateUrl: boolean = true) => {
     setSelectedTutorial(tut);
+    if (updateUrl && typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('id', String(tut.id));
+      window.history.pushState({ tutorialId: tut.id }, '', url.toString());
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
     try {
       const res = await fetch(`/api/tutorials/${tut.id}`).then(r => r.ok && r.headers.get('content-type')?.includes('json') ? r.json() : null);
@@ -257,16 +297,44 @@ export function HowToPage() {
             exit={{ opacity: 0, x: 20 }}
             className="w-full max-w-4xl mx-auto relative z-10 pt-2 sm:pt-4"
           >
-            {/* Back Button */}
-            <button 
-              onClick={() => {
-                setSelectedTutorial(null);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              className="inline-flex items-center gap-2 text-xs text-slate-700 dark:text-zinc-300 font-bold mb-6 bg-white dark:bg-zinc-900 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-2xs self-start hover:bg-slate-50 dark:hover:bg-zinc-800 transition"
-            >
-              <ArrowLeft className="w-4 h-4 rotate-180 text-[var(--color-imamu-accent)]" /> العودة إلى قائمة الشروحات
-            </button>
+            {/* Action Bar: Back Button & Direct Link Share Button */}
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+              <button 
+                onClick={() => {
+                  setSelectedTutorial(null);
+                  if (typeof window !== 'undefined') {
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete('id');
+                    url.searchParams.delete('tutorial');
+                    window.history.pushState({}, '', url.pathname);
+                  }
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="btn-rise inline-flex items-center gap-2 text-xs text-slate-700 dark:text-zinc-300 font-bold bg-white dark:bg-zinc-900 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-2xs hover:bg-slate-50 dark:hover:bg-zinc-800 transition cursor-pointer active:scale-95"
+              >
+                <ArrowLeft className="w-4 h-4 rotate-180 text-[var(--color-imamu-accent)]" /> العودة إلى قائمة الشروحات
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    const shareUrl = `${window.location.origin}/howto?id=${selectedTutorial.id}`;
+                    if (navigator?.clipboard?.writeText) {
+                      navigator.clipboard.writeText(shareUrl);
+                    }
+                    setCustomAlert({
+                      type: 'success',
+                      title: 'تم نسخ رابط الشرح بنجاح! 🔗',
+                      message: 'تم نسخ الرابط المباشر لهذا الشرح إلى الحافظة، يمكنك الآن مشاركته مع الطلاب للوصول السريع للشرح.'
+                    });
+                  }
+                }}
+                className="btn-rise inline-flex items-center gap-2 text-xs font-bold py-2.5 px-4 rounded-xl border transition shadow-xs cursor-pointer active:scale-95 text-[var(--color-imamu-brown)] dark:text-[var(--color-imamu-accent)] bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30"
+              >
+                <Share2 className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" /> نسخ رابط الشرح المباشر
+              </button>
+            </div>
 
             {/* Header Detail Card */}
             <div className="bg-white dark:bg-zinc-900 border border-slate-200/90 dark:border-zinc-800 rounded-2xl p-6 sm:p-8 shadow-2xs mb-8">
@@ -300,7 +368,7 @@ export function HowToPage() {
               )}
 
               <div className="mb-6 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 leading-relaxed font-normal">
-                {renderTutorialContent(selectedTutorial.text, setZoomedImage)}
+                {renderTutorialContent(selectedTutorial.text, setZoomedImage, (url) => router.push(url))}
               </div>
 
               {/* Detailed Steps */}
@@ -358,25 +426,37 @@ export function HowToPage() {
                 </>
               )}
 
-              {/* Action Link Button */}
-              {selectedTutorial.linkUrl && (
-                <div className="mt-8 mb-2 text-right">
-                  <a 
-                    href={selectedTutorial.linkUrl}
-                    target={selectedTutorial.linkUrl!.startsWith('http') ? '_blank' : undefined}
-                    rel={selectedTutorial.linkUrl!.startsWith('http') ? 'noopener noreferrer' : undefined}
-                    onClick={(e) => {
-                      if (!selectedTutorial.linkUrl!.startsWith('http')) {
-                        e.preventDefault();
-                        router.push(selectedTutorial.linkUrl!);
-                      }
-                    }}
-                    className="btn-rise inline-flex items-center gap-2 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white font-bold py-3 px-5 rounded-xl text-xs shadow-md shadow-[var(--color-imamu-brown)/20] w-full sm:w-auto justify-center cursor-pointer"
-                  >
-                    <ExternalLink className="w-4 h-4 shrink-0" /> {selectedTutorial.linkTitle || 'الانتقال للرابط المذكور'}
-                  </a>
-                </div>
-              )}
+              {/* Action Link Button (Only show if tutorial has no links section) */}
+              {(() => {
+                let hasButtonsBlock = false;
+                if (selectedTutorial.text && selectedTutorial.text.trim().startsWith('[')) {
+                  try {
+                    const parsed = JSON.parse(selectedTutorial.text);
+                    hasButtonsBlock = Array.isArray(parsed) && parsed.some(b => b.type === 'buttons' && Array.isArray(b.buttons) && b.buttons.length > 0);
+                  } catch {}
+                }
+
+                if (!selectedTutorial.linkUrl || hasButtonsBlock) return null;
+
+                return (
+                  <div className="mt-8 mb-2 text-right">
+                    <a 
+                      href={selectedTutorial.linkUrl}
+                      target={selectedTutorial.linkUrl.startsWith('http') ? '_blank' : undefined}
+                      rel={selectedTutorial.linkUrl.startsWith('http') ? 'noopener noreferrer' : undefined}
+                      onClick={(e) => {
+                        if (!selectedTutorial.linkUrl!.startsWith('http')) {
+                          e.preventDefault();
+                          router.push(selectedTutorial.linkUrl!);
+                        }
+                      }}
+                      className="btn-rise inline-flex items-center gap-2 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] active:scale-95 text-white font-bold py-3 px-5 rounded-xl text-xs shadow-md shadow-[var(--color-imamu-brown)/20] w-full sm:w-auto justify-center cursor-pointer transition duration-200"
+                    >
+                      <ExternalLink className="w-4 h-4 shrink-0" /> {selectedTutorial.linkTitle || 'الانتقال للرابط المذكور'}
+                    </a>
+                  </div>
+                );
+              })()}
 
               {/* Feedback Rating Widget */}
               <div className="mt-10 pt-6 border-t border-slate-100 dark:border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-right">
@@ -825,47 +905,39 @@ export function HowToPage() {
 
 function renderFormattedInline(str: string): React.ReactNode {
   if (!str) return null;
-  const regex = /\[(.*?)\]\((https?:\/\/[^\s)]+)\)|\*\*(.*?)\*\*/g;
+  // Strip any markdown link syntax [text](url) -> text, so no links or URLs clutter the text
+  const cleaned = str.replace(/\[(.*?)\]\((?:https?:\/\/[^\s)]+)\)/g, '$1');
+  const regex = /\*\*(.*?)\*\*/g;
   const parts: React.ReactNode[] = [];
   let lastIdx = 0;
   let match: RegExpExecArray | null;
 
-  while ((match = regex.exec(str)) !== null) {
+  while ((match = regex.exec(cleaned)) !== null) {
     if (match.index > lastIdx) {
-      parts.push(str.substring(lastIdx, match.index));
+      parts.push(cleaned.substring(lastIdx, match.index));
     }
-    if (match[1] && match[2]) {
-      parts.push(
-        <a
-          key={`link-${match.index}`}
-          href={match[2]}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[var(--color-imamu-brown)] dark:text-[var(--color-imamu-accent)] font-semibold underline underline-offset-4 hover:opacity-80 inline-flex items-center gap-1 mx-0.5"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {match[1]}
-          <ExternalLink className="w-3 h-3 inline-block shrink-0" />
-        </a>
-      );
-    } else if (match[3]) {
+    if (match[1]) {
       parts.push(
         <strong key={`bold-${match.index}`} className="font-bold text-slate-900 dark:text-white">
-          {match[3]}
+          {match[1]}
         </strong>
       );
     }
     lastIdx = regex.lastIndex;
   }
 
-  if (lastIdx < str.length) {
-    parts.push(str.substring(lastIdx));
+  if (lastIdx < cleaned.length) {
+    parts.push(cleaned.substring(lastIdx));
   }
 
-  return parts.length > 0 ? parts : str;
+  return parts.length > 0 ? parts : cleaned;
 }
 
-function renderTutorialContent(text: string, onImageClick?: (url: string) => void) {
+function renderTutorialContent(
+  text: string, 
+  onImageClick?: (url: string) => void,
+  onNavigate?: (url: string) => void
+) {
   if (!text) return null;
 
   if (text.trim().startsWith('[')) {
@@ -889,14 +961,24 @@ function renderTutorialContent(text: string, onImageClick?: (url: string) => voi
                 const isDanger = variant === 'danger' || variant === 'error';
                 const isSuccess = variant === 'success';
 
+                const rawContent = (block.content || block.text || '').trim();
+                let lines: string[] = [];
+                if (rawContent.includes('\n')) {
+                  lines = rawContent.split(/\r?\n/).map((l: string) => l.trim()).filter(Boolean);
+                } else if (/(\d+[\.\)]\s+)/.test(rawContent)) {
+                  lines = rawContent.split(/(?=(?:^|\s+)\d+[\.\)]\s+)/).map((l: string) => l.trim()).filter(Boolean);
+                } else {
+                  lines = [rawContent];
+                }
+
                 return (
                   <div 
                     key={blockIdx} 
-                    className={`p-4 rounded-xl border flex items-start gap-3 my-4 ${
-                      isWarning ? 'bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-200' :
-                      isDanger ? 'bg-rose-500/10 border-rose-500/30 text-rose-900 dark:text-rose-200' :
-                      isSuccess ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-900 dark:text-emerald-200' :
-                      'bg-blue-500/10 border-blue-500/30 text-blue-900 dark:text-blue-200'
+                    className={`p-4 sm:p-5 rounded-2xl border flex items-start gap-3.5 my-5 shadow-xs ${
+                      isWarning ? 'bg-amber-500/10 border-amber-500/30 text-amber-950 dark:text-amber-200' :
+                      isDanger ? 'bg-rose-500/10 border-rose-500/30 text-rose-950 dark:text-rose-200' :
+                      isSuccess ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-950 dark:text-emerald-200' :
+                      'bg-blue-500/10 border-blue-500/30 text-blue-950 dark:text-blue-200'
                     }`}
                   >
                     {isDanger || isWarning ? (
@@ -904,10 +986,96 @@ function renderTutorialContent(text: string, onImageClick?: (url: string) => voi
                     ) : (
                       <Info className="w-5 h-5 shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
                     )}
-                    <div className="text-xs sm:text-sm leading-relaxed font-normal">
-                      {block.title && <h4 className="font-bold mb-1 text-slate-900 dark:text-white">{block.title}</h4>}
-                      <div>{renderFormattedInline(block.content || block.text || '')}</div>
+                    <div className="flex-1 min-w-0 text-right font-normal">
+                      {block.title && (
+                        <h4 className="font-bold text-xs sm:text-sm mb-2 text-slate-900 dark:text-white flex items-center gap-1.5">
+                          {block.title}
+                        </h4>
+                      )}
+                      {lines.length > 1 ? (
+                        <div className="space-y-2 mt-1">
+                          {lines.map((line, lIdx) => (
+                            <div key={lIdx} className="text-xs sm:text-sm leading-relaxed flex items-start gap-2">
+                              <span className="opacity-60 text-xs mt-1 shrink-0">•</span>
+                              <div className="flex-1 min-w-0">{renderFormattedInline(line)}</div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-xs sm:text-sm leading-relaxed whitespace-pre-line">
+                          {renderFormattedInline(rawContent)}
+                        </div>
+                      )}
                     </div>
+                  </div>
+                );
+              }
+
+              if (block.type === 'media') {
+                const images: string[] = [
+                  ...(block.mediaUrls || []),
+                  ...(block.images || []),
+                  ...(block.mediaType === 'image' && block.mediaUrl ? [block.mediaUrl] : [])
+                ].filter(Boolean);
+                const uniqueImages = Array.from(new Set(images));
+                const video = block.videoUrl || (block.mediaType === 'video' ? block.mediaUrl : null);
+
+                if (uniqueImages.length === 0 && !video) return null;
+
+                return (
+                  <div key={blockIdx} className="my-6 space-y-4">
+                    {/* Video Player if present */}
+                    {video && (
+                      <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-zinc-800 bg-black max-w-2xl mx-auto shadow-md">
+                        {video.includes('youtube.com') || video.includes('youtu.be') ? (
+                          <div className="aspect-video w-full">
+                            <iframe 
+                              src={video.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')} 
+                              className="w-full h-full" 
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                              allowFullScreen 
+                            />
+                          </div>
+                        ) : (
+                          <video src={video} controls className="w-full max-h-[460px] object-contain mx-auto" />
+                        )}
+                      </div>
+                    )}
+
+                    {/* Images Gallery */}
+                    {uniqueImages.length === 1 ? (
+                      <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 p-2 text-center max-w-2xl mx-auto shadow-xs">
+                        <img 
+                          src={uniqueImages[0]} 
+                          alt="صورة توضيحية للشرح" 
+                          className="w-full h-auto max-h-[480px] object-contain rounded-xl cursor-pointer hover:opacity-95 transition mx-auto"
+                          onClick={() => onImageClick?.(uniqueImages[0])}
+                        />
+                        <span className="text-[10px] text-slate-400 dark:text-zinc-500 block text-center mt-2">انقر على الصورة لتكبيرها بدقة عالية 🔍</span>
+                      </div>
+                    ) : uniqueImages.length > 1 ? (
+                      <div className="border border-slate-200 dark:border-zinc-800 rounded-2xl p-4 bg-slate-50/50 dark:bg-zinc-950/50">
+                        <span className="text-xs font-bold text-slate-700 dark:text-zinc-300 block mb-3">🖼️ معرض الصور التوضيحية ({uniqueImages.length} صور):</span>
+                        <div className={`grid gap-3 ${uniqueImages.length === 2 ? 'grid-cols-2' : uniqueImages.length === 3 ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4'}`}>
+                          {uniqueImages.map((imgUrl, imgIdx) => (
+                            <div 
+                              key={imgIdx} 
+                              className="group relative rounded-xl overflow-hidden border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 cursor-pointer shadow-2xs hover:shadow-md transition duration-200 aspect-4/3 flex items-center justify-center p-1"
+                              onClick={() => onImageClick?.(imgUrl)}
+                            >
+                              <img 
+                                src={imgUrl} 
+                                alt={`صورة توضيحية ${imgIdx + 1}`} 
+                                className="w-full h-full object-contain rounded-lg group-hover:scale-105 transition duration-200"
+                              />
+                              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-bold">
+                                🔍 تكبير
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 );
               }
@@ -1031,21 +1199,31 @@ function renderTutorialContent(text: string, onImageClick?: (url: string) => voi
               if (block.type === 'buttons') {
                 const buttons = block.buttons || [];
                 return (
-                  <div key={blockIdx} className="flex flex-wrap gap-3 my-6 justify-center sm:justify-start" dir="rtl">
-                    {buttons.map((btn: any, btnIdx: number) => {
-                      if (!btn.label || !btn.url) return null;
-                      return (
-                        <a
-                          key={btnIdx}
-                          href={btn.url}
-                          target={btn.url.startsWith('http') ? '_blank' : undefined}
-                          rel={btn.url.startsWith('http') ? 'noopener noreferrer' : undefined}
-                          className="inline-flex items-center gap-2 bg-[var(--color-imamu-brown)] hover:bg-[#523d2b] text-white font-bold py-2.5 px-4.5 rounded-xl text-xs shadow-md shadow-[var(--color-imamu-brown)/20] transition active:scale-98"
-                        >
-                          <ExternalLink className="w-4 h-4 shrink-0" /> {btn.label}
-                        </a>
-                      );
-                    })}
+                  <div key={blockIdx} className="pt-2 my-6">
+                    <span className="text-xs font-bold text-slate-700 dark:text-zinc-300 block mb-3">🔗 روابط ومنصات الشرح المباشرة:</span>
+                    <div className="flex flex-wrap gap-2.5 justify-start" dir="rtl">
+                      {buttons.map((btn: any, btnIdx: number) => {
+                        if (!btn.label || !btn.url) return null;
+                        const isExternal = btn.url.startsWith('http');
+                        return (
+                          <a
+                            key={btnIdx}
+                            href={btn.url}
+                            target={isExternal ? '_blank' : undefined}
+                            rel={isExternal ? 'noopener noreferrer' : undefined}
+                            onClick={(e) => {
+                              if (!isExternal) {
+                                e.preventDefault();
+                                onNavigate?.(btn.url);
+                              }
+                            }}
+                            className="btn-rise inline-flex items-center gap-2 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] active:scale-95 text-white font-bold py-3 px-5 rounded-xl text-xs shadow-md shadow-[var(--color-imamu-brown)/20] transition duration-200 cursor-pointer"
+                          >
+                            <ExternalLink className="w-4 h-4 shrink-0" /> {btn.label}
+                          </a>
+                        );
+                      })}
+                    </div>
                   </div>
                 );
               }

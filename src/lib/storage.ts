@@ -73,6 +73,13 @@ export function getS3BucketName(category?: string, filename?: string, mimeType?:
     return process.env.S3_BUCKET_NEWS || 'imamu-news';
   }
 
+  // 6. Tutorials & How-To Guides (imamu-tutorials)
+  if (
+    cat === 'tutorial' || cat === 'tutorials' || cat === 'howto' || cat === 'how_to' || cat === 'tut'
+  ) {
+    return process.env.S3_BUCKET_TUTORIALS || 'imamu-tutorials';
+  }
+
   // Fallback bucket
   return process.env.S3_BUCKET_NAME || process.env.RUSTFS_BUCKET || 'imamu-uploads';
 }
@@ -84,6 +91,7 @@ export function getAllBucketNames(): string[] {
     process.env.S3_BUCKET_DALILAH || 'imamu-dalilah',
     process.env.S3_BUCKET_RESOURCES || 'imamu-resources',
     process.env.S3_BUCKET_NEWS || 'imamu-news',
+    process.env.S3_BUCKET_TUTORIALS || 'imamu-tutorials',
     process.env.S3_BUCKET_NAME || process.env.RUSTFS_BUCKET || 'imamu-uploads'
   ]));
 }
@@ -188,6 +196,7 @@ function resolveStorageKey(filename: string, category?: string): string {
   if (cat === 'resource' || cat === 'resources' || cat === 'course') return `resources/${file}`;
   if (cat === 'dalilah' || cat === 'guide') return `dalilah/${file}`;
   if (cat === 'news' || cat === 'article') return `news/${file}`;
+  if (cat === 'tutorial' || cat === 'tutorials' || cat === 'howto' || cat === 'how_to' || cat === 'tut') return `tutorials/${file}`;
   return file;
 }
 

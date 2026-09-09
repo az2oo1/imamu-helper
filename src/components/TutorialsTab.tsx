@@ -6,20 +6,20 @@ import {
   Plus, Trash2, Edit, ChevronUp, ChevronDown, 
   HelpCircle, X, ExternalLink, PlusCircle, ArrowRight,
   Sparkles, FileText, Image, Video, Link, ArrowLeft, Upload, CheckSquare,
-  Compass
+  Compass, AlertCircle, Info, Film
 } from 'lucide-react';
 import { getSectionColorClasses, SECTION_COLOR_PRESETS } from '../lib/section-colors';
 
 interface Section {
-  id: number;
+  id: any;
   title: string;
   icon: string;
   color: string;
 }
 
 interface Tutorial {
-  id: number;
-  sectionId: number;
+  id: any;
+  sectionId: any;
   title: string;
   description: string;
   text: string;
@@ -30,9 +30,24 @@ interface Tutorial {
   linkTitle?: string;
 }
 
+function matchSubjectIds(id1: any, id2: any): boolean {
+  if (id1 == null || id2 == null || id1 === '' || id2 === '') return false;
+  const s1 = String(id1).trim();
+  const s2 = String(id2).trim();
+  if (s1 === s2) return true;
+  const n1 = Number(s1);
+  const n2 = Number(s2);
+  if (!isNaN(n1) && !isNaN(n2)) {
+    return n1 === n2;
+  }
+  return false;
+}
+
 interface Block {
-  type: 'text' | 'steps' | 'list' | 'table' | 'media' | 'buttons';
+  type: 'text' | 'steps' | 'list' | 'table' | 'media' | 'buttons' | 'callout' | 'alert';
   content?: string;
+  title?: string;
+  variant?: 'info' | 'warning' | 'danger' | 'success';
   stepsItems?: string[];
   listItems?: string[];
   listType?: 'ordered' | 'unordered';
@@ -40,6 +55,9 @@ interface Block {
   tableRows?: string[][];
   mediaType?: 'image' | 'video';
   mediaUrl?: string;
+  mediaUrls?: string[];
+  images?: string[];
+  videoUrl?: string;
   buttons?: Array<{ label: string; url: string }>;
 }
 
@@ -69,7 +87,7 @@ export function TutorialsTab({
   // Tutorial form states
   const [tutTitle, setTutTitle] = useState('');
   const [tutDescription, setTutDescription] = useState('');
-  const [tutSectionId, setTutSectionId] = useState<number | ''>('');
+  const [tutSectionId, setTutSectionId] = useState<any>('');
   const [tutLinkUrl, setTutLinkUrl] = useState('');
   const [tutLinkTitle, setTutLinkTitle] = useState('');
   const [tutImageUrl, setTutImageUrl] = useState('');
@@ -184,7 +202,8 @@ export function TutorialsTab({
     setIsCreating(false);
     setTutTitle(tut.title);
     setTutDescription(tut.description);
-    setTutSectionId(tut.sectionId);
+    const matchedSec = sections.find(s => matchSubjectIds(s.id, tut.sectionId));
+    setTutSectionId(matchedSec ? matchedSec.id : (tut.sectionId || ''));
     setTutLinkUrl(tut.linkUrl || '');
     setTutLinkTitle(tut.linkTitle || '');
     setTutImageUrl(tut.imageUrl || '');
@@ -229,10 +248,11 @@ export function TutorialsTab({
   const addBlock = (type: Block['type']) => {
     let newBlock: Block;
     if (type === 'text') newBlock = { type: 'text', content: '' };
+    else if (type === 'callout' || type === 'alert') newBlock = { type: 'callout', title: '⚠️ تنبيه مهم:', variant: 'warning', content: '' };
     else if (type === 'steps') newBlock = { type: 'steps', stepsItems: [''] };
     else if (type === 'list') newBlock = { type: 'list', listItems: [''], listType: 'unordered' };
     else if (type === 'table') newBlock = { type: 'table', tableHeaders: ['العنوان ١', 'العنوان ٢'], tableRows: [['', '']] };
-    else if (type === 'media') newBlock = { type: 'media', mediaType: 'image', mediaUrl: '' };
+    else if (type === 'media') newBlock = { type: 'media', mediaType: 'image', mediaUrl: '', mediaUrls: [], videoUrl: '' };
     else newBlock = { type: 'buttons', buttons: [{ label: '', url: '' }] };
 
     setBlocks([...blocks, newBlock]);
@@ -274,16 +294,27 @@ export function TutorialsTab({
       }
     });
 
+    let primaryImageUrl = tutImageUrl.trim() || null;
+    let primaryVideoUrl: string | null = null;
+    blocks.forEach(b => {
+      if (b.type === 'media') {
+        const imgs = b.mediaUrls || (b.mediaUrl && b.mediaType === 'image' ? [b.mediaUrl] : []);
+        if (!primaryImageUrl && imgs.length > 0) primaryImageUrl = imgs[0];
+        if (!primaryVideoUrl && b.videoUrl) primaryVideoUrl = b.videoUrl;
+      }
+    });
+
+    const matchedSec = sections.find(s => matchSubjectIds(s.id, tutSectionId));
     const payload = {
-      sectionId: tutSectionId,
+      sectionId: matchedSec ? matchedSec.id : tutSectionId,
       title: tutTitle.trim(),
       description: tutDescription.trim(),
       text: JSON.stringify(blocks),
       steps: extractedSteps,
       linkUrl: tutLinkUrl.trim() || null,
       linkTitle: tutLinkTitle.trim() || null,
-      videoUrl: null,
-      imageUrl: tutImageUrl.trim() || null
+      videoUrl: primaryVideoUrl,
+      imageUrl: primaryImageUrl
     };
 
     try {
@@ -555,7 +586,7 @@ export function TutorialsTab({
             <div className="divide-y border rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
               {sections.map(sec => {
                 const colorStyle = getSectionColorClasses(sec.color);
-                const count = tutorials.filter(t => String(t.sectionId) === String(sec.id)).length;
+                const count = tutorials.filter(t => matchSubjectIds(t.sectionId, sec.id)).length;
                 return (
                   <div key={sec.id} className="p-4 flex items-center justify-between group hover:bg-[var(--bg-subtle)] transition">
                     <div className="flex items-center gap-3">
@@ -595,7 +626,7 @@ export function TutorialsTab({
             <h4 className="font-bold text-sm pr-1" style={{ color: 'var(--text-main)' }}>قائمة الشروحات المتوفرة ({tutorials.length})</h4>
             <div className="space-y-4">
               {sections.map(sec => {
-                const secTuts = tutorials.filter(t => String(t.sectionId) === String(sec.id));
+                const secTuts = tutorials.filter(t => matchSubjectIds(t.sectionId, sec.id));
                 if (secTuts.length === 0) return null;
 
                 return (
@@ -638,7 +669,7 @@ export function TutorialsTab({
 
               {/* Orphan / Uncategorized Tutorials */}
               {(() => {
-                const orphanTuts = tutorials.filter(t => !sections.some(sec => String(sec.id) === String(t.sectionId)));
+                const orphanTuts = tutorials.filter(t => !sections.some(sec => matchSubjectIds(sec.id, t.sectionId)));
                 if (orphanTuts.length === 0) return null;
 
                 return (
@@ -785,8 +816,8 @@ export function TutorialsTab({
               <div className="flex flex-col gap-1.5">
                 <label className="text-[11px] font-bold" style={{ color: 'var(--text-muted)' }}>التصنيف / القسم:</label>
                 <select
-                  value={tutSectionId}
-                  onChange={e => setTutSectionId(Number(e.target.value))}
+                  value={sections.find(s => matchSubjectIds(s.id, tutSectionId))?.id || tutSectionId}
+                  onChange={e => setTutSectionId(e.target.value)}
                   className="rounded-xl py-2 px-3 text-xs font-semibold"
                 >
                   <option value="" disabled>اختر التصنيف المناسب</option>
@@ -795,61 +826,6 @@ export function TutorialsTab({
                   ))}
                 </select>
               </div>
-            </div>
-
-            {/* External Links Info */}
-            <div className="border rounded-2xl p-5 space-y-4 shadow-sm" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-              <h4 className="font-bold text-xs border-b pb-2 flex items-center gap-1.5" style={{ color: 'var(--text-main)', borderColor: 'var(--border-color)' }}>
-                <Link className="w-4 h-4 text-[var(--color-imamu-accent)]" />
-                زر رابط خارجي اختياري (Call to Action)
-              </h4>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-bold" style={{ color: 'var(--text-muted)' }}>رابط التوجيه المباشر:</label>
-                <input
-                  type="text"
-                  placeholder="https://selfservice.imamu.edu..."
-                  value={tutLinkUrl}
-                  onChange={e => setTutLinkUrl(e.target.value)}
-                  className="rounded-xl py-2 px-3 text-xs text-left"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-bold" style={{ color: 'var(--text-muted)' }}>عنوان الزر:</label>
-                <input
-                  type="text"
-                  placeholder="مثال: الانتقال للخدمة الذاتية 🔗"
-                  value={tutLinkTitle}
-                  onChange={e => setTutLinkTitle(e.target.value)}
-                  className="rounded-xl py-2 px-3 text-xs"
-                />
-              </div>
-            </div>
-
-            {/* Infographic / Main Image Info */}
-            <div className="border rounded-2xl p-5 space-y-4 shadow-sm" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-              <h4 className="font-bold text-xs border-b pb-2 flex items-center gap-1.5" style={{ color: 'var(--text-main)', borderColor: 'var(--border-color)' }}>
-                <Image className="w-4 h-4 text-[var(--color-imamu-accent)]" />
-                صورة الإنفوجرافيك أو الشرح (Image URL)
-              </h4>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-bold" style={{ color: 'var(--text-muted)' }}>رابط الصورة المباشر:</label>
-                <input
-                  type="text"
-                  placeholder="https://cdn4.telesco.pe/... أو رابط مباشر للصورة"
-                  value={tutImageUrl}
-                  onChange={e => setTutImageUrl(e.target.value)}
-                  className="rounded-xl py-2 px-3 text-xs text-left"
-                />
-              </div>
-
-              {tutImageUrl && (
-                <div className="mt-2 rounded-xl overflow-hidden border p-1 bg-slate-50 dark:bg-zinc-900 text-center" style={{ borderColor: 'var(--border-color)' }}>
-                  <img src={tutImageUrl} alt="معاينة" className="max-h-32 object-contain mx-auto rounded-lg" />
-                </div>
-              )}
             </div>
           </div>
 
@@ -866,6 +842,14 @@ export function TutorialsTab({
                   style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
                 >
                   <FileText className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" /> نص توضيحي
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addBlock('callout')}
+                  className="px-3 py-1.5 border hover:bg-[var(--bg-subtle)] text-xs rounded-xl transition flex items-center gap-1.5 font-bold shadow-xs"
+                  style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
+                >
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-500" /> تنبيه / إرشاد
                 </button>
                 <button
                   type="button"
@@ -897,7 +881,7 @@ export function TutorialsTab({
                   className="px-3 py-1.5 border hover:bg-[var(--bg-subtle)] text-xs rounded-xl transition flex items-center gap-1.5 font-bold shadow-xs"
                   style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
                 >
-                  <Image className="w-3.5 h-3.5 text-rose-500" /> صورة / فيديو
+                  <Image className="w-3.5 h-3.5 text-rose-500" /> وسائط (صور وفيديو)
                 </button>
                 <button
                   type="button"
@@ -905,7 +889,7 @@ export function TutorialsTab({
                   className="px-3 py-1.5 border hover:bg-[var(--bg-subtle)] text-xs rounded-xl transition flex items-center gap-1.5 font-bold shadow-xs"
                   style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
                 >
-                  <ExternalLink className="w-3.5 h-3.5 text-indigo-500" /> أزرار روابط
+                  <ExternalLink className="w-3.5 h-3.5 text-indigo-500" /> أزرار توجيه
                 </button>
               </div>
             </div>
@@ -924,10 +908,11 @@ export function TutorialsTab({
                       <span className="font-mono text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>#{blockIdx + 1}</span>
                       <span className="text-xs font-bold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
                         {block.type === 'text' && <><FileText className="w-4 h-4 text-[var(--color-imamu-accent)]" /> نص توضيحي</>}
+                        {(block.type === 'callout' || block.type === 'alert') && <><AlertCircle className="w-4 h-4 text-amber-500" /> تنبيه / صندوق إرشادي</>}
                         {block.type === 'steps' && <><CheckSquare className="w-4 h-4 text-[var(--color-imamu-accent)]" /> خطوات الشرح التوضيحي</>}
                         {block.type === 'list' && <><Compass className="w-4 h-4 text-purple-500" /> عناصر القائمة النقطية</>}
                         {block.type === 'table' && <><PlusCircle className="w-4 h-4 text-emerald-500" /> جدول بيانات</>}
-                        {block.type === 'media' && <><Image className="w-4 h-4 text-rose-500" /> وسائط (صورة أو فيديو)</>}
+                        {block.type === 'media' && <><Image className="w-4 h-4 text-rose-500" /> وسائط (صور وفيديو)</>}
                         {block.type === 'buttons' && <><ExternalLink className="w-4 h-4 text-indigo-500" /> أزرار توجيه للطلاب</>}
                       </span>
                     </div>
@@ -975,6 +960,52 @@ export function TutorialsTab({
                         value={block.content || ''}
                         onChange={(e) => updateBlock(blockIdx, { content: e.target.value })}
                       />
+                    )}
+
+                    {/* CALLOUT / ALERT BLOCK */}
+                    {(block.type === 'callout' || block.type === 'alert') && (
+                      <div className="space-y-3 text-right">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="sm:col-span-2 flex flex-col gap-1.5">
+                            <label className="text-[11px] font-bold" style={{ color: 'var(--text-muted)' }}>عنوان التنبيه:</label>
+                            <input
+                              type="text"
+                              className="text-xs rounded-xl p-2.5 px-3 text-right font-bold"
+                              value={block.title || ''}
+                              placeholder="مثال: ⚠️ شروط قبول الآيبان البنكي:"
+                              onChange={(e) => updateBlock(blockIdx, { title: e.target.value })}
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[11px] font-bold" style={{ color: 'var(--text-muted)' }}>نوع التنبيه:</label>
+                            <select
+                              className="text-xs rounded-xl p-2.5 px-3 font-semibold"
+                              value={block.variant || 'warning'}
+                              onChange={(e) => updateBlock(blockIdx, { variant: e.target.value as any })}
+                            >
+                              <option value="warning">⚠️ تنبيه (Warning - أصفر)</option>
+                              <option value="info">💡 إرشادي (Info - أزرق)</option>
+                              <option value="danger">🚨 تحذير هام (Danger - أحمر)</option>
+                              <option value="success">✅ نجاح / معتمد (Success - أخضر)</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] text-slate-400">اكتب كل نقطة أو شرط في سطر مستقل لتبدو مرتبة ومنفصلة</span>
+                            <label className="text-[11px] font-bold" style={{ color: 'var(--text-muted)' }}>محتوى وأسطر التنبيه:</label>
+                          </div>
+                          <textarea
+                            rows={4}
+                            className="text-xs rounded-xl p-3 text-right font-normal resize-y leading-relaxed"
+                            value={block.content || ''}
+                            placeholder={"1. يجب أن يكون الحساب البنكي باسم الطالب/الطالبة حصراً.\n2. التأكد من أن الحساب نشط وغير مجمد لدى البنك.\n3. يبدأ الآيبان السعودي دائماً بالرمز SA متبوعاً بـ 22 رقماً."}
+                            onChange={(e) => updateBlock(blockIdx, { content: e.target.value })}
+                          />
+                        </div>
+                      </div>
                     )}
 
                     {/* STEPS BLOCK */}
@@ -1197,83 +1228,238 @@ export function TutorialsTab({
                     )}
 
                     {/* MEDIA BLOCK */}
-                    {block.type === 'media' && (
-                      <div className="space-y-3 text-right">
-                        <div className="flex gap-4 items-center">
-                          <label className="text-xs font-bold" style={{ color: 'var(--text-muted)' }}>نوع الوسائط:</label>
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              className={`px-3 py-1.5 text-xs rounded-xl font-bold border transition ${block.mediaType === 'image' ? 'bg-[var(--color-imamu-brown)] border-[var(--color-imamu-brown)] text-white' : 'hover:bg-[var(--bg-subtle)]'}`}
-                              style={block.mediaType !== 'image' ? { background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' } : {}}
-                              onClick={() => updateBlock(blockIdx, { mediaType: 'image' })}
-                            >
-                              صورة توضيحية
-                            </button>
-                            <button
-                              type="button"
-                              className={`px-3 py-1.5 text-xs rounded-xl font-bold border transition ${block.mediaType === 'video' ? 'bg-[var(--color-imamu-brown)] border-[var(--color-imamu-brown)] text-white' : 'hover:bg-[var(--bg-subtle)]'}`}
-                              style={block.mediaType !== 'video' ? { background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' } : {}}
-                              onClick={() => updateBlock(blockIdx, { mediaType: 'video' })}
-                            >
-                              مقطع مرئي (فيديو)
-                            </button>
+                    {block.type === 'media' && (() => {
+                      const currentImages: string[] = [
+                        ...(block.mediaUrls || []),
+                        ...(block.images || []),
+                        ...(block.mediaType === 'image' && block.mediaUrl ? [block.mediaUrl] : [])
+                      ].filter(Boolean);
+                      const uniqueImages = Array.from(new Set(currentImages));
+                      const currentVideo = block.videoUrl || (block.mediaType === 'video' ? block.mediaUrl : '');
+
+                      return (
+                        <div className="space-y-5 text-right">
+                          {/* 1. Images Gallery Section */}
+                          <div className="border rounded-2xl p-4 space-y-3" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
+                                <Image className="w-4 h-4 text-rose-500" />
+                                صور الشرح والإنفوجرافيك ({uniqueImages.length}/10 صور)
+                              </span>
+                              <span className="text-[10px] text-slate-400">يدعم حتى 10 صور بدقة عالية</span>
+                            </div>
+
+                            {/* Upload Button */}
+                            <div className="flex flex-wrap items-center gap-3">
+                              <label className={`cursor-pointer border font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition hover:bg-[var(--bg-card)] shadow-xs ${uploadingBlockIdx === blockIdx ? 'opacity-50 pointer-events-none' : ''}`} style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>
+                                <Upload className="w-4 h-4 text-[var(--color-imamu-accent)]" />
+                                {uploadingBlockIdx === blockIdx ? "جاري رفع الصور إلى التخزين السحابي..." : "اختر صوراً لرفعها (يمكن اختيار عدة صور)"}
+                                <input
+                                  type="file"
+                                  className="hidden"
+                                  multiple
+                                  accept="image/*"
+                                  disabled={uploadingBlockIdx !== null}
+                                  onChange={async (e) => {
+                                    const files = Array.from(e.target.files || []);
+                                    if (files.length === 0) return;
+                                    setUploadingBlockIdx(blockIdx);
+
+                                    try {
+                                      const token = await user?.getIdToken();
+                                      const uploadedUrls: string[] = [];
+
+                                      for (const file of files) {
+                                        const formData = new FormData();
+                                        formData.append('files', file);
+                                        formData.append('category', 'tutorials');
+
+                                        const res = await fetch('/api/admin/upload', {
+                                          method: 'POST',
+                                          headers: { Authorization: `Bearer ${token}` },
+                                          body: formData
+                                        }).then(r => r.json());
+
+                                        if (res.success && res.urls && res.urls.length > 0) {
+                                          uploadedUrls.push(...res.urls);
+                                        } else if (res.url) {
+                                          uploadedUrls.push(res.url);
+                                        } else if (res.files && res.files[0]?.url) {
+                                          uploadedUrls.push(res.files[0].url);
+                                        }
+                                      }
+
+                                      if (uploadedUrls.length > 0) {
+                                        const combined = Array.from(new Set([...uniqueImages, ...uploadedUrls])).slice(0, 10);
+                                        updateBlock(blockIdx, { mediaUrls: combined, mediaType: 'image' });
+                                      } else {
+                                        alert("فشل رفع الصور. يرجى التأكد من الحجم والصيغة.");
+                                      }
+                                    } catch (err) {
+                                      console.error(err);
+                                      alert("خطأ أثناء الاتصال بالخادم لرفع الصور.");
+                                    } finally {
+                                      setUploadingBlockIdx(null);
+                                      e.target.value = '';
+                                    }
+                                  }}
+                                />
+                              </label>
+                            </div>
+
+                            {/* Images Grid Preview */}
+                            {uniqueImages.length > 0 && (
+                              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3 pt-2">
+                                {uniqueImages.map((imgUrl, imgIdx) => (
+                                  <div 
+                                    key={imgIdx} 
+                                    className="relative group border rounded-xl overflow-hidden aspect-square bg-white dark:bg-zinc-900 p-1 flex items-center justify-center shadow-xs"
+                                    style={{ borderColor: 'var(--border-color)' }}
+                                  >
+                                    <img src={imgUrl} alt={`صورة ${imgIdx + 1}`} className="w-full h-full object-contain rounded-lg" />
+                                    
+                                    {/* Actions overlay */}
+                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1.5 p-1">
+                                      {imgIdx > 0 && (
+                                        <button
+                                          type="button"
+                                          title="تقديم الصورة"
+                                          className="p-1 rounded bg-white/20 hover:bg-white/40 text-white text-xs"
+                                          onClick={() => {
+                                            const arr = [...uniqueImages];
+                                            const tmp = arr[imgIdx];
+                                            arr[imgIdx] = arr[imgIdx - 1];
+                                            arr[imgIdx - 1] = tmp;
+                                            updateBlock(blockIdx, { mediaUrls: arr });
+                                          }}
+                                        >
+                                          ▶
+                                        </button>
+                                      )}
+                                      <button
+                                        type="button"
+                                        title="حذف الصورة"
+                                        className="p-1.5 rounded-full bg-red-500 hover:bg-red-600 text-white transition shadow-sm"
+                                        onClick={() => {
+                                          const filtered = uniqueImages.filter((_, idx) => idx !== imgIdx);
+                                          updateBlock(blockIdx, { mediaUrls: filtered });
+                                        }}
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                      {imgIdx < uniqueImages.length - 1 && (
+                                        <button
+                                          type="button"
+                                          title="تأخير الصورة"
+                                          className="p-1 rounded bg-white/20 hover:bg-white/40 text-white text-xs"
+                                          onClick={() => {
+                                            const arr = [...uniqueImages];
+                                            const tmp = arr[imgIdx];
+                                            arr[imgIdx] = arr[imgIdx + 1];
+                                            arr[imgIdx + 1] = tmp;
+                                            updateBlock(blockIdx, { mediaUrls: arr });
+                                          }}
+                                        >
+                                          ◀
+                                        </button>
+                                      )}
+                                    </div>
+                                    <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[9px] font-mono px-1 rounded">
+                                      #{imgIdx + 1}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 2. Video Section */}
+                          <div className="border rounded-2xl p-4 space-y-3" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
+                                <Film className="w-4 h-4 text-purple-500" />
+                                مقطع فيديو للشرح (اختياري - يدعم فيديو واحد)
+                              </span>
+                              {currentVideo && (
+                                <button
+                                  type="button"
+                                  onClick={() => updateBlock(blockIdx, { videoUrl: '', mediaUrl: '' })}
+                                  className="text-[11px] text-red-500 hover:underline flex items-center gap-1"
+                                >
+                                  <X className="w-3.5 h-3.5" /> حذف الفيديو
+                                </button>
+                              )}
+                            </div>
+
+                            {currentVideo ? (
+                              <div className="rounded-xl border p-2 bg-white dark:bg-zinc-900 flex items-center justify-between gap-3 text-xs" style={{ borderColor: 'var(--border-color)' }}>
+                                <div className="flex items-center gap-2 truncate">
+                                  <Video className="w-4 h-4 text-purple-500 shrink-0" />
+                                  <span className="truncate font-mono text-[11px] dir-ltr text-left" style={{ color: 'var(--text-main)' }}>{currentVideo}</span>
+                                </div>
+                                <span className="text-emerald-600 dark:text-emerald-400 font-bold shrink-0 text-[10px]">جاهز للعرض ✓</span>
+                              </div>
+                            ) : (
+                              <div className="space-y-3">
+                                <div className="flex flex-wrap items-center gap-3">
+                                  <label className="cursor-pointer border font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition hover:bg-[var(--bg-card)] shadow-xs" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>
+                                    <Upload className="w-4 h-4 text-purple-500" />
+                                    رفع ملف فيديو مباشر (MP4)
+                                    <input
+                                      type="file"
+                                      className="hidden"
+                                      accept="video/mp4,video/*"
+                                      disabled={uploadingBlockIdx !== null}
+                                      onChange={async (e) => {
+                                        const file = e.target.files?.[0];
+                                        if (!file) return;
+                                        setUploadingBlockIdx(blockIdx);
+                                        const formData = new FormData();
+                                        formData.append('files', file);
+                                        formData.append('category', 'tutorials');
+
+                                        try {
+                                          const token = await user?.getIdToken();
+                                          const res = await fetch('/api/admin/upload', {
+                                            method: 'POST',
+                                            headers: { Authorization: `Bearer ${token}` },
+                                            body: formData
+                                          }).then(r => r.json());
+
+                                          const vidUrl = res.urls?.[0] || res.url || res.files?.[0]?.url;
+                                          if (vidUrl) {
+                                            updateBlock(blockIdx, { videoUrl: vidUrl });
+                                          } else {
+                                            alert("فشل رفع الفيديو. الرجاء التأكد من حجم الملف.");
+                                          }
+                                        } catch (err) {
+                                          console.error(err);
+                                          alert("خطأ أثناء رفع ملف الفيديو.");
+                                        } finally {
+                                          setUploadingBlockIdx(null);
+                                          e.target.value = '';
+                                        }
+                                      }}
+                                    />
+                                  </label>
+                                </div>
+
+                                <div className="flex flex-col gap-1.5">
+                                  <label className="text-[10px] font-bold" style={{ color: 'var(--text-muted)' }}>أو رابط فيديو خارجي (YouTube / Embed URL):</label>
+                                  <input
+                                    type="text"
+                                    className="text-xs rounded-xl py-2 px-3 text-left outline-none"
+                                    value={currentVideo}
+                                    placeholder="https://www.youtube.com/watch?v=... أو رابط MP4 مباشر"
+                                    onChange={(e) => updateBlock(blockIdx, { videoUrl: e.target.value })}
+                                  />
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
-
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-[11px] font-bold" style={{ color: 'var(--text-muted)' }}>رابط الملف أو رابط التضمين المباشر:</label>
-                          <input
-                            type="text"
-                            className="text-xs rounded-xl py-2 px-3 text-left outline-none"
-                            value={block.mediaUrl || ''}
-                            placeholder={block.mediaType === 'video' ? "أدخل رابط فيديو YouTube Embed أو رابط MP4 مباشر..." : "أدخل رابط الصورة التوضيحية المباشر..."}
-                            onChange={(e) => updateBlock(blockIdx, { mediaUrl: e.target.value })}
-                          />
-                        </div>
-
-                        <div className="flex items-center gap-3 pt-1">
-                          <label className="cursor-pointer border font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 transition hover:bg-[var(--bg-subtle)]" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>
-                            <Upload className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
-                            {uploadingBlockIdx === blockIdx ? "جاري الرفع..." : "اختر ملفاً لرفعه للخادم"}
-                            <input
-                              type="file"
-                              className="hidden"
-                              accept={block.mediaType === 'video' ? 'video/*' : 'image/*'}
-                              disabled={uploadingBlockIdx !== null}
-                              onChange={async (e) => {
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-                                setUploadingBlockIdx(blockIdx);
-                                const formData = new FormData();
-                                formData.append('files', file);
-
-                                try {
-                                  const token = await user?.getIdToken();
-                                  const res = await fetch('/api/admin/upload', {
-                                    method: 'POST',
-                                    headers: { Authorization: `Bearer ${token}` },
-                                    body: formData
-                                  }).then(r => r.json());
-
-                                  if (res.success && res.urls && res.urls.length > 0) {
-                                    updateBlock(blockIdx, { mediaUrl: res.urls[0] });
-                                  } else {
-                                    alert("فشل رفع الملف. الرجاء التأكد من الحجم (الحد الأقصى 50 ميجا).");
-                                  }
-                                } catch (err) {
-                                  console.error(err);
-                                  alert("خطأ أثناء الاتصال بالخادم لرفع الملف.");
-                                } finally {
-                                  setUploadingBlockIdx(null);
-                                }
-                              }}
-                            />
-                          </label>
-                          <span className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>يدعم الصيغ القياسية للصور والفيديوهات</span>
-                        </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     {/* BUTTONS BLOCK */}
                     {block.type === 'buttons' && (
@@ -1336,6 +1522,23 @@ export function TutorialsTab({
                         >
                           + إضافة زر جديد
                         </button>
+
+                        {/* Live Button Feedback Preview */}
+                        {(block.buttons || []).filter(b => b.label && b.url).length > 0 && (
+                          <div className="pt-3 border-t mt-3" style={{ borderColor: 'var(--border-color)' }}>
+                            <span className="text-[10px] font-bold block mb-2" style={{ color: 'var(--text-muted)' }}>معاينة تفاعل واستجابة الأزرار للطلاب:</span>
+                            <div className="flex flex-wrap gap-2.5 justify-start">
+                              {block.buttons?.filter(b => b.label && b.url).map((btn, pIdx) => (
+                                <span
+                                  key={pIdx}
+                                  className="btn-rise inline-flex items-center gap-2 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] active:scale-95 text-white font-bold py-2.5 px-4 rounded-xl text-xs shadow-md shadow-[var(--color-imamu-brown)/20] transition duration-200 cursor-pointer"
+                                >
+                                  <ExternalLink className="w-3.5 h-3.5 shrink-0" /> {btn.label}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
