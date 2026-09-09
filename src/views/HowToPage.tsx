@@ -352,8 +352,8 @@ export function HowToPage() {
               
               <div className="h-px bg-slate-100 dark:bg-zinc-800 w-full mb-6" />
 
-              {/* Main Tutorial Infographic / Image if available */}
-              {selectedTutorial.imageUrl && (
+              {/* Main Tutorial Infographic / Image if available (Only for legacy non-block tutorials) */}
+              {!selectedTutorial.text.trim().startsWith('[') && selectedTutorial.imageUrl && (
                 <div className="mb-8 rounded-2xl overflow-hidden border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 p-2 sm:p-3 text-center">
                   <img 
                     src={selectedTutorial.imageUrl} 
