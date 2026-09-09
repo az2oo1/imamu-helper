@@ -72,6 +72,7 @@ export function TutorialsTab({
   const [tutSectionId, setTutSectionId] = useState<number | ''>('');
   const [tutLinkUrl, setTutLinkUrl] = useState('');
   const [tutLinkTitle, setTutLinkTitle] = useState('');
+  const [tutImageUrl, setTutImageUrl] = useState('');
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [activeSubTab, setActiveSubTab] = useState<'edit' | 'preview'>('edit');
   const [uploadingBlockIdx, setUploadingBlockIdx] = useState<number | null>(null);
@@ -186,6 +187,7 @@ export function TutorialsTab({
     setTutSectionId(tut.sectionId);
     setTutLinkUrl(tut.linkUrl || '');
     setTutLinkTitle(tut.linkTitle || '');
+    setTutImageUrl(tut.imageUrl || '');
 
     // Parse blocks from text column
     try {
@@ -218,6 +220,7 @@ export function TutorialsTab({
     setTutSectionId(sections[0]?.id || '');
     setTutLinkUrl('');
     setTutLinkTitle('');
+    setTutImageUrl('');
     setBlocks([{ type: 'text', content: '' }]);
     setActiveSubTab('edit');
   };
@@ -280,7 +283,7 @@ export function TutorialsTab({
       linkUrl: tutLinkUrl.trim() || null,
       linkTitle: tutLinkTitle.trim() || null,
       videoUrl: null,
-      imageUrl: null
+      imageUrl: tutImageUrl.trim() || null
     };
 
     try {
@@ -822,6 +825,31 @@ export function TutorialsTab({
                   className="rounded-xl py-2 px-3 text-xs"
                 />
               </div>
+            </div>
+
+            {/* Infographic / Main Image Info */}
+            <div className="border rounded-2xl p-5 space-y-4 shadow-sm" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+              <h4 className="font-bold text-xs border-b pb-2 flex items-center gap-1.5" style={{ color: 'var(--text-main)', borderColor: 'var(--border-color)' }}>
+                <Image className="w-4 h-4 text-[var(--color-imamu-accent)]" />
+                صورة الإنفوجرافيك أو الشرح (Image URL)
+              </h4>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-bold" style={{ color: 'var(--text-muted)' }}>رابط الصورة المباشر:</label>
+                <input
+                  type="text"
+                  placeholder="https://cdn4.telesco.pe/... أو رابط مباشر للصورة"
+                  value={tutImageUrl}
+                  onChange={e => setTutImageUrl(e.target.value)}
+                  className="rounded-xl py-2 px-3 text-xs text-left"
+                />
+              </div>
+
+              {tutImageUrl && (
+                <div className="mt-2 rounded-xl overflow-hidden border p-1 bg-slate-50 dark:bg-zinc-900 text-center" style={{ borderColor: 'var(--border-color)' }}>
+                  <img src={tutImageUrl} alt="معاينة" className="max-h-32 object-contain mx-auto rounded-lg" />
+                </div>
+              )}
             </div>
           </div>
 

@@ -8,7 +8,7 @@ import * as Icons from 'lucide-react';
 import { 
   HelpCircle, GraduationCap, Search, CheckSquare, 
   ArrowLeft, Video, ThumbsUp, ThumbsDown, MessageSquare, 
-  CheckCircle, X, AlertCircle, ExternalLink, Compass
+  CheckCircle, X, AlertCircle, ExternalLink, Compass, Info
 } from 'lucide-react';
 import { InView, SpotlightCard } from '../components/ui';
 import { getSectionColorClasses } from '../lib/section-colors';
@@ -73,6 +73,7 @@ export function HowToPage() {
   const [customAlert, setCustomAlert] = useState<{ type: 'success' | 'error' | 'info'; title: string; message: string } | null>(null);
   const [negativeFeedbackModal, setNegativeFeedbackModal] = useState<Tutorial | null>(null);
   const [negativeFeedbackComment, setNegativeFeedbackComment] = useState('');
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
   const loadFeedback = async (tutId: number) => {
     try {
@@ -283,19 +284,49 @@ export function HowToPage() {
               
               <div className="h-px bg-slate-100 dark:bg-zinc-800 w-full mb-6" />
 
+              {/* Main Tutorial Infographic / Image if available */}
+              {selectedTutorial.imageUrl && (
+                <div className="mb-8 rounded-2xl overflow-hidden border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 p-2 sm:p-3 text-center">
+                  <img 
+                    src={selectedTutorial.imageUrl} 
+                    alt={selectedTutorial.title} 
+                    className="w-full h-auto max-h-[520px] object-contain rounded-xl shadow-xs cursor-pointer hover:opacity-95 transition mx-auto"
+                    onClick={() => setZoomedImage(selectedTutorial.imageUrl!)}
+                  />
+                  <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-2 font-medium flex items-center justify-center gap-1.5">
+                    <Search className="w-3.5 h-3.5" /> انقر على الصورة لتكبيرها وقراءتها بدقة عالية
+                  </p>
+                </div>
+              )}
+
               <div className="mb-6 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 leading-relaxed font-normal">
-                {renderTutorialContent(selectedTutorial.text)}
+                {renderTutorialContent(selectedTutorial.text, setZoomedImage)}
               </div>
 
               {/* Detailed Steps */}
-              {!selectedTutorial.text.trim().startsWith('[') && selectedTutorial.steps && selectedTutorial.steps.filter(s => s.trim().length > 0).length > 0 && (
+              {!selectedTutorial.text.trim().startsWith('[') && selectedTutorial.steps && selectedTutorial.steps.filter(s => s && (typeof s === 'string' ? s.trim().length > 0 : true)).length > 0 && (
                 <>
                   <h2 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
                     <CheckSquare className="w-4 h-4 text-[var(--color-imamu-accent)]" /> خطوات وتفاصيل الشرح:
                   </h2>
                   <div className="space-y-6 mb-8 text-right" dir="rtl">
-                    {selectedTutorial.steps.filter(s => s.trim().length > 0).map((step, index, arr) => {
+                    {selectedTutorial.steps.filter(s => s && (typeof s === 'string' ? s.trim().length > 0 : true)).map((rawStep: any, index, arr) => {
                       const isLast = index === arr.length - 1;
+                      let stepText = '';
+                      let stepImg: string | null = null;
+                      if (typeof rawStep === 'string') {
+                        if (rawStep.includes('|||')) {
+                          const parts = rawStep.split('|||');
+                          stepText = parts[0].trim();
+                          stepImg = parts[1].trim();
+                        } else {
+                          stepText = rawStep;
+                        }
+                      } else if (rawStep && typeof rawStep === 'object') {
+                        stepText = rawStep.text || '';
+                        stepImg = rawStep.image || rawStep.imageUrl || null;
+                      }
+
                       return (
                         <div key={index} className="relative flex items-start gap-4">
                           <div className="relative flex flex-col items-center shrink-0 w-7">
@@ -307,7 +338,18 @@ export function HowToPage() {
                             )}
                           </div>
                           <div className="flex-1 pt-0.5 min-w-0">
-                            <p className="text-xs sm:text-sm text-slate-800 dark:text-zinc-200 font-normal leading-relaxed">{step}</p>
+                            <p className="text-xs sm:text-sm text-slate-800 dark:text-zinc-200 font-normal leading-relaxed">{stepText}</p>
+                            {stepImg && (
+                              <div className="mt-3 rounded-xl overflow-hidden border border-slate-200 dark:border-zinc-800 max-w-md bg-slate-50 dark:bg-zinc-950 p-1.5 shadow-xs">
+                                <img 
+                                  src={stepImg} 
+                                  alt={`خطوة ${index + 1}`} 
+                                  className="w-full h-auto max-h-[260px] object-contain rounded-lg cursor-pointer hover:opacity-90 transition mx-auto"
+                                  onClick={() => setZoomedImage(stepImg)}
+                                />
+                                <span className="text-[10px] text-slate-400 dark:text-zinc-500 block text-center mt-1">انقر للتكبير 🔍</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
@@ -746,13 +788,84 @@ export function HowToPage() {
             </motion.div>
           </div>
         )}
+
+        {/* Zoomed Image Lightbox */}
+        {zoomedImage && (
+          <div 
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-zoom-out"
+            onClick={() => setZoomedImage(null)}
+          >
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.92 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.92 }}
+              className="relative max-w-4xl max-h-[90vh] w-full flex flex-col items-center justify-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button 
+                onClick={() => setZoomedImage(null)}
+                className="absolute -top-12 left-0 sm:left-auto sm:-right-2 bg-white/20 hover:bg-white/30 text-white rounded-full p-2 transition backdrop-blur-xs"
+                title="إغلاق"
+              >
+                <X className="w-6 h-6" />
+              </button>
+              <img 
+                src={zoomedImage} 
+                alt="تكبير الصورة" 
+                className="max-h-[85vh] max-w-full object-contain rounded-2xl shadow-2xl bg-white dark:bg-zinc-900 p-1"
+              />
+            </motion.div>
+          </div>
+        )}
       </AnimatePresence>
 
     </div>
   );
 }
 
-function renderTutorialContent(text: string) {
+function renderFormattedInline(str: string): React.ReactNode {
+  if (!str) return null;
+  const regex = /\[(.*?)\]\((https?:\/\/[^\s)]+)\)|\*\*(.*?)\*\*/g;
+  const parts: React.ReactNode[] = [];
+  let lastIdx = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(str)) !== null) {
+    if (match.index > lastIdx) {
+      parts.push(str.substring(lastIdx, match.index));
+    }
+    if (match[1] && match[2]) {
+      parts.push(
+        <a
+          key={`link-${match.index}`}
+          href={match[2]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[var(--color-imamu-brown)] dark:text-[var(--color-imamu-accent)] font-semibold underline underline-offset-4 hover:opacity-80 inline-flex items-center gap-1 mx-0.5"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {match[1]}
+          <ExternalLink className="w-3 h-3 inline-block shrink-0" />
+        </a>
+      );
+    } else if (match[3]) {
+      parts.push(
+        <strong key={`bold-${match.index}`} className="font-bold text-slate-900 dark:text-white">
+          {match[3]}
+        </strong>
+      );
+    }
+    lastIdx = regex.lastIndex;
+  }
+
+  if (lastIdx < str.length) {
+    parts.push(str.substring(lastIdx));
+  }
+
+  return parts.length > 0 ? parts : str;
+}
+
+function renderTutorialContent(text: string, onImageClick?: (url: string) => void) {
   if (!text) return null;
 
   if (text.trim().startsWith('[')) {
@@ -760,49 +873,98 @@ function renderTutorialContent(text: string) {
       const blocks = JSON.parse(text);
       if (Array.isArray(blocks)) {
         return (
-          <div className="space-y-5 text-right" dir="rtl">
+          <div className="space-y-6 text-right" dir="rtl">
             {blocks.map((block: any, blockIdx: number) => {
               if (block.type === 'text') {
                 return (
-                  <p key={blockIdx} className="text-slate-800 dark:text-zinc-200 text-xs sm:text-sm leading-relaxed mb-3 font-normal whitespace-pre-line">
-                    {block.content}
+                  <p key={blockIdx} className="text-slate-800 dark:text-zinc-200 text-xs sm:text-sm leading-relaxed font-normal whitespace-pre-line">
+                    {renderFormattedInline(block.content || block.text || '')}
                   </p>
                 );
               }
+
+              if (block.type === 'callout' || block.type === 'alert') {
+                const variant = block.variant || 'info';
+                const isWarning = variant === 'warning';
+                const isDanger = variant === 'danger' || variant === 'error';
+                const isSuccess = variant === 'success';
+
+                return (
+                  <div 
+                    key={blockIdx} 
+                    className={`p-4 rounded-xl border flex items-start gap-3 my-4 ${
+                      isWarning ? 'bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-200' :
+                      isDanger ? 'bg-rose-500/10 border-rose-500/30 text-rose-900 dark:text-rose-200' :
+                      isSuccess ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-900 dark:text-emerald-200' :
+                      'bg-blue-500/10 border-blue-500/30 text-blue-900 dark:text-blue-200'
+                    }`}
+                  >
+                    {isDanger || isWarning ? (
+                      <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                    ) : (
+                      <Info className="w-5 h-5 shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
+                    )}
+                    <div className="text-xs sm:text-sm leading-relaxed font-normal">
+                      {block.title && <h4 className="font-bold mb-1 text-slate-900 dark:text-white">{block.title}</h4>}
+                      <div>{renderFormattedInline(block.content || block.text || '')}</div>
+                    </div>
+                  </div>
+                );
+              }
+
+              if (block.type === 'image') {
+                const imgUrl = block.url || block.imageUrl;
+                if (!imgUrl) return null;
+                return (
+                  <div key={blockIdx} className="my-6 rounded-2xl overflow-hidden border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 p-2 text-center max-w-2xl mx-auto shadow-xs">
+                    <img 
+                      src={imgUrl} 
+                      alt={block.caption || 'صورة توضيحية'} 
+                      className="w-full h-auto max-h-[500px] object-contain rounded-xl cursor-pointer hover:opacity-95 transition mx-auto"
+                      onClick={() => onImageClick?.(imgUrl)}
+                    />
+                    {block.caption && (
+                      <p className="text-xs text-slate-500 dark:text-zinc-400 mt-2 font-medium">{block.caption}</p>
+                    )}
+                  </div>
+                );
+              }
+
               if (block.type === 'list') {
                 const items = block.listItems || [];
                 if (block.listType === 'ordered') {
                   return (
-                    <ol key={blockIdx} className="list-decimal list-inside space-y-1.5 my-3 pr-2 text-slate-800 dark:text-zinc-200 text-xs sm:text-sm">
-                      {items.map((it: string, idx: number) => <li key={idx}>{it}</li>)}
+                    <ol key={blockIdx} className="list-decimal list-inside space-y-2 my-3 pr-2 text-slate-800 dark:text-zinc-200 text-xs sm:text-sm">
+                      {items.map((it: string, idx: number) => <li key={idx}>{renderFormattedInline(it)}</li>)}
                     </ol>
                   );
                 } else {
                   return (
-                    <ul key={blockIdx} className="list-disc list-inside space-y-1.5 my-3 pr-2 text-slate-800 dark:text-zinc-200 text-xs sm:text-sm">
-                      {items.map((it: string, idx: number) => <li key={idx}>{it}</li>)}
+                    <ul key={blockIdx} className="list-disc list-inside space-y-2 my-3 pr-2 text-slate-800 dark:text-zinc-200 text-xs sm:text-sm">
+                      {items.map((it: string, idx: number) => <li key={idx}>{renderFormattedInline(it)}</li>)}
                     </ul>
                   );
                 }
               }
-              if (block.type === 'table') {
-                const headers = block.tableHeaders || [];
-                const rows = block.tableRows || [];
+
+              if (block.type === 'table' || block.type === 'grid') {
+                const headers = block.tableHeaders || block.headers || [];
+                const rows = block.tableRows || block.rows || [];
                 return (
-                  <div key={blockIdx} className="overflow-x-auto my-4 border border-slate-200 dark:border-zinc-800 rounded-xl">
-                    <table className="w-full text-right border-collapse text-xs">
-                      <thead className="bg-slate-50 dark:bg-zinc-950 border-b border-slate-200 dark:border-zinc-800 font-bold text-slate-900 dark:text-white">
+                  <div key={blockIdx} className="overflow-x-auto my-5 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xs">
+                    <table className="w-full text-right border-collapse text-xs sm:text-sm">
+                      <thead className="bg-slate-100 dark:bg-zinc-800/80 border-b border-slate-200 dark:border-zinc-700 font-bold text-slate-900 dark:text-white">
                         <tr>
                           {headers.map((h: string, idx: number) => (
-                            <th key={idx} className="p-3.5 text-right font-bold">{h}</th>
+                            <th key={idx} className="p-3.5 text-right font-bold whitespace-nowrap">{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-zinc-800 text-slate-800 dark:text-zinc-200">
                         {rows.map((row: string[], rowIdx: number) => (
-                          <tr key={rowIdx} className="hover:bg-slate-50/50 dark:hover:bg-zinc-800/50 transition">
+                          <tr key={rowIdx} className="hover:bg-slate-50/70 dark:hover:bg-zinc-800/40 transition">
                             {row.map((cell: string, cellIdx: number) => (
-                              <td key={cellIdx} className="p-3.5">{cell}</td>
+                              <td key={cellIdx} className="p-3.5 leading-relaxed">{renderFormattedInline(cell)}</td>
                             ))}
                           </tr>
                         ))}
@@ -811,12 +973,28 @@ function renderTutorialContent(text: string) {
                   </div>
                 );
               }
+
               if (block.type === 'steps') {
-                const steps = block.stepsItems || [];
+                const steps = block.stepsItems || block.items || [];
                 return (
                   <div key={blockIdx} className="space-y-6 my-6 text-right" dir="rtl">
-                    {steps.map((step: string, index: number) => {
+                    {steps.map((rawStep: any, index: number) => {
                       const isLast = index === steps.length - 1;
+                      let stepText = '';
+                      let stepImg: string | null = null;
+                      if (typeof rawStep === 'string') {
+                        if (rawStep.includes('|||')) {
+                          const parts = rawStep.split('|||');
+                          stepText = parts[0].trim();
+                          stepImg = parts[1].trim();
+                        } else {
+                          stepText = rawStep;
+                        }
+                      } else if (rawStep && typeof rawStep === 'object') {
+                        stepText = rawStep.text || '';
+                        stepImg = rawStep.image || rawStep.imageUrl || null;
+                      }
+
                       return (
                         <div key={index} className="relative flex items-start gap-4">
                           <div className="relative flex flex-col items-center shrink-0 w-7">
@@ -828,7 +1006,20 @@ function renderTutorialContent(text: string) {
                             )}
                           </div>
                           <div className="flex-1 pt-0.5 min-w-0">
-                            <p className="text-xs sm:text-sm text-slate-800 dark:text-zinc-200 font-normal leading-relaxed">{step}</p>
+                            <p className="text-xs sm:text-sm text-slate-800 dark:text-zinc-200 font-normal leading-relaxed">
+                              {renderFormattedInline(stepText)}
+                            </p>
+                            {stepImg && (
+                              <div className="mt-3 rounded-xl overflow-hidden border border-slate-200 dark:border-zinc-800 max-w-md bg-slate-50 dark:bg-zinc-950 p-1.5 shadow-xs">
+                                <img 
+                                  src={stepImg} 
+                                  alt={`خطوة ${index + 1}`} 
+                                  className="w-full h-auto max-h-[260px] object-contain rounded-lg cursor-pointer hover:opacity-90 transition mx-auto"
+                                  onClick={() => onImageClick?.(stepImg!)}
+                                />
+                                <span className="text-[10px] text-slate-400 dark:text-zinc-500 block text-center mt-1">انقر للتكبير 🔍</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
@@ -836,10 +1027,11 @@ function renderTutorialContent(text: string) {
                   </div>
                 );
               }
+
               if (block.type === 'buttons') {
                 const buttons = block.buttons || [];
                 return (
-                  <div key={blockIdx} className="flex flex-wrap gap-3 my-6 justify-center" dir="rtl">
+                  <div key={blockIdx} className="flex flex-wrap gap-3 my-6 justify-center sm:justify-start" dir="rtl">
                     {buttons.map((btn: any, btnIdx: number) => {
                       if (!btn.label || !btn.url) return null;
                       return (
@@ -848,7 +1040,7 @@ function renderTutorialContent(text: string) {
                           href={btn.url}
                           target={btn.url.startsWith('http') ? '_blank' : undefined}
                           rel={btn.url.startsWith('http') ? 'noopener noreferrer' : undefined}
-                          className="inline-flex items-center gap-2 bg-[var(--color-imamu-brown)] text-white font-bold py-2.5 px-4.5 rounded-xl text-xs shadow-md shadow-[var(--color-imamu-brown)/20] w-full sm:w-auto justify-center"
+                          className="inline-flex items-center gap-2 bg-[var(--color-imamu-brown)] hover:bg-[#523d2b] text-white font-bold py-2.5 px-4.5 rounded-xl text-xs shadow-md shadow-[var(--color-imamu-brown)/20] transition active:scale-98"
                         >
                           <ExternalLink className="w-4 h-4 shrink-0" /> {btn.label}
                         </a>
@@ -857,13 +1049,14 @@ function renderTutorialContent(text: string) {
                   </div>
                 );
               }
+
               return null;
             })}
           </div>
         );
       }
     } catch (e) {
-      // fallback
+      // fallback to plain text parsing
     }
   }
 
@@ -876,13 +1069,13 @@ function renderTutorialContent(text: string) {
     if (currentList.type === 'ul') {
       elements.push(
         <ul key={key} className="list-disc list-inside space-y-1.5 my-3 pr-2 text-slate-800 dark:text-zinc-200 text-xs sm:text-sm">
-          {currentList.items.map((it, idx) => <li key={idx}>{it}</li>)}
+          {currentList.items.map((it, idx) => <li key={idx}>{renderFormattedInline(it)}</li>)}
         </ul>
       );
     } else {
       elements.push(
         <ol key={key} className="list-decimal list-inside space-y-1.5 my-3 pr-2 text-slate-800 dark:text-zinc-200 text-xs sm:text-sm">
-          {currentList.items.map((it, idx) => <li key={idx}>{it}</li>)}
+          {currentList.items.map((it, idx) => <li key={idx}>{renderFormattedInline(it)}</li>)}
         </ol>
       );
     }
@@ -921,7 +1114,7 @@ function renderTutorialContent(text: string) {
     } else {
       elements.push(
         <p key={`p-${i}`} className="text-slate-800 dark:text-zinc-200 text-xs sm:text-sm leading-relaxed mb-3 font-normal whitespace-pre-line">
-          {line}
+          {renderFormattedInline(line)}
         </p>
       );
     }
