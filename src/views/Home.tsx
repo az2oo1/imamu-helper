@@ -297,7 +297,7 @@ function CountdownsSection() {
   // Calculate Progress Percentages for the Vertical Line Progress Bars
   const nowTime = new Date();
 
-  // 1. Mokafaa Percent (Monthly Payout progress e.g. from 27th of prev month to 27th of target month)
+  // 1. Mokafaa Percent (Monthly Payout progress e.g. from 25th of prev month to 25th of target month)
   let mokafaaPercent = 0;
   if (nextMokafaaDate) {
     const prevMokafaaDate = calculateMokafaaDate(nextMokafaaDate.getFullYear(), nextMokafaaDate.getMonth() - 1);

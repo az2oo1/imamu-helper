@@ -1053,7 +1053,7 @@ export function AdminPage() {
 
             <div className="rounded-2xl p-5 border space-y-3 shadow-2xs" style={{ background: 'rgba(16,185,129,0.05)', borderColor: 'rgba(16,185,129,0.2)' }}>
               <h4 className="font-bold text-xs text-emerald-500">جدولة مواعيد المكافأة الجامعية</h4>
-              <p className="text-[11px] text-emerald-400/80 leading-relaxed">يولد مواعيد إيداع المكافأة تلقائياً يوم 27 من كل شهر ميلادي لـ 12 شهراً.</p>
+              <p className="text-[11px] text-emerald-400/80 leading-relaxed">يولد مواعيد إيداع المكافأة تلقائياً يوم 25 من كل شهر ميلادي لـ 12 شهراً.</p>
               <button
                 onClick={() => handlePost('/api/admin/events/generate-mokafaa', {}, () => { toast('success', 'تم توليد 12 موعداً للمكافأة الجامعية!'); fetchData(); })}
                 className="flex items-center justify-center gap-2 bg-emerald-600 text-white font-bold py-2 rounded-xl text-xs w-full hover:bg-emerald-700 transition cursor-pointer shadow-xs"
