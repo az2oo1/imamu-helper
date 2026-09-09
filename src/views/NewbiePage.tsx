@@ -5,11 +5,10 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useRouter } from 'next/navigation';
 import { 
   GraduationCap, ArrowLeft, CheckSquare, 
-  BookOpen, CreditCard, ChevronDown, 
+  BookOpen, ChevronDown, 
   ExternalLink, Laptop, Phone, Mail, Compass, 
-  Search, HelpCircle, AlertCircle, Sparkles, 
-  Check, Copy, ChevronUp, Clock, Building, Calendar,
-  ShieldCheck, MessageSquare
+  Search, HelpCircle, Sparkles, 
+  Check, Copy, MessageSquare
 } from 'lucide-react';
 
 interface NewbieLink {
@@ -58,7 +57,7 @@ const FAQ_DATA: FAQItem[] = [
     points: [
       'تتم معالجة الجداول آلياً من قِبل عمادة القبول والتسجيل لكافة الدفعات المقبولة.',
       'إذا دخلت ووجدت الجدول فارغاً قبل بداية الدراسة بأيام، فالأمر طبيعي جداً ويعني أن تسجيل كليتك قيد التوزيع.',
-      'تابع إعلانات عمادة القبول والتسجيل وقناة التلجرام الرسمية للجامعة لمعرفة موعد إتاحة جداول المستجدين.'
+      'تابع إعلانات عمادة القبول والتسجيل لمعرفة موعد إتاحة جداول المستجدين.'
     ]
   },
   {
