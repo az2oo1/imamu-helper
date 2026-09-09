@@ -325,14 +325,14 @@ export function HowToPage() {
                     }
                     setCustomAlert({
                       type: 'success',
-                      title: 'تم نسخ رابط الشرح بنجاح! 🔗',
-                      message: 'تم نسخ الرابط المباشر لهذا الشرح إلى الحافظة، يمكنك الآن مشاركته مع الطلاب للوصول السريع للشرح.'
+                      title: 'تم نسخ الرابط',
+                      message: 'تم نسخ رابط الشرح إلى الحافظة، يمكنك الآن مشاركته مع الطلاب للوصول السريع للشرح.'
                     });
                   }
                 }}
-                className="btn-rise inline-flex items-center gap-2 text-xs font-bold py-2.5 px-4 rounded-xl border transition shadow-xs cursor-pointer active:scale-95 text-[var(--color-imamu-brown)] dark:text-[var(--color-imamu-accent)] bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30"
+                className="btn-rise inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs font-bold text-slate-700 dark:text-zinc-300 shadow-2xs hover:bg-slate-50 dark:hover:bg-zinc-800 transition cursor-pointer"
               >
-                <Share2 className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" /> نسخ رابط الشرح المباشر
+                <Share2 className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" /> نسخ رابط الشرح
               </button>
             </div>
 
@@ -1200,7 +1200,7 @@ function renderTutorialContent(
                 const buttons = block.buttons || [];
                 return (
                   <div key={blockIdx} className="pt-2 my-6">
-                    <span className="text-xs font-bold text-slate-700 dark:text-zinc-300 block mb-3">🔗 روابط ومنصات الشرح المباشرة:</span>
+                    <span className="text-xs font-bold text-slate-700 dark:text-zinc-300 block mb-3">🔗 روابط ومنصات الشرح المعتمدة:</span>
                     <div className="flex flex-wrap gap-2.5 justify-start" dir="rtl">
                       {buttons.map((btn: any, btnIdx: number) => {
                         if (!btn.label || !btn.url) return null;

@@ -767,7 +767,7 @@ export function TutorialsTab({
                 color: activeSubTab === 'preview' ? 'var(--text-main)' : 'var(--text-muted)'
               }}
             >
-              المعاينة الحية (Live Preview)
+              معاينة الشرح (Preview)
             </button>
           </div>
 
@@ -1554,7 +1554,7 @@ export function TutorialsTab({
           </div>
         </div>
       ) : (
-        /* Real-time split/full Preview */
+        /* Real-time Preview matching HowToPage 1-to-1 */
         <div className="w-full max-w-4xl mx-auto space-y-6">
           <div className="border rounded-2xl p-6 sm:p-8 shadow-sm" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
             {/* Header section preview */}
@@ -1563,18 +1563,18 @@ export function TutorialsTab({
                 const section = sections.find(s => s.id === Number(tutSectionId));
                 const colorStyle = getSectionColorClasses(section?.color);
                 return (
-                  <span className={`text-[9px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider mb-4 inline-block border ${colorStyle.badge}`}>
+                  <span className={`text-[10px] font-bold px-3 py-1 rounded-md uppercase tracking-wider mb-4 inline-block border ${colorStyle.badge}`}>
                     {section?.title || 'التصنيف المختار'}
                   </span>
                 );
               })()}
               <h1 className="text-xl sm:text-2xl font-bold mb-3" style={{ color: 'var(--text-main)' }}>{tutTitle || 'عنوان الشرح التجريبي'}</h1>
-              <p className="text-xs leading-relaxed mb-6 font-normal" style={{ color: 'var(--text-muted)' }}>{tutDescription || 'هذا الجزء مخصص لعرض نبذة قصيرة ومختصرة عن محتويات الشرح الأكاديمي...'}</p>
+              <p className="text-xs sm:text-sm leading-relaxed mb-6 font-normal" style={{ color: 'var(--text-muted)' }}>{tutDescription || 'هذا الجزء مخصص لعرض نبذة قصيرة ومختصرة عن محتويات الشرح الأكاديمي...'}</p>
               
               <div className="h-px w-full mb-6" style={{ background: 'var(--border-color)' }} />
 
               {/* Body Content rendering preview */}
-              <div className="space-y-5 text-right font-normal text-xs sm:text-sm" dir="rtl" style={{ color: 'var(--text-main)' }}>
+              <div className="space-y-6 text-right font-normal text-xs sm:text-sm" dir="rtl" style={{ color: 'var(--text-main)' }}>
                 {blocks.map((block, blockIdx) => {
                   if (block.type === 'text') {
                     return (
@@ -1583,13 +1583,84 @@ export function TutorialsTab({
                       </p>
                     );
                   }
+
+                  if (block.type === 'callout') {
+                    const variant = block.variant || 'info';
+                    const isWarning = variant === 'warning';
+                    const isDanger = variant === 'danger' || variant === 'error';
+                    const isSuccess = variant === 'success';
+
+                    const rawContent = (block.content || block.text || '').trim();
+                    let lines: string[] = [];
+                    if (rawContent.includes('\n')) {
+                      lines = rawContent.split(/\r?\n/).map((l: string) => l.trim()).filter(Boolean);
+                    } else if (/(\d+[\.\)]\s+)/.test(rawContent)) {
+                      lines = rawContent.split(/(?=(?:^|\s+)\d+[\.\)]\s+)/).map((l: string) => l.trim()).filter(Boolean);
+                    } else {
+                      lines = [rawContent];
+                    }
+
+                    return (
+                      <div 
+                        key={blockIdx} 
+                        className={`p-4 sm:p-5 rounded-2xl border flex items-start gap-3.5 my-5 shadow-2xs ${
+                          isWarning ? 'bg-amber-500/10 border-amber-500/30 text-amber-950 dark:text-amber-200' :
+                          isDanger ? 'bg-rose-500/10 border-rose-500/30 text-rose-950 dark:text-rose-200' :
+                          isSuccess ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-950 dark:text-emerald-200' :
+                          'bg-blue-500/10 border-blue-500/30 text-blue-950 dark:text-blue-200'
+                        }`}
+                      >
+                        {isDanger || isWarning ? (
+                          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                        ) : (
+                          <Info className="w-5 h-5 shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
+                        )}
+                        <div className="flex-1 min-w-0 text-right font-normal">
+                          {block.title && (
+                            <h4 className="font-bold text-xs sm:text-sm mb-2 text-slate-900 dark:text-white flex items-center gap-1.5">
+                              {block.title}
+                            </h4>
+                          )}
+                          {lines.length > 1 ? (
+                            <div className="space-y-2 mt-1">
+                              {lines.map((line, lIdx) => (
+                                <div key={lIdx} className="text-xs sm:text-sm leading-relaxed flex items-start gap-2">
+                                  <span className="opacity-60 text-xs mt-1 shrink-0">•</span>
+                                  <div className="flex-1 min-w-0">{line}</div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-xs sm:text-sm leading-relaxed whitespace-pre-line">
+                              {rawContent}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
                   
                   if (block.type === 'steps') {
                     const stepsItems = block.stepsItems || [];
                     return (
                       <div key={blockIdx} className="space-y-6 my-6 text-right" dir="rtl">
-                        {stepsItems.map((step, sIdx) => {
+                        {stepsItems.map((rawStep: any, sIdx: number) => {
                           const isLast = sIdx === stepsItems.length - 1;
+                          let stepText = '';
+                          let stepImg: string | null = null;
+                          if (typeof rawStep === 'string') {
+                            if (rawStep.includes('|||')) {
+                              const parts = rawStep.split('|||');
+                              stepText = parts[0].trim();
+                              stepImg = parts[1].trim();
+                            } else {
+                              stepText = rawStep;
+                            }
+                          } else if (rawStep && typeof rawStep === 'object') {
+                            stepText = rawStep.text || '';
+                            stepImg = rawStep.image || rawStep.imageUrl || null;
+                          }
+
                           return (
                             <div key={sIdx} className="relative flex items-start gap-4">
                               <div className="relative flex flex-col items-center shrink-0 w-7">
@@ -1601,7 +1672,17 @@ export function TutorialsTab({
                                 )}
                               </div>
                               <div className="flex-1 pt-0.5 min-w-0">
-                                <p className="text-xs sm:text-sm font-normal leading-relaxed" style={{ color: 'var(--text-main)' }}>{step || 'محتوى الخطوة فارغ...'}</p>
+                                <p className="text-xs sm:text-sm font-normal leading-relaxed" style={{ color: 'var(--text-main)' }}>{stepText || 'محتوى الخطوة فارغ...'}</p>
+                                {stepImg && (
+                                  <div className="mt-3 rounded-xl overflow-hidden border max-w-md p-1.5 shadow-2xs" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-subtle)' }}>
+                                    <img 
+                                      src={stepImg} 
+                                      alt={`خطوة ${sIdx + 1}`} 
+                                      className="w-full h-auto max-h-[260px] object-contain rounded-lg mx-auto"
+                                    />
+                                    <span className="text-[10px] block text-center mt-1" style={{ color: 'var(--text-muted)' }}>صورة الخطوة الإرشادية</span>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           );
@@ -1655,55 +1736,94 @@ export function TutorialsTab({
                   }
 
                   if (block.type === 'media') {
-                    if (!block.mediaUrl) {
+                    const images: string[] = [
+                      ...(block.mediaUrls || []),
+                      ...(block.images || []),
+                      ...(block.mediaType === 'image' && block.mediaUrl ? [block.mediaUrl] : [])
+                    ].filter(Boolean);
+                    const uniqueImages = Array.from(new Set(images));
+                    const video = block.videoUrl || (block.mediaType === 'video' ? block.mediaUrl : null);
+
+                    if (uniqueImages.length === 0 && !video) {
                       return (
                         <div key={blockIdx} className="w-full max-w-xl aspect-video rounded-2xl border border-dashed flex items-center justify-center my-4 mx-auto text-xs italic" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-subtle)', color: 'var(--text-muted)' }}>
                           لم يتم تحديد ملف وسائط بعد
                         </div>
                       );
                     }
-                    if (block.mediaType === 'video') {
-                      return (
-                        <div key={blockIdx} className="w-full max-w-xl aspect-video rounded-2xl border shadow-sm overflow-hidden relative flex items-center justify-center my-4 mx-auto" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-subtle)' }}>
-                          <iframe 
-                            src={block.mediaUrl} 
-                            title="Walkthrough Video"
-                            className="w-full h-full border-0"
-                            allowFullScreen
-                          />
-                        </div>
-                      );
-                    } else {
-                      return (
-                        <a key={blockIdx} href={block.mediaUrl} target="_blank" rel="noreferrer" className="w-full max-w-xl aspect-video rounded-2xl border shadow-sm overflow-hidden block relative hover:opacity-90 transition my-4 mx-auto" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-subtle)' }}>
-                          <img 
-                            src={block.mediaUrl} 
-                            alt="Screenshot" 
-                            className="w-full h-full object-cover"
-                          />
-                        </a>
-                      );
-                    }
+
+                    return (
+                      <div key={blockIdx} className="my-6 space-y-4">
+                        {video && (
+                          <div className="rounded-2xl overflow-hidden border bg-black max-w-2xl mx-auto shadow-md" style={{ borderColor: 'var(--border-color)' }}>
+                            {video.includes('youtube.com') || video.includes('youtu.be') ? (
+                              <div className="aspect-video w-full">
+                                <iframe 
+                                  src={video.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')} 
+                                  className="w-full h-full border-0" 
+                                  allowFullScreen 
+                                />
+                              </div>
+                            ) : (
+                              <video src={video} controls className="w-full max-h-[460px] object-contain mx-auto" />
+                            )}
+                          </div>
+                        )}
+
+                        {uniqueImages.length === 1 ? (
+                          <div className="rounded-2xl overflow-hidden border p-2 text-center max-w-2xl mx-auto shadow-xs" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-subtle)' }}>
+                            <img 
+                              src={uniqueImages[0]} 
+                              alt="صورة توضيحية للشرح" 
+                              className="w-full h-auto max-h-[480px] object-contain rounded-xl mx-auto"
+                            />
+                            <span className="text-[10px] block text-center mt-2" style={{ color: 'var(--text-muted)' }}>صورة توضيحية للشرح</span>
+                          </div>
+                        ) : uniqueImages.length > 1 ? (
+                          <div className="border rounded-2xl p-4" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-subtle)' }}>
+                            <span className="text-xs font-bold block mb-3" style={{ color: 'var(--text-main)' }}>🖼️ معرض الصور التوضيحية ({uniqueImages.length} صور):</span>
+                            <div className={`grid gap-3 ${uniqueImages.length === 2 ? 'grid-cols-2' : uniqueImages.length === 3 ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4'}`}>
+                              {uniqueImages.map((imgUrl, imgIdx) => (
+                                <div 
+                                  key={imgIdx} 
+                                  className="group relative rounded-xl overflow-hidden border cursor-pointer shadow-2xs aspect-4/3 flex items-center justify-center p-1"
+                                  style={{ borderColor: 'var(--border-color)', background: 'var(--bg-card)' }}
+                                >
+                                  <img 
+                                    src={imgUrl} 
+                                    alt={`صورة توضيحية ${imgIdx + 1}`} 
+                                    className="w-full h-full object-contain rounded-lg"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
                   }
 
                   if (block.type === 'buttons') {
                     const btns = block.buttons || [];
                     return (
-                      <div key={blockIdx} className="flex flex-wrap gap-3 my-6 justify-center" dir="rtl">
-                        {btns.map((btn, btnIdx) => {
-                          if (!btn.label || !btn.url) return null;
-                          return (
-                            <a
-                              key={btnIdx}
-                              href={btn.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-2 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-light)] text-white font-bold py-2.5 px-4.5 rounded-md text-xs transition shadow-sm w-full sm:w-auto justify-center"
-                            >
-                              <ExternalLink className="w-4 h-4 shrink-0" /> {btn.label}
-                            </a>
-                          );
-                        })}
+                      <div key={blockIdx} className="pt-2 my-6">
+                        <span className="text-xs font-bold block mb-3" style={{ color: 'var(--text-muted)' }}>🔗 روابط ومنصات الشرح المعتمدة:</span>
+                        <div className="flex flex-wrap gap-2.5 justify-start" dir="rtl">
+                          {btns.map((btn, btnIdx) => {
+                            if (!btn.label || !btn.url) return null;
+                            return (
+                              <a
+                                key={btnIdx}
+                                href={btn.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn-rise inline-flex items-center gap-2 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] active:scale-95 text-white font-bold py-3 px-5 rounded-xl text-xs shadow-md shadow-[var(--color-imamu-brown)/20] transition duration-200 cursor-pointer"
+                              >
+                                <ExternalLink className="w-4 h-4 shrink-0" /> {btn.label}
+                              </a>
+                            );
+                          })}
+                        </div>
                       </div>
                     );
                   }
@@ -1711,20 +1831,6 @@ export function TutorialsTab({
                   return null;
                 })}
               </div>
-
-              {/* Action Link button preview */}
-              {tutLinkUrl && (
-                <div className="mt-8 mb-2 text-right border-t pt-6" style={{ borderColor: 'var(--border-color)' }}>
-                  <a 
-                    href={tutLinkUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-light)] text-white font-bold py-2.5 px-4.5 rounded-md text-xs transition shadow-sm w-full sm:w-auto justify-center"
-                  >
-                    <ExternalLink className="w-4 h-4 shrink-0" /> {tutLinkTitle || 'الانتقال للرابط المذكور'}
-                  </a>
-                </div>
-              )}
             </div>
           </div>
         </div>
