@@ -113,10 +113,10 @@
 @variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: "ThmanyahSans", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "ThmanyahSerifDisplay", "ThmanyahSans", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "ThmanyahSerifText", ui-serif, Georgia, serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-sans: "ThmanyahSans", sans-serif;
+  --font-display: "ThmanyahSerifDisplay", serif;
+  --font-serif: "ThmanyahSerifText", serif;
+  --font-mono: "JetBrains Mono", monospace;
 
   --color-imamu-brown: #8C6239;
   --color-imamu-brown-light: #9E7348;
@@ -141,16 +141,11 @@
 html.dark {
   color-scheme: dark;
   --bg-canvas: #000000;
-  --bg-card: #0d0b0a;
-  --bg-subtle: #141210;
-  --border-color: #221d18;
+  --bg-card: #0e0e11;
+  --bg-subtle: #18181b;
+  --border-color: #27272a;
   --text-main: #f4f4f5;
   --text-muted: #a1a1aa;
-  /* Light brand brown for dark mode */
-  --color-imamu-brown: #A46E3F;
-  --color-imamu-brown-light: #B8804F;
-  --color-imamu-brown-dark: #8B572B;
-  --color-imamu-accent: #E0B285;    /* brand text — dark mode: warm tan, readable */
   background-color: #000000 !important;
 }
 
@@ -259,14 +254,18 @@ html.dark select {
 }
 
 input:focus, textarea:focus, select:focus {
-  border-color: var(--color-imamu-brown);
-  box-shadow: 0 0 0 2px rgba(160, 109, 66, 0.2);
+  border-color: var(--color-imamu-accent, #3b82f6);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-imamu-accent, #3b82f6) 30%, transparent);
   outline: none;
 }
 
-/* Custom Selection */
+/* Custom Selection — Dynamically aligns with active theme accent color */
 ::selection {
-  background: rgba(160, 109, 66, 0.22);
+  background: color-mix(in srgb, var(--color-imamu-accent, #8C6239) 35%, transparent);
+  color: inherit;
+}
+::-moz-selection {
+  background: color-mix(in srgb, var(--color-imamu-accent, #8C6239) 35%, transparent);
   color: inherit;
 }
 
@@ -294,3 +293,21 @@ button[type="submit"]:not(:disabled):active,
 .btn-action:not(:disabled):active {
   transform: scale(0.97);
 }
+
+/* ── Unified Theme Hover Utilities ─────────────────────────────────── */
+.hover-theme-card {
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+.hover-theme-card:hover {
+  border-color: color-mix(in srgb, var(--color-imamu-accent, #8C6239) 50%, transparent) !important;
+}
+
+.hover-theme-btn {
+  transition: all 0.2s ease;
+}
+.hover-theme-btn:hover {
+  border-color: color-mix(in srgb, var(--color-imamu-accent, #8C6239) 50%, transparent) !important;
+  color: var(--color-imamu-accent, #8C6239) !important;
+  background-color: color-mix(in srgb, var(--color-imamu-accent, #8C6239) 12%, transparent) !important;
+}
+

@@ -8,6 +8,8 @@ import Link from 'next/link';
 import { InView, SpotlightCard } from '../components/ui';
 import { useAuth } from '../lib/AuthContext';
 
+
+
 interface ApiTool {
   id: number | string;
   title?: string;
@@ -45,7 +47,7 @@ function getToolColorClass(iconName?: string) {
     case 'Link':
       return 'text-indigo-600 dark:text-indigo-400';
     default:
-      return 'text-blue-600 dark:text-blue-400';
+      return 'text-[var(--color-imamu-accent)]';
   }
 }
 
@@ -63,7 +65,7 @@ function renderToolIcon(iconName?: string | React.ReactNode) {
     case 'Link':
       return <LinkIcon className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />;
     default:
-      return <Wrench className="w-5 h-5 text-blue-600 dark:text-blue-400" />;
+      return <Wrench className="w-5 h-5 text-[var(--color-imamu-accent)]" />;
   }
 }
 
@@ -303,9 +305,10 @@ export function Tools() {
                             </div>
                           )}
                         </div>
+
                       </div>
 
-                      <h3 className="text-base font-serif font-bold text-slate-900 dark:text-white mb-1.5 group-hover:text-[var(--color-imamu-accent)] dark:group-hover:text-[var(--color-imamu-accent)] transition-colors">
+                      <h3 className="text-base font-serif font-bold text-slate-900 dark:text-white mb-1.5 group-hover:text-[var(--color-imamu-accent)] transition-colors">
                         {tool.name}
                       </h3>
                       

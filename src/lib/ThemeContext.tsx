@@ -54,9 +54,9 @@ export const COLOR_PRESETS: ColorPreset[] = [
     bgCanvasLight: '#F6F2EC',
     bgCanvasDark: '#000000',
     bgCardLight: '#FCFAF6',
-    bgCardDark: '#0D0B0A',
+    bgCardDark: '#0e0e11',
     borderColorLight: '#E0D5C7',
-    borderColorDark: '#261F1A',
+    borderColorDark: '#27272a',
     bgGradient: 'linear-gradient(135deg, #8C6239 0%, #6E4A28 100%)',
   },
   {
@@ -77,9 +77,9 @@ export const COLOR_PRESETS: ColorPreset[] = [
     bgCanvasLight: '#F8F5EE',
     bgCanvasDark: '#000000',
     bgCardLight: '#FDFBF7',
-    bgCardDark: '#0E0D0A',
+    bgCardDark: '#0e0e11',
     borderColorLight: '#E3DAC6',
-    borderColorDark: '#282417',
+    borderColorDark: '#27272a',
     bgGradient: 'linear-gradient(135deg, #D4A32A 0%, #8B6508 100%)',
   },
   {
@@ -209,6 +209,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       root.style.setProperty('--text-muted', preset.textMutedDark);
       root.style.setProperty('--bg-canvas', preset.bgCanvasDark);
       root.style.setProperty('--bg-card', preset.bgCardDark);
+      root.style.setProperty('--bg-subtle', '#18181b');
       root.style.setProperty('--border-color', preset.borderColorDark);
     } else {
       root.style.setProperty('--color-imamu-accent', preset.accentLight);
@@ -217,6 +218,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       root.style.setProperty('--text-muted', preset.textMutedLight);
       root.style.setProperty('--bg-canvas', preset.bgCanvasLight);
       root.style.setProperty('--bg-card', preset.bgCardLight);
+      root.style.setProperty('--bg-subtle', '#EDE9E1');
       root.style.setProperty('--border-color', preset.borderColorLight);
     }
   };

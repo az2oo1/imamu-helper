@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../lib/AuthContext';
 import { BookOpen, Search, ExternalLink, Folder, Plus, Trash2, Pencil, Info, MessageCircle, ChevronDown } from 'lucide-react';
 import { WhatsappIcon } from '../components/WhatsappIcon';
-import { InView, SpotlightCard } from '../components/ui';
+import { InView, SpotlightCard, CustomSelect } from '../components/ui';
 import { CourseDetailsModal } from '../components/CourseDetailsModal';
 import CreateResourceModal from '../components/CreateResourceModal';
+import ReportDropdownMenu from '../components/ReportDropdownMenu';
 import { cleanCourseName, cleanUrlProtocol, parseResourceUrl, parseAllResourceLinks, isWhatsappUrl } from '../lib/url-utils';
+
 
 function matchSubjectIds(id1: any, id2: any): boolean {
   if (id1 == null || id2 == null || id1 === '' || id2 === '') return false;
@@ -40,6 +42,7 @@ interface Resource {
   avatarUrl?: string;
   bannerUrl?: string;
   description?: string;
+  sectionsEnabled?: boolean;
   createdAt: string;
 }
 
@@ -93,9 +96,9 @@ function DriveLinkButton({ boxLink }: { boxLink?: string }) {
         href={links[0].url}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
+        className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-800/70 hover:bg-[var(--color-imamu-brown)]/15 dark:hover:bg-[var(--color-imamu-brown)]/25 text-slate-800 dark:text-zinc-200 hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)] border border-slate-200 dark:border-zinc-700/80 hover:border-[var(--color-imamu-accent)]/50 text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer shrink-0 whitespace-nowrap group/btn"
       >
-        <Folder className="w-3.5 h-3.5 text-white" />
+        <Folder className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-400 group-hover/btn:text-[var(--color-imamu-accent)] transition-colors" />
         <span>الملفات</span>
       </a>
     );
@@ -107,11 +110,11 @@ function DriveLinkButton({ boxLink }: { boxLink?: string }) {
       <button
         type="button"
         onClick={() => setIsOpen(prev => !prev)}
-        className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer shrink-0 whitespace-nowrap shadow-xs"
+        className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-800/70 hover:bg-[var(--color-imamu-brown)]/15 dark:hover:bg-[var(--color-imamu-brown)]/25 text-slate-800 dark:text-zinc-200 hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)] border border-slate-200 dark:border-zinc-700/80 hover:border-[var(--color-imamu-accent)]/50 text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer shrink-0 whitespace-nowrap shadow-xs group/btn"
       >
-        <Folder className="w-3.5 h-3.5 text-white" />
+        <Folder className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-400 group-hover/btn:text-[var(--color-imamu-accent)] transition-colors" />
         <span>الملفات ({links.length})</span>
-        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? 'rotate-180 text-[var(--color-imamu-accent)]' : ''}`} />
       </button>
 
       {isOpen && (
@@ -130,10 +133,10 @@ function DriveLinkButton({ boxLink }: { boxLink?: string }) {
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setIsOpen(false)}
-                className="flex items-center justify-between px-3.5 py-2.5 hover:bg-stone-50 dark:hover:bg-stone-950/50 text-xs font-semibold text-slate-800 dark:text-zinc-200 hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)] transition"
+                className="flex items-center justify-between px-3.5 py-2.5 hover:bg-stone-50 dark:hover:bg-stone-950/50 text-xs font-semibold text-slate-800 dark:text-zinc-200 hover:text-[var(--color-imamu-accent)] transition"
               >
                 <div className="flex items-center gap-2 truncate">
-                  <Folder className="w-3.5 h-3.5 text-white shrink-0" />
+                  <Folder className="w-3.5 h-3.5 text-[var(--color-imamu-accent)] shrink-0" />
                   <span className="truncate">{link.title || `ملف ${idx + 1}`}</span>
                 </div>
                 <ExternalLink className="w-3 h-3 text-slate-400 shrink-0 opacity-70" />
@@ -170,7 +173,8 @@ export function Resources() {
     paidResourcesUrl: '',
     avatarUrl: '',
     bannerUrl: '',
-    description: ''
+    description: '',
+    sectionsEnabled: true
   });
 
   useEffect(() => {
@@ -290,7 +294,7 @@ export function Resources() {
           if (Array.isArray(data)) setResources(data);
         }
         setIsAddResourceOpen(false);
-        setResourceForm({ title: '', type: 'course_hub', url: '', description: '', boxLink: '', whatsappLink: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', bannerUrl: '' });
+        setResourceForm({ title: '', type: 'course_hub', url: '', description: '', boxLink: '', whatsappLink: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', bannerUrl: '', sectionsEnabled: true });
         return true;
       } else {
         const err = await res.json().catch(() => ({}));
@@ -318,7 +322,8 @@ export function Resources() {
       paidResourcesUrl: r.paidResourcesUrl || '',
       avatarUrl: r.avatarUrl || '',
       bannerUrl: r.bannerUrl || '',
-      description: r.description || ''
+      description: r.description || '',
+      sectionsEnabled: r.sectionsEnabled !== false
     });
     setIsAddResourceOpen(true);
   };
@@ -444,24 +449,23 @@ export function Resources() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="ابحث برمز المادة أو اسمها..."
-            className="w-full pr-11 pl-4 py-2.5 bg-slate-50 dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 rounded-xl outline-none focus:ring-2 focus:ring-stone-100 dark:focus:ring-stone-900 focus:border-[var(--color-imamu-brown)] text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500"
+            className="w-full pr-11 pl-4 py-2.5 bg-slate-50 dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 rounded-xl outline-none focus:ring-2 focus:ring-[var(--color-imamu-accent)]/30 focus:border-[var(--color-imamu-accent)] text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 transition"
           />
         </div>
 
         {/* Major Select */}
-        <div className="w-full md:w-64">
-          <select
+        <div className="w-full md:w-64 relative z-30 shrink-0">
+          <CustomSelect
             value={selectedMajor}
-            onChange={e => setSelectedMajor(e.target.value)}
-            className="w-full p-2.5 bg-slate-50 dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-stone-100 dark:focus:ring-stone-900 cursor-pointer font-semibold"
-          >
-            {MAJOR_OPTIONS.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-            {majors.filter(m => m && !MAJOR_OPTIONS.some(o => o.value === m || o.label.includes(m))).map(m => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
+            onChange={setSelectedMajor}
+            className="w-full"
+            options={[
+              ...MAJOR_OPTIONS,
+              ...majors
+                .filter(m => m && !MAJOR_OPTIONS.some(o => o.value === m || o.label.includes(m)))
+                .map(m => ({ value: m, label: m }))
+            ]}
+          />
         </div>
       </div>
 
@@ -492,66 +496,72 @@ export function Resources() {
               return (
                 <SpotlightCard
                   key={item.id}
-                  className="border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 flex flex-col justify-between relative group"
+                  className="border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 relative group h-full"
                 >
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-stone-50 dark:bg-stone-950/50 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] border border-amber-200 dark:border-stone-900/50">
-                        {finalCodeBadge.replace(/^مادة\s*/i, '').trim()}
-                      </span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-slate-500 dark:text-zinc-400 font-medium">{item.major}</span>
-                      {isAdmin && (
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openEditModal(item);
-                            }}
-                            className="p-1 text-slate-400 hover:text-[var(--color-imamu-accent)] hover:bg-stone-50 dark:hover:bg-stone-950/40 rounded-lg transition cursor-pointer"
-                            title="تعديل هذا المصدر"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteResource(item.id);
-                            }}
-                            className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition cursor-pointer"
-                            title="حذف هذا المصدر"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                  <div className="flex flex-col h-full justify-between">
+                    <div className="flex-1 pb-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-[var(--color-imamu-brown)]/10 dark:bg-[var(--color-imamu-brown)]/20 text-[var(--color-imamu-accent)] border border-[var(--color-imamu-brown)]/30">
+                          {finalCodeBadge.replace(/^مادة\s*/i, '').trim()}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-slate-500 dark:text-zinc-400 font-medium">{item.major}</span>
+                          {isAdmin && (
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEditModal(item);
+                                }}
+                                className="p-1 text-slate-400 hover:text-[var(--color-imamu-accent)] hover:bg-[var(--color-imamu-brown)]/10 rounded-lg transition cursor-pointer"
+                                title="تعديل هذا المصدر"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteResource(item.id);
+                                }}
+                                className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition cursor-pointer"
+                                title="حذف هذا المصدر"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                          <ReportDropdownMenu
+                            targetType="resource"
+                            targetId={item.id}
+                            targetTitle={item.title}
+                            user={user}
+                            buttonClassName="p-1 text-slate-400 hover:text-[var(--color-imamu-accent)] hover:bg-[var(--color-imamu-brown)]/10 rounded-lg transition cursor-pointer"
+                          />
                         </div>
-                      )}
+                      </div>
+
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1.5 leading-snug group-hover:text-[var(--color-imamu-accent)] transition-colors">
+                        {item.title}
+                      </h3>
+                      
+                      {item.description && item.description.trim() ? (
+                        <p className="text-xs text-slate-500 dark:text-zinc-400 line-clamp-2 leading-relaxed">
+                          {item.description}
+                        </p>
+                      ) : item.courseName && item.courseName.trim() !== item.title.trim() ? (
+                        <p className="text-xs text-slate-500 dark:text-zinc-400 line-clamp-2 leading-relaxed">
+                          {item.courseName}
+                        </p>
+                      ) : null}
                     </div>
-                  </div>
 
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1.5 leading-snug">
-                    {item.title}
-                  </h3>
-                  
-                  {item.description && item.description.trim() ? (
-                    <p className="text-xs text-slate-500 dark:text-zinc-400 line-clamp-2 leading-relaxed mb-4">
-                      {item.description}
-                    </p>
-                  ) : item.courseName && item.courseName.trim() !== item.title.trim() ? (
-                    <p className="text-xs text-slate-500 dark:text-zinc-400 line-clamp-2 leading-relaxed mb-4">
-                      {item.courseName}
-                    </p>
-                  ) : (
-                    <div className="mb-4" />
-                  )}
-                </div>
-
-                {/* Resource Links */}
-                <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 dark:border-zinc-800/80 pt-3.5 mt-auto w-full relative z-20">
+                    {/* Resource Links */}
+                    <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 dark:border-zinc-800/80 pt-3.5 mt-auto w-full relative z-20">
                   <button
                     onClick={() => setSelectedCourse(item)}
-                    className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-stone-50 dark:bg-stone-950/50 hover:bg-stone-100 dark:hover:bg-stone-900/60 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] border border-amber-200 dark:border-stone-900/50 text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
+                    className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-800/70 hover:bg-[var(--color-imamu-brown)]/15 dark:hover:bg-[var(--color-imamu-brown)]/25 text-slate-800 dark:text-zinc-200 hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)] border border-slate-200 dark:border-zinc-700/80 hover:border-[var(--color-imamu-accent)]/50 text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer shrink-0 whitespace-nowrap group/btn"
                   >
-                    <Info className="w-3.5 h-3.5" />
+                    <Info className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-400 group-hover/btn:text-[var(--color-imamu-accent)] transition-colors" />
                     <span>التفاصيل</span>
                   </button>
 
@@ -569,7 +579,8 @@ export function Resources() {
                     </a>
                   )}
                 </div>
-              </SpotlightCard>
+              </div>
+            </SpotlightCard>
             );
           })}
           </div>

@@ -30,10 +30,12 @@ export function SpotlightCard({
     mouseY.set(e.clientY - top);
   }
 
-  // Use dynamic theme color if spotlightColor isn't explicitly set
+  // Use dynamic IMAMU brown theme color if spotlightColor isn't explicitly set
   const effectiveSpotlight = spotlightColor 
-    ? (spotlightColor.startsWith('var(') ? `color-mix(in srgb, ${spotlightColor} 15%, transparent)` : spotlightColor)
-    : 'color-mix(in srgb, var(--color-imamu-brown) 12%, transparent)';
+    ? (spotlightColor.startsWith('var(') ? `color-mix(in srgb, ${spotlightColor} 18%, transparent)` : spotlightColor)
+    : 'color-mix(in srgb, var(--color-imamu-accent, #8C6239) 16%, transparent)';
+
+  const effectiveHoverBorder = hoverBorderColor || 'color-mix(in srgb, var(--color-imamu-accent, #8C6239) 45%, transparent)';
 
   const background = useMotionTemplate`radial-gradient(350px circle at ${mouseX}px ${mouseY}px, ${effectiveSpotlight}, transparent 80%)`;
 
@@ -44,7 +46,7 @@ export function SpotlightCard({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={onClick}
-      whileHover={{ borderColor: hoverBorderColor || 'var(--color-imamu-accent)' }}
+      whileHover={{ borderColor: effectiveHoverBorder }}
       transition={{ duration: 0.2 }}
       className={`relative rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-2xs ${className}`}
     >
