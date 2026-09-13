@@ -110,7 +110,23 @@ export async function extractTelegramChannelPosts(
     // Split HTML by message widget containers
     const messageBlocks = html.split(/<div[^>]+class=["'][^"']*tgme_widget_message\b[^"']*["']/i).slice(1);
     
+    const isServiceNotice = (text: string) => {
+      const clean = (text || '').trim();
+      if (!clean) return false;
+      return (
+        /pinned a (photo|message|video|file|audio|poll)/i.test(clean) ||
+        /t\.me\/.*pinned/i.test(clean) ||
+        /^pinned an?\s/i.test(clean) ||
+        /قام بتثبيت (صورة|رسالة|فيديو|ملف)/i.test(clean)
+      );
+    };
+
     for (const block of messageBlocks) {
+      // Ignore system/service message containers (e.g. pinned notifications)
+      if (block.includes('tgme_widget_message_service') || block.includes('service_message')) {
+        continue;
+      }
+
       const postMatch = block.match(/data-post=["']([^"']+)["']/i);
       const postPath = postMatch ? postMatch[1] : null;
       const msgIdMatch = postPath ? postPath.split('/')[1] : null;
@@ -123,7 +139,12 @@ export async function extractTelegramChannelPosts(
       // Extract Text
       const textMatch = block.match(/<div[^>]+class=["'][^"']*tgme_widget_message_text\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
       const rawTextHtml = textMatch ? textMatch[1] : '';
-      const cleanText = unescapeHtml(rawTextHtml);
+      let cleanText = unescapeHtml(rawTextHtml);
+
+      // Filter out pure service notice text
+      if (isServiceNotice(cleanText)) {
+        cleanText = '';
+      }
 
       // Extract Photo URL
       const photoMatch = block.match(/background-image:\s*url\(['"]([^'"]+)['"]\)/i) ||
@@ -194,22 +215,29 @@ export async function extractTelegramChannelPosts(
     throw new Error(`لم يتم العثور على أي منشورات عامة في قناة التليقرام @${channelHandle}. يرجى التأكد من أن القناة عامة وليست خاصة.`);
   }
 
-  // Store channel avatar locally so browser loads it smoothly without telesco.pe CORS/CSP issues
-  let finalChannelAvatarUrl: string | null = (channelAvatarUrl as string | null) || null;
-  const avatarUrlStr = typeof channelAvatarUrl === 'string' ? channelAvatarUrl : '';
-  if (avatarUrlStr && (avatarUrlStr.startsWith('http://') || avatarUrlStr.startsWith('https://'))) {
-    try {
-      const stored = await downloadAndUploadToStorage(avatarUrlStr, 'tg_avatar');
-      if (stored) finalChannelAvatarUrl = stored;
-    } catch (e) {
-      console.warn('[Telegram Avatar Download Error]', e);
-    }
-  }
-
   // 1. Insert/Update channel source in news_sources
   const existingSource = await db.select().from(news_sources).where(
     or(eq(news_sources.handle, channelHandle), eq(news_sources.handle, `@${channelHandle}`))
   );
+
+  // Store channel avatar locally so browser loads it smoothly without telesco.pe CORS/CSP issues
+  let finalChannelAvatarUrl: string | null = (channelAvatarUrl as string | null) || null;
+  const existingAvatar = existingSource[0]?.profilePicUrl;
+
+  // Reuse existing stored avatar if available to prevent downloading and saving identical duplicate files on every sync
+  if (existingAvatar && (existingAvatar.startsWith('/uploads/') || existingAvatar.startsWith('http'))) {
+    finalChannelAvatarUrl = existingAvatar;
+  } else {
+    const avatarUrlStr = typeof channelAvatarUrl === 'string' ? channelAvatarUrl : '';
+    if (avatarUrlStr && (avatarUrlStr.startsWith('http://') || avatarUrlStr.startsWith('https://'))) {
+      try {
+        const stored = await downloadAndUploadToStorage(avatarUrlStr, 'tg_avatar');
+        if (stored) finalChannelAvatarUrl = stored;
+      } catch (e) {
+        console.warn('[Telegram Avatar Download Error]', e);
+      }
+    }
+  }
 
   if (existingSource.length > 0) {
     await db.update(news_sources).set({
@@ -226,6 +254,14 @@ export async function extractTelegramChannelPosts(
       lastFetched: new Date()
     });
   }
+
+  // Determine target author details from the authenticated account entity
+  const targetAuthorName = existingSource[0]?.displayName || existingSource[0]?.handle || channelTitle || channelHandle;
+  const targetAuthorHandle = existingSource[0]?.handle
+    ? (existingSource[0].handle.startsWith('@') ? existingSource[0].handle : `@${existingSource[0].handle}`)
+    : `@${channelHandle}`;
+  const targetAuthorAvatar = existingSource[0]?.profilePicUrl || finalChannelAvatarUrl;
+  const targetEntityId = existingSource[0]?.id || null;
 
   // 2. Query existing tweetIds to avoid duplicates
   const tweetIds = allPostsList.map(p => p.tweetId);
@@ -252,9 +288,10 @@ export async function extractTelegramChannelPosts(
     await db.insert(news).values({
       content: postContent,
       source: channelHandle,
-      authorName: channelTitle || channelHandle,
-      authorHandle: `@${channelHandle}`,
-      authorAvatar: finalChannelAvatarUrl,
+      authorName: targetAuthorName,
+      authorHandle: targetAuthorHandle,
+      authorAvatar: targetAuthorAvatar,
+      entityId: targetEntityId,
       imageUrl: finalPhotoUrl,
       videoUrl: post.videoUrl || null,
       date: post.date,
