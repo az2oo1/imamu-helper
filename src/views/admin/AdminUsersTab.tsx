@@ -232,7 +232,7 @@ export default function AdminUsersTab({
                     ? 'bg-rose-50 dark:bg-rose-950/50 text-rose-600 border-rose-200 dark:border-rose-900/50' 
                     : u.isAdmin 
                     ? 'bg-amber-50 dark:bg-amber-950/50 text-[var(--color-imamu-accent)] border-amber-200 dark:border-amber-900/50' 
-                    : 'bg-stone-50 dark:bg-stone-950/50 text-[var(--color-imamu-accent)] border-amber-200 dark:border-stone-900/50'
+                    : 'bg-stone-50 dark:bg-stone-950/50 text-[var(--color-imamu-accent)] border-slate-200/80 dark:border-zinc-700/80'
                 }`}>
                   {u.userName ? u.userName.charAt(0).toUpperCase() : 'ط'}
                 </div>
@@ -296,7 +296,7 @@ export default function AdminUsersTab({
                     ? 'bg-rose-50 dark:bg-rose-950/50 text-rose-600 border-rose-200 dark:border-rose-900/50' 
                     : selectedUser.isAdmin 
                     ? 'bg-amber-50 dark:bg-amber-950/50 text-[var(--color-imamu-accent)] border-amber-200 dark:border-amber-900/50' 
-                    : 'bg-stone-50 dark:bg-stone-950/50 text-[var(--color-imamu-accent)] border-amber-200 dark:border-stone-900/50'
+                    : 'bg-stone-50 dark:bg-stone-950/50 text-[var(--color-imamu-accent)] border-slate-200/80 dark:border-zinc-700/80'
                 }`}>
                   {selectedUser.userName ? selectedUser.userName.charAt(0).toUpperCase() : 'ط'}
                 </div>
@@ -327,7 +327,7 @@ export default function AdminUsersTab({
                 {/* User UID Copy Card */}
                 <div className="p-3.5 mb-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3">
                   <div>
-                    <span className="text-[11px] font-bold text-amber-700 dark:text-amber-300 block mb-0.5">معرّف الحساب (User UID) لربط المساهمات:</span>
+                    <span className="text-[11px] font-bold text-amber-700 dark:text-amber-300 block mb-0.5">معرّف الحساب لربط المساهمات:</span>
                     <span className="text-xs font-bold text-slate-900 dark:text-white font-mono dir-ltr block text-right select-all">{selectedUser.uid || selectedUser.id}</span>
                   </div>
                   <button
@@ -634,7 +634,7 @@ export default function AdminUsersTab({
             <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 border ${
               confirmModal.type === 'delete-user' || confirmModal.type === 'toggle-ban'
                 ? 'bg-rose-50 dark:bg-rose-950/50 text-rose-600 border-rose-200 dark:border-rose-900/50'
-                : 'bg-stone-50 dark:bg-stone-950/50 text-[var(--color-imamu-accent)] border-amber-200 dark:border-stone-900/50'
+                : 'bg-stone-50 dark:bg-stone-950/50 text-[var(--color-imamu-accent)] border-slate-200/80 dark:border-zinc-700/80'
             }`}>
               {confirmModal.type === 'delete-user' && <Trash2 className="w-7 h-7" />}
               {confirmModal.type === 'toggle-ban' && <Ban className="w-7 h-7" />}

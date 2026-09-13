@@ -3,22 +3,28 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../lib/AuthContext';
 import {
-  ShieldAlert, ShieldCheck, Calendar, BookOpen,
+  ShieldAlert, ShieldCheck, Shield, Calendar, BookOpen,
   Trash2, Link as LinkIcon, Download, Upload, Plus, X,
   Users, Settings, HelpCircle, ExternalLink, Server, Command,
-  CheckCircle2, AlertTriangle, Info, XCircle, RefreshCw, Zap, 
-  LayoutDashboard, Newspaper, GraduationCap, Link2, Folder, Edit3, Send, Mail, HeartHandshake
+  CheckCircle2, AlertTriangle, Info, XCircle, RefreshCw, Zap, Loader2,
+  LayoutDashboard, Newspaper, GraduationCap, Link2, Folder, Edit3, Send, Mail, HeartHandshake, MessageSquare
 } from 'lucide-react';
 import { TutorialsTab } from '../components/TutorialsTab';
 import CreateCourseModal from '../components/CreateCourseModal';
 import CreateResourceModal from '../components/CreateResourceModal';
 import CreateEventModal from '../components/CreateEventModal';
+import CreateAuthenticatedAccountModal from '../components/CreateAuthenticatedAccountModal';
+import { AuthenticatedAccountDashboardModal } from '../components/AuthenticatedAccountDashboardModal';
+import { AuthenticatedAccountProfileModal } from '../components/AuthenticatedAccountProfileModal';
 import AdminDashboardTab from './admin/AdminDashboardTab';
 import AdminUsersTab from './admin/AdminUsersTab';
 import AdminContributorsTab from './admin/AdminContributorsTab';
+import AdminFeedbackTab from './admin/AdminFeedbackTab';
+import AdminSettingsTab from './admin/AdminSettingsTab';
+import CommandPalette from './admin/CommandPalette';
 import { parseDate, formatDate } from '../lib/date-utils';
 
-type Tab = 'dashboard' | 'users' | 'contributors' | 'news_sources' | 'majors' | 'events' | 'subjects' | 'resources' | 'tutorials' | 'newbie_links' | 'settings';
+type Tab = 'dashboard' | 'users' | 'contributors' | 'news_sources' | 'majors' | 'events' | 'subjects' | 'resources' | 'tutorials' | 'feedback' | 'settings';
 
 interface Toast {
   id: string;
@@ -33,7 +39,6 @@ interface Stats {
   events: number;
   news: number;
   tutorials: number;
-  newbieLinks: number;
   newsSources: number;
   recentUsers7d: number;
   recentUsers30d: number;
@@ -81,66 +86,6 @@ function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id
   );
 }
 
-// ============================================================================
-// COMMAND PALETTE
-// ============================================================================
-function CommandPalette({ open, onClose, onSelect, tabs }: { open: boolean; onClose: () => void; onSelect: (tab: Tab) => void; tabs: { id: Tab; label: string; icon: React.ReactNode }[] }) {
-  const [query, setQuery] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (open) {
-      setQuery('');
-      setTimeout(() => inputRef.current?.focus(), 50);
-    }
-  }, [open]);
-
-  if (!open) return null;
-
-  const filtered = tabs.filter(t => t.label.toLowerCase().includes(query.toLowerCase()));
-
-  return (
-    <div className="fixed inset-0 z-[90] flex items-start justify-center pt-[20vh]" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-      <div
-        className="relative w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl border"
-        style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--border-color)' }}>
-          <Command className="w-5 h-5 opacity-40" />
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="Search admin sections..."
-            className="flex-1 bg-transparent outline-none text-sm"
-            style={{ color: 'var(--text-main)' }}
-            onKeyDown={e => {
-              if (e.key === 'Escape') onClose();
-              if (e.key === 'Enter' && filtered.length > 0) { onSelect(filtered[0].id); onClose(); }
-            }}
-          />
-          <kbd className="text-[10px] font-mono px-1.5 py-0.5 rounded border opacity-40" style={{ borderColor: 'var(--border-color)' }}>ESC</kbd>
-        </div>
-        <div className="max-h-64 overflow-y-auto p-2">
-          {filtered.map(t => (
-            <button
-              key={t.id}
-              onClick={() => { onSelect(t.id); onClose(); }}
-              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition hover:bg-[var(--bg-subtle)]"
-              style={{ color: 'var(--text-main)' }}
-            >
-              {t.icon}
-              {t.label}
-            </button>
-          ))}
-          {filtered.length === 0 && <div className="text-center py-6 text-sm opacity-40">No results</div>}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export function AdminPage() {
   const { user, dbUser, loading: authLoading } = useAuth();
@@ -168,7 +113,6 @@ export function AdminPage() {
   const [subjects, setSubjects] = useState<any[]>([]);
   const [tutorialSections, setTutorialSections] = useState<any[]>([]);
   const [tutorials, setTutorials] = useState<any[]>([]);
-  const [newbieLinks, setNewbieLinks] = useState<any[]>([]);
   const [resourcesList, setResourcesList] = useState<any[]>([]);
   const [resourceSearch, setResourceSearch] = useState('');
   const [resourceFilterType, setResourceFilterType] = useState('ALL');
@@ -176,7 +120,27 @@ export function AdminPage() {
   const [telegramChannelInput, setTelegramChannelInput] = useState('');
   const [isExtractingTelegram, setIsExtractingTelegram] = useState(false);
 
-  const [sourceForm, setSourceForm] = useState<{ id?: number; handle: string }>({ handle: '' });
+  const [sourceForm, setSourceForm] = useState<{
+    id?: number;
+    displayName: string;
+    handle: string;
+    telegramChannel: string;
+    bio: string;
+    bannerUrl: string;
+    profilePicUrl: string;
+    assignedUserUid: string;
+  }>({
+    displayName: '',
+    handle: '',
+    telegramChannel: '',
+    bio: '',
+    bannerUrl: '',
+    profilePicUrl: '',
+    assignedUserUid: ''
+  });
+  const [selectedAdminAccount, setSelectedAdminAccount] = useState<any | null>(null);
+  const [isCreateAccountModalOpen, setIsCreateAccountModalOpen] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<any | null>(null);
   const [majorForm, setMajorForm] = useState<{
     id?: number; name: string; pdfUrl: string;
     courses: { subjectId: number; optionalGroup: string; optionalGroupReqCount: string }[];
@@ -215,7 +179,6 @@ export function AdminPage() {
   });
 
   const [eventForm, setEventForm] = useState<{ id?: number; title: string; date: string; description: string; isHoliday?: boolean; isHolidayEnd?: boolean; isSemesterStart?: boolean; isSemesterEnd?: boolean; isEid?: boolean; isNationalDay?: boolean }>({ title: '', date: '', description: '', isHoliday: false, isHolidayEnd: false, isSemesterStart: false, isSemesterEnd: false, isEid: false, isNationalDay: false });
-  const [newbieLinkForm, setNewbieLinkForm] = useState<{ id?: number; title: string; url: string; description: string }>({ title: '', url: '', description: '' });
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
   const [isResourceModalOpen, setIsResourceModalOpen] = useState(false);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
@@ -247,44 +210,38 @@ export function AdminPage() {
     avatarUrl?: string;
     bannerUrl?: string;
     description?: string;
-  }>({ title: '', type: 'course_hub', url: '', description: '', driveLink: '', boxLink: '', whatsappLink: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', bannerUrl: '' });
+    sectionsEnabled?: boolean;
+  }>({ title: '', type: 'course_hub', url: '', description: '', driveLink: '', boxLink: '', whatsappLink: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', bannerUrl: '', sectionsEnabled: true });
 
   // Modals
   const [deleteModal, setDeleteModal] = useState<{ url: string; message: string } | null>(null);
 
-  // Test Email State (Using Main Route: /api/auth/send-code)
-  const [testEmailRecipient, setTestEmailRecipient] = useState('');
-  const [testEmailCode, setTestEmailCode] = useState('');
-  const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
+  const [isClearingSections, setIsClearingSections] = useState(false);
 
-  const handleSendTestEmail = async () => {
-    if (!testEmailRecipient || !testEmailRecipient.trim()) {
-      toast('error', 'يرجى كتابة البريد الإلكتروني أو الرقم الجامعي');
+  const handleClearAllSections = async () => {
+    if (!confirm('⚠️ هل أنت متأكد من مسح وحذف كافة الشعب وجروبات الواتساب لجميع المواد؟\n\nتنويه: يُستخدم هذا الزر لتصفير الشعب مع بداية كل ترم دراسي جديد. لا يمكن التراجع عن هذه العملية.')) {
       return;
     }
-    setIsSendingTestEmail(true);
-    try {
-      const res = await fetch('/api/auth/send-code', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          email: testEmailRecipient.trim(),
-          customCode: testEmailCode.trim() || undefined
-        })
-      });
 
-      const data = await res.json();
-      if (res.ok && data.success) {
-        toast('success', data.message || 'تم إرسال رمز التحقق بنجاح!');
+    setIsClearingSections(true);
+    try {
+      const headers = await authHeaders();
+      const res = await fetch('/api/admin/sections/clear-all', {
+        method: 'DELETE',
+        headers
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        toast('success', data.message || `تم مسح ${data.count || 0} شعبة بنجاح!`);
+        fetchData();
       } else {
-        toast('error', data.error || 'فشل إرسال رمز التحقق');
+        toast('error', data.error || 'فشل مسح الشعب');
       }
-    } catch (e: any) {
-      toast('error', 'حدث خطأ في الاتصال بالخادم');
+    } catch (err: any) {
+      console.error(err);
+      toast('error', 'حدث خطأ أثناء الاتصال بالخادم لمسح الشعب');
     } finally {
-      setIsSendingTestEmail(false);
+      setIsClearingSections(false);
     }
   };
 
@@ -293,7 +250,7 @@ export function AdminPage() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get('tab') as Tab;
-      if (tabParam && ['dashboard', 'users', 'news_sources', 'majors', 'events', 'subjects', 'resources', 'tutorials', 'newbie_links', 'settings'].includes(tabParam)) {
+      if (tabParam && ['dashboard', 'users', 'news_sources', 'majors', 'events', 'subjects', 'resources', 'tutorials', 'feedback', 'settings'].includes(tabParam)) {
         setActiveTab(tabParam);
       }
     }
@@ -310,17 +267,17 @@ export function AdminPage() {
 
   // Tab definitions
   const tabDefs: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
-    { id: 'users', label: 'User Management', icon: <Users className="w-5 h-5" /> },
-    { id: 'contributors', label: 'Contributors & Recognition', icon: <HeartHandshake className="w-5 h-5" /> },
-    { id: 'news_sources', label: 'News Sources', icon: <Newspaper className="w-5 h-5" /> },
-    { id: 'majors', label: 'Academic Majors', icon: <GraduationCap className="w-5 h-5" /> },
-    { id: 'events', label: 'Calendar Dates', icon: <Calendar className="w-5 h-5" /> },
-    { id: 'subjects', label: 'Academic Courses', icon: <BookOpen className="w-5 h-5" /> },
-    { id: 'resources', label: 'Course Resources', icon: <Folder className="w-5 h-5" /> },
-    { id: 'tutorials', label: 'Tutorials Manager', icon: <HelpCircle className="w-5 h-5" /> },
-    { id: 'newbie_links', label: 'Newbie Links', icon: <Link2 className="w-5 h-5" /> },
-    { id: 'settings', label: 'Global Settings', icon: <Settings className="w-5 h-5" /> },
+    { id: 'dashboard', label: 'لوحة التحكم', icon: <LayoutDashboard className="w-5 h-5" /> },
+    { id: 'users', label: 'إدارة المستخدمين', icon: <Users className="w-5 h-5" /> },
+    { id: 'contributors', label: 'المساهمون والتقدير', icon: <HeartHandshake className="w-5 h-5" /> },
+    { id: 'news_sources', label: 'حسابات الجهات', icon: <Shield className="w-5 h-5" /> },
+    { id: 'majors', label: 'التخصصات الأكاديمية', icon: <GraduationCap className="w-5 h-5" /> },
+    { id: 'events', label: 'المواعيد والتقويم', icon: <Calendar className="w-5 h-5" /> },
+    { id: 'subjects', label: 'المقررات الأكاديمية', icon: <BookOpen className="w-5 h-5" /> },
+    { id: 'resources', label: 'المصادر والمراجع', icon: <Folder className="w-5 h-5" /> },
+    { id: 'tutorials', label: 'إدارة شروحات الدليلة', icon: <HelpCircle className="w-5 h-5" /> },
+    { id: 'feedback', label: 'البلاغات والتقييمات', icon: <MessageSquare className="w-5 h-5" /> },
+    { id: 'settings', label: 'الإعدادات العامة', icon: <Settings className="w-5 h-5" /> },
   ];
 
   // Granular admin permissions filter
@@ -344,8 +301,7 @@ export function AdminPage() {
     if (tabId === 'resources') return userPerms.includes('resources');
     if (tabId === 'events') return userPerms.includes('dates');
     if (tabId === 'news_sources') return userPerms.includes('news');
-    if (tabId === 'tutorials') return userPerms.includes('tutorials');
-    if (tabId === 'newbie_links') return userPerms.includes('newbie');
+    if (tabId === 'tutorials' || tabId === 'feedback') return userPerms.includes('tutorials') || userPerms.includes('feedback');
     if (tabId === 'settings') return userPerms.includes('logs');
     return true;
   };
@@ -385,11 +341,10 @@ export function AdminPage() {
       fetch('/api/admin/global_settings', opts).then(r => r.ok ? r.json() : { fetchRangeDays: 30, autoDeleteDays: 30 }),
       fetch('/api/tutorials/sections', opts).then(r => r.ok && r.json()),
       fetch('/api/tutorials', opts).then(r => r.ok && r.json()),
-      fetch('/api/newbie/links', opts).then(r => r.ok && r.json()),
       fetch('/api/resources', opts).then(r => r.ok && r.json()),
       fetch('/api/admin/stats', opts).then(r => r.ok ? r.json() : null),
       fetch('/api/admin/health', opts).then(r => r.ok ? r.json() : null),
-    ]).then(([ns, m, e, s, gs, ts, tuts, nl, resList, st, hl]) => {
+    ]).then(([ns, m, e, s, gs, ts, tuts, resList, st, hl]) => {
       if (ns) setNewsSources(ns);
       if (m) setMajors(m);
       if (e) setEvents(e);
@@ -397,7 +352,6 @@ export function AdminPage() {
       if (gs) setGlobalSettings(gs);
       if (ts) setTutorialSections(ts);
       if (tuts) setTutorials(tuts);
-      if (nl) setNewbieLinks(nl);
       if (resList) setResourcesList(resList);
       if (st) setStats(st);
       if (hl) setHealth(hl);
@@ -474,7 +428,6 @@ export function AdminPage() {
     const prevEvents = [...events];
     const prevMajors = [...majors];
     const prevTutorials = [...tutorials];
-    const prevNewbieLinks = [...newbieLinks];
     const prevNewsSources = [...newsSources];
 
     if (targetUrl.includes('/api/admin/subjects/')) {
@@ -489,8 +442,6 @@ export function AdminPage() {
       setMajors(prev => prev.filter(m => String(m.id) !== rawId));
     } else if (targetUrl.includes('/api/admin/tutorials/')) {
       setTutorials(prev => prev.filter(t => String(t.id) !== rawId));
-    } else if (targetUrl.includes('/api/admin/newbie/links/')) {
-      setNewbieLinks(prev => prev.filter(l => String(l.id) !== rawId));
     } else if (targetUrl.includes('/api/admin/news_sources/')) {
       setNewsSources(prev => prev.filter(ns => String(ns.id) !== rawId && ns.handle !== rawId));
     }
@@ -512,7 +463,6 @@ export function AdminPage() {
         setEvents(prevEvents);
         setMajors(prevMajors);
         setTutorials(prevTutorials);
-        setNewbieLinks(prevNewbieLinks);
         setNewsSources(prevNewsSources);
         const err = await res.json().catch(() => ({}));
         toast('error', err.error || err.message || 'Failed to delete'); 
@@ -525,7 +475,6 @@ export function AdminPage() {
       setEvents(prevEvents);
       setMajors(prevMajors);
       setTutorials(prevTutorials);
-      setNewbieLinks(prevNewbieLinks);
       setNewsSources(prevNewsSources);
       console.error(e); 
       toast('error', 'Network error'); 
@@ -637,41 +586,83 @@ export function AdminPage() {
   // TAB: NEWS SOURCES
   // ============================================================================
   const renderNewsSources = () => (
-    <div className="space-y-6">
+    <div className="space-y-6" dir="rtl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h3 className="text-2xl font-serif font-bold" style={{ color: 'var(--text-main)' }}>News Sources</h3>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Track handles & RSS feeds to fetch announcements</p>
+          <h3 className="text-2xl font-serif font-bold" style={{ color: 'var(--text-main)' }}>حسابات الجهات (Entity Accounts)</h3>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>إنشاء وتعيين الحسابات الرسمية، ربط المستخدمين (User UID)، وإدارة السحب التلقائي من التليقرام</p>
         </div>
-        <button
-          disabled={isFetchingAll}
-          onClick={() => handleFetchPosts('', true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition shadow-sm disabled:opacity-50 cursor-pointer"
-        >
-          <RefreshCw className={`w-4 h-4 ${isFetchingAll ? 'animate-spin' : ''}`} />
-          <span>{isFetchingAll ? 'جاري التحديث...' : 'Fetch All Now'}</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => {
+              setEditingAccount(null);
+              setIsCreateAccountModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-[var(--color-imamu-brown)] text-white hover:bg-[var(--color-imamu-brown-dark)] transition shadow-md cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>إنشاء حساب موثق جديد</span>
+          </button>
+          
+          <button
+            disabled={isFetchingAll}
+            onClick={() => handleFetchPosts('', true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition shadow-sm disabled:opacity-50 cursor-pointer"
+          >
+            <RefreshCw className={`w-4 h-4 ${isFetchingAll ? 'animate-spin' : ''}`} />
+            <span>{isFetchingAll ? 'جاري التحديث...' : 'تحديث وسحب جميع القنوات'}</span>
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* Add Source + Telegram Extractor + Settings */}
+        {/* Creation Form + Telegram Extractor + Settings */}
         <div className="space-y-4">
-          {/* Telegram Extractor Card */}
+          
+          {/* Create Authenticated Account Card */}
+          <div className="rounded-2xl p-5 border space-y-4 shadow-sm" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-2xl bg-[var(--color-imamu-brown)]/10 text-[var(--color-imamu-brown)]">
+                <Shield className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="font-bold text-sm" style={{ color: 'var(--text-main)' }}>إضافة حساب موثق جديد</h4>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>إنشاء حساب جديد، تعيين مدراء، وربط قنوات تليقرام</p>
+              </div>
+            </div>
+
+            <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+              من خلال النافذة المنبثقة، يمكنك تعيين عدة مدراء بـ User UID وإضافة عدة قنوات تليقرام للسحب التلقائي.
+            </p>
+
+            <button
+              onClick={() => {
+                setEditingAccount(null);
+                setIsCreateAccountModalOpen(true);
+              }}
+              className="w-full bg-[var(--color-imamu-brown)] text-white px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-[var(--color-imamu-brown-dark)] transition cursor-pointer shadow-sm flex items-center justify-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>فتح نافذة إنشاء حساب موثق</span>
+            </button>
+          </div>
+
+          {/* Telegram Extractor Quick Tools */}
           <div className="rounded-2xl p-5 border space-y-4 shadow-sm" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
             <div className="flex items-center gap-2">
               <div className="p-2 rounded-xl bg-sky-500/10 text-sky-500">
                 <Send className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>Telegram Channel Extractor (30 Posts)</h4>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Extract last 30 messages from any public Telegram channel and publish to News page.</p>
+                <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>سحب منشورات تليقرام سريعة (30 خبر)</h4>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>استخراج ونشر آخر 30 منشور مباشرة من أي قناة تليقرام عامة</p>
               </div>
             </div>
             
             <div className="flex flex-col gap-2">
               <input
                 type="text"
-                placeholder="e.g. IMAMU_NEWS or https://t.me/s/channel"
+                placeholder="مثال: IMAMU_NEWS أو t.me/s/channel"
                 value={telegramChannelInput}
                 onChange={e => setTelegramChannelInput(e.target.value)}
                 className="w-full py-2.5 px-3 rounded-xl text-sm border font-mono"
@@ -680,7 +671,7 @@ export function AdminPage() {
               <button
                 disabled={isExtractingTelegram || !telegramChannelInput.trim()}
                 onClick={handleExtractTelegram}
-                className="w-full bg-sky-600 hover:bg-sky-500 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer shadow-xs"
+                className="w-full bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white px-4 py-2.5 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer shadow-xs"
               >
                 {isExtractingTelegram ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 <span>{isExtractingTelegram ? 'جاري استخراج ورفع 30 خبر...' : 'استخراج ونشر 30 خبر من التليقرام'}</span>
@@ -688,89 +679,116 @@ export function AdminPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl p-5 border space-y-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-            <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>Add News Source (Telegram / RSS)</h4>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Enter a Telegram channel handle or RSS Feed URL.</p>
-            <input
-              type="text"
-              placeholder="Channel Handle (e.g. IMAMU_NEWS) or URL"
-              value={sourceForm.handle}
-              onChange={e => setSourceForm({ ...sourceForm, handle: e.target.value.trim() })}
-              className="w-full py-2 px-3 rounded-xl text-sm border"
-              style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
-            />
-            <button
-              onClick={() => handlePost('/api/admin/news_sources', sourceForm, () => setSourceForm({ handle: '' }))}
-              className="w-full bg-[var(--color-imamu-brown)] text-white px-4 py-2 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-brown-light)] transition"
-            >
-              Add Source
-            </button>
-          </div>
-
-          <div className="rounded-2xl p-5 border space-y-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-            <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>Automation Settings</h4>
-            <div className="space-y-3">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Fetch Range (Days)</label>
-                <input type="number" min="1" value={globalSettings.fetchRangeDays} onChange={e => setGlobalSettings((s: any) => ({ ...s, fetchRangeDays: parseInt(e.target.value) || 30 }))} className="py-2 px-3 rounded-xl text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Auto-Delete Older Than (Days)</label>
-                <input type="number" min="1" value={globalSettings.autoDeleteDays} onChange={e => setGlobalSettings((s: any) => ({ ...s, autoDeleteDays: parseInt(e.target.value) || 30 }))} className="py-2 px-3 rounded-xl text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-              </div>
-              <button
-                className="w-full bg-[var(--color-imamu-brown)] text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-brown-light)] transition"
-                onClick={() => handlePostWithMethod('/api/admin/global_settings', 'PUT', globalSettings, () => toast('success', 'Settings saved!'))}
-              >
-                Save Settings
-              </button>
-            </div>
-          </div>
         </div>
 
-        {/* Sources List */}
+        {/* Sources & Accounts List */}
         <div className="lg:col-span-2">
-          <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-            <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border-color)' }}>
-              <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>Current Sources ({newsSources.length})</h4>
+          <div className="rounded-2xl border overflow-hidden shadow-sm" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <div className="px-5 py-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-color)' }}>
+              <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>الحسابات الموثقة الحالية ({newsSources.length})</h4>
             </div>
-            <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
-              {newsSources.map(s => (
-                <div key={s.id} className="p-4 flex flex-col xl:flex-row xl:items-center justify-between gap-4 transition hover:bg-[var(--bg-subtle)]" style={{ borderColor: 'var(--border-color)' }}>
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-sky-500/10 rounded-full flex items-center justify-center shrink-0 overflow-hidden">
-                      {s.profilePicUrl ? <img src={s.profilePicUrl} className="w-full h-full object-cover" /> : <Send className="w-5 h-5 text-sky-500" />}
-                    </div>
-                    <div>
-                      <div className="font-semibold text-lg" style={{ color: 'var(--text-main)' }}>@{s.handle}</div>
-                      <div className="text-xs mt-1 flex gap-2 flex-wrap" style={{ color: 'var(--text-muted)' }}>
-                        <span className="font-medium px-2 py-0.5 rounded" style={{ background: 'var(--bg-subtle)' }}>{s.newsCount || 0} posts</span>
-                        <span style={{ color: 'var(--border-color)' }}>•</span>
-                        <span>Last fetched: {s.lastFetched ? formatDate(s.lastFetched, 'ar-full') : 'Never'}</span>
+            <div className="divide-y divide-slate-100 dark:divide-zinc-800/60">
+              {newsSources.map(s => {
+                let assignedArr: string[] = [];
+                if (s.assignedUsers) {
+                  try {
+                    assignedArr = typeof s.assignedUsers === 'string' ? JSON.parse(s.assignedUsers) : s.assignedUsers;
+                  } catch (e) {}
+                }
+
+                let tgChannelsArr: string[] = [];
+                if (s.telegramChannels) {
+                  try {
+                    tgChannelsArr = typeof s.telegramChannels === 'string' ? JSON.parse(s.telegramChannels) : s.telegramChannels;
+                  } catch (e) {}
+                }
+
+                return (
+                  <div key={s.id} className="p-4 flex flex-col xl:flex-row xl:items-center justify-between gap-4 transition hover:bg-slate-100/60 dark:hover:bg-zinc-800/60">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className="w-12 h-12 bg-sky-500/10 rounded-full flex items-center justify-center shrink-0 overflow-hidden border border-slate-200 dark:border-zinc-700">
+                        {s.profilePicUrl ? <img src={s.profilePicUrl} className="w-full h-full object-cover" /> : <Shield className="w-5 h-5 text-[var(--color-imamu-brown)]" />}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-bold text-base flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
+                          <span>{s.displayName || s.handle}</span>
+                          <span className="text-xs font-mono text-neutral-400">(@{s.handle})</span>
+                        </div>
+                        {s.bio && <p className="text-xs text-neutral-500 line-clamp-1 mt-0.5">{s.bio}</p>}
+                        <div className="text-xs mt-1.5 flex gap-2 flex-wrap items-center" style={{ color: 'var(--text-muted)' }}>
+                          <span className="font-medium px-2 py-0.5 rounded bg-stone-100 dark:bg-stone-900/50 text-[var(--color-imamu-brown)]">
+                            {assignedArr.length} مدراء معينون
+                          </span>
+                          <span style={{ color: 'var(--border-color)' }}>•</span>
+                          <span className="font-medium px-2 py-0.5 rounded bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400">
+                            {tgChannelsArr.length || (s.telegramChannel ? 1 : 0)} تليقرام
+                          </span>
+                          <span style={{ color: 'var(--border-color)' }}>•</span>
+                          <span>المسحوب: {s.lastFetched ? formatDate(s.lastFetched, 'ar-display') : 'لم يسحب'}</span>
+                        </div>
                       </div>
                     </div>
+
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => window.open(`/@/${encodeURIComponent(s.handle.replace(/^@/, ''))}/dashboard`, '_blank')}
+                        className="bg-[var(--color-imamu-brown)] text-white px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-[var(--color-imamu-brown-dark)] transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                      >
+                        <Settings className="w-3.5 h-3.5" />
+                        <span>لوحة التحكم</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setEditingAccount(s);
+                          setIsCreateAccountModalOpen(true);
+                        }}
+                        className="bg-amber-500/10 text-amber-600 dark:text-amber-400 px-3 py-1.5 rounded-xl text-xs font-semibold hover:bg-amber-500/20 transition flex items-center gap-1.5 cursor-pointer"
+                        title="تعديل الحساب"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        <span>تعديل</span>
+                      </button>
+
+                      <button onClick={() => handleDelete(`/api/admin/news_sources/${s.id}`, `@${s.handle}`)} className="p-1.5 rounded-xl hover:bg-red-500/10 transition" title="حذف الحساب">
+                        <Trash2 className="w-4 h-4 text-red-400" />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button 
-                      disabled={fetchingHandle === s.handle}
-                      onClick={() => handleFetchPosts(s.handle, false)} 
-                      className="bg-[var(--color-imamu-brown)/10] text-[var(--color-imamu-accent)] px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-[var(--color-imamu-brown-light)]/20 transition whitespace-nowrap disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
-                    >
-                      {fetchingHandle === s.handle ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
-                      <span>{fetchingHandle === s.handle ? 'جاري السحب...' : 'Fetch Now'}</span>
-                    </button>
-                    <button onClick={() => handleDelete(`/api/admin/news_sources/${s.handle}/posts`, `all posts from @${s.handle}`)} className="bg-red-500/10 text-red-400 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-500/20 transition whitespace-nowrap">Empty Posts</button>
-                    <button onClick={() => handleDelete(`/api/admin/news_sources/${s.id}`, `@${s.handle}`)} className="p-1.5 rounded-lg hover:bg-red-500/10 transition" title="Delete Source">
-                      <Trash2 className="w-5 h-5 text-red-400" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-              {newsSources.length === 0 && <div className="py-12 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No sources added yet.</div>}
+                );
+              })}
+              {newsSources.length === 0 && <div className="py-12 text-center text-sm" style={{ color: 'var(--text-muted)' }}>لا توجد حسابات موثقة مضافة حتى الآن.</div>}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Create / Edit Authenticated Account Popup Modal */}
+      {isCreateAccountModalOpen && (
+        <CreateAuthenticatedAccountModal
+          isOpen={isCreateAccountModalOpen}
+          onClose={() => {
+            setIsCreateAccountModalOpen(false);
+            setEditingAccount(null);
+          }}
+          editAccount={editingAccount}
+          onSuccess={() => {
+            fetchData();
+            toast('success', editingAccount ? 'تم تحديث الحساب الموثق بنجاح' : 'تم إنشاء الحساب الموثق بنجاح!');
+          }}
+        />
+      )}
+
+      {/* Admin Account Dashboard Modal */}
+      {selectedAdminAccount && (
+        <AuthenticatedAccountDashboardModal
+          isOpen={!!selectedAdminAccount}
+          onClose={() => setSelectedAdminAccount(null)}
+          account={selectedAdminAccount}
+          currentUser={user}
+          onAccountUpdate={() => fetchData()}
+        />
+      )}
     </div>
   );
 
@@ -819,7 +837,7 @@ export function AdminPage() {
               <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>Current Majors ({majors.length})</h4>
             </div>
             <input type="text" placeholder="Search majors..." value={majorSearch} onChange={e => setMajorSearch(e.target.value)} className="w-full py-1.5 px-3 rounded-xl text-xs border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-            <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
+            <div className="divide-y divide-slate-100 dark:divide-zinc-800/60">
               {majors.filter(m => m.name?.toLowerCase().includes(majorSearch.toLowerCase())).slice(0, majorLimit).map(m => (
                 <div key={m.id} className="py-3 flex items-center justify-between group">
                   <div className="min-w-0 flex-1">
@@ -835,7 +853,7 @@ export function AdminPage() {
                         const batches = Array.from(bMap.entries()).map(([name, reqCount]) => ({ name, reqCount }));
                         setMajorForm({ ...m, courses, batches });
                       }}
-                      className="px-2 py-1 rounded transition text-xs font-semibold hover:bg-[var(--bg-subtle)]"
+                      className="px-2.5 py-1.5 rounded-xl transition text-xs font-semibold hover:bg-slate-100/60 dark:hover:bg-zinc-800/60"
                       style={{ color: 'var(--text-muted)' }}
                     >Edit</button>
                     <button onClick={() => handleDelete(`/api/admin/majors/${m.id}`, m.name)} className="p-1.5 rounded transition hover:bg-red-500/10"><Trash2 className="w-4 h-4 text-red-400" /></button>
@@ -1065,15 +1083,14 @@ export function AdminPage() {
 
           {/* Events Vertical List */}
           <div className="lg:col-span-2 space-y-3">
-            <div className="rounded-2xl border divide-y overflow-hidden shadow-2xs" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <div className="rounded-2xl border divide-y divide-slate-100 dark:divide-zinc-800/60 overflow-hidden shadow-2xs" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
               {displayedEvents.map(e => {
                 const dateDisplay = e.date;
 
                 return (
                   <div 
                     key={e.id} 
-                    className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all duration-150 hover:bg-[var(--bg-subtle)] group"
-                    style={{ borderColor: 'var(--border-color)' }}
+                    className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all duration-150 hover:bg-slate-100/60 dark:hover:bg-zinc-800/60 group"
                   >
                     <div className="flex-1 min-w-0 space-y-1.5">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -1208,11 +1225,11 @@ export function AdminPage() {
           </div>
         </div>
 
-        <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
+        <div className="divide-y divide-slate-100 dark:divide-zinc-800/60">
           {subjects.filter(s => s.code?.toLowerCase().includes(subjectSearch.toLowerCase()) || s.name?.toLowerCase().includes(subjectSearch.toLowerCase())).slice(0, subjectLimit).map(s => (
-            <div key={s.id} className="py-3.5 px-5 flex items-center justify-between group hover:bg-[var(--bg-subtle)] transition">
+            <div key={s.id} className="py-3.5 px-5 flex items-center justify-between group hover:bg-slate-100/60 dark:hover:bg-zinc-800/60 transition">
               <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className="font-mono text-xs px-2.5 py-1 rounded-lg border font-bold shrink-0 bg-[var(--color-imamu-brown)/10] text-[var(--color-imamu-accent)] border-amber-700/20">{s.code}</div>
+                <div className="font-mono text-xs px-2.5 py-1 rounded-lg border font-bold shrink-0 bg-[var(--color-imamu-brown)/10] text-[var(--color-imamu-accent)] border-slate-200/80 dark:border-zinc-700/80">{s.code}</div>
                 <div className="flex-1 min-w-0">
                   <div className="font-bold text-sm truncate" style={{ color: 'var(--text-main)' }}>{s.name}</div>
                   <div className="flex items-center gap-2 mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -1278,291 +1295,7 @@ export function AdminPage() {
   );
 
 
-  // ============================================================================
-  // TAB: NEWBIE LINKS
-  // ============================================================================
-  const renderNewbieLinks = () => (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-2xl font-serif font-bold" style={{ color: 'var(--text-main)' }}>Newbie Links</h3>
-        <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Manage orientation links for new students</p>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        <div>
-          <div className="rounded-2xl p-5 border space-y-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-            <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>{newbieLinkForm.id ? 'Edit Link' : 'Add New Link'}</h4>
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Title</label>
-                <input type="text" placeholder="e.g. Student Portal" value={newbieLinkForm.title} onChange={e => setNewbieLinkForm(s => ({ ...s, title: e.target.value }))} className="py-2 px-3 rounded-xl text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>URL</label>
-                <input type="text" placeholder="https://..." value={newbieLinkForm.url} onChange={e => setNewbieLinkForm(s => ({ ...s, url: e.target.value }))} className="py-2 px-3 rounded-xl text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Description</label>
-                <textarea placeholder="Brief description..." value={newbieLinkForm.description} onChange={e => setNewbieLinkForm(s => ({ ...s, description: e.target.value }))} className="py-2 px-3 rounded-xl min-h-[60px] text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-              </div>
-              <div className="flex gap-2 pt-1">
-                <button
-                  onClick={() => {
-                    const url = newbieLinkForm.id ? `/api/admin/newbie/links/${newbieLinkForm.id}` : '/api/admin/newbie/links';
-                    const method = newbieLinkForm.id ? 'PUT' : 'POST';
-                    handlePostWithMethod(url, method, newbieLinkForm, () => setNewbieLinkForm({ id: undefined, title: '', url: '', description: '' }));
-                  }}
-                  className="flex-1 bg-[var(--color-imamu-brown)] text-white py-2 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-brown-light)] transition"
-                >
-                  {newbieLinkForm.id ? 'Update Link' : 'Add Link'}
-                </button>
-                {newbieLinkForm.id && <button onClick={() => setNewbieLinkForm({ id: undefined, title: '', url: '', description: '' })} className="px-3 py-2 border rounded-xl text-sm font-medium transition hover:bg-[var(--bg-subtle)]" style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}>Cancel</button>}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="lg:col-span-2">
-          <div className="rounded-2xl border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-            <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border-color)' }}>
-              <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>Current Links ({newbieLinks.length})</h4>
-            </div>
-            <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
-              {newbieLinks.map((link: any) => (
-                <div key={link.id} className="py-3.5 px-5 flex items-center justify-between group transition hover:bg-[var(--bg-subtle)]">
-                  <div className="min-w-0 flex-1 pr-3">
-                    <div className="font-medium text-sm" style={{ color: 'var(--text-main)' }}>{link.title}</div>
-                    <a href={link.url} target="_blank" rel="noreferrer" className="text-xs text-[var(--color-imamu-brown)] hover:underline flex items-center gap-1 mt-0.5">
-                      <ExternalLink className="w-3 h-3" /> {link.url?.length > 50 ? link.url.slice(0, 50) + '...' : link.url}
-                    </a>
-                    {link.description && <p className="text-xs mt-1 truncate" style={{ color: 'var(--text-muted)' }}>{link.description}</p>}
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button onClick={() => setNewbieLinkForm({ id: link.id, title: link.title || '', url: link.url || '', description: link.description || '' })} className="px-2 py-1 rounded transition text-xs font-semibold hover:bg-[var(--bg-subtle)]" style={{ color: 'var(--text-muted)' }}>Edit</button>
-                    <button onClick={() => handleDelete(`/api/admin/newbie/links/${link.id}`, link.title)} className="p-1.5 rounded transition hover:bg-red-500/10"><Trash2 className="w-4 h-4 text-red-400" /></button>
-                  </div>
-                </div>
-              ))}
-              {newbieLinks.length === 0 && <div className="py-12 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No links added yet.</div>}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // ============================================================================
-  // TAB: SETTINGS
-  // ============================================================================
-  const renderSettings = () => (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-2xl font-serif font-bold" style={{ color: 'var(--text-main)' }}>Global Settings</h3>
-        <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Configure database backups, schedules, and mailing setups</p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        <div className="space-y-4">
-          <div className="rounded-2xl p-5 border space-y-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-            <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>Database Utilities</h4>
-            <div className="flex flex-col gap-3">
-              <label className="bg-[var(--color-imamu-brown)] text-white px-4 py-2 rounded-xl font-medium flex items-center justify-center gap-2 cursor-pointer text-sm hover:bg-[var(--color-imamu-brown-light)] transition w-full">
-                <Upload className="w-4 h-4" /> Import Database
-                <input type="file" accept=".json,.zip" className="hidden" onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  if (!window.confirm('WARNING: This will overwrite the current database. Are you sure?')) return;
-                  try {
-                    const t = await getToken();
-                    const formData = new FormData();
-                    formData.append('file', file);
-                    const res = await fetch('/api/admin/import-db', { method: 'POST', headers: { Authorization: `Bearer ${t}` }, body: formData });
-                    if (!res.ok) throw new Error('Failed');
-                    toast('success', 'Database imported! Reloading...');
-                    setTimeout(() => window.location.reload(), 1000);
-                  } catch { toast('error', 'Error importing database'); }
-                  e.target.value = '';
-                }} />
-              </label>
-              <button
-                onClick={async () => {
-                  try {
-                    const t = await getToken();
-                    const res = await fetch('/api/admin/export-db', { headers: { Authorization: `Bearer ${t}` } });
-                    if (!res.ok) throw new Error('Failed');
-                    const blob = await res.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `imamu_backup_${new Date().toISOString().split('T')[0]}.zip`;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
-                    toast('success', 'Database exported successfully');
-                  } catch { toast('error', 'Error exporting database'); }
-                }}
-                className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-medium flex items-center justify-center gap-2 text-sm hover:bg-emerald-700 transition w-full"
-              >
-                <Download className="w-4 h-4" /> Export Database
-              </button>
-            </div>
-          </div>
-
-
-          <div className="rounded-2xl p-5 border space-y-3" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-            <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>External API Settings</h4>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>API Endpoint Token</label>
-              <input type="text" value={globalSettings.apiToken || ''} onChange={e => setGlobalSettings((s: any) => ({ ...s, apiToken: e.target.value }))} placeholder="super_secret_token_123" className="py-2 px-3 rounded-xl text-sm border w-full" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-            </div>
-          </div>
-        </div>
-
-        <div className="lg:col-span-2 space-y-4">
-          <div className="rounded-2xl p-6 border space-y-6" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-            <div>
-              <h4 className="font-semibold text-sm mb-1" style={{ color: 'var(--text-main)' }}>IMAP Configuration (Direct Email Auth)</h4>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Enable students to log in directly via university credentials.</p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-b pb-5" style={{ borderColor: 'var(--border-color)' }}>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>IMAP Host</label>
-                <input type="text" value={globalSettings.imapHost || ''} onChange={e => setGlobalSettings((s: any) => ({ ...s, imapHost: e.target.value }))} placeholder="outlook.office365.com" className="py-2 px-3 rounded-xl text-sm border w-full" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>IMAP Port</label>
-                <input type="number" value={globalSettings.imapPort || ''} onChange={e => setGlobalSettings((s: any) => ({ ...s, imapPort: parseInt(e.target.value) || undefined }))} placeholder="993" className="py-2 px-3 rounded-xl text-sm border w-full" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-              </div>
-              <div className="flex flex-col justify-end pb-2">
-                <label className="flex items-center gap-2 cursor-pointer text-xs" style={{ color: 'var(--text-muted)' }}>
-                  <input type="checkbox" checked={globalSettings.imapSecure !== false} onChange={e => setGlobalSettings((s: any) => ({ ...s, imapSecure: e.target.checked }))} className="rounded" />
-                  <span>Use Secure TLS</span>
-                </label>
-              </div>
-            </div>
-
-            <div>
-              <h4 className="font-semibold text-sm mb-1" style={{ color: 'var(--text-main)' }}>SMTP Configuration (Verification Mails)</h4>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Required for email verifications and passcodes.</p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>SMTP Host</label>
-                <input type="text" value={globalSettings.smtpHost || ''} onChange={e => setGlobalSettings((s: any) => ({ ...s, smtpHost: e.target.value }))} placeholder="smtp.gmail.com" className="py-2 px-3 rounded-xl text-sm border w-full" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>SMTP Port</label>
-                <input type="number" value={globalSettings.smtpPort || ''} onChange={e => setGlobalSettings((s: any) => ({ ...s, smtpPort: parseInt(e.target.value) || undefined }))} placeholder="587" className="py-2 px-3 rounded-xl text-sm border w-full" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>SMTP Username</label>
-                <input type="text" value={globalSettings.smtpUser || ''} onChange={e => setGlobalSettings((s: any) => ({ ...s, smtpUser: e.target.value }))} placeholder="example@gmail.com" className="py-2 px-3 rounded-xl text-sm border w-full" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>SMTP Password</label>
-                <input type="password" value={globalSettings.smtpPass || ''} onChange={e => setGlobalSettings((s: any) => ({ ...s, smtpPass: e.target.value }))} placeholder="App Password" className="py-2 px-3 rounded-xl text-sm border w-full" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-              </div>
-            </div>
-
-            {/* Send Verification Code (Main Route: /api/auth/send-code) */}
-            <div className="pt-6 mt-6 border-t space-y-4" style={{ borderColor: 'var(--border-color)' }}>
-              <div>
-                <h4 className="font-semibold text-sm mb-1 flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
-                  <Mail className="w-4 h-4 text-[var(--color-imamu-accent)]" /> إرسال رمز التحقق عبر المسار الرئيسي (/api/auth/send-code)
-                </h4>
-                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>اختبار إرسال الرموز عبر المسار الرئيسي المعتمد بإنشاء الحسابات وتأكيد إعدادات SMTP.</p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>البريد الإلكتروني / الرقم الجامعي (Recipient) *</label>
-                  <input
-                    type="text"
-                    value={testEmailRecipient}
-                    onChange={e => setTestEmailRecipient(e.target.value)}
-                    placeholder="441000000 أو student@sm.imamu.edu.sa"
-                    className="py-2 px-3 rounded-xl text-sm border w-full"
-                    style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>رمز مخصص (Custom Code - اختياري)</label>
-                  <input
-                    type="text"
-                    value={testEmailCode}
-                    onChange={e => setTestEmailCode(e.target.value)}
-                    placeholder="توليد تلقائي 6 أرقام أو أدخل رمزك"
-                    className="py-2 px-3 rounded-xl text-sm border w-full"
-                    style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-start">
-                <button
-                  type="button"
-                  disabled={isSendingTestEmail || !testEmailRecipient.trim()}
-                  onClick={handleSendTestEmail}
-                  className="flex items-center gap-2 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white px-5 py-2 rounded-xl font-bold text-xs sm:text-sm transition disabled:opacity-50 cursor-pointer shadow-sm"
-                >
-                  {isSendingTestEmail ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>جاري إرسال الرمز...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-4 h-4" />
-                      <span>إرسال رمز التحقق</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t flex justify-end" style={{ borderColor: 'var(--border-color)' }}>
-              <button
-                className="btn-rise bg-[var(--color-imamu-brown)] text-white px-5 py-2 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-brown-light)] transition cursor-pointer"
-                onClick={() => handlePostWithMethod('/api/admin/global_settings', 'PUT', globalSettings, () => toast('success', 'Settings saved!'))}
-              >
-                Save All Settings
-              </button>
-            </div>
-          </div>
-
-          {/* System Health Panel */}
-          {health && (
-            <div className="rounded-2xl p-5 border space-y-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-              <h4 className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
-                <Server className="w-4 h-4 text-[var(--color-imamu-accent)]" /> System Information
-              </h4>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Node Version</span>
-                  <span className="text-sm font-mono font-medium" style={{ color: 'var(--text-main)' }}>{health.nodeVersion || 'N/A'}</span>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Platform</span>
-                  <span className="text-sm font-mono font-medium" style={{ color: 'var(--text-main)' }}>{health.platform || 'N/A'}</span>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>RSS Memory</span>
-                  <span className="text-sm font-mono font-medium" style={{ color: 'var(--text-main)' }}>
-                    {health.memory?.rss !== undefined 
-                      ? `${health.memory.rss} MB` 
-                      : health.memoryUsage?.rss !== undefined 
-                      ? `${Math.round(health.memoryUsage.rss / (1024 * 1024))} MB` 
-                      : 'N/A'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
 
   // ============================================================================
   // TAB: ACADEMIC RESOURCES (المصادر والمراجع الأكاديمية)
@@ -1575,16 +1308,28 @@ export function AdminPage() {
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Manage academic drives, summaries, past exams, and study links via resource wizard</p>
         </div>
 
-        <button
-          onClick={() => {
-            setResourceForm({ title: '', type: 'course_hub', url: '', description: '', driveLink: '', boxLink: '', whatsappLink: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', bannerUrl: '' });
-            setIsResourceModalOpen(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-semibold text-xs sm:text-sm rounded-xl transition shadow-sm border border-emerald-500/30 shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add New Resource</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
+          <button
+            onClick={handleClearAllSections}
+            disabled={isClearingSections}
+            className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-semibold text-xs sm:text-sm rounded-xl transition shadow-sm border border-rose-500/30 shrink-0 disabled:opacity-50"
+            title="مسح وتفريغ جميع شعب وجروبات الواتساب المضافة لكافة المواد للبدء بترم جديد"
+          >
+            {isClearingSections ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            <span>تفريغ الشعب (ترم جديد)</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setResourceForm({ title: '', type: 'course_hub', url: '', description: '', driveLink: '', boxLink: '', whatsappLink: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', bannerUrl: '', sectionsEnabled: true });
+              setIsResourceModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-semibold text-xs sm:text-sm rounded-xl transition shadow-sm border border-emerald-500/30 shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add New Resource</span>
+          </button>
+        </div>
       </div>
 
       <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
@@ -1619,7 +1364,7 @@ export function AdminPage() {
           </div>
         </div>
 
-        <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
+        <div className="divide-y divide-slate-100 dark:divide-zinc-800/60">
           {resourcesList
             .filter(r => {
               const matchSearch = !resourceSearch || 
@@ -1630,11 +1375,11 @@ export function AdminPage() {
               return matchSearch && matchType;
             })
             .map(r => (
-              <div key={r.id} className="p-4 flex items-center justify-between gap-4 transition hover:bg-[var(--bg-subtle)]">
+              <div key={r.id} className="p-4 flex items-center justify-between gap-4 transition hover:bg-slate-100/60 dark:hover:bg-zinc-800/60">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     {r.courseCode && (
-                      <span className="font-mono text-xs px-2.5 py-0.5 rounded-md font-bold bg-[var(--color-imamu-brown)/10] text-[var(--color-imamu-accent)] border border-amber-700/20">
+                      <span className="font-mono text-xs px-2.5 py-0.5 rounded-md font-bold bg-[var(--color-imamu-brown)/10] text-[var(--color-imamu-accent)] border border-slate-200/80 dark:border-zinc-700/80">
                         {r.courseCode}
                       </span>
                     )}
@@ -1697,7 +1442,8 @@ export function AdminPage() {
                         paidResourcesUrl: r.paidResourcesUrl || '',
                         avatarUrl: r.avatarUrl || '',
                         bannerUrl: r.bannerUrl || '',
-                        description: r.description || ''
+                        description: r.description || '',
+                        sectionsEnabled: r.sectionsEnabled !== false
                       });
                       setIsResourceModalOpen(true);
                     }}
@@ -1781,8 +1527,17 @@ export function AdminPage() {
       case 'subjects': return renderSubjects();
       case 'resources': return renderResources();
       case 'tutorials': return <TutorialsTab user={user} sections={tutorialSections} tutorials={tutorials} onRefresh={fetchData} />;
-      case 'newbie_links': return renderNewbieLinks();
-      case 'settings': return renderSettings();
+      case 'feedback': return <AdminFeedbackTab getToken={getToken} />;
+      case 'settings': return (
+        <AdminSettingsTab
+          globalSettings={globalSettings}
+          setGlobalSettings={setGlobalSettings}
+          getToken={getToken}
+          toast={toast}
+          handlePostWithMethod={handlePostWithMethod}
+          health={health}
+        />
+      );
       default: return null;
     }
   };
@@ -1799,9 +1554,9 @@ export function AdminPage() {
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
               <ShieldCheck className="w-6 h-6 text-white" />
             </div>
-            Admin Console
+            لوحة التحكم والإدارة
           </h1>
-          <p className="mt-1" style={{ color: 'var(--text-muted)' }}>Manage and monitor your platform</p>
+          <p className="mt-1" style={{ color: 'var(--text-muted)' }}>إدارة ومراقبة كافة أقسام المنصة</p>
         </div>
         <button
           onClick={() => setCmdOpen(true)}
@@ -1809,7 +1564,7 @@ export function AdminPage() {
           style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
         >
           <Command className="w-4 h-4" />
-          <span className="hidden sm:inline">Quick Navigate</span>
+          <span className="hidden sm:inline">التنقل السريع</span>
           <kbd className="text-[10px] font-mono px-1.5 py-0.5 rounded border ml-1" style={{ borderColor: 'var(--border-color)' }}>⌘K</kbd>
         </button>
       </div>
@@ -1843,7 +1598,50 @@ export function AdminPage() {
       </div>
 
       {/* Command Palette */}
-      <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} onSelect={setActiveTab} tabs={visibleTabs} />
+      <CommandPalette
+        open={cmdOpen}
+        onClose={() => setCmdOpen(false)}
+        onSelectTab={setActiveTab}
+        tabs={visibleTabs}
+        users={adminUsers}
+        newsSources={newsSources}
+        majors={majors}
+        subjects={subjects}
+        resources={resourcesList}
+        tutorials={tutorials}
+        events={events}
+        onSelectUser={(u) => {
+          setActiveTab('users');
+          setUserSearch(u.email || u.userName || u.handle || '');
+        }}
+        onSelectEntity={(s) => {
+          setActiveTab('news_sources');
+          setEditingAccount(s);
+          setIsCreateAccountModalOpen(true);
+        }}
+        onSelectSubject={(subj) => {
+          setActiveTab('subjects');
+          setSubjectSearch(subj.code || subj.name || '');
+        }}
+        onSelectMajor={(m) => {
+          setActiveTab('majors');
+          setMajorSearch(typeof m === 'string' ? m : m.name || '');
+        }}
+        onSelectResource={(r) => {
+          setActiveTab('resources');
+          setResourceSearch(r.title || '');
+        }}
+        onSelectTutorial={() => {
+          setActiveTab('tutorials');
+        }}
+        onSelectEvent={(ev) => {
+          setActiveTab('events');
+          setEventSearch(ev.title || '');
+        }}
+        onSearchUsersBackend={(q) => {
+          fetchUsers(q);
+        }}
+      />
 
       {/* Delete Modal */}
       {deleteModal && (
@@ -1853,11 +1651,11 @@ export function AdminPage() {
               <div className="w-12 h-12 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center mx-auto mb-4">
                 <Trash2 className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-main)' }}>Delete Confirmation</h3>
+              <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-main)' }}>تأكيد الحذف</h3>
               <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>{deleteModal.message}</p>
               <div className="flex gap-3">
-                <button onClick={() => setDeleteModal(null)} className="flex-1 py-2.5 rounded-xl font-medium transition border hover:bg-[var(--bg-subtle)]" style={{ borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>Cancel</button>
-                <button onClick={confirmDelete} className="flex-1 bg-red-600 text-white py-2.5 rounded-xl font-medium hover:bg-red-700 transition">Delete</button>
+                <button onClick={() => setDeleteModal(null)} className="flex-1 py-2.5 rounded-xl font-medium transition border hover:bg-[var(--bg-subtle)]" style={{ borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>إلغاء</button>
+                <button onClick={confirmDelete} className="flex-1 bg-red-600 text-white py-2.5 rounded-xl font-medium hover:bg-red-700 transition">حذف</button>
               </div>
             </div>
           </div>

@@ -1585,12 +1585,12 @@ export function TutorialsTab({
                   }
 
                   if (block.type === 'callout') {
-                    const variant = block.variant || 'info';
+                    const variant = (block.variant as string) || 'info';
                     const isWarning = variant === 'warning';
                     const isDanger = variant === 'danger' || variant === 'error';
                     const isSuccess = variant === 'success';
 
-                    const rawContent = (block.content || block.text || '').trim();
+                    const rawContent = (block.content || (block as any).text || '').trim();
                     let lines: string[] = [];
                     if (rawContent.includes('\n')) {
                       lines = rawContent.split(/\r?\n/).map((l: string) => l.trim()).filter(Boolean);

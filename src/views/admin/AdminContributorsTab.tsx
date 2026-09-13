@@ -377,7 +377,7 @@ export default function AdminContributorsTab() {
                       {c.userId && (
                         <span className="px-2 py-0.5 rounded-md bg-stone-100 dark:bg-stone-900/60 text-stone-700 dark:text-stone-300 font-mono border border-stone-200 dark:border-stone-800 flex items-center gap-1">
                           <Link2 className="w-3 h-3 text-[var(--color-imamu-accent)]" />
-                          <span>UID: {c.userId}</span>
+                          <span>معرّف الحساب: {c.userId}</span>
                         </span>
                       )}
                       {c.linkedMajor && (
@@ -577,10 +577,10 @@ export default function AdminContributorsTab() {
 
                 {/* User ID (UID / ID) link */}
                 <div>
-                  <label className="text-xs font-bold text-slate-700 dark:text-zinc-300 block mb-1.5">رقم المعرف المولد (User UID) بالقاعدة</label>
+                  <label className="text-xs font-bold text-slate-700 dark:text-zinc-300 block mb-1.5">رقم المعرف المولد بالقاعدة</label>
                   <input
                     type="text"
-                    placeholder="رقم المعرف المولد (UID) للمستخدم بالقاعدة"
+                    placeholder="رقم المعرف المولد للمستخدم بالقاعدة"
                     value={formUserId}
                     onChange={e => setFormUserId(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 text-xs text-slate-900 dark:text-white outline-hidden focus:ring-2 focus:ring-[var(--color-imamu-brown)]/20 font-mono"
@@ -642,28 +642,28 @@ export default function AdminContributorsTab() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   <input
                     type="url"
-                    placeholder="رابط لينكد إن LinkedIn"
+                    placeholder="رابط لينكد إن"
                     value={socialLinkedin}
                     onChange={e => setSocialLinkedin(e.target.value)}
                     className="px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-slate-900 dark:text-white outline-hidden"
                   />
                   <input
                     type="url"
-                    placeholder="رابط إنستغرام Instagram"
+                    placeholder="رابط إنستغرام"
                     value={socialInstagram}
                     onChange={e => setSocialInstagram(e.target.value)}
                     className="px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-slate-900 dark:text-white outline-hidden"
                   />
                   <input
                     type="url"
-                    placeholder="رابط إكس / تويتر X (Twitter)"
+                    placeholder="رابط إكس / تويتر"
                     value={socialTwitter}
                     onChange={e => setSocialTwitter(e.target.value)}
                     className="px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-slate-900 dark:text-white outline-hidden"
                   />
                   <input
                     type="url"
-                    placeholder="رابط جيت هب GitHub"
+                    placeholder="رابط جيت هب"
                     value={socialGithub}
                     onChange={e => setSocialGithub(e.target.value)}
                     className="px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-slate-900 dark:text-white outline-hidden"

@@ -142,7 +142,7 @@ export function AdminLogsPage() {
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-stone-50 dark:bg-stone-950/60 text-[var(--color-imamu-accent)] border border-amber-200 dark:border-stone-900/50">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-stone-50 dark:bg-stone-950/60 text-[var(--color-imamu-accent)] border border-slate-200/80 dark:border-zinc-700/80">
             <Info className="w-3.5 h-3.5" /> INFO
           </span>
         );
@@ -162,8 +162,8 @@ export function AdminLogsPage() {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 flex flex-col items-center justify-center text-center p-4">
         <ShieldAlert className="w-20 h-20 text-red-500 mb-6" />
-        <h1 className="text-3xl font-serif font-bold mb-2 text-slate-900 dark:text-white">Access Denied</h1>
-        <p className="text-slate-600 dark:text-zinc-400 text-sm">You must be an administrator to view this page.</p>
+        <h1 className="text-3xl font-serif font-bold mb-2 text-slate-900 dark:text-white">تم رفض الوصول</h1>
+        <p className="text-slate-600 dark:text-zinc-400 text-sm">يجب أن تكون مسؤولاً للوصول إلى هذه الصفحة.</p>
       </div>
     );
   }
@@ -179,7 +179,7 @@ export function AdminLogsPage() {
               <Activity className="w-4 h-4 animate-pulse text-emerald-500" /> مركز الرقابة والتدقيق الأمني
             </div>
             <h1 className="text-3xl font-serif font-extrabold text-slate-900 dark:text-white">
-              سجلات أحداث النظام (System Logs)
+              سجلات أحداث النظام
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-1">
               متابعة أنشطة المستخدمين، محاولات الدخول، مزامنة قاعدة البيانات، والأحداث الأمنية لحظة بلحظة.
@@ -226,7 +226,7 @@ export function AdminLogsPage() {
 
           <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-slate-200/80 dark:border-zinc-800 shadow-sm flex flex-col justify-between">
             <span className="text-xs font-semibold text-purple-600 dark:text-purple-400 flex items-center gap-1">
-              <Lock className="w-3.5 h-3.5" /> أحداث المصادقة (Auth)
+              <Lock className="w-3.5 h-3.5" /> أحداث المصادقة
             </span>
             <div className="text-2xl sm:text-3xl font-extrabold text-purple-600 dark:text-purple-400 mt-2">
               {(stats?.auth ?? 0).toLocaleString()}
@@ -283,11 +283,11 @@ export function AdminLogsPage() {
               <span className="text-xs font-bold text-slate-400 dark:text-zinc-500 ml-2">المستوى:</span>
               {[
                 { id: 'all', label: 'الكل' },
-                { id: 'info', label: 'معلومات (INFO)' },
-                { id: 'auth', label: 'مصادقة (AUTH)' },
-                { id: 'admin', label: 'إدارة (ADMIN)' },
-                { id: 'warn', label: 'تحذير (WARN)' },
-                { id: 'error', label: 'خطأ (ERROR)' },
+                { id: 'info', label: 'معلومات' },
+                { id: 'auth', label: 'مصادقة' },
+                { id: 'admin', label: 'إدارة' },
+                { id: 'warn', label: 'تحذير' },
+                { id: 'error', label: 'خطأ' },
               ].map(f => (
                 <button
                   key={f.id}
@@ -314,8 +314,8 @@ export function AdminLogsPage() {
                 <tr>
                   <th className="py-3.5 px-4">التاريخ والوقت</th>
                   <th className="py-3.5 px-4">المستوى</th>
-                  <th className="py-3.5 px-4">الفئة (Category)</th>
-                  <th className="py-3.5 px-4">الإجراء (Action)</th>
+                  <th className="py-3.5 px-4">الفئة</th>
+                  <th className="py-3.5 px-4">الإجراء</th>
                   <th className="py-3.5 px-4">الوصف والتفاصيل</th>
                   <th className="py-3.5 px-4">المستخدم / IP</th>
                   <th className="py-3.5 px-4 text-center">التفاصيل</th>
@@ -425,7 +425,7 @@ export function AdminLogsPage() {
 
                   {selectedLog.metadata && (
                     <div>
-                      <span className="text-xs font-bold text-slate-400 dark:text-zinc-500 block mb-1">حمولة البيانات الإضافية (Metadata JSON)</span>
+                      <span className="text-xs font-bold text-slate-400 dark:text-zinc-500 block mb-1">حمولة البيانات الإضافية</span>
                       <pre className="p-3.5 bg-zinc-950 text-emerald-400 border border-zinc-800 rounded-xl text-xs font-mono overflow-x-auto dir-ltr text-left">
                         {(() => {
                           try {
