@@ -6,11 +6,29 @@ import { eq, desc, and, or, sql } from 'drizzle-orm';
 import { users, verification_codes, global_settings } from '../../db/schema';
 import { requireAuth, AuthRequest } from '../../middleware/auth';
 import { sendVerificationEmail } from '../../lib/mailer';
-import { normalizeUserIdentifier, formatStudentEmail, sanitizeUser } from '../../lib/auth-utils';
+import { normalizeUserIdentifier, formatStudentEmail, sanitizeUser, isSmImamuEmail } from '../../lib/auth-utils';
 import { JWT_SECRET } from '../../lib/config';
 import { downloadAndUploadToStorage } from '../../lib/storage';
 
 import { logEvent } from '../../lib/logger';
+
+const DUMMY_BCRYPT_HASH = '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy';
+
+const authRateLimitMap = new Map<string, { attempts: number; expiresAt: number }>();
+function isRateLimited(ip: string, maxAttempts = 15, windowMs = 15 * 60 * 1000): boolean {
+  if (process.env.NODE_ENV === 'test') return false;
+  const now = Date.now();
+  const record = authRateLimitMap.get(ip);
+  if (!record || now > record.expiresAt) {
+    authRateLimitMap.set(ip, { attempts: 1, expiresAt: now + windowMs });
+    return false;
+  }
+  if (record.attempts >= maxAttempts) {
+    return true;
+  }
+  record.attempts += 1;
+  return false;
+}
 
 export function createAuthRouter(db: any) {
   const router = express.Router();
@@ -19,12 +37,27 @@ export function createAuthRouter(db: any) {
   // Auth: Send Code
   router.post(["/send-code", "/auth/send-code"], async (req, res): Promise<any> => {
     try {
+      const clientIp = (req.headers['x-forwarded-for'] as string) || req.ip || '127.0.0.1';
+      if (isRateLimited(`send-code:${clientIp}`, 10, 15 * 60 * 1000)) {
+        return res.status(429).json({ error: "تم تجاوز عدد المحاولات المسموح بها. يرجى المحاولة لاحقاً." });
+      }
+
       const { email: rawEmail } = req.body;
       const input = normalizeUserIdentifier(rawEmail);
       if (!input) return res.status(400).json({ error: "البريد الإلكتروني/الرقم الجامعي مطلوب" });
 
       const email = formatStudentEmail(input);
-      const code = String(req.body.code || req.body.customCode || Math.floor(100000 + Math.random() * 900000).toString());
+
+      if (process.env.NODE_ENV !== 'test' && !isSmImamuEmail(email)) {
+        return res.status(400).json({
+          error: "عذراً، التسجيل محصور فقط على طلاب جامعة الإمام باستخدام البريد الجامعي الرسمي (@sm.imamu.edu.sa)"
+        });
+      }
+
+      const code = (process.env.NODE_ENV === 'test' && (req.body.code || req.body.customCode))
+        ? String(req.body.code || req.body.customCode)
+        : crypto.randomInt(100000, 999999).toString();
+
       const expiresAt = new Date(Date.now() + 10 * 60000); // 10 minutes
 
       await db.insert(verification_codes).values({ email, code, expiresAt });
@@ -55,22 +88,24 @@ export function createAuthRouter(db: any) {
         mailErrorMessage = mailErr.message || "SMTP Auth Failed";
       }
 
-      console.log(`[AUTH LOG] Verification code generated for ${email}: ${code}`);
+      console.log(`[AUTH LOG] Verification code generated for ${email}`);
+
+      const isTestMode = process.env.NODE_ENV === 'test';
 
       if (emailSent) {
         return res.json({
           success: true,
-          code,
-          devCode: code,
+          ...(isTestMode ? { code, devCode: code } : {}),
           message: `تم إرسال رمز التحقق إلى ${email}`
         });
       } else {
         return res.json({
           success: true,
-          code,
-          devCode: code,
+          ...(isTestMode ? { code, devCode: code } : {}),
           smtpError: true,
-          message: `تم إنشاء رمز التحقق بنجاح [${code}] (تعذر الإرسال عبر البريد بسبب خطأ 535: يرجى تحديث كلمة مرور التطبيقات في الإعدادات)`
+          message: isTestMode
+            ? `تم إنشاء رمز التحقق بنجاح [${code}] (تعذر الإرسال عبر البريد بسبب خطأ 535: يرجى تحديث كلمة مرور التطبيقات في الإعدادات)`
+            : `تم تقديم طلب الرمز بنجاح.`
         });
       }
     } catch (error: any) {
@@ -82,6 +117,11 @@ export function createAuthRouter(db: any) {
   // Auth: Register
   router.post(["/register", "/auth/register"], async (req, res): Promise<any> => {
     try {
+      const clientIp = (req.headers['x-forwarded-for'] as string) || req.ip || '127.0.0.1';
+      if (isRateLimited(`register:${clientIp}`, 10, 15 * 60 * 1000)) {
+        return res.status(429).json({ error: "تم تجاوز عدد محاولات التسجيل. يرجى المحاولة لاحقاً." });
+      }
+
       const { email: rawEmail, password, phone, userName: rawUserName, studentEmail: rawStudentEmail, googleEmail: rawGoogleEmail, code, major, currentGpa, completedCourses } = req.body;
       const email = normalizeUserIdentifier(rawEmail);
       const userName = rawUserName?.trim();
@@ -96,6 +136,16 @@ export function createAuthRouter(db: any) {
       }
 
       if (!email || !password || !userName || !code) return res.status(400).json({ error: "Missing required fields" });
+
+      const formattedEmail = formatStudentEmail(email);
+      if (process.env.NODE_ENV !== 'test') {
+        const checkEmail = studentEmail || formattedEmail;
+        if (!isSmImamuEmail(checkEmail)) {
+          return res.status(400).json({
+            error: "التسجيل محصور فقط على طلاب جامعة الإمام باستخدام البريد الجامعي الرسمي (@sm.imamu.edu.sa)"
+          });
+        }
+      }
 
       const existingEmail = await db.select().from(users).where(eq(users.email, email));
       if (existingEmail.length > 0) return res.status(400).json({ error: "Email already registered" });
@@ -140,7 +190,13 @@ export function createAuthRouter(db: any) {
 
       const user = result[0];
       const token = jwt.sign({ uid: user.uid, email: user.email, isAdmin: !!user.isAdmin, role: user.isAdmin ? 'ADMIN' : 'USER' }, JWT_SECRET, { expiresIn: '7d' });
-      res.cookie('token', token, { httpOnly: false, path: '/', maxAge: 7 * 24 * 60 * 60 * 1000, sameSite: 'lax' });
+      res.cookie('token', token, {
+        httpOnly: true,
+        path: '/',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production'
+      });
       res.json({ token, user: sanitizeUser(user) });
     } catch (error: any) {
       console.error("[REGISTER ERROR]", error?.message || error, error?.stack);
@@ -151,6 +207,11 @@ export function createAuthRouter(db: any) {
   // Auth: Reset Password
   router.post(["/reset-password", "/auth/reset-password"], async (req, res): Promise<any> => {
     try {
+      const clientIp = (req.headers['x-forwarded-for'] as string) || req.ip || '127.0.0.1';
+      if (isRateLimited(`reset-password:${clientIp}`, 10, 15 * 60 * 1000)) {
+        return res.status(429).json({ error: "تم تجاوز عدد محاولات إعادة تعيين كلمة المرور. يرجى المحاولة لاحقاً." });
+      }
+
       const { email: rawEmail, code, newPassword } = req.body;
       const email = normalizeUserIdentifier(rawEmail);
       if (!email || !code || !newPassword) return res.status(400).json({ error: "Missing fields" });
@@ -179,6 +240,11 @@ export function createAuthRouter(db: any) {
   // Auth: Login
   router.post(["/login", "/auth/login"], async (req, res): Promise<any> => {
     try {
+      const clientIp = (req.headers['x-forwarded-for'] as string) || req.ip || '127.0.0.1';
+      if (isRateLimited(`login:${clientIp}`, 10, 15 * 60 * 1000)) {
+        return res.status(429).json({ error: "تم تجاوز عدد محاولات تسجيل الدخول. يرجى المحاولة بعد 15 دقيقة." });
+      }
+
       const rawIdentifier = req.body.identifier || req.body.email || req.body.userName;
       const identifier = normalizeUserIdentifier(rawIdentifier);
       const cleanedInput = identifier.replace(/^@/, '');
@@ -201,19 +267,17 @@ export function createAuthRouter(db: any) {
           sql`LOWER(${users.googleEmail}) = LOWER(${identifier})`,
           sql`LOWER(${users.googleEmail}) = LOWER(${cleanedInput})`,
           eq(users.phone, cleanedInput),
-          eq(users.uid, identifier),
-          sql`LOWER(${users.email}) LIKE LOWER(${cleanedInput + '@%'})`,
-          sql`LOWER(${users.studentEmail}) LIKE LOWER(${cleanedInput + '@%'})`
+          eq(users.uid, identifier)
         )
       ))[0];
       let valid = false;
 
-      // Local password check
+      // Local password check with constant-time fallback against timing attacks
       if (user && user.passwordHash) {
         valid = await bcrypt.compare(password, user.passwordHash);
+      } else {
+        await bcrypt.compare(password, DUMMY_BCRYPT_HASH);
       }
-
-
 
       if (!user) {
         return res.status(401).json({ error: "حساب غير موجود. يرجى إنشاء حساب جديد أولاً." });
@@ -228,7 +292,13 @@ export function createAuthRouter(db: any) {
       }
 
       const token = jwt.sign({ uid: user.uid, email: user.email, isAdmin: !!user.isAdmin, role: user.isAdmin ? 'ADMIN' : 'USER' }, JWT_SECRET, { expiresIn: '7d' });
-      res.cookie('token', token, { httpOnly: false, path: '/', maxAge: 7 * 24 * 60 * 60 * 1000, sameSite: 'lax' });
+      res.cookie('token', token, {
+        httpOnly: true,
+        path: '/',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production'
+      });
       res.json({ token, user: sanitizeUser(user) });
     } catch (error) {
       console.error(error);
