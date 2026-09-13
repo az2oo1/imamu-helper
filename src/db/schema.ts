@@ -65,6 +65,7 @@ export const course_resources = pgTable('course_resources', {
   avatarUrl: text('avatar_url'),
   bannerUrl: text('banner_url'),
   description: text('description'),
+  sectionsEnabled: boolean('sections_enabled').default(true),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
@@ -95,22 +96,43 @@ export const events = pgTable('events', {
 
 export const news = pgTable('news', {
   id: serial('id').primaryKey(),
+  title: text('title'),
   content: text('content').notNull(),
+  excerpt: text('excerpt'),
+  category: text('category'), // e.g. Campus, Academic, Sports, Events
   source: text('source'), // e.g. @IMAMU_News
   authorName: text('author_name'),
   authorHandle: text('author_handle'),
   authorAvatar: text('author_avatar'),
+  authorId: text('author_id'),
+  entityId: text('entity_id'),
   imageUrl: text('image_url'),
+  images: text('images'), // JSON string array of image URLs
   videoUrl: text('video_url'),
+  readTime: text('read_time'),
+  isFeatured: boolean('is_featured').default(false),
+  formId: text('form_id'),
+  isArchived: boolean('is_archived').default(false),
   date: text('date').notNull(),
   tweetId: text('tweet_id').unique(),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+export const news_bookmarks = pgTable('news_bookmarks', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  newsId: bigint('news_id', { mode: 'number' }).references(() => news.id, { onDelete: 'cascade' }).notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (t) => ({
+  unq: unique().on(t.userId, t.newsId)
+}));
+
+
 export const global_settings = pgTable('global_settings', {
   id: serial('id').primaryKey(),
   fetchRangeDays: integer('fetch_range_days').default(30),
   autoDeleteDays: integer('auto_delete_days').default(30),
+  autoFetchTelegram: boolean('auto_fetch_telegram').default(false),
   smtpHost: text('smtp_host'),
   smtpPort: integer('smtp_port'),
   smtpUser: text('smtp_user'),
@@ -143,11 +165,27 @@ export const newsComments = pgTable('news_comments', {
 export const news_sources = pgTable('news_sources', {
   id: serial('id').primaryKey(),
   handle: text('handle').notNull().unique(), // e.g. IMAMU_News
+  displayName: text('display_name'),
+  bio: text('bio'),
+  bannerUrl: text('banner_url'),
+  links: text('links'), // JSON string array of { title, url }
+  assignedUsers: text('assigned_users'), // JSON string array of manager User UIDs
+  telegramChannels: text('telegram_channels'), // JSON string array of Telegram channels to fetch from
   isActive: boolean('is_active').default(true),
   profilePicUrl: text('profile_pic_url'),
   lastFetched: timestamp('last_fetched'),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+export const account_follows = pgTable('account_follows', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  sourceId: integer('source_id').references(() => news_sources.id, { onDelete: 'cascade' }).notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (t) => ({
+  unq: unique().on(t.userId, t.sourceId)
+}));
+
 
 export const verification_codes = pgTable('verification_codes', {
   id: serial('id').primaryKey(),
@@ -194,14 +232,6 @@ export const feedback_comments = pgTable('feedback_comments', {
   userId: text('user_id').notNull(),
   userName: text('user_name'),
   content: text('content').notNull(),
-  createdAt: timestamp('created_at').defaultNow(),
-});
-
-export const newbie_links = pgTable('newbie_links', {
-  id: serial('id').primaryKey(),
-  title: text('title').notNull(),
-  url: text('url').notNull(),
-  description: text('description'),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
@@ -253,3 +283,31 @@ export const contributors = pgTable('contributors', {
   displayOrder: integer('display_order').default(0),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+export const app_feedback = pgTable('app_feedback', {
+  id: serial('id').primaryKey(),
+  targetType: text('target_type').notNull(), // 'tutorial' | 'news' | 'resource' | 'tool' | 'event' | 'general'
+  targetId: text('target_id'), // ID or reference key of target item
+  targetTitle: text('target_title'), // Title snapshot for display
+  userId: text('user_id'),
+  userName: text('user_name'),
+  userEmail: text('user_email'),
+  feedbackType: text('feedback_type').notNull().default('bug_report'), // 'helpful' | 'unhelpful' | 'bug_report' | 'broken_link' | 'wrong_info' | 'suggestion'
+  comment: text('comment'),
+  status: text('status').notNull().default('pending'), // 'pending' | 'reviewed' | 'resolved'
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const course_sections = pgTable('course_sections', {
+  id: serial('id').primaryKey(),
+  subjectId: integer('subject_id').references(() => subjects.id, { onDelete: 'cascade' }),
+  courseCode: text('course_code'),
+  sectionName: text('section_name').notNull(),
+  whatsappLink: text('whatsapp_link').notNull(),
+  phone: text('phone'),
+  publishedByUserId: text('published_by_user_id').notNull(),
+  publishedByUserName: text('published_by_user_name'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+

@@ -76,8 +76,7 @@ const SCHEMA_VERIFICATION_STATEMENTS = [
   `ALTER TABLE course_resources ADD COLUMN IF NOT EXISTS free_resources_url text`,
   `ALTER TABLE course_resources ADD COLUMN IF NOT EXISTS paid_resources_url text`,
   `ALTER TABLE course_resources ADD COLUMN IF NOT EXISTS avatar_url text`,
-  `ALTER TABLE course_resources ADD COLUMN IF NOT EXISTS banner_url text`,
-  `ALTER TABLE course_resources ALTER COLUMN subject_id DROP NOT NULL`,
+  `ALTER TABLE course_resources ADD COLUMN IF NOT EXISTS sections_enabled boolean DEFAULT true`,
   `CREATE TABLE IF NOT EXISTS course_resources (
     id serial PRIMARY KEY,
     subject_id integer,
@@ -92,6 +91,18 @@ const SCHEMA_VERIFICATION_STATEMENTS = [
     avatar_url text,
     banner_url text,
     description text,
+    sections_enabled boolean DEFAULT true,
+    created_at timestamp DEFAULT now()
+  )`,
+  `CREATE TABLE IF NOT EXISTS course_sections (
+    id serial PRIMARY KEY,
+    subject_id integer,
+    course_code text,
+    section_name text NOT NULL,
+    whatsapp_link text NOT NULL,
+    phone text,
+    published_by_user_id text NOT NULL,
+    published_by_user_name text,
     created_at timestamp DEFAULT now()
   )`,
   `CREATE TABLE IF NOT EXISTS activity_logs (
@@ -140,10 +151,49 @@ const SCHEMA_VERIFICATION_STATEMENTS = [
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS admin_permissions text`,
   `ALTER TABLE news_likes ALTER COLUMN news_id TYPE bigint`,
   `ALTER TABLE news_comments ALTER COLUMN news_id TYPE bigint`,
+  `ALTER TABLE news ADD COLUMN IF NOT EXISTS title text`,
+  `ALTER TABLE news ADD COLUMN IF NOT EXISTS excerpt text`,
+  `ALTER TABLE news ADD COLUMN IF NOT EXISTS category text`,
+  `ALTER TABLE news ADD COLUMN IF NOT EXISTS author_id text`,
+  `ALTER TABLE news ADD COLUMN IF NOT EXISTS entity_id text`,
+  `ALTER TABLE news ADD COLUMN IF NOT EXISTS images text`,
+  `ALTER TABLE news ADD COLUMN IF NOT EXISTS read_time text`,
+  `ALTER TABLE news ADD COLUMN IF NOT EXISTS is_featured boolean DEFAULT false`,
+  `ALTER TABLE news ADD COLUMN IF NOT EXISTS form_id text`,
+  `ALTER TABLE news ADD COLUMN IF NOT EXISTS is_archived boolean DEFAULT false`,
+  `CREATE TABLE IF NOT EXISTS news_bookmarks (
+    id serial PRIMARY KEY,
+    user_id text NOT NULL,
+    news_id bigint NOT NULL,
+  )`,
   `ALTER TABLE tutorials ALTER COLUMN section_id TYPE bigint`,
-  `ALTER TABLE tutorial_feedback ALTER COLUMN tutorial_id TYPE bigint`,
-  `ALTER TABLE feedback_comments ALTER COLUMN feedback_id TYPE bigint`,
-  `ALTER TABLE tutorial_comments ALTER COLUMN tutorial_id TYPE bigint`
+  `ALTER TABLE tutorial_comments ALTER COLUMN tutorial_id TYPE bigint`,
+  `ALTER TABLE news_sources ADD COLUMN IF NOT EXISTS display_name text`,
+  `ALTER TABLE news_sources ADD COLUMN IF NOT EXISTS bio text`,
+  `ALTER TABLE news_sources ADD COLUMN IF NOT EXISTS banner_url text`,
+  `ALTER TABLE news_sources ADD COLUMN IF NOT EXISTS links text`,
+  `ALTER TABLE news_sources ADD COLUMN IF NOT EXISTS assigned_users text`,
+  `ALTER TABLE news_sources ADD COLUMN IF NOT EXISTS telegram_channels text`,
+  `ALTER TABLE global_settings ADD COLUMN IF NOT EXISTS auto_fetch_telegram boolean DEFAULT false`,
+  `CREATE TABLE IF NOT EXISTS account_follows (
+    id serial PRIMARY KEY,
+    user_id text NOT NULL,
+    source_id integer NOT NULL REFERENCES news_sources(id) ON DELETE CASCADE,
+    created_at timestamp DEFAULT now()
+  )`,
+  `CREATE TABLE IF NOT EXISTS app_feedback (
+    id serial PRIMARY KEY,
+    target_type text NOT NULL,
+    target_id text,
+    target_title text,
+    user_id text,
+    user_name text,
+    user_email text,
+    feedback_type text DEFAULT 'bug_report' NOT NULL,
+    comment text,
+    status text DEFAULT 'pending' NOT NULL,
+    created_at timestamp DEFAULT now()
+  )`
 ];
 
 function isConnectionError(err: any): boolean {
@@ -379,9 +429,22 @@ async function initializeDatabase() {
     memClient = process.env.NODE_ENV === 'test' ? new PGlite('memory://') : new PGlite(dbDir);
     await memClient.waitReady;
   } catch (pgliteErr: any) {
-    console.warn('[DB] Persistent PGlite initialization failed, resetting to fresh in-memory database:', pgliteErr.message || pgliteErr);
-    memClient = new PGlite('memory://');
-    await memClient.waitReady;
+    console.warn('[DB] Persistent PGlite initialization failed, attempting auto-recovery:', pgliteErr.message || pgliteErr);
+    try {
+      if (fs.existsSync(dbDir)) {
+        fs.rmSync(dbDir, { recursive: true, force: true });
+        fs.mkdirSync(dbDir, { recursive: true });
+        memClient = new PGlite(dbDir);
+        await memClient.waitReady;
+      } else {
+        memClient = new PGlite('memory://');
+        await memClient.waitReady;
+      }
+    } catch (_e) {
+      console.warn('[DB] Resetting to fresh in-memory database fallback...');
+      memClient = new PGlite('memory://');
+      await memClient.waitReady;
+    }
   }
   const memDb = drizzlePglite(memClient, { schema });
   fallbackDb = memDb;

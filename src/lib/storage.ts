@@ -248,15 +248,6 @@ export async function uploadFileToStorage(
   }
   fs.writeFileSync(filePath, fileBuffer);
 
-  // Sync to public/uploads
-  try {
-    const legacyPublicDir = path.join(process.cwd(), 'public/uploads', path.dirname(key));
-    if (!fs.existsSync(legacyPublicDir)) {
-      fs.mkdirSync(legacyPublicDir, { recursive: true });
-    }
-    fs.writeFileSync(path.join(process.cwd(), 'public/uploads', key), fileBuffer);
-  } catch (e) {}
-
   console.log(`[Storage] Uploaded "${key}" to persistent disk storage.`);
   return { url: `/uploads/${key}`, key, bucket: bucketName };
 }
