@@ -15,11 +15,28 @@ import { logEvent } from '../../lib/logger';
 const DUMMY_BCRYPT_HASH = '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy';
 
 const authRateLimitMap = new Map<string, { attempts: number; expiresAt: number }>();
+
+// Periodic eviction to prevent memory leak
+if (typeof setInterval !== 'undefined') {
+  const rateLimitEvictionTimer = setInterval(() => {
+    const now = Date.now();
+    for (const [key, record] of authRateLimitMap.entries()) {
+      if (now > record.expiresAt) {
+        authRateLimitMap.delete(key);
+      }
+    }
+  }, 5 * 60 * 1000);
+  if (rateLimitEvictionTimer.unref) rateLimitEvictionTimer.unref();
+}
+
 function isRateLimited(ip: string, maxAttempts = 15, windowMs = 15 * 60 * 1000): boolean {
   if (process.env.NODE_ENV === 'test') return false;
   const now = Date.now();
   const record = authRateLimitMap.get(ip);
   if (!record || now > record.expiresAt) {
+    if (authRateLimitMap.size > 10000) {
+      authRateLimitMap.clear();
+    }
     authRateLimitMap.set(ip, { attempts: 1, expiresAt: now + windowMs });
     return false;
   }
