@@ -31,8 +31,6 @@ services:
       - S3_REGION=${S3_REGION:-garage}
       - S3_FORCE_PATH_STYLE=${S3_FORCE_PATH_STYLE:-true}
       - S3_PUBLIC_URL=${S3_PUBLIC_URL:-/uploads}
-      # Optional features
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
       - APP_URL=${APP_URL:-http://100.70.48.23:3000}
     depends_on:
       - cockroachdb

@@ -203,7 +203,7 @@ describe('Adversarial Verification: Admin Endpoints Authorization & Edge Cases',
     });
   });
 
-  describe('3. Authorization Matrix: File & PDF Upload Endpoints (/api/upload, /api/admin/upload, /api/admin/ai_parse)', () => {
+  describe('3. Authorization Matrix: File & PDF Upload Endpoints (/api/upload, /api/admin/upload)', () => {
     it('Unauthenticated POST /api/upload returns 401 Unauthorized', async () => {
       const res = await unauthClient.post('/api/upload', { file: 'dummy' });
       assert.equal(res.status, 401);
@@ -222,17 +222,6 @@ describe('Adversarial Verification: Admin Endpoints Authorization & Edge Cases',
 
     it('Non-admin POST /api/admin/upload returns 403 Forbidden', async () => {
       const res = await nonAdminClient.post('/api/admin/upload', { file: 'dummy' });
-      assert.equal(res.status, 403);
-      assert.equal(res.data.error, 'Admin only');
-    });
-
-    it('Unauthenticated POST /api/admin/ai_parse returns 401 Unauthorized', async () => {
-      const res = await unauthClient.post('/api/admin/ai_parse', { prompt: 'parse' });
-      assert.equal(res.status, 401);
-    });
-
-    it('Non-admin POST /api/admin/ai_parse returns 403 Forbidden', async () => {
-      const res = await nonAdminClient.post('/api/admin/ai_parse', { prompt: 'parse' });
       assert.equal(res.status, 403);
       assert.equal(res.data.error, 'Admin only');
     });
@@ -289,12 +278,6 @@ describe('Adversarial Verification: Admin Endpoints Authorization & Edge Cases',
       const res = await adminClient.post('/api/upload', {});
       assert.equal(res.status, 400);
       assert.equal(res.data.error, 'No files uploaded');
-    });
-
-    it('POST /api/admin/ai_parse with no file attached returns 400 Bad Request', async () => {
-      const res = await adminClient.post('/api/admin/ai_parse', { prompt: 'test prompt' });
-      assert.equal(res.status, 400);
-      assert.equal(res.data.error, 'File required');
     });
   });
 });
