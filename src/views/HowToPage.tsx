@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { InView, SpotlightCard } from '../components/ui';
 import { getSectionColorClasses } from '../lib/section-colors';
+import ReportDropdownMenu from '../components/ReportDropdownMenu';
 
 interface Section {
   id: number;
@@ -247,26 +248,39 @@ export function HowToPage() {
     if (!negativeFeedbackModal) return;
     try {
       const token = await user?.getIdToken();
-      const res = await fetch(`/api/tutorials/${negativeFeedbackModal.id}/feedback`, {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      await fetch(`/api/tutorials/${negativeFeedbackModal.id}/feedback`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
+        headers,
         body: JSON.stringify({
           isHelpful: false,
           comment: negativeFeedbackComment.trim() || 'لا توجد تفاصيل إضافية'
         })
       });
-      if (res.ok) {
-        setCustomAlert({
-          type: 'success',
-          title: 'تم إرسال ملاحظتك',
-          message: 'نشكرك على الملاحظات، وسيعمل فريق الإشراف على تحسين الشرح وحل مشكلتك.'
-        });
-        loadFeedback(negativeFeedbackModal.id);
-        setNegativeFeedbackModal(null);
-      }
+
+      await fetch('/api/feedback', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          targetType: 'tutorial',
+          targetId: String(negativeFeedbackModal.id),
+          targetTitle: negativeFeedbackModal.title,
+          feedbackType: 'unhelpful',
+          comment: negativeFeedbackComment.trim() || 'الشرح غير مفيد / غير واضح'
+        })
+      });
+
+      setCustomAlert({
+        type: 'success',
+        title: 'تم إرسال ملاحظتك',
+        message: 'نشكرك على الملاحظات، وسيعمل فريق الإشراف على تحسين الشرح وحل مشكلتك.'
+      });
+      loadFeedback(negativeFeedbackModal.id);
+      setNegativeFeedbackModal(null);
     } catch (e) {
       console.error(e);
     }
@@ -315,25 +329,35 @@ export function HowToPage() {
                 <ArrowLeft className="w-4 h-4 rotate-180 text-[var(--color-imamu-accent)]" /> العودة إلى قائمة الشروحات
               </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  if (typeof window !== 'undefined') {
-                    const shareUrl = `${window.location.origin}/howto?id=${selectedTutorial.id}`;
-                    if (navigator?.clipboard?.writeText) {
-                      navigator.clipboard.writeText(shareUrl);
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      const shareUrl = `${window.location.origin}/howto?id=${selectedTutorial.id}`;
+                      if (navigator?.clipboard?.writeText) {
+                        navigator.clipboard.writeText(shareUrl);
+                      }
+                      setCustomAlert({
+                        type: 'success',
+                        title: 'تم نسخ الرابط',
+                        message: 'تم نسخ رابط الشرح إلى الحافظة، يمكنك الآن مشاركته مع الطلاب للوصول السريع للشرح.'
+                      });
                     }
-                    setCustomAlert({
-                      type: 'success',
-                      title: 'تم نسخ الرابط',
-                      message: 'تم نسخ رابط الشرح إلى الحافظة، يمكنك الآن مشاركته مع الطلاب للوصول السريع للشرح.'
-                    });
-                  }
-                }}
-                className="btn-rise inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs font-bold text-slate-700 dark:text-zinc-300 shadow-2xs hover:bg-slate-50 dark:hover:bg-zinc-800 transition cursor-pointer"
-              >
-                <Share2 className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" /> نسخ رابط الشرح
-              </button>
+                  }}
+                  className="btn-rise inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs font-bold text-slate-700 dark:text-zinc-300 shadow-2xs hover:bg-slate-50 dark:hover:bg-zinc-800 transition cursor-pointer"
+                >
+                  <Share2 className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" /> نسخ رابط الشرح
+                </button>
+
+                <ReportDropdownMenu
+                  targetType="tutorial"
+                  targetId={selectedTutorial.id}
+                  targetTitle={selectedTutorial.title}
+                  user={user}
+                  buttonClassName="btn-rise inline-flex items-center justify-center p-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 shadow-2xs hover:bg-slate-50 dark:hover:bg-zinc-800 transition cursor-pointer"
+                />
+              </div>
             </div>
 
             {/* Header Detail Card */}
@@ -505,7 +529,7 @@ export function HowToPage() {
                         {c.profilePicUrl ? (
                           <img src={c.profilePicUrl} alt="" className="w-7 h-7 rounded-full object-cover border border-slate-200 dark:border-zinc-700" />
                         ) : (
-                          <div className="w-7 h-7 rounded-full bg-stone-50 dark:bg-stone-950/50 text-[var(--color-imamu-accent)] flex items-center justify-center shrink-0 font-bold text-xs border border-amber-200 dark:border-stone-900/50">
+                          <div className="w-7 h-7 rounded-full bg-stone-50 dark:bg-stone-950/50 text-[var(--color-imamu-accent)] flex items-center justify-center shrink-0 font-bold text-xs border border-slate-200/80 dark:border-zinc-700/80">
                             {c.userName ? c.userName.charAt(0).toUpperCase() : 'ط'}
                           </div>
                         )}
@@ -703,12 +727,12 @@ export function HowToPage() {
                       <div className="space-y-5">
                         <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-3">
                           <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 shadow-2xs text-[var(--color-imamu-accent)] bg-stone-50 dark:bg-stone-950/50 border-amber-200 dark:border-stone-900/50">
+                            <div className="w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 shadow-2xs text-[var(--color-imamu-accent)] bg-stone-50 dark:bg-stone-950/50 border-slate-200/80 dark:border-zinc-700/80">
                               <GraduationCap className="w-4.5 h-4.5" />
                             </div>
                             <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">شروحات عامة وإضافية</h2>
                           </div>
-                          <span className="text-xs text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] font-bold bg-stone-50 dark:bg-stone-950/50 border border-amber-200 dark:border-stone-900/50 px-3 py-1 rounded-full">
+                          <span className="text-xs text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] font-bold bg-stone-50 dark:bg-stone-950/50 border border-slate-200/80 dark:border-zinc-700/80 px-3 py-1 rounded-full">
                             {orphanTutorials.length} شروحات
                           </span>
                         </div>
@@ -722,7 +746,7 @@ export function HowToPage() {
                               className="cursor-pointer border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5"
                             >
                               <div className="flex items-start gap-4 h-full">
-                                <div className="w-10 h-10 rounded-xl bg-stone-50 dark:bg-stone-950/50 border border-amber-200 dark:border-stone-900/50 text-[var(--color-imamu-accent)] flex items-center justify-center shrink-0">
+                                <div className="w-10 h-10 rounded-xl bg-stone-50 dark:bg-stone-950/50 border border-slate-200/80 dark:border-zinc-700/80 text-[var(--color-imamu-accent)] flex items-center justify-center shrink-0">
                                   <GraduationCap className="w-5 h-5" />
                                 </div>
                                 <div className="flex-1 min-w-0 text-right">
@@ -779,14 +803,14 @@ export function HowToPage() {
 
                 <SpotlightCard 
                   onClick={() => router.push('/emails')}
-                  className="cursor-pointer border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-2xs group hover:border-blue-500/40 transition-colors"
+                  className="cursor-pointer border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-2xs group hover:border-[var(--color-imamu-accent)]/50 transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-stone-50 dark:bg-stone-950/50 text-[var(--color-imamu-accent)] border border-slate-200/80 dark:border-zinc-700/80 flex items-center justify-center shrink-0">
                       <Icons.Mail className="w-5 h-5" />
                     </div>
                     <div className="text-right">
-                      <h4 className="font-bold text-xs text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">دليل البريد الإلكتروني الأكاديمي ✉️</h4>
+                      <h4 className="font-bold text-xs text-slate-900 dark:text-white group-hover:text-[var(--color-imamu-accent)] transition-colors">دليل البريد الإلكتروني الأكاديمي ✉️</h4>
                       <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">إيميلات شؤون الطلاب والأقسام.</p>
                     </div>
                   </div>
@@ -978,13 +1002,13 @@ function renderTutorialContent(
                       isWarning ? 'bg-amber-500/10 border-amber-500/30 text-amber-950 dark:text-amber-200' :
                       isDanger ? 'bg-rose-500/10 border-rose-500/30 text-rose-950 dark:text-rose-200' :
                       isSuccess ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-950 dark:text-emerald-200' :
-                      'bg-blue-500/10 border-blue-500/30 text-blue-950 dark:text-blue-200'
+                      'bg-stone-500/10 border-amber-500/30 text-slate-950 dark:text-zinc-200'
                     }`}
                   >
                     {isDanger || isWarning ? (
                       <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
                     ) : (
-                      <Info className="w-5 h-5 shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
+                      <Info className="w-5 h-5 shrink-0 mt-0.5 text-[var(--color-imamu-accent)]" />
                     )}
                     <div className="flex-1 min-w-0 text-right font-normal">
                       {block.title && (

@@ -356,7 +356,7 @@ export function AuthPage() {
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-            className="mx-auto h-14 w-14 bg-gradient-to-tr from-stone-50 to-indigo-50 dark:from-stone-950/80 dark:to-indigo-950/80 rounded-2xl flex items-center justify-center mb-3 border border-stone-100 dark:border-stone-900/50 text-[var(--color-imamu-accent)] shadow-sm"
+            className="mx-auto h-14 w-14 bg-gradient-to-tr from-stone-50 to-indigo-50 dark:from-stone-950/80 dark:to-indigo-950/80 rounded-2xl flex items-center justify-center mb-3 border border-slate-200 dark:border-zinc-800 text-[var(--color-imamu-accent)] shadow-sm"
           >
             {!isLogin ? (
               signupStep === 4 ? <GraduationCap className="h-7 w-7 text-[var(--color-imamu-accent)]" /> :

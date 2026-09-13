@@ -11,12 +11,6 @@ import {
   Check, Copy, MessageSquare, Shirt
 } from 'lucide-react';
 
-interface NewbieLink {
-  id: number | string;
-  title: string;
-  url: string;
-  description?: string;
-}
 
 interface FAQItem {
   id: string;
@@ -267,19 +261,6 @@ export function NewbiePage() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set(['schedule-auto']));
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [newbieLinks, setNewbieLinks] = useState<NewbieLink[]>([]);
-
-  // Fetch dynamic newbie links
-  useEffect(() => {
-    fetch('/api/newbie/links')
-      .then(r => r.ok && r.headers.get('content-type')?.includes('application/json') ? r.json() : [])
-      .then(data => {
-        if (Array.isArray(data)) {
-          setNewbieLinks(data);
-        }
-      })
-      .catch(e => console.error("Error fetching newbie links:", e));
-  }, []);
 
   // Newbie Checklist state persisted in localStorage
   const [checklist, setChecklist] = useState<Record<string, boolean>>({
@@ -778,7 +759,7 @@ export function NewbiePage() {
                 href="https://outlook.office.com" 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="btn-rise inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-xs hover:shadow-md transition"
+                className="btn-rise inline-flex items-center justify-center gap-2 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-xs hover:shadow-md transition"
               >
                 دخول بريد Outlook <ExternalLink className="w-3.5 h-3.5" />
               </a>
@@ -842,53 +823,18 @@ export function NewbiePage() {
                 className="flex items-center justify-between p-4 bg-slate-50/80 hover:bg-slate-100/80 dark:bg-zinc-950/40 dark:hover:bg-zinc-800/60 border border-slate-200 dark:border-zinc-800 rounded-xl transition text-right group w-full shadow-2xs cursor-pointer"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 flex items-center justify-center shrink-0">
+                  <div className="w-9 h-9 rounded-xl bg-stone-50 dark:bg-stone-950/40 text-[var(--color-imamu-accent)] border border-slate-200/80 dark:border-zinc-700/80 flex items-center justify-center shrink-0">
                     <Mail className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="font-bold text-xs text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">دليل البريد الإلكتروني الأكاديمي</h4>
+                    <h4 className="font-bold text-xs text-slate-900 dark:text-white group-hover:text-[var(--color-imamu-accent)] transition-colors">دليل البريد الإلكتروني الأكاديمي</h4>
                     <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">إيميلات شؤون الطلاب، العميد، ومسؤولي التخصصات.</p>
                   </div>
                 </div>
-                <ChevronDown className="w-4 h-4 text-slate-400 -rotate-90 group-hover:text-blue-600 transition" />
+                <ChevronDown className="w-4 h-4 text-slate-400 -rotate-90 group-hover:text-[var(--color-imamu-accent)] transition" />
               </button>
             </div>
           </div>
-
-          {/* Dynamic Newbie Links from DB */}
-          {newbieLinks.length > 0 && (
-            <div className="bg-white dark:bg-zinc-900/50 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 sm:p-8 shadow-2xs">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                <ExternalLink className="w-4.5 h-4.5 text-[var(--color-imamu-accent)]" /> روابط ومنصات هامة للمستجدين
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {newbieLinks.map(link => (
-                  <a
-                    key={link.id}
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-4 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/30 hover:border-slate-300 dark:hover:border-zinc-700 transition flex items-start justify-between gap-3 group"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-[var(--color-imamu-accent)] transition-colors">
-                        {link.title}
-                      </h4>
-                      {link.description && (
-                        <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-1 leading-relaxed">
-                          {link.description}
-                        </p>
-                      )}
-                      <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono mt-2 block truncate">
-                        {link.url}
-                      </span>
-                    </div>
-                    <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-[var(--color-imamu-accent)] shrink-0 mt-0.5" />
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>

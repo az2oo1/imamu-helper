@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../lib/AuthContext';
@@ -20,6 +20,24 @@ export function TopBar() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [managedAccounts, setManagedAccounts] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (user) {
+      user.getIdToken().then((token: string) => {
+        fetch('/api/authenticated-accounts/my-accounts', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        .then(res => res.ok ? res.json() : [])
+        .then(data => {
+          if (Array.isArray(data)) setManagedAccounts(data);
+        })
+        .catch(() => {});
+      });
+    } else {
+      setManagedAccounts([]);
+    }
+  }, [user]);
 
   const navLinks = [
     { name: 'الرئيسية', path: '/', icon: Home },
@@ -169,6 +187,15 @@ export function TopBar() {
                         >
                           <UserCircle2 className="w-4 h-4 text-slate-400 dark:text-zinc-400" />
                           إعدادات الملف الشخصي
+                        </Link>
+                        <Link 
+                          href={managedAccounts.length > 0 ? `/@/${encodeURIComponent(managedAccounts[0].handle.replace(/^@/, ''))}/dashboard` : '/profile'} 
+                          onClick={() => setProfileMenuOpen(false)}
+                          className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-[var(--color-imamu-accent)] hover:bg-slate-50 dark:hover:bg-zinc-800 transition text-right"
+                          dir="rtl"
+                        >
+                          <Shield className="w-4 h-4 text-[var(--color-imamu-accent)]" />
+                          لوحة تحكم الجهة
                         </Link>
                         {isAdmin && (
                           <>
@@ -331,6 +358,14 @@ export function TopBar() {
                         <span className="text-xs text-slate-500 dark:text-zinc-400 truncate">{dbUser?.major || 'طالب'}</span>
                       </div>
                     </div>
+                    <Link
+                      href={managedAccounts.length > 0 ? `/@/${encodeURIComponent(managedAccounts[0].handle.replace(/^@/, ''))}/dashboard` : '/profile'}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-[var(--color-imamu-brown)]/10 text-[var(--color-imamu-accent)] border border-[var(--color-imamu-brown)]/30 font-bold text-xs hover:bg-[var(--color-imamu-brown)]/20 transition cursor-pointer"
+                    >
+                      <Shield className="w-4 h-4 text-[var(--color-imamu-accent)] shrink-0" />
+                      <span>لوحة تحكم الجهة</span>
+                    </Link>
                     <button
                       onClick={() => { signOut(); setMobileMenuOpen(false); }}
                       className="flex w-full justify-center items-center gap-2 rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40 px-4 py-2.5 text-xs font-bold text-red-600 dark:text-red-400 transition hover:bg-red-100 cursor-pointer"

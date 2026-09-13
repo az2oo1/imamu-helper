@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Image as ImageIcon, Upload, Loader2, X } from 'lucide-react';
+import { compressBannerFile, compressAvatarFile, compressImageFile } from '../lib/imageCompressor';
 
 interface Props {
   label: string;
@@ -14,15 +15,26 @@ export default function ImageUploadInput({ label, value, onChange, type, uploadU
   const [isUploading, setIsUploading] = useState(false);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('category', type === 'avatar' ? 'pfp' : 'resources');
+    let rawFile = e.target.files?.[0];
+    if (!rawFile) return;
 
     try {
       setIsUploading(true);
+
+      // Compress image client-side to optimal web dimensions & file size
+      let processedFile = rawFile;
+      if (type === 'banner') {
+        processedFile = await compressBannerFile(rawFile);
+      } else if (type === 'avatar') {
+        processedFile = await compressAvatarFile(rawFile);
+      } else {
+        processedFile = await compressImageFile(rawFile);
+      }
+
+      const formData = new FormData();
+      formData.append('file', processedFile);
+      formData.append('category', type === 'avatar' ? 'pfp' : 'resources');
+
       const res = await fetch(uploadUrl, {
         method: 'POST',
         headers: {

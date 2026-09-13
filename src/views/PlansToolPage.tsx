@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../lib/AuthContext';
 import { FileText, ArrowLeft, GraduationCap, ExternalLink, Search, ArrowUpRight, Plus, Trash2, Download, Eye, Layers, X, BookOpen, Clock, Sparkles, ChevronDown, Check, Upload } from 'lucide-react';
 import Link from 'next/link';
+import ReportDropdownMenu from '../components/ReportDropdownMenu';
 
 interface PdfFileItem {
   id: string;
@@ -288,7 +289,7 @@ export function PlansToolPage() {
               className="btn-rise inline-flex items-center justify-center gap-2 text-xs sm:text-sm font-bold text-white bg-[#0E352C] hover:bg-[#13493d] px-4.5 py-2.5 rounded-full border border-[#3DC9B0]/40 shadow-sm shadow-[#0E352C]/30 transition-all cursor-pointer shrink-0 self-start sm:self-auto"
               title="الانتقال إلى منصة مساري لتنظيم الخطة الأكاديمية"
             >
-              <Sparkles className="w-4 h-4 text-[#3DC9B0] shrink-0" />
+              <GraduationCap className="w-4 h-4 text-[#3DC9B0] shrink-0" />
               <span>تعمّق مع مساري</span>
               <ArrowUpRight className="w-4 h-4 text-slate-300 shrink-0" />
             </a>
@@ -352,7 +353,7 @@ export function PlansToolPage() {
                           <ChevronDown className="w-4.5 h-4.5" />
                         </div>
 
-                        <div className="w-8 h-8 rounded-xl bg-stone-50 dark:bg-stone-950/60 border border-amber-200/50 dark:border-stone-900/40 flex items-center justify-center text-[var(--color-imamu-accent)] shrink-0">
+                        <div className="w-8 h-8 rounded-xl bg-stone-50 dark:bg-stone-950/60 border border-slate-200/80 dark:border-zinc-700/80 flex items-center justify-center text-[var(--color-imamu-accent)] shrink-0">
                           <FileText className="w-4 h-4" />
                         </div>
 
@@ -372,7 +373,7 @@ export function PlansToolPage() {
                           className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
                             downloadingId === (pdf.id || pdf.title)
                               ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 scale-105 shadow-2xs'
-                              : 'bg-stone-50 dark:bg-stone-950/50 border-amber-200/50 dark:border-stone-900/50 hover:bg-[var(--color-imamu-brown)] hover:text-white dark:hover:bg-[var(--color-imamu-brown)] dark:hover:text-white text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)]'
+                              : 'bg-stone-50 dark:bg-stone-950/50 border border-slate-200/80 dark:border-zinc-700/80 hover:bg-[var(--color-imamu-brown)] hover:text-white dark:hover:bg-[var(--color-imamu-brown)] dark:hover:text-white text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)]'
                           }`}
                           title="تحميل الملف"
                         >
@@ -444,14 +445,24 @@ export function PlansToolPage() {
 
   return (
     <div className="flex flex-col flex-1 w-full max-w-5xl mx-auto pb-24 px-4 sm:px-6 pt-8 text-right" dir="rtl">
-      <Link 
-        href="/tools" 
-        className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-700 dark:text-zinc-300 hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)] mb-6 w-fit transition self-start bg-white dark:bg-zinc-900 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-2xs" 
-        dir="rtl"
-      >
-        <ArrowLeft className="w-4 h-4 rotate-180 text-[var(--color-imamu-accent)]" />
-        <span>العودة إلى الأدوات</span>
-      </Link>
+      <div className="flex items-center justify-between mb-6">
+        <Link 
+          href="/tools" 
+          className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-700 dark:text-zinc-300 hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)] transition self-start bg-white dark:bg-zinc-900 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-2xs" 
+          dir="rtl"
+        >
+          <ArrowLeft className="w-4 h-4 rotate-180 text-[var(--color-imamu-accent)]" />
+          <span>العودة إلى الأدوات</span>
+        </Link>
+
+        <ReportDropdownMenu
+          targetType="tool"
+          targetId="plans"
+          targetTitle="الخطط الدراسية"
+          user={user}
+          buttonClassName="p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-500 dark:text-zinc-400 hover:text-[var(--color-imamu-accent)] transition cursor-pointer shadow-2xs flex items-center gap-2"
+        />
+      </div>
 
       <div className="mb-8">
         <span className="text-xs sm:text-sm font-semibold tracking-widest text-[var(--color-imamu-accent)] uppercase mb-2 block">
@@ -490,7 +501,7 @@ export function PlansToolPage() {
                       onClick={() => setSelectedMajor(m)}
                       className={`text-right px-4 py-3 rounded-xl transition flex items-center justify-between group cursor-pointer ${
                         isSelected 
-                          ? 'bg-stone-50 dark:bg-stone-950/50 border border-amber-200 dark:border-stone-900/50 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] font-bold' 
+                          ? 'bg-stone-50 dark:bg-stone-950/50 border border-slate-200/80 dark:border-zinc-700/80 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] font-bold' 
                           : 'hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300'
                       }`}
                     >
@@ -517,7 +528,7 @@ export function PlansToolPage() {
           ) : (
             <div className="h-full min-h-[380px] flex items-center justify-center bg-white dark:bg-zinc-900 rounded-3xl border border-dashed border-slate-300 dark:border-zinc-800 p-8 text-center">
               <div className="flex flex-col items-center max-w-sm">
-                <div className="w-14 h-14 bg-stone-50 dark:bg-stone-950/50 border border-amber-200 dark:border-stone-900/50 rounded-2xl flex items-center justify-center mb-4 text-[var(--color-imamu-accent)]">
+                <div className="w-14 h-14 bg-stone-50 dark:bg-stone-950/50 border border-slate-200/80 dark:border-zinc-700/80 rounded-2xl flex items-center justify-center mb-4 text-[var(--color-imamu-accent)]">
                   <FileText className="w-7 h-7" />
                 </div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1.5">اختر تخصصاً لعرض الخطة</h3>
@@ -540,7 +551,7 @@ export function PlansToolPage() {
             </button>
             
             <div className="flex items-center gap-3 mb-5">
-              <div className="w-10 h-10 rounded-2xl bg-stone-50 dark:bg-stone-950/50 border border-amber-200 dark:border-stone-900/50 flex items-center justify-center text-[var(--color-imamu-accent)] shrink-0">
+              <div className="w-10 h-10 rounded-2xl bg-stone-50 dark:bg-stone-950/50 border border-slate-200/80 dark:border-zinc-700/80 flex items-center justify-center text-[var(--color-imamu-accent)] shrink-0">
                 <FileText className="w-5 h-5" />
               </div>
               <div>
@@ -601,7 +612,7 @@ export function PlansToolPage() {
                     </div>
                   ) : (
                     <div className="flex flex-col items-center py-1 gap-2">
-                      <div className="w-10 h-10 rounded-2xl bg-amber-50 dark:bg-stone-950/60 border border-amber-200/50 dark:border-stone-900/40 text-[var(--color-imamu-accent)] flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-2xl bg-amber-50 dark:bg-stone-950/60 border border-slate-200/80 dark:border-zinc-700/80 text-[var(--color-imamu-accent)] flex items-center justify-center">
                         <Upload className="w-5 h-5" />
                       </div>
                       <div>

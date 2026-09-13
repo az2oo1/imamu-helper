@@ -73,10 +73,10 @@ export function ContributorsPage() {
 
   const categories = [
     { id: 'all', label: 'جميع المساهمين', icon: <HeartHandshake className="w-4 h-4" /> },
-    { id: 'founder', label: 'المؤسس والقائمون', icon: <Shield className="w-4 h-4 text-amber-500" /> },
-    { id: 'resources', label: 'فريق المصادر والمحتوى', icon: <FileText className="w-4 h-4 text-emerald-500" /> },
-    { id: 'tools', label: 'مطورو الأدوات', icon: <Wrench className="w-4 h-4 text-sky-500" /> },
-    { id: 'dalilah', label: 'فريق إجابات الدليلة', icon: <MessageSquare className="w-4 h-4 text-purple-500" /> },
+    { id: 'founder', label: 'المؤسس والقائمون', icon: <Shield className="w-4 h-4" /> },
+    { id: 'resources', label: 'فريق المصادر والمحتوى', icon: <FileText className="w-4 h-4" /> },
+    { id: 'tools', label: 'مطورو الأدوات', icon: <Wrench className="w-4 h-4" /> },
+    { id: 'dalilah', label: 'فريق إجابات الدليلة', icon: <MessageSquare className="w-4 h-4" /> },
   ];
 
   const fetchContributors = async () => {
@@ -108,11 +108,11 @@ export function ContributorsPage() {
       {/* Hero Header */}
       <InView preset="fade-up" delay={0.1} className="mb-10 text-right">
         <span className="text-xs sm:text-sm font-bold tracking-widest text-[var(--color-imamu-accent)] uppercase mb-2 block flex items-center gap-1.5">
-          <Sparkles className="w-4 h-4 text-amber-500" />
+          <Award className="w-4 h-4 text-[var(--color-imamu-accent)]" />
           <span>لوحة الشرف وتقدير فريق العمل</span>
         </span>
         <h1 className="text-3xl sm:text-5xl font-serif font-bold tracking-tight text-slate-900 dark:text-white mb-4 leading-tight">
-          المساهمون والقائمون على منصة مساعد الإمام 🌟
+          المساهمون والقائمون على منصة مساعد الإمام
         </h1>
         <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-3xl leading-relaxed">
           نفخر ونشيد بكوكبة من الطلاب والطالبات المتميزين الذين بذلوا جهودهم في التأسيس، تطوير الأدوات الحاسوبية، إعداد وتحديث بنك المصادر، والإجابة على استفسارات الطلاب عبر الدليلة.
@@ -121,21 +121,26 @@ export function ContributorsPage() {
 
       {/* Category Pills Filter */}
       <InView preset="fade-up" delay={0.2} className="mb-8 w-full">
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setActiveCategory(cat.id)}
-              className={`btn-rise px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shrink-0 border ${
-                activeCategory === cat.id
-                  ? 'bg-[var(--color-imamu-brown)] text-white border-amber-700/50 shadow-md shadow-[var(--color-imamu-brown)]/30'
-                  : 'bg-white dark:bg-zinc-900/90 text-slate-700 dark:text-zinc-300 border-slate-300 dark:border-zinc-700/80 hover:bg-amber-500/10 hover:text-amber-800 dark:hover:bg-amber-500/15 dark:hover:text-amber-300 hover:border-amber-500/40 dark:hover:border-amber-500/40'
-              }`}
-            >
-              {cat.icon}
-              <span>{cat.label}</span>
-            </button>
-          ))}
+        <div className="flex items-center gap-2 overflow-x-auto py-2 px-1 custom-scrollbar w-full max-w-full" dir="rtl">
+          {categories.map((cat) => {
+            const isActive = activeCategory === cat.id;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setActiveCategory(cat.id)}
+                className={`btn-rise px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shrink-0 border whitespace-nowrap ${
+                  isActive
+                    ? 'bg-[var(--color-imamu-brown)] text-white border-[var(--color-imamu-brown)] shadow-sm'
+                    : 'bg-slate-100/90 dark:bg-zinc-900/90 text-slate-700 dark:text-zinc-300 border-slate-200/80 dark:border-zinc-800 hover:bg-slate-200/80 dark:hover:bg-zinc-800 hover:border-[var(--color-imamu-accent)]/50'
+                }`}
+              >
+                {React.cloneElement(cat.icon, {
+                  className: `w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-[var(--color-imamu-accent)]'}`
+                })}
+                <span>{cat.label}</span>
+              </button>
+            );
+          })}
         </div>
       </InView>
 

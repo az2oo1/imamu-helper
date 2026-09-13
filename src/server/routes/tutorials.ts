@@ -1,6 +1,6 @@
 import express from 'express';
 import { eq, and, inArray, sql } from 'drizzle-orm';
-import { tutorial_sections, tutorials, tutorial_feedback, feedback_comments, tutorial_comments, newbie_links, users } from '../../db/schema';
+import { tutorial_sections, tutorials, tutorial_comments, users, app_feedback } from '../../db/schema';
 import { requireAuth, requireAdmin, AuthRequest } from '../../middleware/auth';
 import { matchId } from '../../lib/auth-utils';
 
@@ -20,63 +20,6 @@ function parseSteps(steps: any): any[] {
 
 export function createTutorialsRouter(db: any) {
   const router = express.Router();
-
-  // Get all newbie links
-  router.get("/newbie/links", async (req, res) => {
-    try {
-      const list = await db.select().from(newbie_links).orderBy(newbie_links.id);
-      res.json(list);
-    } catch (e) {
-      console.error(e);
-      res.status(500).json({ error: "Server error" });
-    }
-  });
-
-  // Admin: Create newbie link
-  router.post("/admin/newbie/links", requireAdmin, async (req: AuthRequest, res): Promise<any> => {
-    try {
-      const { title, url, description } = req.body;
-      if (!title || !url) {
-        return res.status(400).json({ error: "Missing required fields" });
-      }
-      const [newLink] = await db.insert(newbie_links).values({ title, url, description }).returning();
-      res.json(newLink);
-    } catch (e) {
-      console.error(e);
-      res.status(500).json({ error: "Server error" });
-    }
-  });
-
-  // Admin: Update newbie link
-  router.put("/admin/newbie/links/:id", requireAdmin, async (req: AuthRequest, res): Promise<any> => {
-    try {
-      const idRaw = req.params.id;
-      const { title, url, description } = req.body;
-      const [updated] = await db.update(newbie_links)
-        .set({ title, url, description })
-        .where(matchId(newbie_links.id, idRaw))
-        .returning();
-      if (!updated) {
-        return res.status(404).json({ error: "Link not found" });
-      }
-      res.json(updated);
-    } catch (e) {
-      console.error(e);
-      res.status(500).json({ error: "Server error" });
-    }
-  });
-
-  // Admin: Delete newbie link
-  router.delete("/admin/newbie/links/:id", requireAdmin, async (req: AuthRequest, res): Promise<any> => {
-    try {
-      const idRaw = req.params.id;
-      await db.delete(newbie_links).where(matchId(newbie_links.id, idRaw));
-      res.json({ success: true });
-    } catch (e) {
-      console.error(e);
-      res.status(500).json({ error: "Server error" });
-    }
-  });
 
   // Get all sections
   router.get("/tutorials/sections", async (req, res) => {
@@ -115,7 +58,12 @@ export function createTutorialsRouter(db: any) {
       const [tutorial] = await db.select().from(tutorials).where(matchId(tutorials.id, idRaw));
       if (!tutorial) return res.status(404).json({ error: "Tutorial not found" });
 
-      const feedbackList = await db.select().from(tutorial_feedback).where(matchId(tutorial_feedback.tutorialId, idRaw));
+      const feedbackList = await db.select().from(app_feedback).where(
+        and(
+          eq(app_feedback.targetType, 'tutorial'),
+          eq(app_feedback.targetId, String(idRaw))
+        )
+      );
 
       const userIds: string[] = Array.from(new Set(feedbackList.map((fb: any) => String(fb.userId)).filter(Boolean)));
       const userRecords = userIds.length > 0 ? await db.select().from(users).where(inArray(users.uid, userIds)) : [];
@@ -125,7 +73,8 @@ export function createTutorialsRouter(db: any) {
         const userRec = userMap.get(fb.userId);
         return {
           ...fb,
-          userName: userRec ? (userRec.userName || userRec.email?.split('@')[0]) : 'طالب',
+          isHelpful: fb.feedbackType === 'helpful',
+          userName: userRec ? (userRec.userName || userRec.email?.split('@')[0]) : (fb.userName || 'طالب'),
           profilePicUrl: userRec?.profilePicUrl
         };
       });
@@ -141,93 +90,75 @@ export function createTutorialsRouter(db: any) {
     }
   });
 
-  // Submit feedback
+  // Submit feedback on tutorial
   router.post("/tutorials/:id/feedback", requireAuth, async (req: AuthRequest, res) => {
     try {
       const idRaw = req.params.id;
       const userId = req.user.uid;
       const { isHelpful, comment } = req.body;
 
-      const existing = await db.select().from(tutorial_feedback).where(
+      const existing = await db.select().from(app_feedback).where(
         and(
-          matchId(tutorial_feedback.tutorialId, idRaw),
-          eq(tutorial_feedback.userId, userId)
+          eq(app_feedback.targetType, 'tutorial'),
+          eq(app_feedback.targetId, String(idRaw)),
+          eq(app_feedback.userId, userId)
         )
       );
 
+      const [tut] = await db.select().from(tutorials).where(matchId(tutorials.id, idRaw));
+
       let feedbackRecord;
+      const feedbackType = isHelpful ? 'helpful' : 'unhelpful';
       if (existing.length > 0) {
-        [feedbackRecord] = await db.update(tutorial_feedback)
-          .set({ isHelpful, comment: comment || null })
-          .where(matchId(tutorial_feedback.id, existing[0].id))
+        [feedbackRecord] = await db.update(app_feedback)
+          .set({
+            feedbackType,
+            comment: comment || existing[0].comment || ''
+          })
+          .where(eq(app_feedback.id, existing[0].id))
           .returning();
       } else {
-        [feedbackRecord] = await db.insert(tutorial_feedback)
-          .values({ tutorialId: idRaw as any, userId, isHelpful, comment: comment || null })
+        [feedbackRecord] = await db.insert(app_feedback)
+          .values({
+            targetType: 'tutorial',
+            targetId: String(idRaw),
+            targetTitle: tut?.title || null,
+            userId,
+            userName: req.user.userName || 'طالب',
+            userEmail: req.user.email || null,
+            feedbackType,
+            comment: comment || '',
+            status: 'pending'
+          })
           .returning();
       }
 
-      res.json(feedbackRecord);
-    } catch (e) {
-      console.error(e);
-      res.status(500).json({ error: "Server error" });
-    }
-  });
-
-  // Get comments for specific feedback
-  router.get("/feedback/:id/comments", async (req, res) => {
-    try {
-      const idRaw = req.params.id;
-      const commentsList = await db.select().from(feedback_comments).where(matchId(feedback_comments.feedbackId, idRaw));
-
-      const userIds: string[] = Array.from(new Set(commentsList.map((c: any) => String(c.userId)).filter(Boolean)));
-      const userRecords = userIds.length > 0 ? await db.select().from(users).where(inArray(users.uid, userIds)) : [];
-      const userMap = new Map<string, any>(userRecords.map((u: any) => [u.uid, u]));
-
-      const enriched = commentsList.map((c: any) => {
-        const userRec = userMap.get(c.userId);
-        return {
-          ...c,
-          userName: userRec ? (userRec.userName || userRec.email?.split('@')[0]) : (c.userName || 'طالب'),
-          profilePicUrl: userRec?.profilePicUrl
-        };
-      });
-
-      res.json(enriched);
-    } catch (e) {
-      console.error(e);
-      res.status(500).json({ error: "Server error" });
-    }
-  });
-
-  // Post a comment/reply on feedback
-  router.post("/feedback/:id/comments", requireAuth, async (req: AuthRequest, res): Promise<any> => {
-    try {
-      const idRaw = req.params.id;
-      const userId = req.user.uid;
-      const { content } = req.body;
-      if (!content || !content.trim()) return res.status(400).json({ error: "Comment text required" });
-
-      const [userRec] = await db.select().from(users).where(eq(users.uid, userId));
-      const userName = userRec ? (userRec.userName || userRec.email?.split('@')[0]) : 'طالب';
-
-      const [newComment] = await db.insert(feedback_comments)
-        .values({
-          feedbackId: idRaw as any,
-          userId,
-          userName,
-          content: content.trim()
-        })
-        .returning();
-
       res.json({
-        ...newComment,
-        profilePicUrl: userRec?.profilePicUrl
+        ...feedbackRecord,
+        isHelpful: feedbackRecord.feedbackType === 'helpful'
       });
     } catch (e) {
       console.error(e);
       res.status(500).json({ error: "Server error" });
     }
+  });
+
+  // Get comments for specific feedback (Legacy stub endpoint)
+  router.get("/feedback/:id/comments", async (req, res) => {
+    res.json([]);
+  });
+
+  // Post a comment/reply on feedback (Legacy stub endpoint)
+  router.post("/feedback/:id/comments", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    const { content } = req.body;
+    if (!content || !content.trim()) return res.status(400).json({ error: "Comment text required" });
+    res.json({
+      id: Date.now(),
+      feedbackId: req.params.id,
+      userId: req.user.uid,
+      userName: req.user.userName || 'طالب',
+      content: content.trim()
+    });
   });
 
   // Get public comments for specific tutorial
@@ -286,5 +217,43 @@ export function createTutorialsRouter(db: any) {
     }
   });
 
+  // Submit universal app feedback or report problem
+  router.post("/feedback", async (req: AuthRequest, res): Promise<any> => {
+    try {
+      const { targetType, targetId, targetTitle, feedbackType, comment, userEmail, userName } = req.body;
+      if (!targetType) return res.status(400).json({ error: "targetType is required" });
+
+      const userId = req.user?.uid || null;
+      let resolvedUserName = userName || null;
+      let resolvedUserEmail = userEmail || req.user?.email || null;
+
+      if (userId && !resolvedUserName) {
+        const [uRec] = await db.select().from(users).where(eq(users.uid, userId));
+        if (uRec) {
+          resolvedUserName = uRec.userName || uRec.email?.split('@')[0];
+          resolvedUserEmail = uRec.email || resolvedUserEmail;
+        }
+      }
+
+      const [newFeedback] = await db.insert(app_feedback).values({
+        targetType,
+        targetId: targetId ? String(targetId) : null,
+        targetTitle: targetTitle || null,
+        userId,
+        userName: resolvedUserName || 'طالب',
+        userEmail: resolvedUserEmail,
+        feedbackType: feedbackType || 'bug_report',
+        comment: comment ? String(comment).trim() : '',
+        status: 'pending'
+      }).returning();
+
+      res.json(newFeedback);
+    } catch (e: any) {
+      console.error("[Post Feedback Error]", e);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   return router;
 }
+

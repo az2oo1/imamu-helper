@@ -1,6 +1,6 @@
 import express from 'express';
 import { eq, sql, inArray } from 'drizzle-orm';
-import { subjects, majors, majorCourses, course_resources } from '../../db/schema';
+import { subjects, majors, majorCourses, course_resources, course_sections } from '../../db/schema';
 import { requireAuth } from '../../middleware/auth';
 import { matchId, matchSubjectIds } from '../../lib/auth-utils';
 import { cleanCourseName } from '../../lib/url-utils';
@@ -221,6 +221,7 @@ export function createSubjectsRouter(db: any) {
               avatarUrl: firstRes?.avatarUrl || undefined,
               bannerUrl: firstRes?.bannerUrl || undefined,
               resources: matchingResources,
+              sectionsEnabled: firstRes ? (firstRes.sectionsEnabled !== false) : true,
               prerequisites: [],
               dependents: []
             }
@@ -287,6 +288,16 @@ export function createSubjectsRouter(db: any) {
         ? firstResWithDesc.description.trim() 
         : (subject.description?.trim() || firstResWithDesc?.description?.trim() || null);
 
+      let sectionsList: any[] = [];
+      try {
+        const allSections = await db.select().from(course_sections);
+        sectionsList = allSections.filter((sec: any) => {
+          if (subject.id && matchSubjectIds(sec.subjectId, subject.id)) return true;
+          if (subject.code && sec.courseCode && sec.courseCode.toLowerCase().trim() === subject.code.toLowerCase().trim()) return true;
+          return false;
+        });
+      } catch (_secErr) {}
+
       res.json({
         course: {
           ...subject,
@@ -296,6 +307,8 @@ export function createSubjectsRouter(db: any) {
           whatsappLink: resolvedWhatsappLink,
           isAcademicSubject: true,
           resources: allResources,
+          sections: sectionsList,
+          sectionsEnabled: allResources.length > 0 ? !allResources.every((r: any) => r.sectionsEnabled === false) : true,
           prerequisites,
           dependents,
           connectUrl: `${connectUrl.replace(/\/$/, '')}/academics?courseId=${encodeURIComponent(subject.code)}`
@@ -312,19 +325,125 @@ export function createSubjectsRouter(db: any) {
   router.get("/subjects/:idOrCode", getCourseDetailsHandler);
   router.get("/courses/:idOrCode", getCourseDetailsHandler);
 
+  // Get resources specifically for a subject
+  router.get(["/subjects/:idOrCode/resources", "/courses/:idOrCode/resources"], async (req: express.Request, res: express.Response): Promise<any> => {
+    try {
+      const { idOrCode } = req.params;
+      const rawDecoded = decodeURIComponent(idOrCode || '').trim();
+      const realId = rawDecoded.replace(/^syn(thetic)?_/, '').trim();
+      const isNumeric = !isNaN(Number(realId)) && realId !== '';
+
+      const allCr = await db.select().from(course_resources);
+      const filtered = allCr.filter((cr: any) => {
+        if (isNumeric && matchSubjectIds(cr.subjectId, realId)) return true;
+        if (cr.courseCode && cr.courseCode.toLowerCase().trim() === realId.toLowerCase().trim()) return true;
+        return false;
+      });
+      res.json(filtered);
+    } catch (err) {
+      console.error("Error fetching subject resources:", err);
+      res.status(500).json({ error: "Failed to fetch subject resources" });
+    }
+  });
+
+  // Section Management Endpoints
+  router.get("/sections", async (req: express.Request, res: express.Response) => {
+    try {
+      const { subjectId, courseCode } = req.query;
+      let allSecs = await db.select().from(course_sections);
+      if (subjectId) {
+        allSecs = allSecs.filter((s: any) => matchSubjectIds(s.subjectId, subjectId));
+      } else if (courseCode) {
+        const cleanCode = String(courseCode).trim().toLowerCase();
+        allSecs = allSecs.filter((s: any) => s.courseCode && s.courseCode.trim().toLowerCase() === cleanCode);
+      }
+      res.json(allSecs);
+    } catch (err) {
+      console.error("Error fetching sections:", err);
+      res.json([]);
+    }
+  });
+
+  router.get("/subjects/:idOrCode/sections", async (req: express.Request, res: express.Response) => {
+    try {
+      const { idOrCode } = req.params;
+      const cleanTarget = decodeURIComponent(idOrCode || '').trim();
+      const isNumeric = !isNaN(Number(cleanTarget)) && cleanTarget !== '';
+      const allSecs = await db.select().from(course_sections);
+      const filtered = allSecs.filter((s: any) => {
+        if (isNumeric && matchSubjectIds(s.subjectId, cleanTarget)) return true;
+        if (s.courseCode && s.courseCode.toLowerCase().trim() === cleanTarget.toLowerCase()) return true;
+        return false;
+      });
+      res.json(filtered);
+    } catch (err) {
+      console.error("Error fetching subject sections:", err);
+      res.json([]);
+    }
+  });
+
+  router.post("/sections", async (req: express.Request, res: express.Response): Promise<any> => {
+    try {
+      const { sectionName, whatsappLink, phone, subjectId, courseCode, publishedByUserId, publishedByUserName } = req.body;
+      if (!sectionName || !sectionName.trim()) {
+        return res.status(400).json({ error: "اسم الشعبة مطلوب" });
+      }
+      if (!whatsappLink || !whatsappLink.trim()) {
+        return res.status(400).json({ error: "رابط الواتساب مطلوب" });
+      }
+
+      // Resolve publisher user ID from auth middleware or request payload or fallback ID
+      const reqUser = (req as any).user;
+      const resolvedUserId = (reqUser?.uid || reqUser?.userName || publishedByUserId || `user_${Math.random().toString(36).substring(2, 8)}`).trim();
+      const resolvedUserName = reqUser?.userName || publishedByUserName || null;
+
+      let targetSubjectId = subjectId ? Number(subjectId) : null;
+      if (!targetSubjectId && courseCode) {
+        const sub = (await db.select().from(subjects).where(sql`LOWER(${subjects.code}) = LOWER(${String(courseCode).trim()})`))[0];
+        if (sub) targetSubjectId = sub.id;
+      }
+
+      const [newSection] = await db.insert(course_sections).values({
+        subjectId: targetSubjectId || null,
+        courseCode: courseCode || null,
+        sectionName: sectionName.trim(),
+        whatsappLink: whatsappLink.trim(),
+        phone: phone ? phone.trim() : null,
+        publishedByUserId: resolvedUserId,
+        publishedByUserName: resolvedUserName
+      }).returning();
+
+      res.json(newSection);
+    } catch (err: any) {
+      console.error("Error creating section:", err);
+      res.status(500).json({ error: "فشل إضافة الشعبة" });
+    }
+  });
+
+  router.delete("/sections/:id", async (req: express.Request, res: express.Response): Promise<any> => {
+    try {
+      const { id } = req.params;
+      await db.delete(course_sections).where(matchId(course_sections.id, id));
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("Error deleting section:", err);
+      res.status(500).json({ error: "فشل حذف الشعبة" });
+    }
+  });
+
   router.get("/majors", async (req: express.Request, res: express.Response) => {
     try {
-      const records = await db.select().from(majors);
+      let records = await db.select().from(majors);
+      if (!records || records.length === 0) {
+        await db.insert(majors).values([
+          { name: 'علوم الحاسب' },
+          { name: 'تقنية المعلومات' },
+          { name: 'نظم المعلومات' }
+        ]).catch(() => {});
+        records = await db.select().from(majors);
+      }
       const rawMajorCourses: any = await db.execute(sql`SELECT CAST(id AS text) as id, CAST(major_id AS text) as "majorId", CAST(subject_id AS text) as "subjectId", optional_group as "optionalGroup", optional_group_req_count as "optionalGroupReqCount", prereq FROM major_courses`).catch(() => []);
       const allMajorCourses = rawMajorCourses.rows || rawMajorCourses || [];
-
-      if (!records || records.length === 0) {
-        return res.json([
-          { id: 1, name: 'علوم الحاسب', pdfUrl: null, plans: [], courseIds: [], courses: [] },
-          { id: 2, name: 'تقنية المعلومات', pdfUrl: null, plans: [], courseIds: [], courses: [] },
-          { id: 3, name: 'نظم المعلومات', pdfUrl: null, plans: [], courseIds: [], courses: [] }
-        ]);
-      }
 
       const mapped = await Promise.all(records.map(async (m: any) => {
         const courseIds = allMajorCourses.filter((mc: any) => String(mc.majorId) === String(m.id)).map((mc: any) => String(mc.subjectId));
@@ -444,6 +563,7 @@ export function createSubjectsRouter(db: any) {
           bannerUrl: cr.bannerUrl || undefined,
           telegramUrl: cr.type === 'telegram' ? cr.url : undefined,
           description: cr.description,
+          sectionsEnabled: cr.sectionsEnabled !== false,
           createdAt: cr.createdAt ? new Date(cr.createdAt).toISOString() : new Date().toISOString()
         });
       }

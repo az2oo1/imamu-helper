@@ -8,7 +8,8 @@ import { getDb } from "./src/db/index";
 import { requestLogger, logger } from "./src/middleware/logger";
 import { getFileFromStorage, ensureAllBucketsExist } from "./src/lib/storage";
 
-import { seedDefaults } from './src/server/services/seed';
+import { extractTelegramChannelPosts } from './src/server/services/telegram';
+import { news_sources } from './src/db/schema';
 import { createAuthRouter } from './src/server/routes/auth';
 import { createSubjectsRouter } from './src/server/routes/subjects';
 import { createNewsRouter } from './src/server/routes/news';
@@ -16,6 +17,7 @@ import { createTutorialsRouter } from './src/server/routes/tutorials';
 import { createAdminRouter } from './src/server/routes/admin';
 import { createContributorsRouter } from './src/server/routes/contributors';
 import { createSeoRouter } from './src/server/routes/seo';
+import { createAuthenticatedAccountsRouter } from './src/server/routes/authenticatedAccounts';
 
 async function startServer() {
   // Wait for DB to be fully initialized (PGlite WASM or CockroachDB / PostgreSQL)
@@ -105,9 +107,6 @@ async function startServer() {
   // Ensure all dedicated S3 buckets exist in Garage Object Storage
   await ensureAllBucketsExist().catch(err => console.warn('[Storage] Bucket init notice:', err.message || err));
 
-  // Seed default tutorials & newbie portal links if empty
-  await seedDefaults(db);
-
   // Health check API
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
@@ -120,13 +119,50 @@ async function startServer() {
   app.use("/api", createTutorialsRouter(db));
   app.use("/api", createAdminRouter(db));
   app.use("/api", createContributorsRouter(db));
+  app.use("/api", createAuthenticatedAccountsRouter(db));
 
   // Dynamic SEO Router (/sitemap.xml & /robots.txt)
   app.use("/", createSeoRouter(db));
 
+  // Start periodic Telegram channel news fetcher worker (runs every 30 minutes if enabled in settings)
+  const startPeriodicTelegramFetcher = () => {
+    const fetchAllSources = async () => {
+      try {
+        const settings = await db.query.global_settings.findFirst().catch(() => null);
+        if (!settings?.autoFetchTelegram) {
+          // Off by default unless explicitly turned ON in Global Settings
+          return;
+        }
+
+        const sources = await db.select().from(news_sources);
+        for (const source of sources) {
+          if (source.handle && source.isActive !== false) {
+            try {
+              await extractTelegramChannelPosts(source.handle, 25, db);
+            } catch (err: any) {
+              console.warn(`[Periodic Fetcher Warning] Channel @${source.handle}:`, err.message || err);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('[Periodic Fetcher Error]', e);
+      }
+    };
+
+    setTimeout(fetchAllSources, 10000);
+    setInterval(fetchAllSources, 30 * 60 * 1000);
+  };
+
+  startPeriodicTelegramFetcher();
+
   // JSON 404 fallback for unmatched /api routes (prevents Next.js HTML 404 rendering)
   app.all("/api/*", (req, res) => {
     res.status(404).json({ error: `API route not found: ${req.method} ${req.path}` });
+  });
+
+  // 404 fallback for missing /uploads files (prevents routing missing images to Next.js SSR)
+  app.all("/uploads/*", (req, res) => {
+    res.status(404).send("File not found");
   });
 
   // Next.js SSR request handling

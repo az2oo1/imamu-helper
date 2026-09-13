@@ -118,7 +118,7 @@ const colleges: College[] = [
 
 const collegeThemes: Record<string, string> = {
   engineering: 'bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-900/50 text-orange-900 dark:text-orange-300 border-r-4 border-r-orange-500 shadow-xs',
-  ccis: 'bg-stone-50 dark:bg-stone-950/30 border-amber-200 dark:border-stone-900/50 text-stone-900 dark:text-[var(--color-imamu-accent)] border-r-4 border-r-amber-700 shadow-xs',
+  ccis: 'bg-stone-50 dark:bg-stone-950/30 border-slate-200/80 dark:border-zinc-700/80 text-stone-900 dark:text-[var(--color-imamu-accent)] border-r-4 border-r-amber-700 shadow-xs',
   science: 'bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-900/50 text-purple-900 dark:text-purple-300 border-r-4 border-r-purple-500 shadow-xs',
   economics: 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/50 text-emerald-900 dark:text-emerald-300 border-r-4 border-r-emerald-500 shadow-xs',
   sharia: 'bg-indigo-50 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-900/50 text-indigo-900 dark:text-indigo-300 border-r-4 border-r-indigo-500 shadow-xs',
@@ -197,7 +197,7 @@ export function EmailsPage() {
                 }}
                 className={`p-4 rounded-2xl border text-right transition-all duration-300 flex flex-col gap-1 w-full ${
                   selectedCollegeId === college.id 
-                    ? (collegeThemes[college.id] || 'bg-stone-50 dark:bg-stone-950/30 border-amber-200 dark:border-stone-900/50 text-stone-900 dark:text-[var(--color-imamu-accent)] border-r-4 border-r-amber-700 shadow-xs') 
+                    ? (collegeThemes[college.id] || 'bg-stone-50 dark:bg-stone-950/30 border-slate-200/80 dark:border-zinc-700/80 text-stone-900 dark:text-[var(--color-imamu-accent)] border-r-4 border-r-amber-700 shadow-xs') 
                     : 'bg-slate-50 dark:bg-zinc-900/40 border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800/60 hover:border-slate-300 dark:hover:border-zinc-700'
                 }`}
               >

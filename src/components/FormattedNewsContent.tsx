@@ -58,6 +58,7 @@ export function cleanNewsText(text: string): string {
     .replace(/\s*\(\?q=%23[^)]+\)/gi, '')
     .replace(/\s*\?q=%23[^\s)]+/gi, '')
     .replace(/(\B#[\w\u0600-\u06FF]+)\s*\([^)]*https?:\/\/[^)]*\)/gi, '$1') // remove url parens directly following hashtags
+    .replace(/\(\s*(https?:\/\/[^\s)]+)\s*\)/g, '$1') // unwrap bare URLs inside parentheses e.g. (https://...) -> https://...
     .trim();
 }
 
@@ -73,7 +74,7 @@ export function FormattedNewsContent({ content, className = '', truncateLines }:
       let cursor = 0;
 
       // Master regex matching tokens in order
-      const regex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(?:([A-Za-z0-9\u0600-\u06FF\s🔗✨💼🚀👀⏳]{1,35})\s*\((https?:\/\/[^\s)]+)\))|(https?:\/\/[^\s)]+)|(\B#[\w\u0600-\u06FF]+)/g;
+      const regex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(?:([^\n()]{1,50}))\s*\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s)]+)|(\B#[\w\u0600-\u06FF]+)/g;
       
       let m: RegExpExecArray | null;
       while ((m = regex.exec(line)) !== null) {
@@ -92,7 +93,7 @@ export function FormattedNewsContent({ content, className = '', truncateLines }:
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 my-0.5 rounded-lg bg-stone-50 dark:bg-stone-950/60 border border-amber-200/80 dark:border-stone-900/60 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] font-bold text-xs hover:bg-stone-100 dark:hover:bg-stone-900/80 transition-all shadow-2xs group"
+              className="inline-flex items-center gap-1.5 text-[var(--color-imamu-accent)] font-bold text-xs hover:underline transition-colors group cursor-pointer mx-1"
             >
               <PlatformIcon url={url} />
               <span>{label}</span>
@@ -100,8 +101,9 @@ export function FormattedNewsContent({ content, className = '', truncateLines }:
           );
         } else if (m[3] && m[4]) {
           // Parenthesized link Label (URL)
-          const label = m[3].trim();
+          const rawLabel = m[3].trim().replace(/[:\-–—\s]+$/, '');
           const url = m[4];
+          const label = rawLabel || url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
           lineTokens.push(
             <a
               key={`${lineIdx}-${m.index}`}
@@ -109,7 +111,7 @@ export function FormattedNewsContent({ content, className = '', truncateLines }:
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 my-0.5 rounded-lg bg-slate-100 dark:bg-zinc-800/90 border border-slate-200/80 dark:border-zinc-700/80 text-slate-800 dark:text-zinc-200 font-bold text-xs hover:bg-stone-50 dark:hover:bg-stone-950/60 hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)] hover:border-amber-200 transition-all shadow-2xs group"
+              className="inline-flex items-center gap-1.5 text-[var(--color-imamu-accent)] font-bold text-xs hover:underline transition-colors group cursor-pointer mx-1"
             >
               <PlatformIcon url={url} />
               <span>{label}</span>
@@ -126,7 +128,7 @@ export function FormattedNewsContent({ content, className = '', truncateLines }:
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-1 px-2 py-0.5 my-0.5 rounded-md bg-stone-50/70 dark:bg-stone-950/40 text-[var(--color-imamu-accent)] font-medium text-xs hover:underline ltr"
+              className="inline-flex items-center gap-1.5 text-[var(--color-imamu-accent)] font-bold text-xs hover:underline transition-colors group cursor-pointer mx-1 ltr"
               dir="ltr"
             >
               <PlatformIcon url={url} />
@@ -134,7 +136,7 @@ export function FormattedNewsContent({ content, className = '', truncateLines }:
             </a>
           );
         } else if (m[6]) {
-          // Hashtag #tag - Clean inline colored text style (no big box)
+          // Hashtag #tag - Clean inline colored text style
           const tag = m[6];
           lineTokens.push(
             <span

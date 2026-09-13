@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../lib/AuthContext';
 import { useTheme, COLOR_PRESETS } from '../lib/ThemeContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronDown, ChevronUp, UserCircle2, Mail, Phone, BookOpen, Calculator, Clock, CheckCircle2, AlertCircle, Loader2, Camera, GraduationCap, Settings, Sparkles, ArrowUpRight, Palette, Check, Sun, Moon } from 'lucide-react';
+import { ChevronDown, ChevronUp, UserCircle2, Mail, Phone, BookOpen, Calculator, Clock, CheckCircle2, AlertCircle, Loader2, Camera, GraduationCap, Settings, Sparkles, ArrowUpRight, Palette, Check, Sun, Moon, Shield, ExternalLink } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AnimatedNumber } from '../components/ui';
 
@@ -90,12 +90,28 @@ export function ProfilePage() {
   const router = useRouter();
   const [majors, setMajors] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
+  const [managedEntityAccounts, setManagedEntityAccounts] = useState<any[]>([]);
 
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login');
     }
   }, [user, authLoading, router]);
+
+  useEffect(() => {
+    if (user) {
+      user.getIdToken().then((token: string) => {
+        fetch('/api/authenticated-accounts/my-accounts', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        .then(res => res.ok ? res.json() : [])
+        .then(data => {
+          if (Array.isArray(data)) setManagedEntityAccounts(data);
+        })
+        .catch(() => {});
+      });
+    }
+  }, [user]);
   
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
@@ -269,7 +285,7 @@ export function ProfilePage() {
           <button 
             type="button"
             onClick={() => document.getElementById('pfp-upload')?.click()}
-            className="mt-3.5 inline-flex items-center gap-1.5 text-xs font-bold text-[var(--color-imamu-accent)] bg-stone-50 dark:bg-stone-950/50 hover:bg-stone-100 dark:hover:bg-stone-900/60 px-4 py-2 rounded-xl border border-amber-200 dark:border-stone-900/50 transition shadow-2xs cursor-pointer"
+            className="mt-3.5 inline-flex items-center gap-1.5 text-xs font-bold text-[var(--color-imamu-accent)] bg-stone-50 dark:bg-stone-950/50 hover:bg-stone-100 dark:hover:bg-stone-900/60 px-4 py-2 rounded-xl border border-slate-200/80 dark:border-zinc-700/80 transition shadow-2xs cursor-pointer"
           >
             <Camera className="w-3.5 h-3.5" />
             <span>تغيير الصورة الشخصية</span>
@@ -283,6 +299,23 @@ export function ProfilePage() {
               {user?.email || ''}
             </p>
           </div>
+
+          {/* Access Managed Entity Accounts Button */}
+          {managedEntityAccounts.length > 0 && (
+            <div className="mt-4 flex flex-col items-center gap-2 w-full max-w-[220px]">
+              {managedEntityAccounts.map((acc: any) => (
+                <button
+                  key={acc.id}
+                  type="button"
+                  onClick={() => router.push(`/@/${encodeURIComponent(acc.handle.replace(/^@/, ''))}/dashboard`)}
+                  className="w-full inline-flex items-center justify-center gap-2 text-xs font-bold text-[var(--color-imamu-accent)] bg-stone-100 dark:bg-zinc-900 hover:bg-stone-200 dark:hover:bg-zinc-800 px-4 py-2.5 rounded-xl border border-[var(--color-imamu-accent)]/30 transition shadow-sm cursor-pointer"
+                >
+                  <Shield className="w-4 h-4 text-[var(--color-imamu-accent)] shrink-0" />
+                  <span className="truncate">لوحة تحكم ({acc.displayName || acc.handle})</span>
+                </button>
+              ))}
+            </div>
+          )}
           
           <button 
             onClick={async () => {
@@ -601,7 +634,7 @@ export function ProfilePage() {
                               progressData.allGroupNames.forEach(n => { nextState[n] = false; });
                               setCollapsedGroups(nextState);
                             }}
-                            className="text-xs font-bold text-[var(--color-imamu-accent)] hover:underline px-3 py-1.5 rounded-xl bg-stone-50 dark:bg-stone-950/40 border border-amber-200/50 dark:border-stone-900/50 cursor-pointer"
+                            className="text-xs font-bold text-[var(--color-imamu-accent)] hover:underline px-3 py-1.5 rounded-xl bg-stone-50 dark:bg-stone-950/40 border border-slate-200/80 dark:border-zinc-700/80 cursor-pointer"
                           >
                             توسيع الكل
                           </button>
@@ -686,7 +719,7 @@ export function ProfilePage() {
                                     <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap ${
                                       isGroupFull 
                                         ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' 
-                                        : 'bg-stone-50 dark:bg-stone-950/50 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] border-amber-200 dark:border-stone-900/50'
+                                        : 'bg-stone-50 dark:bg-stone-950/50 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] border-slate-200/80 dark:border-zinc-700/80'
                                     }`}>
                                       المنجز: {selectedInGroup} / {reqCount}
                                     </span>

@@ -69,25 +69,6 @@ export function parseDate(input: DateInput): Date | null {
 }
 
 /**
- * Legacy compatibility alias for parseDate.
- */
-export function parseAcademicDate(dateStr: string | null | undefined): Date | null {
-  return parseDate(dateStr);
-}
-
-/**
- * Legacy compatibility helper for date range extraction.
- */
-export function extractCleanDateRange(desc: string | null | undefined, fallbackDate: string = ''): string {
-  if (!desc) return fallbackDate;
-  const matches = Array.from(String(desc).matchAll(/\((\d{2}\/\d{2}\/\d{4})م?\)/g)).map(m => m[1]);
-  if (matches.length >= 2) {
-    return `${matches[0]} - ${matches[1]}`;
-  }
-  return fallbackDate;
-}
-
-/**
  * 2. Unified Date Formatter
  */
 export function formatDate(input: DateInput, preset: DateFormatPreset = 'ar-display'): string {

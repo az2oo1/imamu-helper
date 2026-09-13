@@ -17,7 +17,11 @@ import {
   Copy,
   Check,
   DollarSign,
-  BadgePercent
+  BadgePercent,
+  Users,
+  Phone,
+  Plus,
+  User
 } from 'lucide-react';
 
 import { cleanCourseName, cleanUrlProtocol, parseResourceUrl, parseAllResourceLinks, isWhatsappUrl } from '../lib/url-utils';
@@ -69,6 +73,79 @@ function CourseAvatar({ avatarUrl, bannerUrl, name }: { avatarUrl?: string; what
 
 function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any; activeTab: string; setActiveTab: (t: any) => void }) {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  // Sections State & Handler
+  const [sections, setSections] = useState<any[]>(course.sections || []);
+  const [isAddingSection, setIsAddingSection] = useState(false);
+  const [newSectionName, setNewSectionName] = useState('');
+  const [newWhatsappLink, setNewWhatsappLink] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  const [isSubmittingSection, setIsSubmittingSection] = useState(false);
+
+  useEffect(() => {
+    if (course.sections && Array.isArray(course.sections)) {
+      setSections(course.sections);
+    } else {
+      const targetCode = course.subjectId || course.code || course.id;
+      if (targetCode) {
+        fetch(`/api/subjects/${encodeURIComponent(String(targetCode))}/sections`)
+          .then(res => res.ok ? res.json() : [])
+          .then(data => { if (Array.isArray(data)) setSections(data); })
+          .catch(() => {});
+      }
+    }
+  }, [course]);
+
+  useEffect(() => {
+    if (course?.sectionsEnabled === false && activeTab === 'sections') {
+      setActiveTab('overview');
+    }
+  }, [course?.sectionsEnabled, activeTab, setActiveTab]);
+
+  const handleAddSection = async () => {
+    if (!newSectionName.trim()) {
+      alert('الرجاء إدخال اسم الشعبة');
+      return;
+    }
+    if (!newWhatsappLink.trim()) {
+      alert('الرجاء إدخال رابط الواتساب');
+      return;
+    }
+    setIsSubmittingSection(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/sections', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          sectionName: newSectionName.trim(),
+          whatsappLink: newWhatsappLink.trim(),
+          phone: newPhone.trim() || undefined,
+          subjectId: course.subjectId || course.id,
+          courseCode: course.code
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSections(prev => [data, ...prev]);
+        setNewSectionName('');
+        setNewWhatsappLink('');
+        setNewPhone('');
+        setIsAddingSection(false);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || 'فشل إضافة الشعبة');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('حدث خطأ أثناء حفظ الشعبة');
+    } finally {
+      setIsSubmittingSection(false);
+    }
+  };
 
   const isNonCourseRes = course.isAcademicSubject === false || course.code === 'مجموعة طلابية' || course.code === 'مصدر أكاديمي' || (!course.subjectId && (!course.code || course.code === 'مجموعة طلابية' || course.code === 'مصدر أكاديمي'));
 
@@ -192,7 +269,7 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
         <div>
           <div className="flex flex-wrap items-center gap-2 mb-2">
             {displayCode && displayCode !== 'مادة' && displayCode !== 'مصدر أكاديمي' && !/[\u0600-\u06FF]/.test(displayCode) && (
-              <span className="px-2.5 py-1 bg-stone-50 dark:bg-stone-950/60 text-[var(--color-imamu-accent)] border border-amber-200 dark:border-stone-900/50 text-xs font-mono font-bold rounded-lg" dir="ltr">
+              <span className="px-2.5 py-1 bg-slate-100 dark:bg-zinc-800/80 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700/80 text-xs font-mono font-bold rounded-lg" dir="ltr">
                 {displayCode}
               </span>
             )}
@@ -235,16 +312,38 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
                 : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
             }`}
           >
-            <BookOpen className={`w-4 h-4 transition-colors ${activeTab === 'overview' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-zinc-500'}`} />
+            <BookOpen className={`w-4 h-4 transition-colors ${activeTab === 'overview' ? 'text-[var(--color-imamu-accent)]' : 'text-slate-400 dark:text-zinc-500'}`} />
             <span>نظرة عامة</span>
             {activeTab === 'overview' && (
               <motion.div
                 layoutId="modalActiveTabUnderline"
-                className="absolute bottom-0 right-0 left-0 h-0.5 bg-[var(--color-imamu-brown)] dark:bg-[var(--color-imamu-brown)] rounded-full shadow-xs shadow-[var(--color-imamu-brown)/20]"
+                className="absolute bottom-0 right-0 left-0 h-0.5 bg-[var(--color-imamu-accent)] rounded-full shadow-xs shadow-[var(--color-imamu-accent)/20]"
                 transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
               />
             )}
           </button>
+
+          {course?.sectionsEnabled !== false && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('sections')}
+              className={`relative pb-3 px-4 font-bold transition-colors duration-200 text-xs sm:text-sm flex items-center gap-2 select-none cursor-pointer ${
+                activeTab === 'sections'
+                  ? 'text-[var(--color-imamu-accent)]'
+                  : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
+              }`}
+            >
+              <Users className={`w-4 h-4 transition-colors ${activeTab === 'sections' ? 'text-[var(--color-imamu-accent)]' : 'text-slate-400 dark:text-zinc-500'}`} />
+              <span>الشعب ({sections.length})</span>
+              {activeTab === 'sections' && (
+                <motion.div
+                  layoutId="modalActiveTabUnderline"
+                  className="absolute bottom-0 right-0 left-0 h-0.5 bg-[var(--color-imamu-accent)] rounded-full shadow-xs shadow-[var(--color-imamu-accent)/20]"
+                  transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+                />
+              )}
+            </button>
+          )}
 
           <button
             type="button"
@@ -255,12 +354,12 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
                 : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
             }`}
           >
-            <Video className={`w-4 h-4 transition-colors ${activeTab === 'explanations' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-zinc-500'}`} />
+            <Video className={`w-4 h-4 transition-colors ${activeTab === 'explanations' ? 'text-[var(--color-imamu-accent)]' : 'text-slate-400 dark:text-zinc-500'}`} />
             <span>الشروحات ({explanationsCount})</span>
             {activeTab === 'explanations' && (
               <motion.div
                 layoutId="modalActiveTabUnderline"
-                className="absolute bottom-0 right-0 left-0 h-0.5 bg-[var(--color-imamu-brown)] dark:bg-[var(--color-imamu-brown)] rounded-full shadow-xs shadow-[var(--color-imamu-brown)/20]"
+                className="absolute bottom-0 right-0 left-0 h-0.5 bg-[var(--color-imamu-accent)] rounded-full shadow-xs shadow-[var(--color-imamu-accent)/20]"
                 transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
               />
             )}
@@ -275,12 +374,12 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
                 : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
             }`}
           >
-            <Folder className={`w-4 h-4 transition-colors ${activeTab === 'files' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-zinc-500'}`} />
+            <Folder className={`w-4 h-4 transition-colors ${activeTab === 'files' ? 'text-[var(--color-imamu-accent)]' : 'text-slate-400 dark:text-zinc-500'}`} />
             <span>الملفات ({filesCount})</span>
             {activeTab === 'files' && (
               <motion.div
                 layoutId="modalActiveTabUnderline"
-                className="absolute bottom-0 right-0 left-0 h-0.5 bg-[var(--color-imamu-brown)] dark:bg-[var(--color-imamu-brown)] rounded-full shadow-xs shadow-[var(--color-imamu-brown)/20]"
+                className="absolute bottom-0 right-0 left-0 h-0.5 bg-[var(--color-imamu-accent)] rounded-full shadow-xs shadow-[var(--color-imamu-accent)/20]"
                 transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
               />
             )}
@@ -296,12 +395,12 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
                   : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
               }`}
             >
-              <FileText className={`w-4 h-4 transition-colors ${activeTab === 'syllabus' ? 'text-purple-600 dark:text-purple-400' : 'text-slate-400 dark:text-zinc-500'}`} />
+              <FileText className={`w-4 h-4 transition-colors ${activeTab === 'syllabus' ? 'text-[var(--color-imamu-accent)]' : 'text-slate-400 dark:text-zinc-500'}`} />
               <span>توصيف المقرر</span>
               {activeTab === 'syllabus' && (
                 <motion.div
                   layoutId="modalActiveTabUnderline"
-                  className="absolute bottom-0 right-0 left-0 h-0.5 bg-[var(--color-imamu-brown)] dark:bg-[var(--color-imamu-brown)] rounded-full shadow-xs shadow-[var(--color-imamu-brown)/20]"
+                  className="absolute bottom-0 right-0 left-0 h-0.5 bg-[var(--color-imamu-accent)] rounded-full shadow-xs shadow-[var(--color-imamu-accent)/20]"
                   transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
                 />
               )}
@@ -365,6 +464,135 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
           </motion.div>
         )}
 
+        {activeTab === 'sections' && (
+          <motion.div
+            key="sections"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="space-y-5"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-xs font-bold text-slate-400 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
+                <span>الشعب الدراسية والجروبات ({sections.length})</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsAddingSection(prev => !prev)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-light)] text-white text-xs font-bold transition-all duration-200 hover:scale-[1.03] active:scale-95 cursor-pointer shadow-sm"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>{isAddingSection ? 'إلغاء' : 'إضافة شعبة جديدة'}</span>
+              </button>
+            </div>
+
+            {isAddingSection && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200 dark:border-zinc-700/80 space-y-3"
+              >
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white">إضافة شعبة جديدة لهذه المادة</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 dark:text-zinc-400 mb-1">اسم الشعبة *</label>
+                    <input
+                      type="text"
+                      placeholder="مثال: شعبة 101 أو شعبة 352..."
+                      value={newSectionName}
+                      onChange={e => setNewSectionName(e.target.value)}
+                      className="w-full py-2 px-3 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:ring-2 focus:ring-[var(--color-imamu-accent)]/40 focus:border-[var(--color-imamu-accent)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 dark:text-zinc-400 mb-1">رابط مجموعة الواتساب *</label>
+                    <input
+                      type="text"
+                      placeholder="https://chat.whatsapp.com/..."
+                      value={newWhatsappLink}
+                      onChange={e => setNewWhatsappLink(e.target.value)}
+                      className="w-full py-2 px-3 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-mono font-bold text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:ring-2 focus:ring-emerald-500"
+                      dir="ltr"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 dark:text-zinc-400 mb-1">رقم الهاتف (اختياري)</label>
+                  <input
+                    type="text"
+                    placeholder="050xxxxxxx"
+                    value={newPhone}
+                    onChange={e => setNewPhone(e.target.value)}
+                    className="w-full py-2 px-3 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-mono font-bold text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:ring-2 focus:ring-[var(--color-imamu-accent)]/40 focus:border-[var(--color-imamu-accent)]"
+                    dir="ltr"
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    disabled={isSubmittingSection}
+                    onClick={handleAddSection}
+                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition duration-200 cursor-pointer flex items-center gap-1.5 shadow-sm"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>{isSubmittingSection ? 'جاري الحفظ...' : 'حفظ الشعبة'}</span>
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {sections.length === 0 ? (
+              <p className="text-xs text-slate-400 dark:text-zinc-500 italic bg-slate-50 dark:bg-zinc-800/40 p-4 rounded-2xl border border-slate-100 dark:border-zinc-800">
+                لا توجد شعب مسجلة حالياً لهذه المادة. اضغط على "إضافة شعبة جديدة" لإضافة أول شعبة!
+              </p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {sections.map((sec, idx) => (
+                  <div
+                    key={sec.id || idx}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/50 border border-slate-200/80 dark:border-zinc-800 gap-3"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="px-2.5 py-0.5 bg-[var(--color-imamu-brown)] text-white text-xs font-bold rounded-lg">
+                          {sec.sectionName}
+                        </span>
+                        {sec.publishedByUserId && (
+                          <span className="text-[11px] text-slate-500 dark:text-zinc-400 flex items-center gap-1 font-mono">
+                            <User className="w-3 h-3 text-slate-400" />
+                            <span>معرّف الناشر (User ID): <strong className="text-slate-800 dark:text-zinc-200">{sec.publishedByUserId}</strong></span>
+                          </span>
+                        )}
+                      </div>
+                      {sec.phone && (
+                        <p className="text-xs text-slate-600 dark:text-zinc-400 flex items-center gap-1">
+                          <Phone className="w-3 h-3 text-slate-400" />
+                          <span>التواصل / الهاتف: <span className="font-mono font-bold" dir="ltr">{sec.phone}</span></span>
+                        </p>
+                      )}
+                    </div>
+
+                    {sec.whatsappLink && (
+                      <a
+                        href={parseResourceUrl(sec.whatsappLink).url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all duration-200 hover:scale-[1.03] active:scale-95 cursor-pointer shrink-0"
+                      >
+                        <WhatsappIcon className="w-3.5 h-3.5 fill-current" />
+                        <span>انضمام للشعبة عبر الواتساب</span>
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        )}
+
         {activeTab === 'explanations' && (
           <motion.div
             key="explanations"
@@ -377,7 +605,7 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
             {/* Free Resources Section */}
             <div className="space-y-3">
               <h3 className="text-xs font-bold text-slate-400 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Video className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <Video className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
                 <span>المصادر المجانية ({freeList.length})</span>
               </h3>
               {freeList.length === 0 ? (
@@ -392,14 +620,14 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
                       href={item.url}
                       target="_blank"
                       rel="noreferrer"
-                      className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-800/50 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border border-slate-200/80 dark:border-zinc-800 hover:border-emerald-500/40 dark:hover:border-emerald-400/40 transition-all duration-200 group cursor-pointer"
+                      className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-800/50 hover:bg-stone-50 dark:hover:bg-stone-950/40 border border-slate-200/80 dark:border-zinc-800 hover:border-[var(--color-imamu-accent)]/50 transition-all duration-200 group cursor-pointer"
                     >
                       <div className="flex items-center gap-3.5 min-w-0">
-                        <div className="p-2.5 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 shrink-0">
+                        <div className="p-2.5 rounded-xl bg-stone-100 dark:bg-stone-900/50 text-[var(--color-imamu-accent)] shrink-0">
                           <Video className="w-4 h-4" />
                         </div>
                         <div className="min-w-0">
-                          <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate">
+                          <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white group-hover:text-[var(--color-imamu-accent)] transition-colors truncate">
                             {item.title}
                           </h4>
                           {item.description && (
@@ -409,7 +637,7 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
                           )}
                         </div>
                       </div>
-                      <ExternalLink className="w-4 h-4 text-slate-400 dark:text-zinc-500 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors shrink-0 mr-2" />
+                      <ExternalLink className="w-4 h-4 text-slate-400 dark:text-zinc-500 group-hover:text-[var(--color-imamu-accent)] transition-colors shrink-0 mr-2" />
                     </a>
                   ))}
                 </div>
@@ -419,7 +647,7 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
             {/* Paid Resources Section */}
             <div className="space-y-3">
               <h3 className="text-xs font-bold text-slate-400 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
-                <DollarSign className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
+                <DollarSign className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
                 <span>المصادر والشروحات المدفوعة ({paidList.length})</span>
               </h3>
 
@@ -436,14 +664,14 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
                         href={item.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50/70 dark:bg-zinc-800/40 hover:bg-amber-500/10 dark:hover:bg-amber-400/10 border border-slate-200/80 dark:border-zinc-800/80 hover:border-amber-500/40 dark:hover:border-amber-400/40 transition-all duration-200 group cursor-pointer"
+                        className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50/70 dark:bg-zinc-800/40 hover:bg-stone-50 dark:hover:bg-stone-950/40 border border-slate-200/80 dark:border-zinc-800/80 hover:border-[var(--color-imamu-accent)]/50 transition-all duration-200 group cursor-pointer"
                       >
                         <div className="flex items-center gap-3.5 min-w-0">
-                          <div className="p-2.5 rounded-xl bg-amber-500/10 dark:bg-amber-400/20 text-amber-600 dark:text-amber-400 shrink-0 transition-colors">
+                          <div className="p-2.5 rounded-xl bg-stone-100 dark:bg-stone-900/50 text-[var(--color-imamu-accent)] shrink-0 transition-colors">
                             <DollarSign className="w-4 h-4" />
                           </div>
                           <div className="min-w-0">
-                            <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors truncate">
+                            <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white group-hover:text-[var(--color-imamu-accent)] transition-colors truncate">
                               {item.title}
                             </h4>
                             {item.description && (
@@ -465,24 +693,24 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
                                 setCopiedCode(item.code!);
                                 setTimeout(() => setCopiedCode(null), 2000);
                               }}
-                              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-500/10 dark:bg-amber-400/10 hover:bg-amber-500/20 dark:hover:bg-amber-400/20 text-amber-700 dark:text-amber-300 text-xs font-bold transition-all duration-200 cursor-pointer border border-amber-500/30 dark:border-amber-400/30 group/btn shadow-2xs"
+                              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-stone-100 dark:bg-stone-900/50 hover:bg-stone-200 dark:hover:bg-stone-800 text-[var(--color-imamu-accent)] text-xs font-bold transition-all duration-200 cursor-pointer border border-amber-500/30 dark:border-amber-400/30 group/btn shadow-2xs"
                               title="انقر لنسخ كود الخصم"
                             >
-                              <Tag className="w-3 h-3 text-amber-600 dark:text-amber-400 transition-colors" />
+                              <Tag className="w-3 h-3 text-[var(--color-imamu-accent)] transition-colors" />
                               <span>كود الخصم: <span className="font-mono tracking-wider font-extrabold">{item.code}</span></span>
                               {item.discount && (
-                                <span className="bg-amber-500/20 dark:bg-amber-400/20 text-amber-800 dark:text-amber-200 text-[10px] px-1.5 py-0.5 rounded-md font-extrabold mr-0.5">
+                                <span className="bg-amber-500/20 dark:bg-amber-400/20 text-[var(--color-imamu-accent)] text-[10px] px-1.5 py-0.5 rounded-md font-extrabold mr-0.5">
                                   {item.discount.includes('%') || item.discount.includes('خصم') || item.discount.includes('ريال') ? item.discount : `خصم ${item.discount}`}
                                 </span>
                               )}
                               {copiedCode === item.code ? (
                                 <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                               ) : (
-                                <Copy className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 opacity-70 group-hover/btn:opacity-100 transition-colors" />
+                                <Copy className="w-3.5 h-3.5 text-[var(--color-imamu-accent)] opacity-70 group-hover/btn:opacity-100 transition-colors" />
                               )}
                             </button>
                           )}
-                          <ExternalLink className="w-4 h-4 text-slate-400 dark:text-zinc-500 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors shrink-0" />
+                          <ExternalLink className="w-4 h-4 text-slate-400 dark:text-zinc-500 group-hover:text-[var(--color-imamu-accent)] transition-colors shrink-0" />
                         </div>
                       </a>
                     ))}
@@ -508,7 +736,7 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
             className="space-y-4"
           >
             <h3 className="text-xs font-bold text-slate-400 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Folder className="w-3.5 h-3.5 text-white" />
+              <Folder className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
               الملفات ({fileList.length})
             </h3>
             {fileList.length === 0 ? (
@@ -523,14 +751,14 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
                     href={item.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/50 hover:bg-stone-50 dark:hover:bg-stone-950/40 border border-slate-200/80 dark:border-zinc-800 hover:border-amber-200 dark:hover:border-amber-900/60 transition-all duration-200 group cursor-pointer"
+                    className="flex items-center gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/50 hover:bg-stone-50 dark:hover:bg-stone-950/40 border border-slate-200/80 dark:border-zinc-800 hover:border-[var(--color-imamu-accent)]/50 transition-all duration-200 group cursor-pointer"
                   >
-                    <div className="p-2.5 rounded-xl bg-stone-100 dark:bg-stone-900/50 text-white shrink-0">
-                      <Folder className="w-5 h-5 text-white" />
+                    <div className="p-2.5 rounded-xl bg-stone-100 dark:bg-stone-900/50 text-[var(--color-imamu-accent)] shrink-0">
+                      <Folder className="w-5 h-5 text-[var(--color-imamu-accent)]" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1">
-                        <h4 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-[var(--color-imamu-accent)] dark:group-hover:text-[var(--color-imamu-accent)] transition-colors truncate">{item.title}</h4>
+                        <h4 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-[var(--color-imamu-accent)] transition-colors truncate">{item.title}</h4>
                         <ExternalLink className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 group-hover:text-[var(--color-imamu-accent)] transition-colors shrink-0" />
                       </div>
                       {item.description && (
@@ -565,7 +793,7 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
 export function CourseDetailsModal({ isOpen, onClose, courseIdOrCode, initialData }: CourseDetailsModalProps) {
   const [course, setCourse] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'explanations' | 'files' | 'syllabus'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'sections' | 'explanations' | 'files' | 'syllabus'>('overview');
   const [contentHeight, setContentHeight] = useState<number | 'auto'>('auto');
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -618,7 +846,8 @@ export function CourseDetailsModal({ isOpen, onClose, courseIdOrCode, initialDat
         description: initialData.description,
         creditHours: initialData.creditHours,
         level: initialData.level,
-        resources: initialData.resources || []
+        resources: initialData.resources || [],
+        sectionsEnabled: initialData.sectionsEnabled !== false
       };
       setCourse(initObj);
       setLoading(false);
@@ -650,6 +879,7 @@ export function CourseDetailsModal({ isOpen, onClose, courseIdOrCode, initialDat
             return {
               ...data.course,
               ...(prev || {}),
+              sectionsEnabled: data.course.sectionsEnabled !== false && (prev?.sectionsEnabled !== false),
               name: (isNonCourse && (prev?.name || prev?.title)) ? (prev.name || prev.title) : (data.course.name || prev?.name || prev?.title),
               description: chosenDescription,
               code: (isNonCourse && prev?.code) ? prev.code : (data.course.code || prev?.code),

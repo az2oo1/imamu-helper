@@ -15,7 +15,13 @@ import {
   Search, 
   Loader2,
   MessageCircle,
-  Download
+  Download,
+  Users,
+  Phone,
+  User,
+  Plus,
+  Trash2,
+  Settings
 } from 'lucide-react';
 import ImageUploadInput from './ImageUploadInput';
 import ResourceLinksInput from './ResourceLinksInput';
@@ -39,6 +45,7 @@ interface CreateResourceModalProps {
     avatarUrl?: string;
     bannerUrl?: string;
     description?: string;
+    sectionsEnabled?: boolean;
   };
   setResourceForm: React.Dispatch<React.SetStateAction<any>>;
   subjects: any[];
@@ -53,13 +60,83 @@ export default function CreateResourceModal({
   subjects,
   onSave
 }: CreateResourceModalProps) {
-  const [activeStep, setActiveStep] = useState<1 | 2 | 3 | 4>(1);
+  const [activeStep, setActiveStep] = useState<1 | 2 | 3 | 4 | 5 | 6>(1);
   const [courseSearch, setCourseSearch] = useState('');
   const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFetchingWaAvatar, setIsFetchingWaAvatar] = useState(false);
   const [waAvatarMessage, setWaAvatarMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Section Management State in Step 6
+  const [sections, setSections] = useState<any[]>([]);
+  const [newSecName, setNewSecName] = useState('');
+  const [newSecWa, setNewSecWa] = useState('');
+  const [newSecPhone, setNewSecPhone] = useState('');
+  const [isSavingSec, setIsSavingSec] = useState(false);
+
+  const selectedCourse = subjects.find(s => 
+    Boolean(resourceForm.subjectId) && String(s.id) === String(resourceForm.subjectId)
+  );
+
+  useEffect(() => {
+    if (isOpen && (resourceForm.subjectId || resourceForm.title)) {
+      const target = resourceForm.subjectId || selectedCourse?.code || resourceForm.title;
+      fetch(`/api/subjects/${encodeURIComponent(String(target))}/sections`)
+        .then(res => res.ok ? res.json() : [])
+        .then(data => { if (Array.isArray(data)) setSections(data); })
+        .catch(() => {});
+    }
+  }, [isOpen, resourceForm.subjectId, resourceForm.title, selectedCourse]);
+
+  const handleAddSectionModal = async () => {
+    if (!newSecName.trim()) { alert('الرجاء إدخال اسم الشعبة'); return; }
+    if (!newSecWa.trim()) { alert('الرجاء إدخال رابط الواتساب'); return; }
+    setIsSavingSec(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/sections', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          sectionName: newSecName.trim(),
+          whatsappLink: newSecWa.trim(),
+          phone: newSecPhone.trim() || undefined,
+          subjectId: resourceForm.subjectId,
+          courseCode: selectedCourse?.code || resourceForm.title
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSections(prev => [data, ...prev]);
+        setNewSecName('');
+        setNewSecWa('');
+        setNewSecPhone('');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || 'فشل إضافة الشعبة');
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSavingSec(false);
+    }
+  };
+
+  const handleDeleteSectionModal = async (id: number) => {
+    if (!confirm('هل أنت متأكد من حذف هذه الشعبة؟')) return;
+    try {
+      const res = await fetch(`/api/sections/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setSections(prev => prev.filter(s => s.id !== id));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const handleFetchWhatsappAvatar = async () => {
     const waUrl = resourceForm.whatsappLink?.trim();
@@ -109,9 +186,6 @@ export default function CreateResourceModal({
   if (!isOpen) return null;
 
   const isEditing = !!resourceForm.id;
-  const selectedCourse = subjects.find(s => 
-    Boolean(resourceForm.subjectId) && String(s.id) === String(resourceForm.subjectId)
-  );
 
   const filteredSubjects = subjects.filter(s => 
     !courseSearch || 
@@ -126,7 +200,7 @@ export default function CreateResourceModal({
       alert('الرجاء اختيار المادة الأكاديمية أو إدخال عنوان المصدر');
       return;
     }
-    if (activeStep < 4) {
+    if (activeStep < 6) {
       setActiveStep((s) => (s + 1) as any);
     }
   };
@@ -159,7 +233,9 @@ export default function CreateResourceModal({
     { id: 1, title: 'المادة والعنوان', icon: BookOpen },
     { id: 2, title: 'المجلدات والواتساب', icon: FolderGit2 },
     { id: 3, title: 'المصادر المجانية والمدفوعة', icon: Sparkles },
-    { id: 4, title: 'الوسائط والوصف', icon: FileText }
+    { id: 4, title: 'الوسائط والوصف', icon: FileText },
+    { id: 5, title: 'إعدادات وخيارات', icon: Settings },
+    { id: 6, title: 'الشعب', icon: Users }
   ];
 
   // Calculate track fill width for completed steps (0%, 33.3%, 66.6%, 100%)
@@ -195,7 +271,7 @@ export default function CreateResourceModal({
           <div className="p-6 bg-slate-50/80 dark:bg-zinc-900/90 border-b border-slate-200/80 dark:border-zinc-800 relative shrink-0">
             <div className="flex items-center justify-between gap-4 mb-6">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-2xl bg-stone-50 dark:bg-stone-950/60 border border-amber-200 dark:border-stone-900/50 text-white shadow-xs">
+                <div className="p-2.5 rounded-2xl bg-stone-50 dark:bg-stone-950/60 border border-slate-200/80 dark:border-zinc-700/80 text-white shadow-xs">
                   <Folder className="w-5 h-5 text-white" />
                 </div>
                 <div>
@@ -218,10 +294,10 @@ export default function CreateResourceModal({
               </button>
             </div>
 
-            {/* 4 Circles Horizontal Progress Stepper */}
+            {/* 6 Circles Horizontal Progress Stepper */}
             <div className="relative pt-1 px-4">
-              {/* Background Track Line (Spans exactly from Node 1 center at 12.5% right to Node 4 center at 12.5% left) */}
-              <div className="absolute top-4 right-[12.5%] left-[12.5%] h-0.5 bg-slate-200 dark:bg-zinc-800 -z-0 overflow-hidden">
+              {/* Background Track Line (Spans exactly from Node 1 center at 8.33% right to Node 6 center at 8.33% left) */}
+              <div className="absolute top-4 right-[8.33%] left-[8.33%] h-0.5 bg-slate-200 dark:bg-zinc-800 -z-0 overflow-hidden">
                 {/* Animated Completed Track Line (Starts at Node 1 center, extends exactly to active node center) */}
                 <motion.div
                   className="h-full bg-emerald-500 rounded-full origin-right"
@@ -231,8 +307,8 @@ export default function CreateResourceModal({
                 />
               </div>
 
-              {/* 4 Step Circle Nodes Grid */}
-              <div className="relative z-10 grid grid-cols-4 w-full">
+              {/* 6 Step Circle Nodes Grid */}
+              <div className="relative z-10 grid grid-cols-6 w-full">
                 {steps.map((step) => {
                   const isCompleted = activeStep > step.id;
                   const isActive = activeStep === step.id;
@@ -299,7 +375,7 @@ export default function CreateResourceModal({
                     </label>
 
                     {selectedCourse ? (
-                      <div className="flex items-center justify-between p-3.5 bg-stone-50/70 dark:bg-stone-950/40 border border-amber-200 dark:border-stone-900/50 rounded-2xl">
+                      <div className="flex items-center justify-between p-3.5 bg-stone-50/70 dark:bg-stone-950/40 border border-slate-200/80 dark:border-zinc-700/80 rounded-2xl">
                         <div className="flex items-center gap-3">
                           <span className="px-2.5 py-1 bg-[var(--color-imamu-brown)] text-white text-xs font-mono font-bold rounded-lg" dir="ltr">
                             {selectedCourse.code}
@@ -336,7 +412,7 @@ export default function CreateResourceModal({
                               setCourseSearch(e.target.value);
                               setIsCourseDropdownOpen(true);
                             }}
-                            className="w-full py-3 pr-10 pl-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-bold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-[var(--color-imamu-brown)] shadow-xs"
+                            className="w-full py-3 pr-10 pl-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-bold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-[var(--color-imamu-accent)]/40 focus:border-[var(--color-imamu-accent)] shadow-xs"
                           />
                           <Search className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5" />
                         </div>
@@ -366,7 +442,7 @@ export default function CreateResourceModal({
                                       </h5>
                                       <span className="text-[11px] text-slate-400">المستوى {subj.level || 'عام'}</span>
                                     </div>
-                                    <span className="text-xs font-mono font-bold px-2 py-0.5 bg-stone-50 dark:bg-stone-950/60 text-[var(--color-imamu-accent)] border border-amber-200 dark:border-stone-900/50 rounded-md" dir="ltr">
+                                    <span className="text-xs font-mono font-bold px-2 py-0.5 bg-stone-50 dark:bg-stone-950/60 text-[var(--color-imamu-accent)] border border-slate-200/80 dark:border-zinc-700/80 rounded-md" dir="ltr">
                                       {subj.code}
                                     </span>
                                   </button>
@@ -395,7 +471,7 @@ export default function CreateResourceModal({
                           placeholder="مثال: قروب تقنية المعلومات / باقة مصادر عامة..."
                           value={resourceForm.title || ''}
                           onChange={e => setResourceForm((s: any) => ({ ...s, title: e.target.value }))}
-                          className="w-full py-3 px-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-bold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-[var(--color-imamu-brown)] shadow-xs"
+                          className="w-full py-3 px-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-bold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-[var(--color-imamu-accent)]/40 focus:border-[var(--color-imamu-accent)] shadow-xs"
                         />
                       </div>
                     )}
@@ -409,7 +485,7 @@ export default function CreateResourceModal({
                         placeholder="اكتب وصفاً ثرياً ومختصراً يوضح محتويات وأهداف هذه الباقة أو المجموعة..."
                         value={resourceForm.description || ''}
                         onChange={e => setResourceForm((s: any) => ({ ...s, description: e.target.value }))}
-                        className="w-full py-3 px-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-[var(--color-imamu-brown)] shadow-xs resize-none"
+                        className="w-full py-3 px-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-[var(--color-imamu-accent)]/40 focus:border-[var(--color-imamu-accent)] shadow-xs resize-none"
                       />
                     </div>
                   </div>
@@ -540,8 +616,211 @@ export default function CreateResourceModal({
                       placeholder="اكتب ملخص شامل ومحتوى الباقة والمواضيع التي تنطوي عليها..."
                       value={resourceForm.description || ''}
                       onChange={e => setResourceForm((s: any) => ({ ...s, description: e.target.value }))}
-                      className="w-full py-3 px-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-[var(--color-imamu-brown)] shadow-xs resize-none"
+                      className="w-full py-3 px-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-[var(--color-imamu-accent)]/40 focus:border-[var(--color-imamu-accent)] shadow-xs resize-none"
                     />
+                  </div>
+                </motion.div>
+              )}
+
+              {/* STEP 5: Advanced Options */}
+              {activeStep === 5 && (
+                <motion.div
+                  key="step5"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  transition={{ duration: 0.2 }}
+                  className="space-y-5"
+                >
+                  <div className="bg-slate-50 dark:bg-zinc-800/50 rounded-2xl p-5 border border-slate-200/80 dark:border-zinc-800 space-y-4">
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                      <Settings className="w-4 h-4 text-[var(--color-imamu-accent)]" />
+                      إعدادات وخيارات المصدر الإضافية
+                    </h4>
+                    
+                    {/* Toggle Sections Feature */}
+                    <div className="flex items-center justify-between p-3.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl">
+                      <div>
+                        <h5 className="text-xs font-bold text-slate-900 dark:text-white">تفعيل قسم الشعب لهذه الباقة (Sections Step & Tab)</h5>
+                        <p className="text-[11px] text-slate-500 dark:text-zinc-400">السماح للطلاب بعرض وإضافة الشعب ورابط الواتساب للمادة</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={resourceForm.sectionsEnabled !== false}
+                          onChange={e => setResourceForm((s: any) => ({ ...s, sectionsEnabled: e.target.checked }))}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                      </label>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-slate-700 dark:text-zinc-200">نوع الباقة الأساسي</label>
+                      <select
+                        value={resourceForm.type || 'course_hub'}
+                        onChange={e => setResourceForm((s: any) => ({ ...s, type: e.target.value }))}
+                        className="w-full py-2.5 px-3 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white outline-none"
+                      >
+                        <option value="course_hub">باقة مصادر شاملة (Course Hub)</option>
+                        <option value="drive">تخزين درايف (Drive Storage)</option>
+                        <option value="box">تخزين بوكس (Box Link)</option>
+                        <option value="whatsapp">مجموعة واتساب (WhatsApp Group)</option>
+                        <option value="summary">ملخصات ومذكرات (Summary)</option>
+                      </select>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* STEP 6: Course Sections (الشعب) */}
+              {activeStep === 6 && (
+                <motion.div
+                  key="step6"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  transition={{ duration: 0.2 }}
+                  className="space-y-5"
+                >
+                  <div className="bg-slate-50 dark:bg-zinc-800/50 rounded-2xl p-5 border border-slate-200/80 dark:border-zinc-800 space-y-4">
+                    {/* Toggle Header for Step 6 */}
+                    <div className="flex items-center justify-between p-3.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                          <Users className="w-4 h-4 text-[var(--color-imamu-accent)]" />
+                          <span>تفعيل وتخصيص شعب المادة ({sections.length})</span>
+                        </h4>
+                        <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">يمكنك تعطيل أو تفعيل تبويب الشعب لهذه الباقة في أي وقت</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={resourceForm.sectionsEnabled !== false}
+                          onChange={e => setResourceForm((s: any) => ({ ...s, sectionsEnabled: e.target.checked }))}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                      </label>
+                    </div>
+
+                    {resourceForm.sectionsEnabled === false ? (
+                      <div className="p-5 bg-amber-50/70 dark:bg-amber-950/30 rounded-2xl border border-amber-200 dark:border-amber-900/50 text-center text-xs font-bold text-amber-700 dark:text-amber-400">
+                        تنبيه: قسم الشعب معطّل حالياً لهذه الباقة. قم بتفعيل المفتاح اعلاه لتمكين الطلاب من إضافة واستعراض الشعب.
+                      </div>
+                    ) : (
+                      <>
+                        {/* Inline Form to Add New Section */}
+                        <div className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 space-y-3 shadow-xs">
+                      <h5 className="text-xs font-bold text-slate-900 dark:text-white">إضافة شعبة جديدة</h5>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-600 dark:text-zinc-400 mb-1">اسم الشعبة *</label>
+                          <input
+                            type="text"
+                            placeholder="مثال: شعبة 101 أو شعبة الدكتور أحمد..."
+                            value={newSecName}
+                            onChange={e => setNewSecName(e.target.value)}
+                            className="w-full py-2 px-3 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-600 dark:text-zinc-400 mb-1">رابط مجموعـة الواتساب *</label>
+                          <input
+                            type="text"
+                            placeholder="https://chat.whatsapp.com/..."
+                            value={newSecWa}
+                            onChange={e => setNewSecWa(e.target.value)}
+                            className="w-full py-2 px-3 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-mono font-bold text-slate-900 dark:text-white outline-none"
+                            dir="ltr"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-600 dark:text-zinc-400 mb-1">رقم الهاتف (اختياري)</label>
+                        <input
+                          type="text"
+                          placeholder="050xxxxxxx"
+                          value={newSecPhone}
+                          onChange={e => setNewSecPhone(e.target.value)}
+                          className="w-full py-2 px-3 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-mono font-bold text-slate-900 dark:text-white outline-none"
+                          dir="ltr"
+                        />
+                      </div>
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          disabled={isSavingSec}
+                          onClick={handleAddSectionModal}
+                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition duration-200 cursor-pointer flex items-center gap-1.5 shadow-sm"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>{isSavingSec ? 'جاري الإضافة...' : 'إضافة الشعبة'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Section Cards List */}
+                    {sections.length === 0 ? (
+                      <p className="text-xs text-slate-400 dark:text-zinc-500 italic bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-slate-100 dark:border-zinc-800 text-center">
+                        لا توجد شعب مسجلة لهذه المادة حالياً.
+                      </p>
+                    ) : (
+                      <div className="flex flex-col gap-2.5">
+                        {sections.map((sec, idx) => (
+                          <div
+                            key={sec.id || idx}
+                            className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 gap-3"
+                          >
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="px-2.5 py-0.5 bg-[var(--color-imamu-brown)] text-white text-xs font-bold rounded-lg">
+                                  {sec.sectionName}
+                                </span>
+                                {sec.publishedByUserId && (
+                                  <span className="text-[11px] text-slate-500 dark:text-zinc-400 flex items-center gap-1 font-mono">
+                                    <User className="w-3 h-3 text-slate-400" />
+                                    <span>معرّف الناشر (User ID): <strong className="text-slate-800 dark:text-zinc-200">{sec.publishedByUserId}</strong></span>
+                                  </span>
+                                )}
+                              </div>
+                              {sec.phone && (
+                                <p className="text-xs text-slate-600 dark:text-zinc-400 flex items-center gap-1">
+                                  <Phone className="w-3 h-3 text-slate-400" />
+                                  <span>الهاتف: <span className="font-mono font-bold" dir="ltr">{sec.phone}</span></span>
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              {sec.whatsappLink && (
+                                <a
+                                  href={sec.whatsappLink}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition cursor-pointer"
+                                >
+                                  <WhatsappIcon className="w-3.5 h-3.5 fill-current" />
+                                  <span>واتساب</span>
+                                </a>
+                              )}
+                              {sec.id && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteSectionModal(sec.id)}
+                                  className="p-1.5 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition cursor-pointer"
+                                  title="حذف الشعبة"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                      </>
+                    )}
                   </div>
                 </motion.div>
               )}
@@ -570,7 +849,7 @@ export default function CreateResourceModal({
                 </button>
               )}
 
-              {activeStep < 4 ? (
+              {activeStep < 6 ? (
                 <button
                   type="button"
                   onClick={handleNext}
