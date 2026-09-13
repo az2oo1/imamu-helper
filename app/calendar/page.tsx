@@ -1,6 +1,17 @@
+import type { Metadata } from 'next';
 import { CalendarPage } from '../../src/views/CalendarPage';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'التقويم الأكاديمي والفعاليات',
+  description: 'التقويم الأكاديمي الرسمي لجامعة الإمام محمد بن سعود الإسلامية - مواعيد بداية ونهاية الفصول، فترات الحذف والإضافة، ومواعيد إيداع المكافأة.',
+  openGraph: {
+    title: 'التقويم الأكاديمي والفعاليات | مساعد الإمام',
+    description: 'التقويم الأكاديمي الرسمي لجامعة الإمام محمد بن سعود الإسلامية.',
+    url: '/calendar',
+  },
+};
 
 export default function Page() {
   return (

@@ -1,6 +1,17 @@
+import type { Metadata } from 'next';
 import { Tools } from '../../src/views/Tools';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'الأدوات والخدمات الطلابية',
+  description: 'مجموعة من الأدوات الطلابية الذكية لجامعة الإمام - حاسبة المعدل الفصلي والتراكمي، حاسبة الساعات المنجزة، والروابط السريعة.',
+  openGraph: {
+    title: 'الأدوات والخدمات الطلابية | مساعد الإمام',
+    description: 'مجموعة من الأدوات الطلابية الذكية لجامعة الإمام - حاسبة المعدل الفصلي والتراكمي، حاسبة الساعات المنجزة.',
+    url: '/tools',
+  },
+};
 
 export default function Page() {
   return (

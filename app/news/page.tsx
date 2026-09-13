@@ -1,6 +1,15 @@
+import type { Metadata } from 'next';
 import { NewsPage } from '../../src/views/NewsPage';
 
-export const dynamic = 'force-dynamic';
+export const metadata: Metadata = {
+  title: 'أخبار وفعاليات الجامعة',
+  description: 'متابعة حية لآخر أخبار وإعلانات وفعاليات جامعة الإمام محمد بن سعود الإسلامية وقنوات الكليات والنوادي الطلابية.',
+  openGraph: {
+    title: 'أخبار وفعاليات الجامعة | مساعد الإمام',
+    description: 'متابعة حية لآخر أخبار وإعلانات وفعاليات جامعة الإمام محمد بن سعود الإسلامية.',
+    url: '/news',
+  },
+};
 
 export default function Page() {
   return (
