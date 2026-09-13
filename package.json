@@ -22,7 +22,6 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1131.0",
     "@electric-sql/pglite": "^0.5.8",
-    "@google/genai": "^2.22.0",
     "adm-zip": "^0.6.1",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
@@ -40,7 +39,8 @@
     "pg": "^8.23.0",
     "react": "^19.3.0",
     "react-confetti": "^6.4.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "zod": "^4.6.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
