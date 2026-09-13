@@ -1,12 +1,13 @@
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
 # Install build dependencies
 RUN apk add --no-cache python3 make g++ bash libc6-compat
 
-# Disable Next.js telemetry during build
+# Disable Next.js telemetry and set memory limit during build
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 
 # Copy package files
 COPY package*.json ./
@@ -24,7 +25,7 @@ RUN mkdir -p public dist
 RUN npm run build
 
 # Production image
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
