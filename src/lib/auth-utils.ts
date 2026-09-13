@@ -20,6 +20,11 @@ export function formatStudentEmail(cleanedId: string): string {
   return cleanId;
 }
 
+export function isSmImamuEmail(email?: string): boolean {
+  if (!email) return false;
+  return email.trim().toLowerCase().endsWith('@sm.imamu.edu.sa');
+}
+
 /**
  * Sanitizes user record before returning in API payloads by removing passwordHash.
  */
@@ -68,3 +73,32 @@ export function matchSubjectIds(id1: any, id2: any): boolean {
   }
   return false;
 }
+
+/**
+ * Safely extracts the user authentication token from a Firebase user instance or localStorage fallback.
+ */
+export async function getAuthToken(user?: any): Promise<string> {
+  if (user && typeof user.getIdToken === 'function') {
+    try {
+      const token = await user.getIdToken();
+      if (token) return token;
+    } catch (e) {}
+  }
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('token') || localStorage.getItem('imamu_token') || '';
+  }
+  return '';
+}
+
+/**
+ * Returns HTTP headers containing the Authorization bearer token if available.
+ */
+export async function getAuthHeaders(user?: any, extraHeaders: Record<string, string> = {}): Promise<Record<string, string>> {
+  const token = await getAuthToken(user);
+  const headers: Record<string, string> = { ...extraHeaders };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
