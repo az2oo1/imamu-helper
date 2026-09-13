@@ -3,13 +3,47 @@ import { AuthProvider } from '../src/lib/AuthContext';
 import { ThemeProvider } from '../src/lib/ThemeContext';
 import '../src/index.css';
 
-export const metadata = {
-  title: 'مساعد الإمام - المنصة الطلابية الشاملة',
-  description: 'المساعد الأكاديمي والطلابي الشامل لطلاب جامعة الإمام محمد بن سعود الإسلامية',
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://imamu.app'),
+  title: {
+    default: 'مساعد الإمام - المنصة الطلابية الشاملة',
+    template: '%s | مساعد الإمام',
+  },
+  description: 'المساعد الأكاديمي والطلابي الشامل لطلاب جامعة الإمام محمد بن سعود الإسلامية - مصادر، أدوات، تقويم أكاديمي، وأخبار',
+  keywords: ['جامعة الإمام', 'مساعد الإمام', 'مواد جامعة الإمام', 'حاسبة المعدل', 'التقويم الأكاديمي', 'ملفات طلابية'],
+  manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'black-translucent',
+    statusBarStyle: 'default',
     title: 'مساعد الإمام',
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'ar_SA',
+    url: '/',
+    siteName: 'مساعد الإمام - IMAMU Helper',
+    title: 'مساعد الإمام - المنصة الطلابية الشاملة',
+    description: 'المساعد الأكاديمي والطلابي الشامل لطلاب جامعة الإمام محمد بن سعود الإسلامية',
+    images: [
+      {
+        url: '/logo_light.png',
+        width: 800,
+        height: 800,
+        alt: 'شعار مساعد الإمام',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'مساعد الإمام - المنصة الطلابية الشاملة',
+    description: 'المساعد الأكاديمي والطلابي الشامل لطلاب جامعة الإمام محمد بن سعود الإسلامية',
+    images: ['/logo_light.png'],
+  },
+  icons: {
+    icon: '/logo_light.png',
+    apple: '/logo_light.png',
   },
 };
 
@@ -28,6 +62,8 @@ export const dynamic = 'force-dynamic';
 
 import { TopBar } from '../src/components/TopBar';
 import { Footer } from '../src/components/Footer';
+import { PwaRegister } from '../src/components/PwaRegister';
+import { PwaInstallPrompt } from '../src/components/PwaInstallPrompt';
 
 export default function RootLayout({
   children,
@@ -60,9 +96,6 @@ export default function RootLayout({
         />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className="antialiased min-h-screen relative font-sans transition-colors duration-300">
         <ThemeProvider>
@@ -73,6 +106,8 @@ export default function RootLayout({
                 {children}
               </div>
               <Footer />
+              <PwaRegister />
+              <PwaInstallPrompt />
             </div>
           </AuthProvider>
         </ThemeProvider>
