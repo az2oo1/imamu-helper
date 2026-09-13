@@ -16,6 +16,7 @@ import { ImageViewerModal } from '../components/ImageViewerModal';
 import { NewsMediaPreview } from '../components/NewsMediaPreview';
 import { formatDate } from '../lib/date-utils';
 import { getArabicCategoryLabel } from '../lib/textHelpers';
+import { useSWR } from '../lib/swr';
 
 interface Comment {
   id: number;
@@ -102,42 +103,28 @@ export function NewsPage() {
     { id: 'general', label: 'أخبار عامة' },
   ];
 
-  const fetchNews = async () => {
-    try {
-      const token = user ? await user.getIdToken() : (localStorage.getItem('token') || localStorage.getItem('imamu_token') || '');
-      const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
-      const res = await fetch('/api/news', { headers });
-      if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
-        const data = await res.json().catch(() => null);
-        if (Array.isArray(data)) {
-          setNews(data);
-        }
-      }
-    } catch (e) {
-      console.error('Failed to fetch news', e);
+  const { data: newsData, mutate: refreshNews } = useSWR<any[]>('/api/news');
+  const { data: accountsData, mutate: refreshAccounts } = useSWR<any[]>('/api/authenticated-accounts');
+
+  useEffect(() => {
+    if (Array.isArray(newsData)) {
+      setNews(newsData);
     }
+  }, [newsData]);
+
+  useEffect(() => {
+    if (Array.isArray(accountsData)) {
+      setAccounts(accountsData);
+    }
+  }, [accountsData]);
+
+  const fetchNews = async () => {
+    refreshNews();
   };
 
   const fetchAccounts = async () => {
-    try {
-      const token = user ? await user.getIdToken() : (localStorage.getItem('token') || localStorage.getItem('imamu_token') || '');
-      const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
-      const res = await fetch('/api/authenticated-accounts', { headers });
-      if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
-        const data = await res.json().catch(() => null);
-        if (Array.isArray(data)) {
-          setAccounts(data);
-        }
-      }
-    } catch (e) {
-      console.error('Failed to fetch accounts', e);
-    }
+    refreshAccounts();
   };
-
-  useEffect(() => {
-    fetchNews();
-    fetchAccounts();
-  }, [user]);
 
   const handleLike = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();

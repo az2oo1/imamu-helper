@@ -9,6 +9,9 @@ import {
 } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { parseDate, formatDate, formatHijriDate, formatHijriMonthDay, getCountdown, getEventCategoryMeta } from '../lib/date-utils';
+import ReportDropdownMenu from '../components/ReportDropdownMenu';
+import { useSWR } from '../lib/swr';
+
 
 export function CalendarPage() {
   const [events, setEvents] = useState<any[]>([]);
@@ -20,27 +23,14 @@ export function CalendarPage() {
   const [visibleCount, setVisibleCount] = useState(10);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
+  const { data: eventsData } = useSWR<any[]>('/api/events');
+
   useEffect(() => {
-    fetch('/api/events')
-      .then(r => {
-        if (!r.ok) {
-          throw new Error(`HTTP error! status: ${r.status}`);
-        }
-        const contentType = r.headers.get("content-type");
-        if (!contentType || !contentType.includes("application/json")) {
-          throw new TypeError("Received non-JSON response from server");
-        }
-        return r.json();
-      })
-      .then(data => {
-        if(Array.isArray(data)) {
-          data.sort((a, b) => (parseDate(a.date)?.getTime() || 0) - (parseDate(b.date)?.getTime() || 0));
-          setEvents(data);
-        }
-      }).catch(err => {
-        console.error("Error fetching events:", err);
-      });
-  }, []);
+    if (Array.isArray(eventsData)) {
+      const sorted = [...eventsData].sort((a, b) => (parseDate(a.date)?.getTime() || 0) - (parseDate(b.date)?.getTime() || 0));
+      setEvents(sorted);
+    }
+  }, [eventsData]);
 
   const nextPeriod = () => {
     setCurrentDate(viewState === 'month' ? addMonths(currentDate, 1) : addWeeks(currentDate, 1));
@@ -305,7 +295,7 @@ export function CalendarPage() {
                       isExpanded ? 'grid-rows-[1fr] opacity-100 mt-3 pt-3 border-t border-[var(--color-imamu-brown)]/20 dark:border-zinc-800' : 'grid-rows-[0fr] opacity-0 mt-0 pt-0 border-t-0'
                     }`}
                   >
-                    <div className="overflow-hidden p-0.5">
+                    <div className={`${isExpanded ? 'overflow-visible' : 'overflow-hidden'} p-0.5`}>
                       {ev.description ? (
                         <div className="text-[11px] text-slate-700 dark:text-zinc-300 bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl p-2.5 leading-relaxed mb-3 text-right" dir="auto">
                           {ev.description}
@@ -314,7 +304,7 @@ export function CalendarPage() {
                         <span className="text-[11px] italic text-slate-400 dark:text-zinc-500 block mb-3">لا يوجد وصف متاح لهذا الموعد.</span>
                       )}
 
-                      <div className="flex gap-2 px-0.5 pt-0.5 pb-0.5">
+                      <div className="flex gap-2 px-0.5 pt-0.5 pb-0.5 items-center">
                         <a 
                           href={getGoogleCalendarUrl(ev)}
                           target="_blank"
@@ -333,7 +323,14 @@ export function CalendarPage() {
                         >
                           <Download className="w-3 h-3" /> ICS
                         </button>
+                        <ReportDropdownMenu
+                          targetType="event"
+                          targetId={ev.id}
+                          targetTitle={ev.title}
+                          buttonClassName="btn-rise p-1.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-200 dark:bg-zinc-800 text-slate-400 hover:text-white transition cursor-pointer"
+                        />
                       </div>
+
                     </div>
                   </div>
                 </div>
@@ -610,7 +607,7 @@ export function CalendarPage() {
               </div>
             )}
 
-            <div className="flex gap-2.5 border-t border-slate-200 dark:border-zinc-800 pt-4 mt-2">
+            <div className="flex gap-2.5 border-t border-slate-200 dark:border-zinc-800 pt-4 mt-2 items-center">
               <a 
                 href={getGoogleCalendarUrl(selectedEvent)}
                 target="_blank"
@@ -625,7 +622,14 @@ export function CalendarPage() {
               >
                 <Download className="w-4 h-4 text-slate-400 dark:text-zinc-400" /> ICS
               </button>
+              <ReportDropdownMenu
+                targetType="event"
+                targetId={selectedEvent.id}
+                targetTitle={selectedEvent.title}
+                buttonClassName="btn-rise p-2.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-100 dark:bg-zinc-800 text-slate-400 hover:text-white transition cursor-pointer"
+              />
             </div>
+
           </div>
         </div>
       )}

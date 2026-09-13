@@ -10,6 +10,7 @@ import { CourseDetailsModal } from '../components/CourseDetailsModal';
 import CreateResourceModal from '../components/CreateResourceModal';
 import ReportDropdownMenu from '../components/ReportDropdownMenu';
 import { cleanCourseName, cleanUrlProtocol, parseResourceUrl, parseAllResourceLinks, isWhatsappUrl } from '../lib/url-utils';
+import { useSWR } from '../lib/swr';
 
 
 function matchSubjectIds(id1: any, id2: any): boolean {
@@ -177,51 +178,50 @@ export function Resources() {
     sectionsEnabled: true
   });
 
+  const authFetcher = async (url: string) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
+    const res = await fetch(url, { headers });
+    if (res.status === 401) {
+      if (logout) await logout();
+      else if (signOut) await signOut();
+      else {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user_uid');
+        localStorage.removeItem('user_email');
+      }
+      router.push('/login');
+      return [];
+    }
+    if (!res.ok) return [];
+    return res.json();
+  };
+
+  const { data: subData, isLoading: subLoading } = useSWR(user ? '/api/subjects' : null, authFetcher);
+  const { data: resData, isLoading: resLoading, mutate: refreshResources } = useSWR<Resource[]>(user ? '/api/resources' : null, authFetcher);
+
+  useEffect(() => {
+    if (Array.isArray(subData)) setSubjects(subData);
+  }, [subData]);
+
+  useEffect(() => {
+    if (Array.isArray(resData)) {
+      setResources(resData);
+      const uniqueMajors = Array.from(new Set(resData.map((r: Resource) => r.major).filter(Boolean))) as string[];
+      setMajors(uniqueMajors);
+    }
+  }, [resData]);
+
   useEffect(() => {
     if (authLoading) return;
-
     if (!user) {
       router.push('/login');
       return;
     }
-
-    const token = localStorage.getItem('token');
-    const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
-
-    Promise.all([
-      fetch('/api/subjects', { headers }).then(res => res.ok ? res.json() : []),
-      fetch('/api/resources', { headers }).then(async res => {
-        if (res.status === 401) {
-          if (logout) await logout();
-          else if (signOut) await signOut();
-          else {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user_uid');
-            localStorage.removeItem('user_email');
-          }
-          router.push('/login');
-          return [];
-        }
-        if (!res.ok) return [];
-        const contentType = res.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-          return res.json();
-        }
-        return [];
-      })
-    ]).then(([subData, resData]) => {
-      if (Array.isArray(subData)) setSubjects(subData);
-      if (Array.isArray(resData)) {
-        setResources(resData);
-        const uniqueMajors = Array.from(new Set(resData.map((r: Resource) => r.major).filter(Boolean))) as string[];
-        setMajors(uniqueMajors);
-      }
+    if (!subLoading && !resLoading) {
       setLoading(false);
-    }).catch(err => {
-      console.error('Failed to load resources:', err);
-      setLoading(false);
-    });
-  }, [authLoading, user, router, logout, signOut]);
+    }
+  }, [authLoading, user, router, subLoading, resLoading]);
 
   const handleDeleteResource = async (id: number | string) => {
     if (!isAdmin) return;

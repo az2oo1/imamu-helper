@@ -12,7 +12,8 @@ import {
   ExternalLink, 
   ArrowUpRight, 
   Award,
-  Sparkles
+  Sun,
+  CheckCircle2
 } from 'lucide-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
@@ -28,6 +29,7 @@ import {
   calculateMokafaaDate, 
   calculateProgressPercent 
 } from '../lib/date-utils';
+import { useSWR } from '../lib/swr';
 
 const DynamicConfetti = dynamic(() => import('react-confetti'), { ssr: false });
 
@@ -155,6 +157,13 @@ function CountdownsSection() {
   const [nextHoliday, setNextHoliday] = useState<{ title: string; date: Date; description?: string } | null>(null);
   const [isMokafaaToday, setIsMokafaaToday] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [semesterInfo, setSemesterInfo] = useState<{ start: Date | null; target: Date | null; label: string }>({ 
+    start: null, 
+    target: null, 
+    label: "ينتهي الفصل الدراسي خلال" 
+  });
+  const [isNationalDayToday, setIsNationalDayToday] = useState(false);
+  const [isEidToday, setIsEidToday] = useState(false);
 
   const [windowSize, setWindowSize] = useState({
     width: typeof window !== 'undefined' ? window.innerWidth : 1200,
@@ -169,12 +178,18 @@ function CountdownsSection() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const { data: settingsData } = useSWR<{semesterStartDate?: string, semesterEndDate?: string}>('/api/settings');
+  const { data: eventsData } = useSWR<any[]>('/api/events');
+
   useEffect(() => {
-    Promise.all([
-      fetch('/api/settings').then(r => r.ok ? r.json() : {}),
-      fetch('/api/events').then(r => r.ok ? r.json() : [])
-    ]).then(([s, events]) => {
-      setSettings(s);
+    if (settingsData) {
+      setSettings(settingsData);
+    }
+  }, [settingsData]);
+
+  useEffect(() => {
+    if (!eventsData || !Array.isArray(eventsData)) return;
+    const events = eventsData;
       
       const now = new Date();
       const todayStart = new Date();
@@ -207,18 +222,23 @@ function CountdownsSection() {
       }
 
       // Next Holiday Calculation (strictly relying on database flags)
-      const holidayEvents = events
-        .filter((e: any) => e.isHoliday || e.isHolidayEnd || e.isEid || e.isNationalDay)
-        .map((e: any) => ({
-          title: e.title,
-          date: parseDate(e.date),
-          description: e.description,
-          isEid: !!e.isEid,
-          isNationalDay: !!e.isNationalDay,
-          isHolidayEnd: !!e.isHolidayEnd
-        }))
-        .filter((e: any): e is { title: string; date: Date; description?: string; isEid: boolean; isNationalDay: boolean; isHolidayEnd: boolean } => e.date !== null && e.date >= todayStart)
-        .sort((a, b) => a.date.getTime() - b.date.getTime());
+      const holidayEvents: { title: string; date: Date; description?: string; isEid: boolean; isNationalDay: boolean; isHolidayEnd: boolean }[] = [];
+      for (const e of events) {
+        if (e.isHoliday || e.isHolidayEnd || e.isEid || e.isNationalDay) {
+          const d = parseDate(e.date);
+          if (d && d >= todayStart) {
+            holidayEvents.push({
+              title: e.title,
+              date: d,
+              description: e.description,
+              isEid: !!e.isEid,
+              isNationalDay: !!e.isNationalDay,
+              isHolidayEnd: !!e.isHolidayEnd,
+            });
+          }
+        }
+      }
+      holidayEvents.sort((a, b) => a.date.getTime() - b.date.getTime());
 
       if (holidayEvents.length > 0) {
         setNextHoliday(holidayEvents[0]);
@@ -279,16 +299,7 @@ function CountdownsSection() {
       }
 
       setSemesterInfo({ start: calcStart, target: calcTarget, label: calcLabel });
-    }).catch(() => {});
-  }, []);
-
-  const [semesterInfo, setSemesterInfo] = useState<{ start: Date | null; target: Date | null; label: string }>({ 
-    start: null, 
-    target: null, 
-    label: "ينتهي الفصل الدراسي خلال" 
-  });
-  const [isNationalDayToday, setIsNationalDayToday] = useState(false);
-  const [isEidToday, setIsEidToday] = useState(false);
+  }, [eventsData]);
 
   const semesterTargetDate: Date | null = semesterInfo.target;
   const semesterLabel: string = semesterInfo.label;
@@ -387,7 +398,7 @@ function CountdownsSection() {
               {isMokafaaToday ? (
                 <div className="bg-emerald-500/10 border border-emerald-500/20 px-4 py-4 rounded-2xl shadow-2xs relative overflow-hidden flex flex-col items-center justify-center w-full">
                   <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400 z-10 flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-emerald-500 animate-pulse" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-pulse" />
                     اليوم نزلت المكافأة!
                   </span>
                   <p className="text-[11px] text-emerald-600 dark:text-emerald-300 mt-1 font-medium z-10 text-center leading-relaxed">
@@ -447,7 +458,7 @@ function CountdownsSection() {
           <div className="w-full">
             <div className="flex items-center justify-center gap-2.5 mb-4 w-full">
               <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-600 dark:text-emerald-400 shrink-0">
-                <Sparkles className="w-4.5 h-4.5" />
+                <Sun className="w-4.5 h-4.5" />
               </div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate" title={nextHoliday?.title || "موعد الإجازة القادمة"}>
                 {nextHoliday?.title || "موعد الإجازة القادمة"}
