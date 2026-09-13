@@ -28,19 +28,21 @@ export async function ensureServerRunning(port: number = DEFAULT_PORT): Promise<
       PORT: port.toString(),
       NODE_ENV: 'test',
     },
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: process.env.DEBUG_TEST_SERVER ? ['ignore', 'pipe', 'pipe'] : 'ignore',
   });
 
-  serverProcess.stdout?.on('data', (chunk) => {
-    if (process.env.DEBUG_TEST_SERVER) {
+  serverProcess.unref();
+
+  if (process.env.DEBUG_TEST_SERVER) {
+    serverProcess.stdout?.on('data', (chunk) => {
       console.log(`[Server stdout] ${chunk.toString().trim()}`);
-    }
-  });
-  serverProcess.stderr?.on('data', (chunk) => {
-    if (process.env.DEBUG_TEST_SERVER) {
+    });
+    serverProcess.stderr?.on('data', (chunk) => {
       console.error(`[Server stderr] ${chunk.toString().trim()}`);
-    }
-  });
+    });
+    (serverProcess.stdout as any)?.unref?.();
+    (serverProcess.stderr as any)?.unref?.();
+  }
 
   const startTime = Date.now();
   while (Date.now() - startTime < 10000) {

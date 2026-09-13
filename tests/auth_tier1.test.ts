@@ -203,4 +203,14 @@ describe('Tier 1: Feature Coverage Tests', () => {
     assert.equal(status, 200);
     assert.ok(Array.isArray(data));
   });
+
+  it('T1.10: Verify @sm.imamu.edu.sa domain restriction helper', async () => {
+    const { isSmImamuEmail } = await import('../src/lib/auth-utils.js');
+    assert.equal(isSmImamuEmail('441234567@sm.imamu.edu.sa'), true);
+    assert.equal(isSmImamuEmail('s441234567@sm.imamu.edu.sa'), true);
+    assert.equal(isSmImamuEmail('user@gmail.com'), false);
+    assert.equal(isSmImamuEmail('user@yahoo.com'), false);
+    assert.equal(isSmImamuEmail('user@imamu.edu.sa'), false);
+  });
 });
+
