@@ -12,6 +12,7 @@ import { extractTelegramChannelPosts } from './src/server/services/telegram';
 import { news_sources } from './src/db/schema';
 import { createAuthRouter } from './src/server/routes/auth';
 import { createSubjectsRouter } from './src/server/routes/subjects';
+import { createSectionsRouter } from './src/server/routes/sections';
 import { createNewsRouter } from './src/server/routes/news';
 import { createTutorialsRouter } from './src/server/routes/tutorials';
 import { createAdminRouter } from './src/server/routes/admin';
@@ -115,6 +116,7 @@ async function startServer() {
   // Mount Modular Express Routers under /api
   app.use("/api", createAuthRouter(db));
   app.use("/api", createSubjectsRouter(db));
+  app.use("/api", createSectionsRouter(db));
   app.use("/api", createNewsRouter(db));
   app.use("/api", createTutorialsRouter(db));
   app.use("/api", createAdminRouter(db));

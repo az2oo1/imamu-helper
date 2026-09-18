@@ -36,11 +36,109 @@ export function createNewsRouter(db: any) {
   // Events
   router.get("/events", async (req, res) => {
     try {
+      const currentUserId = extractUserId(req);
       const records = await db.select().from(events);
-      res.json(records);
+      // Filter: return academic, entity, and if user is logged in, their own events
+      const filtered = records.filter((e: any) => {
+        if (!e.calendarType || e.calendarType === 'academic' || e.calendarType === 'entity') {
+          return true;
+        }
+        if (e.calendarType === 'user') {
+          return currentUserId && e.userId === currentUserId;
+        }
+        return true;
+      });
+      res.json(filtered);
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: "Failed to fetch events" });
+    }
+  });
+
+  // Personal user events (Create)
+  router.post("/user-events", async (req, res): Promise<any> => {
+    try {
+      const currentUserId = extractUserId(req);
+      if (!currentUserId) {
+        return res.status(401).json({ error: "يجب تسجيل الدخول لإضافة موعد شخصي" });
+      }
+      const { title, date, description, location } = req.body;
+      if (!title || !date) {
+        return res.status(400).json({ error: "العنوان والتاريخ مطلوبان" });
+      }
+      const [newEvent] = await db.insert(events).values({
+        title,
+        date,
+        description: description || '',
+        location: location || '',
+        calendarType: 'user',
+        userId: currentUserId,
+      }).returning();
+      res.status(201).json(newEvent);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Failed to create user event" });
+    }
+  });
+
+  // Personal user events (Bulk Sync from local/exams)
+  router.post("/user-events/sync", async (req, res): Promise<any> => {
+    try {
+      const currentUserId = extractUserId(req);
+      if (!currentUserId) {
+        return res.status(401).json({ error: "يجب تسجيل الدخول لمزامنة المواعيد" });
+      }
+      const items = Array.isArray(req.body?.events) ? req.body.events : [];
+      let syncedCount = 0;
+      for (const item of items) {
+        if (!item.title || !item.date) continue;
+        const dateTime = item.time && !item.date.includes('T') ? `${item.date}T${item.time}:00` : item.date;
+        const existing = await db.select().from(events).where(
+          and(
+            eq(events.userId, currentUserId),
+            eq(events.title, item.title),
+            eq(events.date, dateTime)
+          )
+        );
+        if (existing.length === 0) {
+          await db.insert(events).values({
+            title: item.title,
+            date: dateTime,
+            description: item.description || '',
+            location: item.location || '',
+            calendarType: 'user',
+            userId: currentUserId,
+          });
+          syncedCount++;
+        }
+      }
+      res.json({ success: true, count: syncedCount });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Failed to sync user events" });
+    }
+  });
+
+  // Personal user events (Delete)
+  router.delete("/user-events/:id", async (req, res): Promise<any> => {
+    try {
+      const currentUserId = extractUserId(req);
+      if (!currentUserId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const eventId = Number(req.params.id);
+      const [existing] = await db.select().from(events).where(eq(events.id, eventId));
+      if (!existing) {
+        return res.status(404).json({ error: "الموعد غير موجود" });
+      }
+      if (existing.userId !== currentUserId) {
+        return res.status(403).json({ error: "غير مصرح بحذف هذا الموعد" });
+      }
+      await db.delete(events).where(eq(events.id, eventId));
+      res.json({ success: true });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Failed to delete user event" });
     }
   });
 

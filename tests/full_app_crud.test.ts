@@ -270,6 +270,117 @@ describe('Exhaustive Full Application Endpoints & CRUD Operations Test Suite', (
     });
   });
 
+  // 4b. Course Sections CRUD & Bulk Clear
+  describe('Course Sections CRUD & Delete All Sections', () => {
+    it('POST /api/admin/import-data - imports course sections with academicYear and semester (Admin)', async () => {
+      const res = await adminClient.post('/api/admin/import-data', {
+        academicYear: '1448',
+        semester: 'الفصل الأول',
+        data: [
+          {
+            crn: '88881',
+            sectionNumber: '001',
+            courseCode: 'CS101',
+            courseTitle: 'Introduction to Computer Science',
+            campus: 'طلاب'
+          },
+          {
+            crn: '88882',
+            sectionNumber: '002',
+            courseCode: 'CS101',
+            courseTitle: 'Introduction to Computer Science',
+            campus: 'طالبات'
+          }
+        ]
+      });
+      assert.equal(res.status, 200);
+      assert.equal(res.data.success, true);
+      assert.equal(res.data.sectionsCount, 2);
+
+      // Import another section for 1447 second semester
+      const res2 = await adminClient.post('/api/admin/import-data', {
+        academicYear: '1447',
+        semester: 'الفصل الثاني',
+        data: [
+          {
+            crn: '77771',
+            sectionNumber: '001',
+            courseCode: 'MATH101',
+            courseTitle: 'Calculus I',
+            campus: 'طلاب'
+          }
+        ]
+      });
+      assert.equal(res2.status, 200);
+      assert.equal(res2.data.sectionsCount, 1);
+    });
+
+    it('GET /api/admin/sections - lists course sections and respects academicYear/semester filter', async () => {
+      const res = await adminClient.get('/api/admin/sections?academicYear=1448&semester=' + encodeURIComponent('الفصل الأول'));
+      assert.equal(res.status, 200);
+      assert.ok(Array.isArray(res.data.sections));
+      assert.equal(res.data.sections.length, 2);
+      assert.equal(res.data.sections[0].academicYear, '1448');
+      assert.equal(res.data.sections[0].semester, 'الفصل الأول');
+
+      // Filter for 1447
+      const res1447 = await adminClient.get('/api/admin/sections?academicYear=1447');
+      assert.equal(res1447.status, 200);
+      assert.equal(res1447.data.sections.length, 1);
+      assert.equal(res1447.data.sections[0].crn, '77771');
+    });
+
+    it('GET /api/admin/sections/terms - returns distinct academic terms metadata', async () => {
+      const res = await adminClient.get('/api/admin/sections/terms');
+      assert.equal(res.status, 200);
+      assert.ok(Array.isArray(res.data.terms));
+      const years = res.data.terms.map((t: any) => t.academicYear);
+      assert.ok(years.includes('1448'));
+      assert.ok(years.includes('1447'));
+    });
+
+    it('GET /api/sections/by-crn - looks up sections by CRN without authentication', async () => {
+      const res = await unauthClient.get('/api/sections/by-crn?crns=77771,99999');
+      assert.equal(res.status, 200);
+      assert.ok(Array.isArray(res.data.sections));
+      assert.equal(res.data.sections.length, 1);
+      assert.equal(res.data.sections[0].crn, '77771');
+      assert.equal(res.data.sections[0].courseCode, 'MATH101');
+    });
+
+    it('DELETE /api/admin/sections/clear-all - rejects unauthenticated / non-admin', async () => {
+      const pureUnauthClient = new TestApiClient(baseUrl);
+      const unauthRes = await pureUnauthClient.delete('/api/admin/sections/clear-all');
+      assert.equal(unauthRes.status, 401);
+
+      const nonAdminRes = await userClient.delete('/api/admin/sections/clear-all');
+      assert.equal(nonAdminRes.status, 403);
+    });
+
+    it('DELETE /api/admin/sections/clear-all?academicYear=1447 - selectively clears 1447 sections while keeping 1448 intact', async () => {
+      const delete1447 = await adminClient.delete('/api/admin/sections/clear-all?academicYear=1447');
+      assert.equal(delete1447.status, 200);
+      assert.equal(delete1447.data.count, 1);
+
+      // Verify 1448 sections still remain intact
+      const verifyRes = await adminClient.get('/api/admin/sections?academicYear=1448');
+      assert.equal(verifyRes.status, 200);
+      assert.equal(verifyRes.data.sections.length, 2);
+    });
+
+    it('DELETE /api/admin/sections/clear-all - deletes all remaining sections (Admin)', async () => {
+      const res = await adminClient.delete('/api/admin/sections/clear-all');
+      assert.equal(res.status, 200);
+      assert.equal(res.data.success, true);
+      assert.ok(typeof res.data.count === 'number');
+
+      // Verify sections are cleared
+      const verifyRes = await adminClient.get('/api/admin/sections');
+      assert.equal(verifyRes.status, 200);
+      assert.equal(verifyRes.data.sections.length, 0);
+    });
+  });
+
   // 5. News, Likes, Comments & Events CRUD
   describe('News, Events & Sources CRUD', () => {
     it('POST /api/admin/news_sources - creates news source (Admin)', async () => {

@@ -112,6 +112,7 @@ export function AuthenticatedAccountProfileModal({
   const [account, setAccount] = useState<AccountData | null>(initialAccount);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followersCount, setFollowersCount] = useState(0);
+  const [isTogglingFollow, setIsTogglingFollow] = useState(false);
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState<any | null>(null);
   const [viewerImageUrl, setViewerImageUrl] = useState<string | null>(null);
@@ -205,7 +206,7 @@ export function AuthenticatedAccountProfileModal({
         fetchLatestAccountDetails(initialAccount.handle || String(initialAccount.id));
       }
     }
-  }, [initialAccount]);
+  }, [initialAccount, currentUser]);
 
   const fetchLatestAccountDetails = async (handleOrId: string) => {
     try {
@@ -245,6 +246,18 @@ export function AuthenticatedAccountProfileModal({
       showToast('info', 'يرجى تسجيل الدخول أولاً للمتابعة');
       return;
     }
+    if (isTogglingFollow) return;
+    setIsTogglingFollow(true);
+
+    const prevFollowing = isFollowing;
+    const prevCount = followersCount;
+    const nextFollowing = !prevFollowing;
+    const nextCount = nextFollowing ? prevCount + 1 : Math.max(0, prevCount - 1);
+
+    // Immediate optimistic update for zero delay
+    setIsFollowing(nextFollowing);
+    setFollowersCount(nextCount);
+
     try {
       const token = await currentUser.getIdToken();
       const res = await fetch(`/api/authenticated-accounts/${account.id}/follow`, {
@@ -256,9 +269,19 @@ export function AuthenticatedAccountProfileModal({
         setIsFollowing(data.isFollowing);
         setFollowersCount(data.followersCount);
         if (onAccountUpdate) onAccountUpdate();
+      } else {
+        // Rollback on server failure
+        setIsFollowing(prevFollowing);
+        setFollowersCount(prevCount);
+        showToast('error', 'حدث خطأ أثناء تحديث حالة المتابعة');
       }
     } catch (e) {
       console.error('Failed to toggle follow', e);
+      setIsFollowing(prevFollowing);
+      setFollowersCount(prevCount);
+      showToast('error', 'تعذر الاتصال بالخادم');
+    } finally {
+      setIsTogglingFollow(false);
     }
   };
 
@@ -358,7 +381,8 @@ export function AuthenticatedAccountProfileModal({
             <div className="flex items-center gap-3 w-full sm:w-auto pt-2 sm:pt-0">
               <button
                 onClick={handleToggleFollow}
-                className={`flex-1 sm:flex-initial px-7 py-2.5 rounded-full font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition shadow-lg cursor-pointer ${
+                disabled={isTogglingFollow}
+                className={`btn-rise flex-1 sm:flex-initial px-7 py-2.5 rounded-full font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all duration-200 shadow-lg cursor-pointer active:scale-95 disabled:opacity-75 ${
                   isFollowing
                     ? 'bg-neutral-900 hover:bg-neutral-800 text-white border border-neutral-700'
                     : 'bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white'
@@ -786,7 +810,8 @@ export function AuthenticatedAccountProfileModal({
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <button
               onClick={handleToggleFollow}
-              className={`flex-1 sm:flex-initial px-6 py-2.5 rounded-full font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition shadow-md cursor-pointer ${
+              disabled={isTogglingFollow}
+              className={`btn-rise flex-1 sm:flex-initial px-6 py-2.5 rounded-full font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all duration-200 shadow-md cursor-pointer active:scale-95 disabled:opacity-75 ${
                 isFollowing
                   ? 'bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700'
                   : 'bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white'

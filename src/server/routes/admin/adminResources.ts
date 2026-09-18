@@ -1,6 +1,6 @@
 import express from 'express';
 import { sql } from 'drizzle-orm';
-import { course_resources, subjects, course_sections } from '../../../db/schema';
+import { course_resources, subjects } from '../../../db/schema';
 import { requireAuth, AuthRequest } from '../../../middleware/auth';
 import { matchId } from '../../../lib/auth-utils';
 import { checkAdmin } from './common';
@@ -33,15 +33,19 @@ export function createAdminResourcesRouter(db: any) {
     try {
       const { 
         subjectId, courseCode, title, type, url, description, 
-        driveLink, boxLink, whatsappLink, freeResourcesUrl, paidResourcesUrl, avatarUrl, bannerUrl, sectionsEnabled 
+        driveLink, boxLink, whatsappLink, freeResourcesUrl, paidResourcesUrl, avatarUrl, bannerUrl, sectionsEnabled,
+        resourceKind
       } = req.body;
-      let targetSubjectId: any = subjectId ? String(subjectId).replace(/^syn(thetic)?_/, '') : null;
-      if (!targetSubjectId && courseCode) {
-        const sub = (await db.select().from(subjects).where(sql`LOWER(${subjects.code}) = LOWER(${courseCode.trim()})`))[0];
-        if (sub) targetSubjectId = sub.id;
+      let targetSubjectId: any = null;
+      if (resourceKind !== 'manual') {
+        targetSubjectId = subjectId ? String(subjectId).replace(/^syn(thetic)?_/, '') : null;
+        if (!targetSubjectId && courseCode) {
+          const sub = (await db.select().from(subjects).where(sql`LOWER(${subjects.code}) = LOWER(${courseCode.trim()})`))[0];
+          if (sub) targetSubjectId = sub.id;
+        }
       }
-      if (!targetSubjectId && !courseCode && (!title || !title.trim())) {
-        return res.status(400).json({ error: "الرجاء اختيار المادة الأكاديمية أو إدخال عنوان للمصدر" });
+      if (!targetSubjectId && (!title || !title.trim())) {
+        return res.status(400).json({ error: "الرجاء إدخال عنوان المصدر أو اختيار المادة الأكاديمية" });
       }
       const [resRec] = await db.insert(course_resources).values({
         subjectId: targetSubjectId || null,
@@ -72,13 +76,19 @@ export function createAdminResourcesRouter(db: any) {
       const idRaw = req.params.id;
       const { 
         title, type, url, description, subjectId, courseCode,
-        driveLink, boxLink, whatsappLink, freeResourcesUrl, paidResourcesUrl, avatarUrl, bannerUrl, sectionsEnabled 
+        driveLink, boxLink, whatsappLink, freeResourcesUrl, paidResourcesUrl, avatarUrl, bannerUrl, sectionsEnabled,
+        resourceKind
       } = req.body;
 
-      let targetSubjectId: any = subjectId ? String(subjectId).replace(/^syn(thetic)?_/, '') : undefined;
-      if (!targetSubjectId && courseCode) {
-        const sub = (await db.select().from(subjects).where(sql`LOWER(${subjects.code}) = LOWER(${courseCode.trim()})`))[0];
-        if (sub) targetSubjectId = sub.id;
+      let targetSubjectId: any = undefined;
+      if (resourceKind === 'manual') {
+        targetSubjectId = null;
+      } else if (subjectId !== undefined) {
+        targetSubjectId = subjectId ? String(subjectId).replace(/^syn(thetic)?_/, '') : null;
+        if (!targetSubjectId && courseCode) {
+          const sub = (await db.select().from(subjects).where(sql`LOWER(${subjects.code}) = LOWER(${courseCode.trim()})`))[0];
+          if (sub) targetSubjectId = sub.id;
+        }
       }
 
       const updateData: any = {};
@@ -148,26 +158,6 @@ export function createAdminResourcesRouter(db: any) {
       return res.status(404).json({ success: false, error: "Resource not found", deletedCount: 0 });
     } catch (e: any) {
       console.error("[Admin Resource Delete Error]", e);
-      res.status(500).json({ error: "Server error" });
-    }
-  });
-
-  // Admin Clear All Course Sections (Reset for new term)
-  router.delete("/admin/sections/clear-all", requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
-    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
-    try {
-      const { subjectId, courseCode } = req.query;
-      let deletedRows: any[] = [];
-      if (subjectId) {
-        deletedRows = await db.delete(course_sections).where(matchId(course_sections.subjectId, String(subjectId))).returning();
-      } else if (courseCode) {
-        deletedRows = await db.delete(course_sections).where(sql`LOWER(${course_sections.courseCode}) = LOWER(${String(courseCode).trim()})`).returning();
-      } else {
-        deletedRows = await db.delete(course_sections).returning();
-      }
-      res.json({ success: true, count: deletedRows.length });
-    } catch (e: any) {
-      console.error("[Clear All Sections Error]", e);
       res.status(500).json({ error: "Server error" });
     }
   });

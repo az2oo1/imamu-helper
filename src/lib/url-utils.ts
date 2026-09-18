@@ -3,13 +3,38 @@
  */
 
 /**
+ * Decodes HTML entities commonly found in academic catalog exports (e.g. &quot;, &amp;, &nbsp;, &rlm;)
+ */
+export function decodeHtmlEntities(str?: string | null): string {
+  if (!str) return '';
+  return str
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&ndash;/g, '–')
+    .replace(/&mdash;/g, '—')
+    .replace(/&laquo;/g, '«')
+    .replace(/&raquo;/g, '»')
+    .replace(/&hellip;/g, '…')
+    .replace(/&rlm;/g, '')
+    .replace(/&lrm;/g, '')
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+}
+
+/**
  * Sanitizes course and resource titles by removing:
+ * - HTML entities like &quot;, &amp;, etc.
  * - Redundant "مصادر مادة مادة" / "مصادر مادة" / "مادة" prefixes
  * - Parenthetical expressions like (أساسيات الحوسبة والأخلاقيات)
  */
 export function cleanCourseName(rawName?: string): string {
   if (!rawName) return '';
-  let cleaned = rawName
+  let cleaned = decodeHtmlEntities(rawName)
     .replace(/^مصادر مادة\s+مادة\s*/gi, '')
     .replace(/^مصادر مادة\s*/gi, '')
     .replace(/^مادة\s*/gi, '')

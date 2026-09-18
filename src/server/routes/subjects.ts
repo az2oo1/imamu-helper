@@ -1,10 +1,11 @@
 import express from 'express';
-import { eq, sql, inArray } from 'drizzle-orm';
+import { eq, sql, inArray, or } from 'drizzle-orm';
 import { subjects, majors, majorCourses, course_resources, course_sections } from '../../db/schema';
 import { requireAuth } from '../../middleware/auth';
 import { matchId, matchSubjectIds } from '../../lib/auth-utils';
-import { cleanCourseName } from '../../lib/url-utils';
+import { cleanCourseName, decodeHtmlEntities } from '../../lib/url-utils';
 import { listMajorPlansFromS3 } from '../../lib/storage';
+import { querySections, formatSectionRow } from './sections';
 
 export function createSubjectsRouter(db: any) {
   const router = express.Router();
@@ -87,6 +88,8 @@ export function createSubjectsRouter(db: any) {
 
       const mapped = allSubjects.map((s: any) => ({
         ...s,
+        name: decodeHtmlEntities(s.name),
+        description: decodeHtmlEntities(s.description),
         majorId: majorMap.get(String(s.id)) || null,
         resources: resourceMap.get(String(s.id)) || []
       }));
@@ -156,12 +159,12 @@ export function createSubjectsRouter(db: any) {
         }
 
         const firstRes = isNumeric 
-          ? (matchingResources.find((r: any) => matchId(r.id, realId)) || matchingResources[0])
+          ? (matchingResources.find((r: any) => matchSubjectIds(r.id, realId)) || matchingResources[0])
           : matchingResources[0];
 
         if (firstRes) {
-          // 1. Only resolve parent subject if firstRes has a subjectId AND realId was NOT explicitly requesting a specific resource ID!
-          if (firstRes.subjectId && !isNumeric) {
+          // 1. Resolve parent subject if firstRes has a linked subjectId
+          if (firstRes.subjectId) {
             const allSubjs = await db.select().from(subjects);
             const linkedSubj = allSubjs.find((s: any) => matchSubjectIds(s.id, firstRes.subjectId));
             if (linkedSubj) {
@@ -229,16 +232,9 @@ export function createSubjectsRouter(db: any) {
         }
       }
 
-      const allCr = await db.select().from(course_resources);
-      let allResources = allCr.filter((cr: any) => {
-        if (matchSubjectIds(cr.subjectId, subject.id)) return true;
-        const cleanS = cleanCourseName(subject.name).toLowerCase();
-        const cleanT = cleanCourseName(cr.title).toLowerCase();
-        const cleanCode = (subject.code || '').toLowerCase().trim();
-        const titleText = (cr.title + ' ' + (cr.description || '')).toLowerCase();
-        return (cleanS && cleanT && (cleanS === cleanT || cleanT.includes(cleanS) || cleanS.includes(cleanT))) ||
-               (cleanCode && cleanCode.length > 2 && titleText.includes(cleanCode));
-      });
+      let allResources = subject.id 
+        ? await db.select().from(course_resources).where(matchId(course_resources.subjectId, subject.id))
+        : [];
       const connectUrl = process.env.CONNECT_APP_URL || 'http://localhost:3000';
 
       const subjectMajorLinks = await db.select().from(majorCourses).where(matchId(majorCourses.subjectId, subject.id));
@@ -247,15 +243,15 @@ export function createSubjectsRouter(db: any) {
       let prereqCodes: string[] = [];
       subjectMajorLinks.forEach((link: any) => {
         if (link.prereq) {
-          const codes = link.prereq.split(/[,|\s\+/]+/).map((s: string) => s.trim()).filter(Boolean);
+          const codes = link.prereq.split(/[,|،+/]+/).map((s: string) => s.trim()).filter(Boolean);
           prereqCodes.push(...codes);
         }
       });
       if (prereqCodes.length === 0 && subject.description) {
         const match = subject.description.match(/(?:المتطلبات السابقة:|prereq:?)\s*([A-Z0-9,\s\u0600-\u06FF]+)/i);
         if (match) {
-          const codes = match[1].match(/[A-Z]{2,4}\d{3,4}|عال\d{4}/g);
-          if (codes) prereqCodes.push(...codes);
+          const codes = match[1].match(/[A-Z]{2,4}\s*\d{3,4}|[\u0600-\u06FF]{2,4}\s*\d{3,4}/g);
+          if (codes) prereqCodes.push(...codes.map(c => c.trim()));
         }
       }
       prereqCodes = Array.from(new Set(prereqCodes));
@@ -263,12 +259,15 @@ export function createSubjectsRouter(db: any) {
       let prerequisites: { id: number; code: string; name: string }[] = [];
       if (prereqCodes.length > 0) {
         const allSimpleSubjects = await db.select({ id: subjects.id, code: subjects.code, name: subjects.name }).from(subjects);
-        prerequisites = allSimpleSubjects.filter((s: any) => prereqCodes.some(code => code && s.code && code.toLowerCase() === s.code.toLowerCase()));
+        prerequisites = allSimpleSubjects.filter((s: any) => prereqCodes.some(code => 
+          code && s.code && code.replace(/\s+/g, '').toLowerCase() === s.code.replace(/\s+/g, '').toLowerCase()
+        ));
       }
 
+      const normalizedSubjCode = subject?.code ? subject.code.replace(/\s+/g, '').toLowerCase() : '';
       const dependentSubjectIds = allMajorCourses.filter((mc: any) => {
-        if (!mc.prereq || !subject?.code) return false;
-        return mc.prereq.toLowerCase().includes(subject.code.toLowerCase());
+        if (!mc.prereq || !normalizedSubjCode) return false;
+        return mc.prereq.replace(/\s+/g, '').toLowerCase().includes(normalizedSubjCode);
       }).map((mc: any) => mc.subjectId);
 
       let dependents: { id: any; code: string; name: string }[] = [];
@@ -290,18 +289,17 @@ export function createSubjectsRouter(db: any) {
 
       let sectionsList: any[] = [];
       try {
-        const allSections = await db.select().from(course_sections);
-        sectionsList = allSections.filter((sec: any) => {
-          if (subject.id && matchSubjectIds(sec.subjectId, subject.id)) return true;
-          if (subject.code && sec.courseCode && sec.courseCode.toLowerCase().trim() === subject.code.toLowerCase().trim()) return true;
-          return false;
+        sectionsList = await querySections(db, {
+          subjectId: subject.id,
+          courseCode: subject.code
         });
       } catch (_secErr) {}
 
       res.json({
         course: {
           ...subject,
-          description: resolvedDescription,
+          name: decodeHtmlEntities(subject.name),
+          description: decodeHtmlEntities(resolvedDescription),
           avatarUrl: firstAvatar,
           bannerUrl: firstBanner,
           whatsappLink: resolvedWhatsappLink,
@@ -333,12 +331,15 @@ export function createSubjectsRouter(db: any) {
       const realId = rawDecoded.replace(/^syn(thetic)?_/, '').trim();
       const isNumeric = !isNaN(Number(realId)) && realId !== '';
 
-      const allCr = await db.select().from(course_resources);
-      const filtered = allCr.filter((cr: any) => {
-        if (isNumeric && matchSubjectIds(cr.subjectId, realId)) return true;
-        if (cr.courseCode && cr.courseCode.toLowerCase().trim() === realId.toLowerCase().trim()) return true;
-        return false;
-      });
+      let filtered: any[] = [];
+      if (isNumeric) {
+        filtered = await db.select().from(course_resources).where(matchId(course_resources.subjectId, realId));
+      } else {
+        const sub = (await db.select({ id: subjects.id }).from(subjects).where(sql`REPLACE(REPLACE(LOWER(${subjects.code}), ' ', ''), '-', '') = ${realId.toLowerCase().replace(/[\s\-]/g, '')}`))[0];
+        if (sub?.id) {
+          filtered = await db.select().from(course_resources).where(matchId(course_resources.subjectId, sub.id));
+        }
+      }
       res.json(filtered);
     } catch (err) {
       console.error("Error fetching subject resources:", err);
@@ -346,88 +347,19 @@ export function createSubjectsRouter(db: any) {
     }
   });
 
-  // Section Management Endpoints
-  router.get("/sections", async (req: express.Request, res: express.Response) => {
-    try {
-      const { subjectId, courseCode } = req.query;
-      let allSecs = await db.select().from(course_sections);
-      if (subjectId) {
-        allSecs = allSecs.filter((s: any) => matchSubjectIds(s.subjectId, subjectId));
-      } else if (courseCode) {
-        const cleanCode = String(courseCode).trim().toLowerCase();
-        allSecs = allSecs.filter((s: any) => s.courseCode && s.courseCode.trim().toLowerCase() === cleanCode);
-      }
-      res.json(allSecs);
-    } catch (err) {
-      console.error("Error fetching sections:", err);
-      res.json([]);
-    }
-  });
-
+  // Subject Sections Endpoint (delegated to unified querySections)
   router.get("/subjects/:idOrCode/sections", async (req: express.Request, res: express.Response) => {
     try {
       const { idOrCode } = req.params;
       const cleanTarget = decodeURIComponent(idOrCode || '').trim();
+      if (!cleanTarget) return res.json([]);
+
       const isNumeric = !isNaN(Number(cleanTarget)) && cleanTarget !== '';
-      const allSecs = await db.select().from(course_sections);
-      const filtered = allSecs.filter((s: any) => {
-        if (isNumeric && matchSubjectIds(s.subjectId, cleanTarget)) return true;
-        if (s.courseCode && s.courseCode.toLowerCase().trim() === cleanTarget.toLowerCase()) return true;
-        return false;
-      });
-      res.json(filtered);
+      const sections = await querySections(db, isNumeric ? { subjectId: cleanTarget } : { courseCode: cleanTarget });
+      res.json(sections);
     } catch (err) {
       console.error("Error fetching subject sections:", err);
       res.json([]);
-    }
-  });
-
-  router.post("/sections", async (req: express.Request, res: express.Response): Promise<any> => {
-    try {
-      const { sectionName, whatsappLink, phone, subjectId, courseCode, publishedByUserId, publishedByUserName } = req.body;
-      if (!sectionName || !sectionName.trim()) {
-        return res.status(400).json({ error: "اسم الشعبة مطلوب" });
-      }
-      if (!whatsappLink || !whatsappLink.trim()) {
-        return res.status(400).json({ error: "رابط الواتساب مطلوب" });
-      }
-
-      // Resolve publisher user ID from auth middleware or request payload or fallback ID
-      const reqUser = (req as any).user;
-      const resolvedUserId = (reqUser?.uid || reqUser?.userName || publishedByUserId || `user_${Math.random().toString(36).substring(2, 8)}`).trim();
-      const resolvedUserName = reqUser?.userName || publishedByUserName || null;
-
-      let targetSubjectId = subjectId ? Number(subjectId) : null;
-      if (!targetSubjectId && courseCode) {
-        const sub = (await db.select().from(subjects).where(sql`LOWER(${subjects.code}) = LOWER(${String(courseCode).trim()})`))[0];
-        if (sub) targetSubjectId = sub.id;
-      }
-
-      const [newSection] = await db.insert(course_sections).values({
-        subjectId: targetSubjectId || null,
-        courseCode: courseCode || null,
-        sectionName: sectionName.trim(),
-        whatsappLink: whatsappLink.trim(),
-        phone: phone ? phone.trim() : null,
-        publishedByUserId: resolvedUserId,
-        publishedByUserName: resolvedUserName
-      }).returning();
-
-      res.json(newSection);
-    } catch (err: any) {
-      console.error("Error creating section:", err);
-      res.status(500).json({ error: "فشل إضافة الشعبة" });
-    }
-  });
-
-  router.delete("/sections/:id", async (req: express.Request, res: express.Response): Promise<any> => {
-    try {
-      const { id } = req.params;
-      await db.delete(course_sections).where(matchId(course_sections.id, id));
-      res.json({ success: true });
-    } catch (err: any) {
-      console.error("Error deleting section:", err);
-      res.status(500).json({ error: "فشل حذف الشعبة" });
     }
   });
 
@@ -512,22 +444,24 @@ export function createSubjectsRouter(db: any) {
       const subjectsWithResources = new Set<number>();
 
       for (const cr of allCourseResources) {
+        const isGroupOrBatch = cr.type === 'group' || cr.type === 'whatsapp' || 
+          cr.title?.includes('قروب') || cr.title?.includes('مجموعة') || cr.title?.includes('دفعة') || cr.title?.includes('قناة');
+
+        // STRICT SEPARATION:
+        // A resource belongs to a course IF AND ONLY IF it has an explicit subjectId!
+        // No automatic guessing or title matching. Manual resources remain strictly independent.
         const s = cr.subjectId ? (subjectMap.get(cr.subjectId) || allSubjects.find((subj: any) => matchSubjectIds(subj.id, cr.subjectId))) : null;
-        const matchedSubjByTitle = !s ? allSubjects.find((subj: any) => {
-          const cleanS = cleanCourseName(subj.name).toLowerCase();
-          const cleanT = cleanCourseName(cr.title).toLowerCase();
-          return cleanS === cleanT || (cleanS.length > 3 && cleanT.includes(cleanS)) || (cleanT.length > 3 && cleanS.includes(cleanT));
-        }) : null;
+        const isCourseResource = Boolean(s);
 
-        const resolvedSubject = s || matchedSubjByTitle;
-        if (resolvedSubject) {
-          subjectsWithResources.add(resolvedSubject.id);
+        if (s) {
+          subjectsWithResources.add(s.id);
         }
-        const majorNames = resolvedSubject ? (subjectMajorsMap.get(resolvedSubject.id) || []) : [];
-        const majorStr = majorNames.length > 0 ? majorNames.join(' / ') : 'جميع التخصصات';
-        const cleanName = resolvedSubject ? cleanCourseName(resolvedSubject.name) : cleanCourseName(cr.title);
 
-        const rawTitle = cr.title || (resolvedSubject ? cleanName : 'باقة مصادر جديدة');
+        const majorNames = s ? (subjectMajorsMap.get(s.id) || []) : [];
+        const majorStr = majorNames.length > 0 ? majorNames.join(' / ') : (isGroupOrBatch ? 'مجموعات طلابية' : 'عام');
+        const cleanName = s ? cleanCourseName(s.name) : cleanCourseName(cr.title);
+
+        const rawTitle = cr.title || (s ? cleanName : 'مصدر مستقل');
         const cleanTitle = cleanCourseName(rawTitle);
         const isWaUrl = (u?: string) => Boolean(u && (u.includes('whatsapp.com') || u.includes('wa.me')));
         const resolvedWa = isWaUrl(cr.whatsappLink) ? cr.whatsappLink : 
@@ -535,20 +469,19 @@ export function createSubjectsRouter(db: any) {
                            isWaUrl(cr.url) ? cr.url : 
                            (cr.type === 'whatsapp' || cr.type === 'group') ? cr.url : undefined;
 
-        const codeMatch = (cr.title || cr.description || '').match(/[A-Z]{2,4}\d{3,4}|عال\d{4}/i)?.[0];
-        let extractedCode = resolvedSubject?.code || codeMatch || '';
-        if (!extractedCode || /[\u0600-\u06FF]/.test(extractedCode) || extractedCode === 'مادة') {
-          extractedCode = (cr.type === 'group' || cr.type === 'whatsapp' || cr.title?.includes('قروب') || cr.title?.includes('مجموعة')) 
-            ? 'مجموعة طلابية' 
-            : 'مصدر أكاديمي';
+        let extractedCode = '';
+        if (isCourseResource) {
+          extractedCode = s.code || '';
+        } else {
+          extractedCode = isGroupOrBatch ? 'مجموعة طلابية' : 'مصدر مستقل';
         }
 
         resourcesList.push({
           id: cr.id,
-          subjectId: resolvedSubject?.id || cr.subjectId || null,
+          subjectId: s ? s.id : null,
           title: cleanTitle,
           courseCode: extractedCode,
-          courseName: cleanName,
+          courseName: isCourseResource ? cleanName : cleanTitle,
           major: majorStr,
           majors: majorNames,
           type: cr.type || (resolvedWa ? 'group' : 'drive'),
@@ -563,7 +496,7 @@ export function createSubjectsRouter(db: any) {
           bannerUrl: cr.bannerUrl || undefined,
           telegramUrl: cr.type === 'telegram' ? cr.url : undefined,
           description: cr.description,
-          sectionsEnabled: cr.sectionsEnabled !== false,
+          sectionsEnabled: isCourseResource ? (cr.sectionsEnabled !== false) : false,
           createdAt: cr.createdAt ? new Date(cr.createdAt).toISOString() : new Date().toISOString()
         });
       }

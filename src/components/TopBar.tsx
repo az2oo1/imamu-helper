@@ -8,7 +8,7 @@ import { useTheme } from '../lib/ThemeContext';
 import { 
   LogIn, LogOut, Menu, X, UserCircle2, 
   Home, Calculator, BookOpen, Calendar, Newspaper, HelpCircle, 
-  Sun, Moon, Activity, Shield 
+  Sun, Moon, Activity, Shield, Building2, ShieldCheck, User2
 } from 'lucide-react';
 import clsx from 'clsx';
 import { motion, AnimatePresence, LayoutGroup } from 'motion/react';
@@ -21,6 +21,16 @@ export function TopBar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [managedAccounts, setManagedAccounts] = useState<any[]>([]);
+  const [mounted, setMounted] = useState(false);
+  const [isClientLoggedIn, setIsClientLoggedIn] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('token');
+    setIsClientLoggedIn(!!(user || dbUser || hasToken));
+  }, [user, dbUser]);
+
+  const isLoggedIn = mounted && (isClientLoggedIn || !!user || !!dbUser);
 
   useEffect(() => {
     if (user) {
@@ -39,7 +49,7 @@ export function TopBar() {
     }
   }, [user]);
 
-  const navLinks = [
+  const baseNavLinks = [
     { name: 'الرئيسية', path: '/', icon: Home },
     { name: 'الأدوات', path: '/tools', icon: Calculator },
     { name: 'المصادر', path: '/resources', icon: BookOpen },
@@ -47,6 +57,10 @@ export function TopBar() {
     { name: 'الأخبار', path: '/news', icon: Newspaper },
     { name: 'الدليلة', path: '/how-to', icon: HelpCircle },
   ];
+
+  const navLinks = isLoggedIn 
+    ? [...baseNavLinks, { name: 'أنا', path: '/ana', icon: User2 }]
+    : baseNavLinks;
 
   return (
     <>
@@ -70,7 +84,7 @@ export function TopBar() {
           </div>
 
           {/* Right Section (in RTL): Menu Button on mobile, Logo & Nav on desktop */}
-          <div className="flex items-center gap-x-2 sm:gap-x-6 md:gap-x-10 min-w-0">
+          <div className="flex items-center gap-x-2 sm:gap-x-4 md:gap-x-4 lg:gap-x-6 xl:gap-x-8 min-w-0">
             <button 
               className="md:hidden p-1.5 -mr-1 text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-900 transition shrink-0 cursor-pointer"
               onClick={() => setMobileMenuOpen(true)}
@@ -80,7 +94,7 @@ export function TopBar() {
             </button>
 
             {/* Desktop Brand Logo */}
-            <Link href="/" className="hidden md:flex items-center group shrink min-w-0 py-1">
+            <Link href="/" className="hidden md:flex items-center group shrink-0 py-1">
               <img 
                 src="/logo_dark.png" 
                 alt="مساعد الإمام" 
@@ -97,7 +111,7 @@ export function TopBar() {
             <LayoutGroup id="topbar-nav">
               <motion.nav 
                 layoutRoot
-                className="hidden md:flex gap-x-1 h-full items-center text-sm font-semibold relative"
+                className="hidden md:flex gap-x-0.5 lg:gap-x-1 h-full items-center text-xs lg:text-sm font-semibold relative shrink-0"
               >
                 {navLinks.map((link) => {
                   const isActive = pathname === link.path;
@@ -106,14 +120,14 @@ export function TopBar() {
                       key={link.path}
                       href={link.path}
                       className={clsx(
-                        "relative h-9 px-3.5 rounded-full flex items-center gap-2 transition-colors duration-200",
+                        "relative h-9 px-2.5 lg:px-3.5 rounded-full flex items-center gap-1.5 lg:gap-2 transition-colors duration-200 shrink-0",
                         isActive 
                           ? "text-slate-900 dark:text-white font-bold" 
                           : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-zinc-900/80"
                       )}
                     >
-                      <link.icon className={clsx("w-4 h-4 transition-colors", isActive ? "text-[var(--color-imamu-accent)]" : "text-slate-400 dark:text-zinc-500")} />
-                      <span>{link.name}</span>
+                      <link.icon className={clsx("w-4 h-4 transition-colors shrink-0", isActive ? "text-[var(--color-imamu-accent)]" : "text-slate-400 dark:text-zinc-500")} />
+                      <span className="whitespace-nowrap">{link.name}</span>
                       {isActive && (
                         <motion.div
                           layoutId="active-topbar-pill"
@@ -131,6 +145,23 @@ export function TopBar() {
 
           {/* Left Action Controls (Desktop Theme Switcher + User/Login Button) */}
           <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+            {/* Mobile quick link to Ana */}
+            {isLoggedIn && (
+              <Link
+                href="/ana"
+                className={clsx(
+                  "md:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition active:scale-95 shrink-0",
+                  pathname === '/ana'
+                    ? "bg-[var(--color-imamu-brown)] text-white shadow-xs"
+                    : "bg-[var(--color-imamu-brown)]/10 dark:bg-[var(--color-imamu-brown)]/20 text-[var(--color-imamu-accent)] border border-[var(--color-imamu-brown)]/20 hover:bg-[var(--color-imamu-brown)]/20"
+                )}
+                title="لوحتي الأكاديمية"
+              >
+                <User2 className="w-3.5 h-3.5 shrink-0" />
+                <span>أنا</span>
+              </Link>
+            )}
+
             {/* Theme Toggle Button (Desktop only) */}
             <button
               onClick={toggleTheme}
@@ -145,12 +176,12 @@ export function TopBar() {
               )}
             </button>
 
-            {user ? (
+            {isLoggedIn ? (
               <div className="relative">
                 <button 
                   onClick={() => setProfileMenuOpen(!profileMenuOpen)}
                   className="flex items-center justify-center p-1 rounded-full border border-slate-200/80 dark:border-zinc-800/80 bg-slate-50/80 dark:bg-zinc-900/80 hover:bg-slate-100 dark:hover:bg-zinc-800 transition active:scale-95 focus:outline-none cursor-pointer"
-                  title={dbUser?.userName || user.displayName || 'الحساب الشخصي'}
+                  title={dbUser?.userName || user?.displayName || 'الحساب الشخصي'}
                 >
                   <div className="w-8.5 h-8.5 rounded-full overflow-hidden bg-slate-200 dark:bg-zinc-800 flex items-center justify-center border border-slate-300/80 dark:border-zinc-700/80 shrink-0">
                     {(dbUser as any)?.profilePicUrl ? (
@@ -177,8 +208,17 @@ export function TopBar() {
                       >
                         <div className="px-4 py-2 border-b border-slate-100 dark:border-zinc-800 mb-1 text-right">
                           <p className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">الحساب الشخصي</p>
-                          <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{dbUser?.userName || 'طالب'}</p>
+                          <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{dbUser?.userName || user?.displayName || 'طالب'}</p>
                         </div>
+                        <Link 
+                          href="/ana" 
+                          onClick={() => setProfileMenuOpen(false)}
+                          className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-[var(--color-imamu-accent)] hover:bg-[var(--color-imamu-brown)]/5 dark:hover:bg-[var(--color-imamu-brown)]/10 transition text-right"
+                          dir="rtl"
+                        >
+                          <User2 className="w-4 h-4 text-[var(--color-imamu-accent)] shrink-0" />
+                          لوحتي الأكاديمية (أنا)
+                        </Link>
                         <Link 
                           href="/profile" 
                           onClick={() => setProfileMenuOpen(false)}
@@ -191,10 +231,10 @@ export function TopBar() {
                         <Link 
                           href={managedAccounts.length > 0 ? `/@/${encodeURIComponent(managedAccounts[0].handle.replace(/^@/, ''))}/dashboard` : '/profile'} 
                           onClick={() => setProfileMenuOpen(false)}
-                          className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-[var(--color-imamu-accent)] hover:bg-slate-50 dark:hover:bg-zinc-800 transition text-right"
+                          className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:bg-slate-50 dark:hover:bg-zinc-800 transition text-right"
                           dir="rtl"
                         >
-                          <Shield className="w-4 h-4 text-[var(--color-imamu-accent)]" />
+                          <Building2 className="w-4 h-4 text-emerald-500 shrink-0" />
                           لوحة تحكم الجهة
                         </Link>
                         {isAdmin && (
@@ -202,10 +242,10 @@ export function TopBar() {
                             <Link 
                               href="/admin" 
                               onClick={() => setProfileMenuOpen(false)}
-                              className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-[var(--color-imamu-accent)] hover:bg-slate-50 dark:hover:bg-zinc-800 transition text-right"
+                              className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:bg-slate-50 dark:hover:bg-zinc-800 transition text-right"
                               dir="rtl"
                             >
-                              <Shield className="w-4 h-4 text-[var(--color-imamu-accent)]" />
+                              <ShieldCheck className="w-4 h-4 text-indigo-500 shrink-0" />
                               لوحة تحكم المسؤول
                             </Link>
                             <Link 
@@ -343,7 +383,7 @@ export function TopBar() {
                   <span className="text-[11px] font-semibold text-slate-400 dark:text-zinc-500">تبديل</span>
                 </button>
 
-                {user ? (
+                {isLoggedIn ? (
                   <>
                     <div className="flex items-center gap-3 mt-1">
                       <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-200 dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 shrink-0">
@@ -354,18 +394,36 @@ export function TopBar() {
                         )}
                       </div>
                       <div className="flex flex-col overflow-hidden text-right">
-                        <span className="text-sm font-bold text-slate-900 dark:text-white truncate">{dbUser?.userName || user.displayName || 'طالب'}</span>
+                        <span className="text-sm font-bold text-slate-900 dark:text-white truncate">{dbUser?.userName || user?.displayName || 'طالب'}</span>
                         <span className="text-xs text-slate-500 dark:text-zinc-400 truncate">{dbUser?.major || 'طالب'}</span>
                       </div>
                     </div>
                     <Link
+                      href="/ana"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-[var(--color-imamu-brown)]/10 dark:bg-[var(--color-imamu-brown)]/20 text-[var(--color-imamu-accent)] border border-[var(--color-imamu-brown)]/30 font-bold text-xs hover:bg-[var(--color-imamu-brown)]/20 transition cursor-pointer"
+                    >
+                      <User2 className="w-4 h-4 text-[var(--color-imamu-accent)] shrink-0" />
+                      <span>لوحتي الأكاديمية (أنا)</span>
+                    </Link>
+                    <Link
                       href={managedAccounts.length > 0 ? `/@/${encodeURIComponent(managedAccounts[0].handle.replace(/^@/, ''))}/dashboard` : '/profile'}
                       onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-[var(--color-imamu-brown)]/10 text-[var(--color-imamu-accent)] border border-[var(--color-imamu-brown)]/30 font-bold text-xs hover:bg-[var(--color-imamu-brown)]/20 transition cursor-pointer"
+                      className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40 font-bold text-xs hover:bg-emerald-100 dark:hover:bg-emerald-950/50 transition cursor-pointer"
                     >
-                      <Shield className="w-4 h-4 text-[var(--color-imamu-accent)] shrink-0" />
+                      <Building2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                       <span>لوحة تحكم الجهة</span>
                     </Link>
+                    {isAdmin && (
+                      <Link
+                        href="/admin"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/40 font-bold text-xs hover:bg-indigo-100 dark:hover:bg-indigo-950/50 transition cursor-pointer"
+                      >
+                        <ShieldCheck className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                        <span>لوحة تحكم المسؤول</span>
+                      </Link>
+                    )}
                     <button
                       onClick={() => { signOut(); setMobileMenuOpen(false); }}
                       className="flex w-full justify-center items-center gap-2 rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40 px-4 py-2.5 text-xs font-bold text-red-600 dark:text-red-400 transition hover:bg-red-100 cursor-pointer"

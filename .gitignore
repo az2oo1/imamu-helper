@@ -14,6 +14,8 @@
 
 # Project Data & Embedded DB
 /.data/
+data/
+/data/
 
 # Agent Workspaces
 /.agents/

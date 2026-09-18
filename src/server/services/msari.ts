@@ -90,6 +90,48 @@ const COURSE_NAME_AR: Record<string, string> = {
   IS1483: 'مشروع تخرج 2'
 };
 
+const PREFIX_MAP: Record<string, string> = {
+  CS: 'عال',
+  IT: 'تال',
+  IS: 'نال',
+  MAT: 'ريض',
+  PHY: 'فيز',
+  STA: 'احص',
+  ACC: 'حسب',
+  ENG: 'نجل',
+  QUR: 'قرا',
+  COM: 'تصل',
+  ARB: 'عرب',
+  RHB: 'سلم',
+  JR: 'فقه',
+  BRO: 'علم',
+  HST: 'ترخ',
+  IDE: 'عقد'
+};
+
+const MANUAL_OVERRIDES: Record<string, string> = {
+  IT1441: 'تال 1441',
+  QUR1001: 'قرا 1001'
+};
+
+function toOfficialArabicCode(code: string): string {
+  if (!code) return code;
+  const trimmed = code.trim();
+  if (MANUAL_OVERRIDES[trimmed]) return MANUAL_OVERRIDES[trimmed];
+  const m = trimmed.match(/^([A-Z]+)(\d+)$/);
+  if (m && PREFIX_MAP[m[1]]) return `${PREFIX_MAP[m[1]]} ${m[2]}`;
+  const mAr = trimmed.match(/^([^\d\s]+)(\d+)$/);
+  if (mAr) return `${mAr[1]} ${mAr[2]}`;
+  return trimmed;
+}
+
+function toOfficialPrereq(prereq: any): string | null {
+  if (!prereq) return null;
+  const raw = Array.isArray(prereq) ? prereq.join(', ') : String(prereq);
+  return raw.replace(/([A-Z]+)(\d+)/g, (_, l, d) => PREFIX_MAP[l] ? `${PREFIX_MAP[l]} ${d}` : `${l}${d}`)
+            .replace(/([^\d\s,،|]+)(\d+)/g, (_, p, d) => `${p} ${d}`);
+}
+
 async function fetchMsari(endpoint: string) {
   const res = await fetch(`${MSARI_BASE_URL}/${endpoint}`, {
     headers: {
@@ -137,15 +179,17 @@ export async function importMsariData() {
   const subjectIdMapByCode = new Map<string, number>();
 
   for (const c of msariCourses) {
-    const code = c.code.trim();
-    if (!code || code.startsWith('UNIV-') || code.startsWith('FREE-') || code.startsWith('ELEC-')) {
+    const rawCode = c.code.trim();
+    if (!rawCode || rawCode.startsWith('UNIV-') || rawCode.startsWith('FREE-') || rawCode.startsWith('ELEC-')) {
       continue;
     }
 
-    const arName = COURSE_NAME_AR[code] || c.name_ar || c.name;
+    const code = toOfficialArabicCode(rawCode);
+    const arName = COURSE_NAME_AR[rawCode] || c.name_ar || c.name;
     const displayName = (arName && arName !== c.name) ? `${arName} (${c.name})` : (c.name || arName);
     const level = c.term_hint ? Number(c.term_hint) : null;
     const hours = c.hours ? Number(c.hours) : 3;
+    const prereqStr = toOfficialPrereq(c.prereq);
 
     let localSub = (await db.select().from(subjects).where(eq(subjects.code, code)))[0];
     if (!localSub) {
@@ -154,16 +198,15 @@ export async function importMsariData() {
         name: displayName,
         creditHours: hours,
         level,
-        description: c.prereq ? `المتطلبات السابقة: ${Array.isArray(c.prereq) ? c.prereq.join(', ') : c.prereq}` : null
+        description: prereqStr ? `المتطلبات السابقة: ${prereqStr}` : null
       }).returning();
       localSub = inserted[0];
       console.log(`[Import] Added subject: ${code} - ${displayName}`);
     } else {
       await db.update(subjects).set({
-        name: displayName || localSub.name,
         creditHours: hours || localSub.creditHours,
         level: level ?? localSub.level,
-        description: c.prereq ? `المتطلبات السابقة: ${Array.isArray(c.prereq) ? c.prereq.join(', ') : c.prereq}` : localSub.description
+        description: prereqStr ? `المتطلبات السابقة: ${prereqStr}` : localSub.description
       }).where(eq(subjects.id, localSub.id));
     }
 
@@ -172,7 +215,6 @@ export async function importMsariData() {
     const localMajorId = majorIdMap.get(c.major_id);
     if (localMajorId) {
       const groupName = level ? `المستوى ${level}` : 'المتطلبات العامة';
-      const prereqStr = c.prereq ? (Array.isArray(c.prereq) ? c.prereq.join(', ') : String(c.prereq)) : null;
       const existingLink = (await db.select().from(majorCourses).where(
         and(eq(majorCourses.majorId, localMajorId), eq(majorCourses.subjectId, localSub.id))
       ))[0];
@@ -201,11 +243,13 @@ export async function importMsariData() {
   }
 
   for (const nc of msariNonCore) {
-    const code = nc.code ? nc.code.trim() : '';
-    if (!code) continue;
+    const rawCode = nc.code ? nc.code.trim() : '';
+    if (!rawCode) continue;
 
+    const code = toOfficialArabicCode(rawCode);
     const name = nc.name_ar || nc.name || code;
     const hours = nc.hours ? Number(nc.hours) : 3;
+    const ncPrereqStr = toOfficialPrereq(nc.prereq);
 
     let localSub = (await db.select().from(subjects).where(eq(subjects.code, code)))[0];
     if (!localSub) {
@@ -214,14 +258,14 @@ export async function importMsariData() {
         name,
         creditHours: hours,
         level: null,
-        description: nc.prereq ? `المتطلبات السابقة: ${nc.prereq}` : null
+        description: ncPrereqStr ? `المتطلبات السابقة: ${ncPrereqStr}` : null
       }).returning();
       localSub = inserted[0];
     } else {
       await db.update(subjects).set({
         name: name || localSub.name,
         creditHours: hours || localSub.creditHours,
-        description: nc.prereq ? `المتطلبات السابقة: ${nc.prereq}` : localSub.description
+        description: ncPrereqStr ? `المتطلبات السابقة: ${ncPrereqStr}` : localSub.description
       }).where(eq(subjects.id, localSub.id));
     }
 
@@ -231,7 +275,6 @@ export async function importMsariData() {
     const pkg = packageMap.get(nc.package_code);
     const groupName = pkg ? pkg.name : (nc.subgroup_ar || 'المقررات الاختيارية');
     const reqCount = pkg ? (pkg.required_units || 1) : 1;
-    const ncPrereqStr = nc.prereq ? (Array.isArray(nc.prereq) ? nc.prereq.join(', ') : String(nc.prereq)) : null;
 
     if (localMajorId) {
       const existingLink = (await db.select().from(majorCourses).where(

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../lib/AuthContext';
 import { useTheme, COLOR_PRESETS } from '../lib/ThemeContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronDown, ChevronUp, UserCircle2, Mail, Phone, BookOpen, Calculator, Clock, CheckCircle2, AlertCircle, Loader2, Camera, GraduationCap, Settings, Sparkles, ArrowUpRight, Palette, Check, Sun, Moon, Shield, ExternalLink } from 'lucide-react';
+import { ChevronDown, ChevronUp, UserCircle2, Mail, Phone, BookOpen, Calculator, Clock, CheckCircle2, AlertCircle, Loader2, Camera, GraduationCap, Settings, Sparkles, ArrowUpRight, Palette, Check, Sun, Moon, ExternalLink } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AnimatedNumber } from '../components/ui';
 
@@ -12,8 +12,21 @@ function extractPrereqCodes(description?: string | null): string[] {
   if (!description) return [];
   const match = description.match(/(?:المتطلبات السابقة:|prereq:?)\s*([A-Z0-9,\s\u0600-\u06FF]+)/i);
   if (!match) return [];
-  const codes = match[1].match(/[A-Z]{2,4}\d{3,4}|عال\d{4}/g);
-  return codes ? Array.from(new Set(codes)) : [];
+  const codes = match[1].match(/[A-Z]{2,4}\s*\d{3,4}|[\u0600-\u06FF]{2,4}\s*\d{3,4}/g);
+  return codes ? Array.from(new Set(codes.map(c => c.trim()))) : [];
+}
+
+function getSubjectPrereqs(s: any): string[] {
+  if (s.prereq) {
+    return s.prereq.split(/[,|،+/]+/).map((c: string) => c.trim()).filter(Boolean);
+  }
+  return extractPrereqCodes(s.description);
+}
+
+function isCourseCompleted(completedCourses: string[], targetCode: string): boolean {
+  if (!targetCode || !completedCourses) return false;
+  const targetNorm = targetCode.replace(/\s+/g, '').toLowerCase();
+  return completedCourses.some(c => c && c.replace(/\s+/g, '').toLowerCase() === targetNorm);
 }
 
 function computeAcademicProgress(majors: any[], subjects: any[], majorName: string, completedCourses: string[]) {
@@ -26,17 +39,21 @@ function computeAcademicProgress(majors: any[], subjects: any[], majorName: stri
     displayedSubjects.reduce((acc, s) => {
       let g = s.level ? `المستوى ${s.level}` : 'المتطلبات العامة';
       let reqCount = 0;
+      let prereq = s.prereq || null;
       if (userMajor && userMajor.courses) {
         const c = userMajor.courses.find((mc: any) => String(mc.subjectId) === String(s.id));
-        if (c && c.optionalGroup && c.optionalGroup !== 'المتطلبات العامة') {
-          g = c.optionalGroup;
-          reqCount = Number(c.optionalGroupReqCount) || 0;
-        } else if (c && c.optionalGroupReqCount) {
-          reqCount = Number(c.optionalGroupReqCount) || 0;
+        if (c) {
+          if (c.prereq) prereq = c.prereq;
+          if (c.optionalGroup && c.optionalGroup !== 'المتطلبات العامة') {
+            g = c.optionalGroup;
+            reqCount = Number(c.optionalGroupReqCount) || 0;
+          } else if (c.optionalGroupReqCount) {
+            reqCount = Number(c.optionalGroupReqCount) || 0;
+          }
         }
       }
       if (!acc[g]) acc[g] = [];
-      acc[g].push({...s, reqCount});
+      acc[g].push({...s, reqCount, prereq});
       return acc;
     }, {} as Record<string, any[]>)
   ) as [string, any[]][]).sort((a, b) => {
@@ -53,7 +70,7 @@ function computeAcademicProgress(majors: any[], subjects: any[], majorName: stri
   let totalFinishedHours = 0;
 
   displayedSubjects.forEach(s => {
-    if (completedCourses.includes(s.code)) {
+    if (isCourseCompleted(completedCourses, s.code)) {
       totalFinishedHours += Number(s.creditHours || 3);
     }
   });
@@ -90,28 +107,12 @@ export function ProfilePage() {
   const router = useRouter();
   const [majors, setMajors] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
-  const [managedEntityAccounts, setManagedEntityAccounts] = useState<any[]>([]);
 
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login');
     }
   }, [user, authLoading, router]);
-
-  useEffect(() => {
-    if (user) {
-      user.getIdToken().then((token: string) => {
-        fetch('/api/authenticated-accounts/my-accounts', {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        .then(res => res.ok ? res.json() : [])
-        .then(data => {
-          if (Array.isArray(data)) setManagedEntityAccounts(data);
-        })
-        .catch(() => {});
-      });
-    }
-  }, [user]);
   
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
@@ -299,23 +300,6 @@ export function ProfilePage() {
               {user?.email || ''}
             </p>
           </div>
-
-          {/* Access Managed Entity Accounts Button */}
-          {managedEntityAccounts.length > 0 && (
-            <div className="mt-4 flex flex-col items-center gap-2 w-full max-w-[220px]">
-              {managedEntityAccounts.map((acc: any) => (
-                <button
-                  key={acc.id}
-                  type="button"
-                  onClick={() => router.push(`/@/${encodeURIComponent(acc.handle.replace(/^@/, ''))}/dashboard`)}
-                  className="w-full inline-flex items-center justify-center gap-2 text-xs font-bold text-[var(--color-imamu-accent)] bg-stone-100 dark:bg-zinc-900 hover:bg-stone-200 dark:hover:bg-zinc-800 px-4 py-2.5 rounded-xl border border-[var(--color-imamu-accent)]/30 transition shadow-sm cursor-pointer"
-                >
-                  <Shield className="w-4 h-4 text-[var(--color-imamu-accent)] shrink-0" />
-                  <span className="truncate">لوحة تحكم ({acc.displayName || acc.handle})</span>
-                </button>
-              ))}
-            </div>
-          )}
           
           <button 
             onClick={async () => {
@@ -666,14 +650,14 @@ export function ProfilePage() {
                             const isLevelGroup = groupName.startsWith('المستوى');
                             const reqCount = (declaredReqCount > 0 && !isLevelGroup) ? declaredReqCount : totalInGroup;
                             
-                            const selectedInGroup = groupSubjects.filter(s => profileForm.completedCourses.includes(s.code)).length;
+                            const selectedInGroup = groupSubjects.filter(s => isCourseCompleted(profileForm.completedCourses, s.code)).length;
                             const isGroupFull = selectedInGroup >= reqCount;
 
                             // Calculate if ALL courses in this batch are locked
                             const allCoursesInGroupLocked = groupSubjects.length > 0 && groupSubjects.every(s => {
-                              if (profileForm.completedCourses.includes(s.code)) return false;
-                              const prereqs = extractPrereqCodes(s.description);
-                              return prereqs.length > 0 && prereqs.some(p => !profileForm.completedCourses.includes(p));
+                              if (isCourseCompleted(profileForm.completedCourses, s.code)) return false;
+                              const prereqs = getSubjectPrereqs(s);
+                              return prereqs.length > 0 && prereqs.some(p => !isCourseCompleted(profileForm.completedCourses, p));
                             });
 
                             // Calculate batch completion ratio
@@ -740,9 +724,9 @@ export function ProfilePage() {
                                       <div className="p-4 sm:p-5 pt-0 border-t border-slate-100 dark:border-zinc-800/80 mt-2">
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3">
                                           {groupSubjects.map((s: any) => {
-                                            const isChecked = profileForm.completedCourses.includes(s.code);
-                                            const prereqCodes = extractPrereqCodes(s.description);
-                                            const unmetPrereqs = prereqCodes.filter(p => !profileForm.completedCourses.includes(p));
+                                            const isChecked = isCourseCompleted(profileForm.completedCourses, s.code);
+                                            const prereqCodes = getSubjectPrereqs(s);
+                                            const unmetPrereqs = prereqCodes.filter(p => !isCourseCompleted(profileForm.completedCourses, p));
                                             const isLocked = !isChecked && unmetPrereqs.length > 0;
 
                                             return (

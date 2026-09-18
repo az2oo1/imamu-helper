@@ -1,5 +1,17 @@
-import { integer, bigint, pgTable, serial, text, timestamp, boolean, varchar, unique, index } from 'drizzle-orm/pg-core';
+import { integer, bigint, pgTable, serial, text, timestamp, boolean, varchar, unique, index, uniqueIndex, customType } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
+
+export const stringBigint = customType<{ data: string; driverData: string }>({
+  dataType() {
+    return 'bigint';
+  },
+  fromDriver(value: unknown): string {
+    return String(value ?? '');
+  },
+  toDriver(value: string | number): string {
+    return String(value ?? '');
+  },
+});
 
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
@@ -35,21 +47,34 @@ export const majors = pgTable('majors', {
 
 export const subjects = pgTable('subjects', {
   id: serial('id').primaryKey(),
-  code: text('code').notNull(),
+  code: text('code').notNull().unique(),
   name: text('name').notNull(),
-  driveLink: text('drive_link'),
-  whatsappLink: text('whatsapp_link'),
+  courseNumber: text('course_number'),
+  subjectCode: text('subject_code'),
+  subjectDescription: text('subject_description'),
+  college: text('college'),
+  collegeCode: text('college_code'),
+  department: text('department'),
+  departmentCode: text('department_code'),
   creditHours: integer('credit_hours').default(3),
+  lectureHours: integer('lecture_hours'),
+  labHours: integer('lab_hours'),
   level: integer('level'),
   description: text('description'),
   syllabus: text('syllabus'),
+  driveLink: text('drive_link'),
+  whatsappLink: text('whatsapp_link'),
   freeResourcesUrl: text('free_resources_url'),
   paidResourcesUrl: text('paid_resources_url'),
   avatarUrl: text('avatar_url'),
   bannerUrl: text('banner_url'),
   tags: text('tags'),
   createdAt: timestamp('created_at').defaultNow(),
-});
+}, (table) => ({
+  idxSubjectsCode: index('idx_subjects_code').on(table.code),
+  idxSubjectsCollege: index('idx_subjects_college').on(table.collegeCode),
+  idxSubjectsDept: index('idx_subjects_dept').on(table.departmentCode),
+}));
 
 export const course_resources = pgTable('course_resources', {
   id: serial('id').primaryKey(),
@@ -83,6 +108,11 @@ export const events = pgTable('events', {
   title: text('title').notNull(),
   date: text('date').notNull(), // Date string YYYY-MM-DD or ISO
   description: text('description'),
+  calendarType: text('calendar_type').default('academic'), // 'academic' | 'entity' | 'user'
+  entityId: text('entity_id'),
+  entityName: text('entity_name'),
+  userId: text('user_id'),
+  location: text('location'),
   isHoliday: boolean('is_holiday').default(false),
   isHolidayEnd: boolean('is_holiday_end').default(false),
   isSemesterStart: boolean('is_semester_start').default(false),
@@ -205,7 +235,7 @@ export const tutorial_sections = pgTable('tutorial_sections', {
 
 export const tutorials = pgTable('tutorials', {
   id: serial('id').primaryKey(),
-  sectionId: bigint('section_id', { mode: 'number' }).references(() => tutorial_sections.id, { onDelete: 'cascade' }).notNull(),
+  sectionId: stringBigint('section_id').references(() => tutorial_sections.id, { onDelete: 'cascade' }).notNull(),
   title: text('title').notNull(),
   description: text('description').notNull(),
   text: text('text').notNull(),
@@ -300,14 +330,41 @@ export const app_feedback = pgTable('app_feedback', {
 
 export const course_sections = pgTable('course_sections', {
   id: serial('id').primaryKey(),
-  subjectId: integer('subject_id').references(() => subjects.id, { onDelete: 'cascade' }),
+  crn: text('crn'),
+  sectionNumber: text('section_number'),
   courseCode: text('course_code'),
-  sectionName: text('section_name').notNull(),
-  whatsappLink: text('whatsapp_link').notNull(),
+  courseTitle: text('course_title'),
+  subjectId: integer('subject_id').references(() => subjects.id, { onDelete: 'cascade' }),
+  academicYear: text('academic_year'),
+  semester: text('semester'),
+  term: text('term'),
+  campus: text('campus'),
+  scheduleType: text('schedule_type'),
+  instructionalMethod: text('instructional_method'),
+  creditHours: integer('credit_hours'),
+  isOpen: boolean('is_open').default(true),
+  maxEnrollment: integer('max_enrollment'),
+  currentEnrollment: integer('current_enrollment'),
+  seatsAvailable: integer('seats_available'),
+  finalExam: text('final_exam'),
+  primaryInstructor: text('primary_instructor'),
+  instructors: text('instructors'), // JSON string array of { name, email, isPrimary }
+  schedules: text('schedules'), // JSON string array of meeting schedules
+  scheduleSummary: text('schedule_summary'),
+  // Legacy / community fields
+  sectionName: text('section_name'),
+  whatsappLink: text('whatsapp_link'),
   phone: text('phone'),
-  publishedByUserId: text('published_by_user_id').notNull(),
+  publishedByUserId: text('published_by_user_id'),
   publishedByUserName: text('published_by_user_name'),
   createdAt: timestamp('created_at').defaultNow(),
-});
+}, (table) => ({
+  idxSectionsCrnTerm: uniqueIndex('idx_sections_crn_term_unq').on(table.crn, table.term),
+  idxSectionsCourseCode: index('idx_sections_course_code').on(table.courseCode),
+  idxSectionsSubjectId: index('idx_sections_subject_id').on(table.subjectId),
+  idxSectionsAcademicYear: index('idx_sections_academic_year').on(table.academicYear),
+  idxSectionsSemester: index('idx_sections_semester').on(table.semester),
+  idxSectionsTerm: index('idx_sections_term').on(table.term),
+}));
 
 

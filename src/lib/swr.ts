@@ -42,7 +42,9 @@ function setPersisted<T>(key: string, data: T) {
 }
 
 const defaultFetcher = async (url: string) => {
-  const res = await fetch(url);
+  const token = typeof window !== 'undefined' ? (localStorage.getItem('token') || localStorage.getItem('imamu_token')) : null;
+  const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
+  const res = await fetch(url, { headers });
   if (!res.ok) {
     const err: any = new Error(`Request failed with status ${res.status}`);
     err.status = res.status;

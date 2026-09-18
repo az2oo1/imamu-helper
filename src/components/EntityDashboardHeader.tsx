@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
-  Edit3, Newspaper, Users, Shield, ExternalLink, BadgeCheck, ArrowRight, Layout, LayoutList, ChevronLeft
+  Edit3, Newspaper, Users, Shield, ExternalLink, BadgeCheck, ArrowRight, Layout, LayoutList, ChevronLeft, Calendar
 } from 'lucide-react';
 import { SpotlightCard } from './ui/SpotlightCard';
 
@@ -18,7 +18,7 @@ interface EntityDashboardHeaderProps {
     followersCount?: number;
     articles?: any[];
   };
-  activePage: 'grid' | 'settings' | 'composer' | 'articles' | 'managers';
+  activePage: 'grid' | 'settings' | 'composer' | 'articles' | 'managers' | 'events';
   publishedCount?: number;
 }
 
@@ -60,6 +60,15 @@ export function EntityDashboardHeader({
       gradient: 'from-[#6e4624] via-[var(--color-imamu-brown)] to-[#966b40]'
     },
     {
+      id: 'events',
+      href: `/@/${encodeURIComponent(cleanHandle)}/dashboard/events`,
+      title: 'إدارة الفعاليات والمواعيد',
+      description: 'إضافة ونشر فعاليات الجهة في التقويم',
+      icon: Calendar,
+      badgeCount: undefined,
+      gradient: 'from-[#1e4d3a] via-[#246349] to-[#2e7d58]'
+    },
+    {
       id: 'managers',
       href: `/@/${encodeURIComponent(cleanHandle)}/dashboard/managers`,
       title: 'إدارة المدراء',
@@ -97,7 +106,7 @@ export function EntityDashboardHeader({
             <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10">
               <button
                 onClick={() => router.push('/news')}
-                className="flex items-center gap-2.5 px-5 py-2.5 bg-neutral-900/90 hover:bg-neutral-800 text-white text-xs sm:text-sm font-bold rounded-2xl backdrop-blur-md transition border border-neutral-700/60 shadow-lg cursor-pointer"
+                className="btn-rise flex items-center gap-2.5 px-5 py-2.5 bg-neutral-900/90 hover:bg-neutral-800 text-white hover:text-[var(--color-imamu-accent)] text-xs sm:text-sm font-bold rounded-2xl backdrop-blur-md transition-all duration-200 border border-neutral-700/60 hover:border-neutral-600 shadow-lg cursor-pointer active:scale-95"
               >
                 <ArrowRight className="w-4 h-4 text-[var(--color-imamu-accent)]" />
                 <span>العودة للأخبار</span>
@@ -108,7 +117,7 @@ export function EntityDashboardHeader({
                   href={`/@/${encodeURIComponent(cleanHandle)}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-4 py-2 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-xs font-bold rounded-xl shadow-lg transition cursor-pointer"
+                  className="btn-rise flex items-center gap-1.5 px-4 py-2 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-xs font-bold rounded-xl shadow-lg transition-all duration-200 cursor-pointer active:scale-95"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
                   <span>زيارة الصفحة العامة</span>
@@ -213,37 +222,15 @@ export function EntityDashboardHeader({
           </div>
         </div>
       ) : (
-        /* Sub-page Navigation Header with Back Button */
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-neutral-800 bg-neutral-900/80 rounded-3xl shadow-xl">
+        /* Sub-page Navigation Header: Just the Back Button */
+        <div className="flex items-center">
           <button
             onClick={() => router.push(`/@/${encodeURIComponent(cleanHandle)}/dashboard`)}
-            className="flex items-center justify-center gap-2.5 px-5 py-2.5 bg-neutral-900/90 hover:bg-neutral-800 text-white font-bold text-xs sm:text-sm rounded-2xl transition border border-neutral-700/60 cursor-pointer shadow-lg shrink-0"
+            className="btn-rise inline-flex items-center justify-center gap-2.5 px-5 py-2.5 bg-neutral-900/90 hover:bg-neutral-800 text-white hover:text-[var(--color-imamu-accent)] font-bold text-xs sm:text-sm rounded-2xl transition-all duration-200 border border-neutral-700/60 hover:border-neutral-600 cursor-pointer shadow-lg active:scale-95 shrink-0"
           >
             <ArrowRight className="w-4 h-4 text-[var(--color-imamu-accent)]" />
             <span>العودة لتطبيقات الحساب</span>
           </button>
-
-          {/* Quick tab switcher bar */}
-          <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar py-1">
-            {apps.map((app) => {
-              const IconComp = app.icon;
-              const isActive = activePage === app.id;
-              return (
-                <a
-                  key={app.id}
-                  href={app.href}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap border ${
-                    isActive
-                      ? 'bg-[var(--color-imamu-brown)] text-white border-[var(--color-imamu-brown)] shadow-md'
-                      : 'bg-neutral-900/90 text-neutral-400 border-neutral-800 hover:text-white hover:bg-neutral-800'
-                  }`}
-                >
-                  <IconComp className="w-3.5 h-3.5" />
-                  <span>{app.title}</span>
-                </a>
-              );
-            })}
-          </div>
         </div>
       )}
     </div>

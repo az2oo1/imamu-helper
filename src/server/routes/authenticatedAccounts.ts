@@ -1,8 +1,8 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import { eq, and, desc, inArray, or } from 'drizzle-orm';
-import { news_sources, account_follows, news, users, newsLikes, newsComments, news_bookmarks } from '../../db/schema';
-import { requireAuth, AuthRequest } from '../../middleware/auth';
+import { news_sources, account_follows, news, users, newsLikes, newsComments, news_bookmarks, events } from '../../db/schema';
+import { requireAuth, optionalAuth, AuthRequest } from '../../middleware/auth';
 import { JWT_SECRET } from '../../lib/config';
 import { matchId } from '../../lib/auth-utils';
 import { extractTelegramChannelPosts } from '../services/telegram';
@@ -138,21 +138,23 @@ export function createAuthenticatedAccountsRouter(db: any) {
   });
 
   // GET /authenticated-accounts/:idOrHandle - Single account profile detail & published articles
-  router.get('/authenticated-accounts/:idOrHandle', async (req, res): Promise<any> => {
+  router.get('/authenticated-accounts/:idOrHandle', optionalAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
     try {
       const param = req.params.idOrHandle;
       if (!param) return res.status(400).json({ error: 'Invalid account ID or handle' });
 
-      let currentUserId: string | null = null;
-      let currentUserIsAdmin = false;
-      const authHeader = req.headers.authorization;
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        const token = authHeader.split('Bearer ')[1];
-        try {
-          const decodedToken: any = jwt.verify(token, JWT_SECRET);
-          currentUserId = decodedToken.uid;
-          currentUserIsAdmin = !!(decodedToken.isAdmin || decodedToken.role === 'ADMIN');
-        } catch (e) {}
+      let currentUserId: string | null = req.user?.uid || null;
+      let currentUserIsAdmin = !!(req.user?.isAdmin || req.user?.role === 'ADMIN');
+      if (!currentUserId) {
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+          const token = authHeader.split('Bearer ')[1];
+          try {
+            const decodedToken: any = jwt.verify(token, JWT_SECRET);
+            currentUserId = decodedToken.uid;
+            currentUserIsAdmin = !!(decodedToken.isAdmin || decodedToken.role === 'ADMIN');
+          } catch (e) {}
+        }
       }
 
       const isNumeric = /^\d+$/.test(param);
@@ -479,6 +481,85 @@ export function createAuthenticatedAccountsRouter(db: any) {
     } catch (e: any) {
       console.error('[Sync Telegram Account Error]', e);
       res.status(500).json({ error: e.message || 'Failed to sync Telegram channel' });
+    }
+  });
+
+  // GET /authenticated-accounts/:id/events - List events for an entity
+  router.get('/authenticated-accounts/:id/events', async (req: express.Request, res: express.Response): Promise<any> => {
+    try {
+      const account = await getAccountByParam(req.params.id);
+      if (!account) return res.status(404).json({ error: 'Account not found' });
+
+      const entityEvents = await db
+        .select()
+        .from(events)
+        .where(and(eq(events.calendarType, 'entity'), eq(events.entityId, String(account.id))));
+
+      res.json(entityEvents);
+    } catch (e) {
+      console.error('[Fetch Entity Events Error]', e);
+      res.status(500).json({ error: 'Failed to fetch entity events' });
+    }
+  });
+
+  // POST /authenticated-accounts/:id/events - Add event for an entity
+  router.post('/authenticated-accounts/:id/events', requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
+    try {
+      const account = await getAccountByParam(req.params.id);
+      if (!account) return res.status(404).json({ error: 'Account not found' });
+
+      if (!isManagerOrAdmin(account, req.user)) {
+        return res.status(403).json({ error: 'Forbidden: Not authorized to add events for this account' });
+      }
+
+      const { title, date, description, location } = req.body;
+      if (!title || !date) {
+        return res.status(400).json({ error: 'العنوان والتاريخ مطلوبان' });
+      }
+
+      const [newEvent] = await db.insert(events).values({
+        title: title.trim(),
+        date,
+        description: description ? description.trim() : '',
+        location: location ? location.trim() : '',
+        calendarType: 'entity',
+        entityId: String(account.id),
+        entityName: account.displayName || account.handle,
+        userId: req.user.uid,
+      }).returning();
+
+      res.status(201).json(newEvent);
+    } catch (e: any) {
+      console.error('[Create Entity Event Error]', e);
+      res.status(500).json({ error: e.message || 'Failed to create entity event' });
+    }
+  });
+
+  // DELETE /authenticated-accounts/:id/events/:eventId - Delete event
+  router.delete('/authenticated-accounts/:id/events/:eventId', requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
+    try {
+      const account = await getAccountByParam(req.params.id);
+      if (!account) return res.status(404).json({ error: 'Account not found' });
+
+      if (!isManagerOrAdmin(account, req.user)) {
+        return res.status(403).json({ error: 'Forbidden: Not authorized to manage events for this account' });
+      }
+
+      const eventId = Number(req.params.eventId);
+      const [existing] = await db.select().from(events).where(eq(events.id, eventId));
+      if (!existing) {
+        return res.status(404).json({ error: 'الموعد غير موجود' });
+      }
+
+      if (existing.entityId !== String(account.id) && !req.user.isAdmin) {
+        return res.status(403).json({ error: 'Forbidden: Event does not belong to this entity' });
+      }
+
+      await db.delete(events).where(eq(events.id, eventId));
+      res.json({ success: true });
+    } catch (e: any) {
+      console.error('[Delete Entity Event Error]', e);
+      res.status(500).json({ error: e.message || 'Failed to delete entity event' });
     }
   });
 

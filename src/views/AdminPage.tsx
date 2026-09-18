@@ -7,7 +7,7 @@ import {
   Trash2, Link as LinkIcon, Download, Upload, Plus, X,
   Users, Settings, HelpCircle, ExternalLink, Server, Command,
   CheckCircle2, AlertTriangle, Info, XCircle, RefreshCw, Zap, Loader2,
-  LayoutDashboard, Newspaper, GraduationCap, Link2, Folder, Edit3, Send, Mail, HeartHandshake, MessageSquare
+  LayoutDashboard, Newspaper, GraduationCap, Link2, Folder, Edit3, Send, Mail, HeartHandshake, MessageSquare, Layers
 } from 'lucide-react';
 import { TutorialsTab } from '../components/TutorialsTab';
 import CreateCourseModal from '../components/CreateCourseModal';
@@ -21,10 +21,11 @@ import AdminUsersTab from './admin/AdminUsersTab';
 import AdminContributorsTab from './admin/AdminContributorsTab';
 import AdminFeedbackTab from './admin/AdminFeedbackTab';
 import AdminSettingsTab from './admin/AdminSettingsTab';
+import AdminSectionsTab from './admin/AdminSectionsTab';
 import CommandPalette from './admin/CommandPalette';
 import { parseDate, formatDate } from '../lib/date-utils';
 
-type Tab = 'dashboard' | 'users' | 'contributors' | 'news_sources' | 'majors' | 'events' | 'subjects' | 'resources' | 'tutorials' | 'feedback' | 'settings';
+type Tab = 'dashboard' | 'users' | 'contributors' | 'news_sources' | 'majors' | 'events' | 'subjects' | 'sections' | 'resources' | 'tutorials' | 'feedback' | 'settings';
 
 interface Toast {
   id: string;
@@ -216,35 +217,6 @@ export function AdminPage() {
   // Modals
   const [deleteModal, setDeleteModal] = useState<{ url: string; message: string } | null>(null);
 
-  const [isClearingSections, setIsClearingSections] = useState(false);
-
-  const handleClearAllSections = async () => {
-    if (!confirm('⚠️ هل أنت متأكد من مسح وحذف كافة الشعب وجروبات الواتساب لجميع المواد؟\n\nتنويه: يُستخدم هذا الزر لتصفير الشعب مع بداية كل ترم دراسي جديد. لا يمكن التراجع عن هذه العملية.')) {
-      return;
-    }
-
-    setIsClearingSections(true);
-    try {
-      const headers = await authHeaders();
-      const res = await fetch('/api/admin/sections/clear-all', {
-        method: 'DELETE',
-        headers
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        toast('success', data.message || `تم مسح ${data.count || 0} شعبة بنجاح!`);
-        fetchData();
-      } else {
-        toast('error', data.error || 'فشل مسح الشعب');
-      }
-    } catch (err: any) {
-      console.error(err);
-      toast('error', 'حدث خطأ أثناء الاتصال بالخادم لمسح الشعب');
-    } finally {
-      setIsClearingSections(false);
-    }
-  };
-
   // Sync activeTab with URL search param on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -274,6 +246,7 @@ export function AdminPage() {
     { id: 'majors', label: 'التخصصات الأكاديمية', icon: <GraduationCap className="w-5 h-5" /> },
     { id: 'events', label: 'المواعيد والتقويم', icon: <Calendar className="w-5 h-5" /> },
     { id: 'subjects', label: 'المقررات الأكاديمية', icon: <BookOpen className="w-5 h-5" /> },
+    { id: 'sections', label: 'الشعب والمواعيد', icon: <Layers className="w-5 h-5" /> },
     { id: 'resources', label: 'المصادر والمراجع', icon: <Folder className="w-5 h-5" /> },
     { id: 'tutorials', label: 'إدارة شروحات الدليلة', icon: <HelpCircle className="w-5 h-5" /> },
     { id: 'feedback', label: 'البلاغات والتقييمات', icon: <MessageSquare className="w-5 h-5" /> },
@@ -297,7 +270,7 @@ export function AdminPage() {
     if (!userPerms || userPerms.length === 0 || userPerms.includes('*') || userPerms.includes('all')) return true;
     if (tabId === 'dashboard') return true;
     if (tabId === 'users' || tabId === 'contributors') return userPerms.includes('users') || userPerms.includes('contributors');
-    if (tabId === 'majors' || tabId === 'subjects') return userPerms.includes('courses');
+    if (tabId === 'majors' || tabId === 'subjects' || tabId === 'sections') return userPerms.includes('courses');
     if (tabId === 'resources') return userPerms.includes('resources');
     if (tabId === 'events') return userPerms.includes('dates');
     if (tabId === 'news_sources') return userPerms.includes('news');
@@ -1193,18 +1166,28 @@ export function AdminPage() {
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Manage course metadata, credits, level, syllabus, and basic info</p>
         </div>
 
-        <button
-          onClick={() => {
-            setSubjectForm({ 
-              id: undefined, code: '', name: '', creditHours: '3', level: '', whatsappLink: '', driveLink: '', description: '', syllabus: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', bannerUrl: '', tags: '' 
-            });
-            setIsCourseModalOpen(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] active:scale-95 text-white font-semibold text-xs sm:text-sm rounded-xl transition shadow-sm border border-amber-700/30 shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Create New Course</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setActiveTab('sections')}
+            className="flex items-center gap-2 px-3.5 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 font-semibold text-xs sm:text-sm rounded-xl transition border border-indigo-500/20 shrink-0"
+          >
+            <Layers className="w-4 h-4" />
+            <span>إدارة الشعب والمواعيد</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setSubjectForm({ 
+                id: undefined, code: '', name: '', creditHours: '3', level: '', whatsappLink: '', driveLink: '', description: '', syllabus: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', bannerUrl: '', tags: '' 
+              });
+              setIsCourseModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] active:scale-95 text-white font-semibold text-xs sm:text-sm rounded-xl transition shadow-sm border border-amber-700/30 shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Create New Course</span>
+          </button>
+        </div>
 
       </div>
 
@@ -1309,16 +1292,6 @@ export function AdminPage() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
-          <button
-            onClick={handleClearAllSections}
-            disabled={isClearingSections}
-            className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-semibold text-xs sm:text-sm rounded-xl transition shadow-sm border border-rose-500/30 shrink-0 disabled:opacity-50"
-            title="مسح وتفريغ جميع شعب وجروبات الواتساب المضافة لكافة المواد للبدء بترم جديد"
-          >
-            {isClearingSections ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-            <span>تفريغ الشعب (ترم جديد)</span>
-          </button>
-
           <button
             onClick={() => {
               setResourceForm({ title: '', type: 'course_hub', url: '', description: '', driveLink: '', boxLink: '', whatsappLink: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', bannerUrl: '', sectionsEnabled: true });
@@ -1525,6 +1498,7 @@ export function AdminPage() {
       case 'majors': return renderMajors();
       case 'events': return renderEvents();
       case 'subjects': return renderSubjects();
+      case 'sections': return <AdminSectionsTab getToken={getToken} toast={toast} />;
       case 'resources': return renderResources();
       case 'tutorials': return <TutorialsTab user={user} sections={tutorialSections} tutorials={tutorials} onRefresh={fetchData} />;
       case 'feedback': return <AdminFeedbackTab getToken={getToken} />;

@@ -38,6 +38,7 @@ export interface NewsItem {
   authorHandle?: string;
   authorAvatar?: string;
   isFollowedAuthor?: boolean;
+  entityId?: string;
   formId?: string;
   form?: { id: string; title: string; description?: string };
   createdAt?: string;
@@ -194,6 +195,63 @@ export function NewsArticleModal({
   const cleanHandle = authorHandle.replace(/^@/, '');
   const authorAvatar = article.authorAvatar || (typeof article.author === 'object' ? article.author.avatar : null);
 
+  const [isTogglingFollow, setIsTogglingFollow] = useState(false);
+
+  useEffect(() => {
+    if (article && isOpen && cleanHandle && cleanHandle !== 'admin') {
+      const checkFollow = async () => {
+        try {
+          const token = user ? await user.getIdToken() : (localStorage.getItem('token') || localStorage.getItem('imamu_token') || '');
+          const res = await fetch(`/api/authenticated-accounts/${encodeURIComponent(cleanHandle)}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+          });
+          if (res.ok) {
+            const accData = await res.json();
+            if (typeof accData.isFollowing === 'boolean') {
+              setIsFollowing(accData.isFollowing);
+            }
+          }
+        } catch (e) {}
+      };
+      checkFollow();
+    }
+  }, [article?.id, isOpen, user, cleanHandle]);
+
+  const handleToggleFollow = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    const targetParam = article?.entityId || cleanHandle;
+    if (!targetParam || targetParam === 'admin') return;
+
+    if (isTogglingFollow) return;
+    setIsTogglingFollow(true);
+
+    const prevFollowing = isFollowing;
+    setIsFollowing(!prevFollowing);
+
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/authenticated-accounts/${encodeURIComponent(targetParam)}/follow`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setIsFollowing(data.isFollowing);
+      } else {
+        setIsFollowing(prevFollowing);
+      }
+    } catch (err) {
+      console.error('Failed to toggle follow', err);
+      setIsFollowing(prevFollowing);
+    } finally {
+      setIsTogglingFollow(false);
+    }
+  };
+
   // Parse images
   let displayImages: string[] = [];
   if (article.images) {
@@ -285,14 +343,16 @@ export function NewsArticleModal({
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setIsFollowing(!isFollowing)}
-              className={`px-5 py-2 text-xs font-bold rounded-full transition ${
+              onClick={handleToggleFollow}
+              disabled={isTogglingFollow}
+              className={`btn-rise px-5 py-2 text-xs font-bold rounded-full transition-all duration-200 cursor-pointer active:scale-95 disabled:opacity-75 flex items-center gap-1.5 ${
                 isFollowing
                   ? 'bg-neutral-900 text-white hover:bg-neutral-800 border border-neutral-700'
                   : 'bg-[var(--color-imamu-brown)] text-white hover:bg-[var(--color-imamu-brown-dark)]'
               }`}
             >
-              {isFollowing ? 'مُتابَع' : 'متابعة'}
+              {isFollowing ? <UserCheck className="w-3.5 h-3.5 text-emerald-400" /> : <UserPlus className="w-3.5 h-3.5" />}
+              <span>{isFollowing ? 'مُتابَع' : 'متابعة'}</span>
             </button>
 
             <button
@@ -550,14 +610,16 @@ export function NewsArticleModal({
 
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setIsFollowing(!isFollowing)}
-                  className={`px-5 py-2 text-xs font-bold rounded-full transition ${
+                  onClick={handleToggleFollow}
+                  disabled={isTogglingFollow}
+                  className={`btn-rise px-5 py-2 text-xs font-bold rounded-full transition-all duration-200 cursor-pointer active:scale-95 disabled:opacity-75 flex items-center gap-1.5 ${
                     isFollowing
                       ? 'bg-neutral-900 text-white hover:bg-neutral-800 border border-neutral-700'
                       : 'bg-white text-black hover:bg-neutral-200'
                   }`}
                 >
-                  {isFollowing ? 'Following' : 'Follow'}
+                  {isFollowing ? <UserCheck className="w-3.5 h-3.5 text-emerald-400" /> : <UserPlus className="w-3.5 h-3.5" />}
+                  <span>{isFollowing ? 'Following' : 'Follow'}</span>
                 </button>
 
                 <button

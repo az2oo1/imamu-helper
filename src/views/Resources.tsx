@@ -9,7 +9,7 @@ import { InView, SpotlightCard, CustomSelect } from '../components/ui';
 import { CourseDetailsModal } from '../components/CourseDetailsModal';
 import CreateResourceModal from '../components/CreateResourceModal';
 import ReportDropdownMenu from '../components/ReportDropdownMenu';
-import { cleanCourseName, cleanUrlProtocol, parseResourceUrl, parseAllResourceLinks, isWhatsappUrl } from '../lib/url-utils';
+import { cleanCourseName, cleanUrlProtocol, parseResourceUrl, parseAllResourceLinks, isWhatsappUrl, decodeHtmlEntities } from '../lib/url-utils';
 import { useSWR } from '../lib/swr';
 
 
@@ -18,11 +18,15 @@ function matchSubjectIds(id1: any, id2: any): boolean {
   const s1 = String(id1).trim();
   const s2 = String(id2).trim();
   if (s1 === s2) return true;
-  const n1 = Number(s1);
-  const n2 = Number(s2);
-  if (!isNaN(n1) && !isNaN(n2)) {
-    return n1 === n2;
-  }
+  try {
+    if (/^\d+$/.test(s1) && /^\d+$/.test(s2)) {
+      const b1 = BigInt(s1);
+      const b2 = BigInt(s2);
+      if (b1 === b2) return true;
+      const diff = b1 > b2 ? b1 - b2 : b2 - b1;
+      return diff < 200n;
+    }
+  } catch (_e) {}
   return false;
 }
 
@@ -259,10 +263,16 @@ export function Resources() {
       alert('إضافة وتعديل المصادر متاحة فقط لحسابات المدراء والأدمن');
       return false;
     }
-    if (!resourceForm.subjectId && !resourceForm.title?.trim()) {
-      alert('الرجاء اختيار المادة الأكاديمية أو إدخال عنوان المصدر');
+    const isManual = resourceForm.resourceKind === 'manual' || (!resourceForm.subjectId && Boolean(resourceForm.title?.trim()));
+    if (!isManual && !resourceForm.subjectId) {
+      alert('الرجاء اختيار المادة الأكاديمية المستهدفة للمقرر');
       return false;
     }
+    if (isManual && !resourceForm.title?.trim()) {
+      alert('الرجاء إدخال عنوان المصدر أو القروب المستقل');
+      return false;
+    }
+
     const token = user ? await user.getIdToken() : localStorage.getItem('token');
     const selectedSubj = subjects.find(s => s.id === resourceForm.subjectId);
     const cleanName = selectedSubj ? selectedSubj.name.replace(/\s*\(([^)]+)\)/g, (match: string, p1: string) => {
@@ -270,8 +280,18 @@ export function Resources() {
       const innerText = p1.trim().toLowerCase();
       return (mainText.includes(innerText) || innerText.includes(mainText)) ? '' : match;
     }).trim() : '';
-    const finalTitle = resourceForm.title?.trim() || (selectedSubj ? (cleanName || selectedSubj.name) : 'باقة مصادر جديدة');
-    const payload = { ...resourceForm, title: finalTitle };
+
+    const finalTitle = isManual 
+      ? resourceForm.title?.trim() 
+      : (resourceForm.title?.trim() || (selectedSubj ? (cleanName || selectedSubj.name) : 'باقة مصادر'));
+    const finalSubjectId = isManual ? null : (resourceForm.subjectId || null);
+
+    const payload = { 
+      ...resourceForm, 
+      subjectId: finalSubjectId,
+      resourceKind: isManual ? 'manual' : 'course',
+      title: finalTitle 
+    };
 
     const url = resourceForm.id ? `/api/admin/resources/${resourceForm.id}` : '/api/admin/resources';
     const method = resourceForm.id ? 'PUT' : 'POST';
@@ -294,7 +314,20 @@ export function Resources() {
           if (Array.isArray(data)) setResources(data);
         }
         setIsAddResourceOpen(false);
-        setResourceForm({ title: '', type: 'course_hub', url: '', description: '', boxLink: '', whatsappLink: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', bannerUrl: '', sectionsEnabled: true });
+        setResourceForm({ 
+          resourceKind: 'course',
+          title: '', 
+          type: 'course_hub', 
+          url: '', 
+          description: '', 
+          boxLink: '', 
+          whatsappLink: '', 
+          freeResourcesUrl: '', 
+          paidResourcesUrl: '', 
+          avatarUrl: '', 
+          bannerUrl: '', 
+          sectionsEnabled: true 
+        });
         return true;
       } else {
         const err = await res.json().catch(() => ({}));
@@ -308,13 +341,34 @@ export function Resources() {
     }
   };
 
+  const handleOpenAddResource = (kind: 'course' | 'manual' = 'course') => {
+    setResourceForm({
+      resourceKind: kind,
+      title: '',
+      type: kind === 'course' ? 'course_hub' : 'group',
+      url: '',
+      description: '',
+      boxLink: '',
+      whatsappLink: '',
+      freeResourcesUrl: '',
+      paidResourcesUrl: '',
+      avatarUrl: '',
+      bannerUrl: '',
+      sectionsEnabled: kind === 'course'
+    });
+    setIsAddResourceOpen(true);
+  };
+
   const openEditModal = (r: Resource) => {
     if (!isAdmin) return;
+    const isManual = !r.subjectId;
     setResourceForm({
       id: r.id,
-      subjectId: r.subjectId,
+      resourceKind: isManual ? 'manual' : 'course',
+      subjectId: r.subjectId || undefined,
       title: r.title || '',
-      type: r.type || 'course_hub',
+      type: r.type || (isManual ? 'group' : 'course_hub'),
+      major: r.major || '',
       url: r.boxLink || r.whatsappLink || r.whatsappUrl || '',
       boxLink: r.boxLink || '',
       whatsappLink: r.whatsappLink || r.whatsappUrl || '',
@@ -323,7 +377,7 @@ export function Resources() {
       avatarUrl: r.avatarUrl || '',
       bannerUrl: r.bannerUrl || '',
       description: r.description || '',
-      sectionsEnabled: r.sectionsEnabled !== false
+      sectionsEnabled: isManual ? false : (r.sectionsEnabled !== false)
     });
     setIsAddResourceOpen(true);
   };
@@ -427,11 +481,11 @@ export function Resources() {
         {/* Admin Add Resource Button */}
         {isAdmin && (
           <button
-            onClick={() => setIsAddResourceOpen(true)}
+            onClick={() => handleOpenAddResource('course')}
             className="btn-rise flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-xs font-bold transition shadow-md shadow-[var(--color-imamu-brown)/20] cursor-pointer shrink-0 self-start md:self-auto"
           >
             <Plus className="w-4 h-4" />
-            <span>إضافة مصدر جديد</span>
+            <span>إضافة باقة / مصدر جديد</span>
           </button>
         )}
       </div>
@@ -483,9 +537,9 @@ export function Resources() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredResources.map((item) => {
               const cardSubject = item.subjectId ? subjects.find(s => matchSubjectIds(s.id, item.subjectId)) : null;
-              const isRealCode = (code?: string) => code && /^[A-Z0-9\-\_]{2,10}$/i.test(code.trim()) && !/[\u0600-\u06FF]/.test(code) && code !== 'مصدر أكاديمي' && code !== 'مجموعة طلابية';
-              const isGroupResource = item.type === 'group' || item.type === 'whatsapp' || item.title.includes('قروب') || item.title.includes('مجموعة');
-              const finalCodeBadge = cardSubject?.code || (isRealCode(item.courseCode) ? item.courseCode : null) || (isGroupResource ? 'مجموعة طلابية' : 'مصدر أكاديمي');
+              const isRealCode = (code?: string) => code && /^[A-Z0-9\-\_]{2,10}$/i.test(code.trim()) && !/[\u0600-\u06FF]/.test(code) && code !== 'مصدر أكاديمي' && code !== 'مجموعة طلابية' && code !== 'مصدر مستقل';
+              const isGroupResource = item.type === 'group' || item.type === 'whatsapp' || item.title.includes('قروب') || item.title.includes('مجموعة') || item.title.includes('دفعة');
+              const finalCodeBadge = cardSubject?.code || (isRealCode(item.courseCode) ? item.courseCode : null) || (isGroupResource ? 'مجموعة طلابية' : 'مصدر مستقل');
 
               const isWaUrl = (u?: string) => Boolean(u && (u.includes('whatsapp.com') || u.includes('wa.me')));
               const resolvedWaUrl = isWaUrl(item.whatsappUrl) ? item.whatsappUrl :
@@ -541,16 +595,16 @@ export function Resources() {
                       </div>
 
                       <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1.5 leading-snug group-hover:text-[var(--color-imamu-accent)] transition-colors">
-                        {item.title}
+                        {decodeHtmlEntities(item.title)}
                       </h3>
                       
                       {item.description && item.description.trim() ? (
                         <p className="text-xs text-slate-500 dark:text-zinc-400 line-clamp-2 leading-relaxed">
-                          {item.description}
+                          {decodeHtmlEntities(item.description)}
                         </p>
-                      ) : item.courseName && item.courseName.trim() !== item.title.trim() ? (
+                      ) : (item.subjectId && item.courseName && item.courseName.trim() !== item.title.trim()) ? (
                         <p className="text-xs text-slate-500 dark:text-zinc-400 line-clamp-2 leading-relaxed">
-                          {item.courseName}
+                          {decodeHtmlEntities(item.courseName)}
                         </p>
                       ) : null}
                     </div>
@@ -588,6 +642,7 @@ export function Resources() {
       </InView>
 
       <CourseDetailsModal 
+        key={selectedCourse ? String(selectedCourse.id || selectedCourse.subjectId || selectedCourse.courseCode || 'active') : 'closed'}
         isOpen={!!selectedCourse} 
         onClose={() => setSelectedCourse(null)} 
         courseIdOrCode={

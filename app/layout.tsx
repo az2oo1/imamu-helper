@@ -97,7 +97,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       </head>
-      <body className="antialiased min-h-screen relative font-sans transition-colors duration-300">
+      <body className="antialiased min-h-screen relative font-sans transition-colors duration-300" suppressHydrationWarning>
         <ThemeProvider>
           <AuthProvider>
             <div className="min-h-screen flex flex-col font-sans relative z-0">

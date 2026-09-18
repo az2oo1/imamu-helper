@@ -42,8 +42,10 @@ import { or, eq, sql } from 'drizzle-orm';
  */
 export function matchId(column: any, idRaw: string | number) {
   const strId = String(idRaw ?? '').trim();
+  if (!strId) return sql`1 = 0`;
   const numId = Number(strId);
-  if (!isNaN(numId) && strId !== '') {
+  // Only use eq(column, numId) if within safe integer range to prevent float64 rounding on 64-bit BigInts
+  if (!isNaN(numId) && Number.isSafeInteger(numId)) {
     return or(
       eq(column, numId),
       sql`CAST(${column} AS TEXT) = ${strId}`
@@ -59,17 +61,14 @@ export function matchSubjectIds(id1: any, id2: any): boolean {
   if (s1 === s2) return true;
 
   try {
-    const b1 = BigInt(s1);
-    const b2 = BigInt(s2);
-    if (b1 === b2) return true;
-    const diff = b1 > b2 ? b1 - b2 : b2 - b1;
-    if (diff < 100n) return true;
-  } catch (e) {
-    const n1 = Number(s1);
-    const n2 = Number(s2);
-    if (!isNaN(n1) && !isNaN(n2)) {
-      return n1 === n2;
+    if (/^\d+$/.test(s1) && /^\d+$/.test(s2)) {
+      const b1 = BigInt(s1);
+      const b2 = BigInt(s2);
+      if (b1 === b2) return true;
+      const diff = b1 > b2 ? b1 - b2 : b2 - b1;
+      // Handle JavaScript float precision loss on 64-bit integers (CockroachDB INT8)
+      return diff < 200n;
     }
-  }
+  } catch (_e) {}
   return false;
 }

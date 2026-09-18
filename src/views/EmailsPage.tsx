@@ -145,7 +145,7 @@ export function EmailsPage() {
       {/* Back Button */}
       <button 
         onClick={() => router.push('/how-to')}
-        className="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-zinc-400 hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)] transition font-semibold mb-6 bg-white dark:bg-zinc-900/40 hover:bg-slate-50 dark:hover:bg-zinc-800/40 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-xs self-start"
+        className="btn-rise inline-flex items-center gap-2 text-sm text-slate-600 dark:text-zinc-400 hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)] transition-all duration-200 font-semibold mb-6 bg-white dark:bg-zinc-900/40 hover:bg-slate-50 dark:hover:bg-zinc-800/40 hover:border-slate-300 dark:hover:border-zinc-700 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-xs self-start cursor-pointer active:scale-95"
       >
         <ArrowLeft className="w-4 h-4 rotate-180" /> العودة إلى الدليلة
       </button>

@@ -22,13 +22,15 @@ export default function StandaloneAccountPage() {
     if (handleParam) {
       fetchAccount();
     }
-  }, [handleParam]);
+  }, [handleParam, user]);
 
-  const fetchAccount = async () => {
-    setLoading(true);
+  const fetchAccount = async (isBackground = false) => {
+    if (!isBackground) {
+      setLoading(true);
+    }
     setError('');
     try {
-      const token = localStorage.getItem('token') || localStorage.getItem('imamu_token') || '';
+      const token = user ? await user.getIdToken() : (localStorage.getItem('token') || localStorage.getItem('imamu_token') || '');
       const res = await fetch(`/api/authenticated-accounts/${encodeURIComponent(handleParam)}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
@@ -41,9 +43,13 @@ export default function StandaloneAccountPage() {
         setError(errData.error || 'تعذر العثور على حساب الجهة المطلوب');
       }
     } catch (err: any) {
-      setError(err.message || 'حدث خطأ في الاتصال بالخادم');
+      if (!isBackground) {
+        setError(err.message || 'حدث خطأ في الاتصال بالخادم');
+      }
     } finally {
-      setLoading(false);
+      if (!isBackground) {
+        setLoading(false);
+      }
     }
   };
 
@@ -69,7 +75,7 @@ export default function StandaloneAccountPage() {
           <p className="text-xs text-neutral-400 leading-relaxed">{error || 'تعذر العثور على هذا الحساب أو قد يكون تم حذفه.'}</p>
           <button
             onClick={() => router.push('/news')}
-            className="px-6 py-2.5 bg-neutral-900/90 hover:bg-neutral-800 text-white font-bold text-xs rounded-2xl border border-neutral-700/60 shadow-lg flex items-center justify-center gap-2 mx-auto transition cursor-pointer"
+            className="btn-rise px-6 py-2.5 bg-neutral-900/90 hover:bg-neutral-800 text-white hover:text-[var(--color-imamu-accent)] font-bold text-xs rounded-2xl border border-neutral-700/60 hover:border-neutral-600 shadow-lg flex items-center justify-center gap-2 mx-auto transition-all duration-200 cursor-pointer active:scale-95"
           >
             <ArrowRight className="w-4 h-4 text-[var(--color-imamu-accent)]" />
             <span>العودة للأخبار</span>
@@ -88,7 +94,7 @@ export default function StandaloneAccountPage() {
         currentUser={user}
         dbUser={dbUser}
         isStandalonePage={true}
-        onAccountUpdate={fetchAccount}
+        onAccountUpdate={() => fetchAccount(true)}
       />
     </main>
   );

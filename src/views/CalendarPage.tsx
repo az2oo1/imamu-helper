@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight, LayoutGrid, List, X, Info, ExternalLink, Download, CalendarPlus, Search, Loader2 } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight, LayoutGrid, List, X, Info, ExternalLink, Download, CalendarPlus, Search, Loader2, Trash2, Building2, User, Plus, Sparkles } from 'lucide-react';
 import { 
   format, parseISO, addMonths, subMonths, startOfWeek, endOfWeek, 
   startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, 
@@ -10,11 +10,13 @@ import {
 import { ar } from 'date-fns/locale';
 import { parseDate, formatDate, formatHijriDate, formatHijriMonthDay, getCountdown, getEventCategoryMeta } from '../lib/date-utils';
 import ReportDropdownMenu from '../components/ReportDropdownMenu';
+import CalendarSelector from '../components/CalendarSelector';
 import { useSWR } from '../lib/swr';
 
 
 export function CalendarPage() {
   const [events, setEvents] = useState<any[]>([]);
+  const [localEvents, setLocalEvents] = useState<any[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewState, setViewState] = useState<'month' | 'week'>('month');
   const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
@@ -23,14 +25,166 @@ export function CalendarPage() {
   const [visibleCount, setVisibleCount] = useState(10);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  const { data: eventsData } = useSWR<any[]>('/api/events');
+  const [visibleCalendars, setVisibleCalendars] = useState<Record<'academic' | 'entity' | 'user', boolean>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('imamu_calendar_visibility');
+        if (saved) return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return { academic: true, entity: true, user: true };
+  });
+
+  const handleToggleCalendar = (id: 'academic' | 'entity' | 'user') => {
+    setVisibleCalendars(prev => {
+      const next = { ...prev, [id]: !prev[id] };
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('imamu_calendar_visibility', JSON.stringify(next));
+      }
+      return next;
+    });
+  };
+
+  const handleShowOnlyCalendar = (id: 'academic' | 'entity' | 'user') => {
+    const next = { academic: false, entity: false, user: false, [id]: true };
+    setVisibleCalendars(next);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('imamu_calendar_visibility', JSON.stringify(next));
+    }
+  };
+
+  const loadLocalEvents = () => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('imamu_local_events');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setLocalEvents(parsed);
+
+          const token = localStorage.getItem('token') || localStorage.getItem('imamu_token') || '';
+          if (token && Array.isArray(parsed) && parsed.length > 0) {
+            fetch('/api/user-events/sync', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+              },
+              body: JSON.stringify({ events: parsed })
+            }).then(r => {
+              if (r.ok) {
+                localStorage.removeItem('imamu_local_events');
+                setLocalEvents([]);
+                mutate();
+              }
+            }).catch(() => {});
+          }
+        }
+      } catch (e) {}
+    }
+  };
+
+  // Add Event Popover State (Google Calendar style quick-add)
+  const [isAddPopoverOpen, setIsAddPopoverOpen] = useState(false);
+  const [newEventTitle, setNewEventTitle] = useState('');
+  const [newEventDate, setNewEventDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newEventTime, setNewEventTime] = useState('09:00');
+  const [newEventDesc, setNewEventDesc] = useState('');
+  const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
+  const [addEventError, setAddEventError] = useState('');
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const addButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    if (Array.isArray(eventsData)) {
-      const sorted = [...eventsData].sort((a, b) => (parseDate(a.date)?.getTime() || 0) - (parseDate(b.date)?.getTime() || 0));
-      setEvents(sorted);
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        popoverRef.current && 
+        !popoverRef.current.contains(e.target as Node) &&
+        !addButtonRef.current?.contains(e.target as Node)
+      ) {
+        setIsAddPopoverOpen(false);
+      }
+    };
+    if (isAddPopoverOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
     }
-  }, [eventsData]);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isAddPopoverOpen]);
+
+  useEffect(() => {
+    loadLocalEvents();
+  }, []);
+
+  const { data: eventsData, mutate } = useSWR<any[]>('/api/events');
+
+  useEffect(() => {
+    const combined = [...(Array.isArray(eventsData) ? eventsData : [])];
+    localEvents.forEach(le => {
+      if (!combined.some(e => e.id === le.id)) {
+        combined.push(le);
+      }
+    });
+    const sorted = combined.sort((a, b) => (parseDate(a.date)?.getTime() || 0) - (parseDate(b.date)?.getTime() || 0));
+    setEvents(sorted);
+  }, [eventsData, localEvents]);
+
+  const handleAddPersonalEvent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newEventTitle.trim() || !newEventDate) {
+      setAddEventError('يرجى كتابة عنوان الموعد وتاريخه');
+      return;
+    }
+
+    setIsSubmittingEvent(true);
+    setAddEventError('');
+
+    try {
+      const dateTime = newEventTime ? `${newEventDate}T${newEventTime}:00` : newEventDate;
+      const payload = {
+        title: newEventTitle.trim(),
+        date: dateTime,
+        description: newEventDesc.trim(),
+        calendarType: 'user'
+      };
+
+      const token = localStorage.getItem('token') || localStorage.getItem('imamu_token') || '';
+      if (token) {
+        const res = await fetch('/api/user-events', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || 'فشل حفظ الموعد');
+        }
+      } else {
+        // Fallback to local storage for guests
+        const local = JSON.parse(localStorage.getItem('imamu_local_events') || '[]');
+        local.push({
+          id: `local-${Date.now()}`,
+          ...payload,
+          calendarType: 'user',
+          createdAt: new Date().toISOString()
+        });
+        localStorage.setItem('imamu_local_events', JSON.stringify(local));
+      }
+
+      setNewEventTitle('');
+      setNewEventDesc('');
+      setIsAddPopoverOpen(false);
+      mutate();
+      loadLocalEvents();
+    } catch (err: any) {
+      setAddEventError(err.message || 'حدث خطأ أثناء حفظ الموعد');
+    } finally {
+      setIsSubmittingEvent(false);
+    }
+  };
 
   const nextPeriod = () => {
     setCurrentDate(viewState === 'month' ? addMonths(currentDate, 1) : addWeeks(currentDate, 1));
@@ -121,8 +275,16 @@ export function CalendarPage() {
 
   const isTodayDate = isToday(currentDate);
 
+  const filteredEvents = events.filter(e => {
+    const type = e.calendarType || 'academic';
+    if (type === 'academic') return visibleCalendars.academic;
+    if (type === 'entity') return visibleCalendars.entity;
+    if (type === 'user') return visibleCalendars.user;
+    return true;
+  });
+
   const getEventsForDay = (day: Date) => {
-    return events.filter(e => {
+    return filteredEvents.filter(e => {
       const d = parseDate(e.date);
       return d ? isSameDay(d, day) : false;
     });
@@ -130,13 +292,14 @@ export function CalendarPage() {
 
   const [searchQuery, setSearchQuery] = useState('');
 
-  const upcomingEvents = events
+  const upcomingEvents = filteredEvents
     .map(e => ({ ...e, parsedDate: parseDate(e.date) }))
     .filter(e => {
       if (!e.parsedDate) return false;
       const matchesSearch = !searchQuery.trim() || 
         e.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        (e.description && e.description.toLowerCase().includes(searchQuery.toLowerCase()));
+        (e.description && e.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (e.entityName && e.entityName.toLowerCase().includes(searchQuery.toLowerCase()));
       
       if (searchQuery.trim()) return matchesSearch;
       return isAfter(e.parsedDate, startOfDay(new Date())) || isSameDay(e.parsedDate, new Date());
@@ -161,50 +324,44 @@ export function CalendarPage() {
     }
   };
 
-  const webcalUrl = typeof window !== 'undefined' 
-    ? `webcal://${window.location.host}/api/calendar.ics` 
-    : '';
-
-  const googleCalendarUrl = typeof window !== 'undefined'
-    ? `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(window.location.origin + '/api/calendar.ics')}`
-    : '#';
+  const handleDeletePersonalEvent = async (ev: any) => {
+    if (!window.confirm('هل أنت متأكد من حذف هذا الموعد الشخصي؟')) return;
+    try {
+      if (String(ev.id).startsWith('local-')) {
+        const remaining = localEvents.filter(le => le.id !== ev.id);
+        setLocalEvents(remaining);
+        localStorage.setItem('imamu_local_events', JSON.stringify(remaining));
+      } else {
+        const token = localStorage.getItem('token') || localStorage.getItem('imamu_token') || '';
+        await fetch(`/api/user-events/${ev.id}`, {
+          method: 'DELETE',
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        mutate();
+      }
+      setSelectedEvent(null);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   return (
     <div className="flex flex-col md:flex-row flex-1 w-full bg-white dark:bg-zinc-950 items-stretch h-full max-h-[calc(100vh-65px)] min-h-0 overflow-hidden text-right" dir="rtl">
       
-      {/* Sidebar: Upcoming Events & Sync Options */}
+      {/* Sidebar: Upcoming Events & Calendar Selector */}
       <div className="w-full md:w-80 md:shrink-0 border-b md:border-b-0 md:border-l border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex flex-col self-stretch max-h-[calc(100vh-65px)] min-h-0 overflow-hidden">
-        <div className="p-4 pb-3 border-b border-slate-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/95 backdrop-blur z-10 text-right shrink-0">
-          <span className="text-xs font-semibold tracking-widest text-[var(--color-imamu-accent)] uppercase mb-1 block">
-            المواعيد الرسمية
-          </span>
-          <h1 className="text-xl font-serif font-bold text-slate-900 dark:text-white inline-flex items-center gap-2">
-            <CalendarIcon className="w-5 h-5 text-[var(--color-imamu-accent)]" />
-            التقويم الأكاديمي
-          </h1>
-          <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-1 mb-3 leading-relaxed">
-            تابع المواعيد الأكاديمية والجدول التقويمي لجامعة الإمام.
-          </p>
-          
-          <div className="flex flex-col gap-1.5">
-            <a 
-              href={googleCalendarUrl}
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className="btn-rise text-xs bg-[var(--color-imamu-accent)] text-white dark:text-zinc-950 hover:opacity-95 px-3 py-2 rounded-xl font-bold inline-flex items-center justify-center gap-1.5 transition-all duration-200 shadow-sm cursor-pointer border border-amber-500/30"
-              title="مزامنة التقويم بالكامل مع تقويم Google"
-            >
-              <CalendarPlus className="w-3.5 h-3.5" /> ربط بتقويم قوقل
-            </a>
-            <a 
-              href={webcalUrl}
-              className="btn-rise text-xs bg-slate-100 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700/60 text-slate-800 dark:text-zinc-200 px-3 py-2 rounded-xl font-bold inline-flex items-center justify-center gap-1.5 hover:bg-slate-200 dark:hover:bg-zinc-700 transition-all duration-200 shadow-2xs cursor-pointer"
-              title="الاشتراك التلقائي في التقويم على جميع الهواتف والأجهزة"
-            >
-              <CalendarIcon className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> ربط بتقويم الجوال
-            </a>
-          </div>
-        </div>
+        
+        {/* Google Calendar Style Calendar Selector */}
+        <CalendarSelector
+          visibleCalendars={visibleCalendars}
+          onToggleCalendar={handleToggleCalendar}
+          onShowOnlyCalendar={handleShowOnlyCalendar}
+          onOpenAddEvent={() => setIsAddPopoverOpen(true)}
+          onEventCreated={() => {
+            mutate();
+            loadLocalEvents();
+          }}
+        />
         
         <div className="p-3 flex-1 flex flex-col min-h-0 overflow-hidden">
 
@@ -282,11 +439,19 @@ export function CalendarPage() {
                       <span className="opacity-40 shrink-0">•</span>
                       <span className="shrink-0">{formatHijriMonthDay(ev.date)}</span>
                     </div>
-                    {meta && (
+                    {meta ? (
                       <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold border shrink-0 truncate max-w-[110px] ${meta.badgeClass}`}>
                         {meta.label}
                       </span>
-                    )}
+                    ) : ev.calendarType === 'entity' ? (
+                      <span className="px-2 py-0.5 rounded-md text-[9px] font-bold border shrink-0 truncate max-w-[110px] bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
+                        {ev.entityName || 'فعالية جهة'}
+                      </span>
+                    ) : ev.calendarType === 'user' ? (
+                      <span className="px-2 py-0.5 rounded-md text-[9px] font-bold border shrink-0 truncate max-w-[110px] bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30">
+                        موعد شخصي
+                      </span>
+                    ) : null}
                   </div>
 
                   {/* Smooth Expandable Content Container */}
@@ -379,7 +544,7 @@ export function CalendarPage() {
       <div className="flex-1 flex flex-col self-stretch max-h-[calc(100vh-65px)] max-w-full min-h-0 overflow-hidden bg-white dark:bg-zinc-950">
         
         {/* Calendar Navigation Header & Filter Bar */}
-        <div className="p-3 sm:p-4 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between gap-3 bg-white dark:bg-zinc-900 shrink-0">
+        <div className="p-3 sm:p-4 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between gap-3 bg-white dark:bg-zinc-900 shrink-0 relative">
           <div className="flex items-center gap-3">
             <h2 className="text-lg sm:text-xl font-serif font-extrabold text-slate-900 dark:text-white shrink-0">
               {viewState === 'month' 
@@ -415,27 +580,161 @@ export function CalendarPage() {
             </div>
           </div>
 
-          <div className="flex bg-slate-100 dark:bg-zinc-950 p-1 rounded-2xl border border-slate-200 dark:border-zinc-800 shrink-0">
-            <button 
-              onClick={() => setViewState('month')}
-              className={`btn-rise px-3 py-1 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer ${
-                viewState === 'month' 
-                  ? 'bg-white dark:bg-zinc-800 text-[var(--color-imamu-accent)] shadow-2xs border border-slate-200 dark:border-zinc-700' 
-                  : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
+          <div className="flex items-center gap-2 relative">
+            {/* New Add Event Button (Moved here per user request) */}
+            <button
+              ref={addButtonRef}
+              type="button"
+              onClick={() => setIsAddPopoverOpen(!isAddPopoverOpen)}
+              className={`btn-rise inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer shadow-2xs active:scale-95 border shrink-0 ${
+                isAddPopoverOpen
+                  ? 'bg-[var(--color-imamu-brown)] text-white border-[var(--color-imamu-brown)] shadow-xs'
+                  : 'bg-slate-100 dark:bg-zinc-950 text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-800 hover:text-[var(--color-imamu-accent)] hover:border-[var(--color-imamu-accent)]/50'
               }`}
+              title="إضافة موعد شخصي جديد"
             >
-              <LayoutGrid className="w-3.5 h-3.5" /> شهر
+              <Plus className={`w-3.5 h-3.5 transition-transform duration-200 ${isAddPopoverOpen ? 'rotate-45 text-white' : 'text-[var(--color-imamu-accent)]'}`} />
+              <span>موعد جديد</span>
             </button>
-            <button 
-              onClick={() => setViewState('week')}
-              className={`btn-rise px-3 py-1 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer ${
-                viewState === 'week' 
-                  ? 'bg-white dark:bg-zinc-800 text-[var(--color-imamu-accent)] shadow-2xs border border-slate-200 dark:border-zinc-700' 
-                  : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <List className="w-3.5 h-3.5" /> أسبوع
-            </button>
+
+            {/* View Switcher: شهر | أسبوع */}
+            <div className="flex bg-slate-100 dark:bg-zinc-950 p-1 rounded-2xl border border-slate-200 dark:border-zinc-800 shrink-0">
+              <button 
+                type="button"
+                onClick={() => setViewState('month')}
+                className={`btn-rise px-3 py-1 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer ${
+                  viewState === 'month' 
+                    ? 'bg-white dark:bg-zinc-800 text-[var(--color-imamu-accent)] shadow-2xs border border-slate-200 dark:border-zinc-700' 
+                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" /> شهر
+              </button>
+              <button 
+                type="button"
+                onClick={() => setViewState('week')}
+                className={`btn-rise px-3 py-1 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer ${
+                  viewState === 'week' 
+                    ? 'bg-white dark:bg-zinc-800 text-[var(--color-imamu-accent)] shadow-2xs border border-slate-200 dark:border-zinc-700' 
+                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <List className="w-3.5 h-3.5" /> أسبوع
+              </button>
+            </div>
+
+            {/* Quick Add Event Floating Popover ("look like the white box") */}
+            {isAddPopoverOpen && (
+              <div 
+                ref={popoverRef}
+                className="absolute top-full left-0 mt-2.5 z-50 w-80 sm:w-96 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-5 shadow-2xl text-right animate-in fade-in zoom-in-95 duration-150"
+                dir="rtl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-3 mb-3.5">
+                  <h3 className="font-serif font-extrabold text-sm sm:text-base text-slate-900 dark:text-white inline-flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-[#0284c7]" />
+                    <span>إضافة موعد إلى تقويمي الخاص</span>
+                  </h3>
+                  <button 
+                    type="button"
+                    onClick={() => setIsAddPopoverOpen(false)}
+                    className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+              {addEventError && (
+                <div className="mb-3.5 p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 text-xs">
+                  {addEventError}
+                </div>
+              )}
+
+              <form onSubmit={handleAddPersonalEvent} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1">
+                    عنوان الموعد أو المهمة *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="مثال: تسليم مشروع التخرج، موعد اختبار..."
+                    value={newEventTitle}
+                    onChange={(e) => setNewEventTitle(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:border-[#0284c7] transition"
+                    autoFocus
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1">
+                      التاريخ *
+                    </label>
+                    <input
+                      type="date"
+                      value={newEventDate}
+                      onChange={(e) => setNewEventDate(e.target.value)}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:border-[#0284c7] transition"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1">
+                      الوقت
+                    </label>
+                    <input
+                      type="time"
+                      value={newEventTime}
+                      onChange={(e) => setNewEventTime(e.target.value)}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:border-[#0284c7] transition"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1">
+                    ملاحظات أو وصف إضافي (اختياري)
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="تفاصيل الموعد أو التذكير..."
+                    value={newEventDesc}
+                    onChange={(e) => setNewEventDesc(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:border-[#0284c7] transition resize-none"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 pt-2 border-t border-slate-200 dark:border-zinc-800">
+                  <button
+                    type="submit"
+                    disabled={isSubmittingEvent}
+                    className="btn-rise flex-1 py-2 px-4 rounded-xl text-xs font-bold bg-[#0284c7] hover:bg-[#0369a1] text-white transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50 active:scale-95"
+                  >
+                    {isSubmittingEvent ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>جاري الحفظ...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>حفظ الموعد</span>
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddPopoverOpen(false)}
+                    className="py-2 px-3 rounded-xl text-xs font-bold text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
           </div>
         </div>
 
@@ -497,7 +796,15 @@ export function CalendarPage() {
                     let badgeColor = 'text-amber-700 dark:text-amber-400';
                     let activeHighlightClass = 'bg-[var(--color-imamu-accent)] text-white dark:text-zinc-950 border-r-[var(--color-imamu-brown-dark)] dark:border-r-[var(--color-imamu-accent)] font-bold shadow-sm';
 
-                    if (ev.isHoliday || ev.isHolidayEnd || ev.isNationalDay) {
+                    if (ev.calendarType === 'entity') {
+                      lineAccentClass = 'border-r-emerald-500';
+                      badgeColor = 'text-emerald-700 dark:text-emerald-400';
+                      activeHighlightClass = 'bg-emerald-600 dark:bg-emerald-500 text-white dark:text-zinc-950 border-r-emerald-700 dark:border-r-emerald-400 font-bold shadow-sm';
+                    } else if (ev.calendarType === 'user') {
+                      lineAccentClass = 'border-r-sky-500';
+                      badgeColor = 'text-sky-700 dark:text-sky-400';
+                      activeHighlightClass = 'bg-sky-600 dark:bg-sky-500 text-white dark:text-zinc-950 border-r-sky-700 dark:border-r-sky-400 font-bold shadow-sm';
+                    } else if (ev.isHoliday || ev.isHolidayEnd || ev.isNationalDay) {
                       lineAccentClass = 'border-r-emerald-600/70 dark:border-emerald-500/60';
                       badgeColor = 'text-emerald-700 dark:text-emerald-400';
                       activeHighlightClass = 'bg-emerald-600 dark:bg-emerald-500 text-white dark:text-zinc-950 border-r-emerald-700 dark:border-r-emerald-400 font-bold shadow-sm';
@@ -531,14 +838,28 @@ export function CalendarPage() {
                             <Clock className="w-2.5 h-2.5 inline" />
                             {format(parseISO(ev.date), 'h:mm a', { locale: ar })}
                           </span>
-                          {meta && (
+                          {meta ? (
                             <>
                               <span className="opacity-40">•</span>
                               <span className={`font-semibold truncate ${isHighlighted ? 'text-white dark:text-zinc-950 font-bold' : badgeColor}`}>
                                 {meta.label}
                               </span>
                             </>
-                          )}
+                          ) : ev.calendarType === 'entity' ? (
+                            <>
+                              <span className="opacity-40">•</span>
+                              <span className={`font-semibold truncate ${isHighlighted ? 'text-white dark:text-zinc-950 font-bold' : badgeColor}`}>
+                                {ev.entityName || 'جهة'}
+                              </span>
+                            </>
+                          ) : ev.calendarType === 'user' ? (
+                            <>
+                              <span className="opacity-40">•</span>
+                              <span className={`font-semibold truncate ${isHighlighted ? 'text-white dark:text-zinc-950 font-bold' : badgeColor}`}>
+                                شخصي
+                              </span>
+                            </>
+                          ) : null}
                         </div>
                       </div>
                     );
@@ -575,11 +896,28 @@ export function CalendarPage() {
               </div>
               {(() => {
                 const meta = getEventCategoryMeta(selectedEvent);
-                return meta ? (
-                  <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${meta.badgeClass}`}>
-                    {meta.label}
-                  </span>
-                ) : null;
+                if (meta) {
+                  return (
+                    <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${meta.badgeClass}`}>
+                      {meta.label}
+                    </span>
+                  );
+                }
+                if (selectedEvent.calendarType === 'entity') {
+                  return (
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-bold border bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
+                      🏛️ {selectedEvent.entityName || 'فعالية جهة'}
+                    </span>
+                  );
+                }
+                if (selectedEvent.calendarType === 'user') {
+                  return (
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-bold border bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30">
+                      👤 موعد شخصي
+                    </span>
+                  );
+                }
+                return null;
               })()}
             </div>
 
@@ -595,6 +933,11 @@ export function CalendarPage() {
               <div className="text-xs text-slate-400 dark:text-zinc-500 mr-6">
                 {formatHijriDate(selectedEvent.date)}
               </div>
+              {selectedEvent.location && (
+                <div className="text-xs text-slate-500 dark:text-zinc-400 mr-6 pt-1">
+                  📍 {selectedEvent.location}
+                </div>
+              )}
             </div>
 
             {selectedEvent.description ? (
@@ -610,8 +953,8 @@ export function CalendarPage() {
             <div className="flex gap-2.5 border-t border-slate-200 dark:border-zinc-800 pt-4 mt-2 items-center">
               <a 
                 href={getGoogleCalendarUrl(selectedEvent)}
-                target="_blank"
-                rel="noopener noreferrer"
+                target="_blank" 
+                rel="noopener noreferrer" 
                 className="btn-rise flex-1 text-xs bg-[var(--color-imamu-accent)] text-white dark:text-zinc-950 hover:opacity-95 py-2.5 px-3 rounded-xl font-bold inline-flex items-center justify-center gap-1.5 transition shadow-xs cursor-pointer"
               >
                 <ExternalLink className="w-4 h-4 text-white dark:text-zinc-950" /> ربط بتقويم قوقل
@@ -622,6 +965,16 @@ export function CalendarPage() {
               >
                 <Download className="w-4 h-4 text-slate-400 dark:text-zinc-400" /> ICS
               </button>
+              {selectedEvent.calendarType === 'user' && (
+                <button
+                  type="button"
+                  onClick={() => handleDeletePersonalEvent(selectedEvent)}
+                  className="btn-rise p-2.5 rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition cursor-pointer"
+                  title="حذف هذا الموعد الشخصي"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
               <ReportDropdownMenu
                 targetType="event"
                 targetId={selectedEvent.id}

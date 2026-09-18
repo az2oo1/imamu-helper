@@ -1,6 +1,6 @@
 import express from 'express';
 import { eq, or, sql } from 'drizzle-orm';
-import { subjects, majors, majorCourses, course_resources, events } from '../../../db/schema';
+import { subjects, majors, majorCourses, course_resources, events, users } from '../../../db/schema';
 import { requireAuth, AuthRequest } from '../../../middleware/auth';
 import { matchId } from '../../../lib/auth-utils';
 import { calculateMokafaaDate, formatDate, parseDate } from '../../../lib/date-utils';
@@ -270,21 +270,153 @@ export function createAdminAcademicRouter(db: any) {
     }
   });
 
-  // Calendar .ics export
-  router.get("/calendar.ics", async (req, res) => {
+  // Calendar .ics live subscription & export
+  router.get("/calendar.ics", async (req, res): Promise<any> => {
     try {
+      const type = req.query.type as string; // 'academic' | 'entity' | 'user' | 'all'
+      const userId = (req.query.userId as string || '').trim();
+      const isDownload = req.query.download === 'true' || req.query.download === '1';
+      const includeAcademic = req.query.includeAcademic === 'true' || req.query.includeAcademic === '1';
       const allEvents = await db.select().from(events);
-      let ics = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//IMAMU Helper//Academic Calendar//AR\nCALSCALE:GREGORIAN\nMETHOD:PUBLISH\nX-WR-CALNAME:تقويم جامعة الإمام\n";
-      for (const ev of allEvents) {
+      
+      let filtered: any[] = [];
+      let calName = 'تقويم جامعة الإمام';
+
+      const escapeIcs = (str: string) => {
+        if (!str) return '';
+        return String(str)
+          .replace(/\\/g, '\\\\')
+          .replace(/;/g, '\\;')
+          .replace(/,/g, '\\,')
+          .replace(/\r?\n/g, '\\n');
+      };
+
+      if (type === 'entity') {
+        calName = 'فعاليات الجهات والأندية - جامعة الإمام';
+        filtered = allEvents.filter((ev: any) => ev.calendarType === 'entity');
+      } else if (type === 'user') {
+        if (!userId) {
+          res.setHeader("Content-Type", "text/calendar; charset=utf-8");
+          res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0");
+          res.setHeader("Pragma", "no-cache");
+          res.setHeader("Expires", "0");
+          if (isDownload) {
+            res.setHeader("Content-Disposition", `attachment; filename="user_calendar.ics"`);
+          }
+          return res.send(
+            "BEGIN:VCALENDAR\r\n" +
+            "VERSION:2.0\r\n" +
+            "PRODID:-//IMAMU Helper//Personal Calendar//AR\r\n" +
+            "CALSCALE:GREGORIAN\r\n" +
+            "METHOD:PUBLISH\r\n" +
+            "X-WR-CALNAME:التقويم الشخصي\r\n" +
+            "X-WR-TIMEZONE:Asia/Riyadh\r\n" +
+            "REFRESH-INTERVAL;VALUE=DURATION:PT1H\r\n" +
+            "X-PUBLISHED-TTL:PT1H\r\n" +
+            "END:VCALENDAR\r\n"
+          );
+        }
+
+        // Look up user in DB to match any identifier variant (uid, id, email)
+        const userRecs = await db.select().from(users).where(
+          or(
+            eq(users.uid, userId),
+            matchId(users.id, userId),
+            eq(users.email, userId)
+          )
+        );
+        const u = userRecs[0];
+        const validIds = new Set<string>([userId]);
+        if (u) {
+          if (u.uid) validIds.add(String(u.uid));
+          if (u.id) validIds.add(String(u.id));
+          if (u.email) validIds.add(String(u.email));
+        }
+
+        calName = u?.userName 
+          ? `التقويم الشخصي (${u.userName}) - جامعة الإمام` 
+          : 'التقويم الشخصي - جامعة الإمام';
+
+        const userEvents = allEvents.filter((ev: any) => {
+          return ev.calendarType === 'user' && ev.userId && validIds.has(String(ev.userId));
+        });
+
+        if (includeAcademic) {
+          const academicEvents = allEvents.filter((ev: any) => !ev.calendarType || ev.calendarType === 'academic');
+          filtered = [...academicEvents, ...userEvents];
+        } else {
+          filtered = userEvents;
+        }
+      } else if (type === 'all') {
+        calName = 'تقويم جامعة الإمام الشامل';
+        filtered = allEvents.filter((ev: any) => {
+          if (!ev.calendarType || ev.calendarType === 'academic' || ev.calendarType === 'entity') return true;
+          if (ev.calendarType === 'user') {
+            return userId && (ev.userId === userId);
+          }
+          return true;
+        });
+      } else {
+        calName = 'التقويم الأكاديمي - جامعة الإمام';
+        filtered = allEvents.filter((ev: any) => !ev.calendarType || ev.calendarType === 'academic');
+      }
+
+      let ics = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//IMAMU Helper//Academic Calendar//AR",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        `X-WR-CALNAME:${escapeIcs(calName)}`,
+        "X-WR-TIMEZONE:Asia/Riyadh",
+        "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
+        "X-PUBLISHED-TTL:PT1H",
+      ].join("\r\n") + "\r\n";
+
+      for (const ev of filtered) {
         const d = parseDate(ev.date);
         if (!d) continue;
-        const dtstamp = formatDate(new Date(), 'ics');
-        const dtstart = formatDate(d, 'iso-date').replace(/-/g, '');
-        ics += `BEGIN:VEVENT\nUID:event-${ev.id}@imamu-helper\nDTSTAMP:${dtstamp}\nDTSTART;VALUE=DATE:${dtstart}\nSUMMARY:${ev.title}\nDESCRIPTION:${ev.description || ''}\nEND:VEVENT\n`;
+
+        const dtstamp = ev.createdAt ? formatDate(new Date(ev.createdAt), 'ics') : formatDate(new Date(), 'ics');
+        const hasTime = typeof ev.date === 'string' && (ev.date.includes('T') || ev.date.includes(':'));
+
+        ics += "BEGIN:VEVENT\r\n";
+        ics += `UID:event-${ev.id}@imamu-helper\r\n`;
+        ics += `DTSTAMP:${dtstamp}\r\n`;
+        ics += `LAST-MODIFIED:${dtstamp}\r\n`;
+        ics += "SEQUENCE:0\r\n";
+        ics += "STATUS:CONFIRMED\r\n";
+
+        if (hasTime) {
+          const dtstart = formatDate(d, 'ics');
+          const dtend = formatDate(new Date(d.getTime() + 60 * 60 * 1000), 'ics');
+          ics += `DTSTART:${dtstart}\r\n`;
+          ics += `DTEND:${dtend}\r\n`;
+        } else {
+          const dtstart = formatDate(d, 'iso-date').replace(/-/g, '');
+          ics += `DTSTART;VALUE=DATE:${dtstart}\r\n`;
+        }
+
+        ics += `SUMMARY:${escapeIcs(ev.title)}\r\n`;
+        if (ev.description) {
+          ics += `DESCRIPTION:${escapeIcs(ev.description)}\r\n`;
+        }
+        if (ev.location) {
+          ics += `LOCATION:${escapeIcs(ev.location)}\r\n`;
+        }
+        ics += "END:VEVENT\r\n";
       }
-      ics += "END:VCALENDAR";
+
+      ics += "END:VCALENDAR\r\n";
+
       res.setHeader("Content-Type", "text/calendar; charset=utf-8");
-      res.setHeader("Content-Disposition", 'attachment; filename="imamu_calendar.ics"');
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+
+      if (isDownload) {
+        res.setHeader("Content-Disposition", `attachment; filename="${type || 'imamu'}_calendar.ics"`);
+      }
       res.send(ics);
     } catch (e) {
       res.status(500).send("Error generating ICS");

@@ -21,10 +21,12 @@ import {
   Users,
   Phone,
   Plus,
-  User
+  User,
+  Edit3,
+  Trash2
 } from 'lucide-react';
 
-import { cleanCourseName, cleanUrlProtocol, parseResourceUrl, parseAllResourceLinks, isWhatsappUrl } from '../lib/url-utils';
+import { cleanCourseName, cleanUrlProtocol, parseResourceUrl, parseAllResourceLinks, isWhatsappUrl, decodeHtmlEntities } from '../lib/url-utils';
 import { WhatsappIcon } from './WhatsappIcon';
 import { CourseBannerPattern } from './CourseBannerPattern';
 
@@ -74,27 +76,35 @@ function CourseAvatar({ avatarUrl, bannerUrl, name }: { avatarUrl?: string; what
 function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any; activeTab: string; setActiveTab: (t: any) => void }) {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
-  // Sections State & Handler
+  // Sections State & Link Management
   const [sections, setSections] = useState<any[]>(course.sections || []);
-  const [isAddingSection, setIsAddingSection] = useState(false);
-  const [newSectionName, setNewSectionName] = useState('');
-  const [newWhatsappLink, setNewWhatsappLink] = useState('');
-  const [newPhone, setNewPhone] = useState('');
-  const [isSubmittingSection, setIsSubmittingSection] = useState(false);
+  const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
+  const [editWaLink, setEditWaLink] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [isUpdatingLink, setIsUpdatingLink] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     if (course.sections && Array.isArray(course.sections)) {
       setSections(course.sections);
     } else {
+      setSections([]);
       const targetCode = course.subjectId || course.code || course.id;
       if (targetCode) {
         fetch(`/api/subjects/${encodeURIComponent(String(targetCode))}/sections`)
           .then(res => res.ok ? res.json() : [])
-          .then(data => { if (Array.isArray(data)) setSections(data); })
+          .then(data => { 
+            if (!cancelled && Array.isArray(data)) {
+              setSections(data); 
+            }
+          })
           .catch(() => {});
       }
     }
-  }, [course]);
+    return () => {
+      cancelled = true;
+    };
+  }, [course.id, course.subjectId, course.code, course.sections]);
 
   useEffect(() => {
     if (course?.sectionsEnabled === false && activeTab === 'sections') {
@@ -102,58 +112,75 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
     }
   }, [course?.sectionsEnabled, activeTab, setActiveTab]);
 
-  const handleAddSection = async () => {
-    if (!newSectionName.trim()) {
-      alert('الرجاء إدخال اسم الشعبة');
-      return;
-    }
-    if (!newWhatsappLink.trim()) {
-      alert('الرجاء إدخال رابط الواتساب');
-      return;
-    }
-    setIsSubmittingSection(true);
+  const handleOpenEditSectionLink = (sec: any) => {
+    setEditingSectionId(sec.id);
+    setEditWaLink(sec.whatsappLink || '');
+    setEditPhone(sec.phone || '');
+  };
+
+  const handleSaveSectionLink = async (secId: string) => {
+    setIsUpdatingLink(true);
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/sections', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
+      const res = await fetch(`/api/sections/${secId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sectionName: newSectionName.trim(),
-          whatsappLink: newWhatsappLink.trim(),
-          phone: newPhone.trim() || undefined,
-          subjectId: course.subjectId || course.id,
-          courseCode: course.code
+          whatsappLink: editWaLink.trim() || null,
+          phone: editPhone.trim() || null
         })
       });
       if (res.ok) {
-        const data = await res.json();
-        setSections(prev => [data, ...prev]);
-        setNewSectionName('');
-        setNewWhatsappLink('');
-        setNewPhone('');
-        setIsAddingSection(false);
+        const updated = await res.json();
+        setSections(prev => prev.map(s => s.id === secId ? { ...s, ...updated } : s));
+        setEditingSectionId(null);
+        setEditWaLink('');
+        setEditPhone('');
       } else {
         const err = await res.json().catch(() => ({}));
-        alert(err.error || 'فشل إضافة الشعبة');
+        alert(err.error || 'فشل حفظ رابط الشعبة');
       }
     } catch (e) {
       console.error(e);
-      alert('حدث خطأ أثناء حفظ الشعبة');
+      alert('حدث خطأ أثناء حفظ الرابط');
     } finally {
-      setIsSubmittingSection(false);
+      setIsUpdatingLink(false);
+    }
+  };
+
+  const handleDeleteSectionLink = async (secId: string) => {
+    if (!window.confirm('هل أنت متأكد من حذف رابط الواتساب ورقم التواصل لهذه الشعبة؟')) return;
+    setIsUpdatingLink(true);
+    try {
+      const res = await fetch(`/api/sections/${secId}/links`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setSections(prev => prev.map(s => s.id === secId ? { ...s, whatsappLink: null, phone: null } : s));
+        if (editingSectionId === secId) {
+          setEditingSectionId(null);
+          setEditWaLink('');
+          setEditPhone('');
+        }
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || 'فشل حذف الرابط');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('حدث خطأ أثناء حذف الرابط');
+    } finally {
+      setIsUpdatingLink(false);
     }
   };
 
   const isNonCourseRes = course.isAcademicSubject === false || course.code === 'مجموعة طلابية' || course.code === 'مصدر أكاديمي' || (!course.subjectId && (!course.code || course.code === 'مجموعة طلابية' || course.code === 'مصدر أكاديمي'));
 
   const rawCode = course.code ? course.code.replace(/^مصادر مادة\s*/i, '').replace(/^مادة\s*/i, '').trim() : '';
-  const rawName = (course.name || course.title) ? String(course.name || course.title).replace(/^مصادر مادة\s+مادة\s*/gi, '').replace(/^مصادر مادة\s*/gi, '').trim() : '';
+  const decodedCourseTitle = decodeHtmlEntities(course.name || course.title);
+  const rawName = decodedCourseTitle ? decodedCourseTitle.replace(/^مصادر مادة\s+مادة\s*/gi, '').replace(/^مصادر مادة\s*/gi, '').trim() : '';
   
   const displayCode = isNonCourseRes ? rawCode : rawCode.replace(/\s*\([^)]*\)/g, '').trim();
-  const displayName = isNonCourseRes ? (rawName || course.name || course.title) : (rawName.replace(/\s*\([^)]*\)/g, '').trim() || course.name || course.title);
+  const displayName = isNonCourseRes ? (rawName || decodedCourseTitle) : (rawName.replace(/\s*\([^)]*\)/g, '').trim() || decodedCourseTitle);
 
   const isAcademicSubject = !isNonCourseRes && course.isAcademicSubject !== false && Boolean(
     course.subjectId || 
@@ -323,27 +350,7 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
             )}
           </button>
 
-          {course?.sectionsEnabled !== false && (
-            <button
-              type="button"
-              onClick={() => setActiveTab('sections')}
-              className={`relative pb-3 px-4 font-bold transition-colors duration-200 text-xs sm:text-sm flex items-center gap-2 select-none cursor-pointer ${
-                activeTab === 'sections'
-                  ? 'text-[var(--color-imamu-accent)]'
-                  : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
-              }`}
-            >
-              <Users className={`w-4 h-4 transition-colors ${activeTab === 'sections' ? 'text-[var(--color-imamu-accent)]' : 'text-slate-400 dark:text-zinc-500'}`} />
-              <span>الشعب ({sections.length})</span>
-              {activeTab === 'sections' && (
-                <motion.div
-                  layoutId="modalActiveTabUnderline"
-                  className="absolute bottom-0 right-0 left-0 h-0.5 bg-[var(--color-imamu-accent)] rounded-full shadow-xs shadow-[var(--color-imamu-accent)/20]"
-                  transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-                />
-              )}
-            </button>
-          )}
+
 
           <button
             type="button"
@@ -424,9 +431,11 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
               <h3 className="text-xs font-bold text-slate-400 dark:text-zinc-400 uppercase tracking-wider">الوصف</h3>
               <p className="text-xs sm:text-sm text-slate-700 dark:text-zinc-300 leading-relaxed whitespace-pre-line">
                 {(() => {
-                  const desc = course.description?.trim();
+                  const rawDesc = course.description?.trim();
+                  const desc = rawDesc ? decodeHtmlEntities(rawDesc) : '';
                   const isPrereqDesc = desc && (desc.startsWith('المتطلبات السابقة:') || desc.startsWith('المتطلب السابق:'));
-                  const resDesc = (course.resources || []).find((r: any) => r.description && r.description.trim() && !r.description.trim().startsWith('المتطلبات السابقة:'))?.description;
+                  const rawResDesc = (course.resources || []).find((r: any) => r.description && r.description.trim() && !r.description.trim().startsWith('المتطلبات السابقة:'))?.description;
+                  const resDesc = rawResDesc ? decodeHtmlEntities(rawResDesc) : '';
                   
                   if (desc && !isPrereqDesc) {
                     return desc;
@@ -461,135 +470,6 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
                 </div>
               )}
             </div>
-          </motion.div>
-        )}
-
-        {activeTab === 'sections' && (
-          <motion.div
-            key="sections"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            className="space-y-5"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-xs font-bold text-slate-400 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Users className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
-                <span>الشعب الدراسية والجروبات ({sections.length})</span>
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsAddingSection(prev => !prev)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-light)] text-white text-xs font-bold transition-all duration-200 hover:scale-[1.03] active:scale-95 cursor-pointer shadow-sm"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>{isAddingSection ? 'إلغاء' : 'إضافة شعبة جديدة'}</span>
-              </button>
-            </div>
-
-            {isAddingSection && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200 dark:border-zinc-700/80 space-y-3"
-              >
-                <h4 className="text-xs font-bold text-slate-900 dark:text-white">إضافة شعبة جديدة لهذه المادة</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 dark:text-zinc-400 mb-1">اسم الشعبة *</label>
-                    <input
-                      type="text"
-                      placeholder="مثال: شعبة 101 أو شعبة 352..."
-                      value={newSectionName}
-                      onChange={e => setNewSectionName(e.target.value)}
-                      className="w-full py-2 px-3 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:ring-2 focus:ring-[var(--color-imamu-accent)]/40 focus:border-[var(--color-imamu-accent)]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 dark:text-zinc-400 mb-1">رابط مجموعة الواتساب *</label>
-                    <input
-                      type="text"
-                      placeholder="https://chat.whatsapp.com/..."
-                      value={newWhatsappLink}
-                      onChange={e => setNewWhatsappLink(e.target.value)}
-                      className="w-full py-2 px-3 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-mono font-bold text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:ring-2 focus:ring-emerald-500"
-                      dir="ltr"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 dark:text-zinc-400 mb-1">رقم الهاتف (اختياري)</label>
-                  <input
-                    type="text"
-                    placeholder="050xxxxxxx"
-                    value={newPhone}
-                    onChange={e => setNewPhone(e.target.value)}
-                    className="w-full py-2 px-3 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-mono font-bold text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:ring-2 focus:ring-[var(--color-imamu-accent)]/40 focus:border-[var(--color-imamu-accent)]"
-                    dir="ltr"
-                  />
-                </div>
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    disabled={isSubmittingSection}
-                    onClick={handleAddSection}
-                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition duration-200 cursor-pointer flex items-center gap-1.5 shadow-sm"
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                    <span>{isSubmittingSection ? 'جاري الحفظ...' : 'حفظ الشعبة'}</span>
-                  </button>
-                </div>
-              </motion.div>
-            )}
-
-            {sections.length === 0 ? (
-              <p className="text-xs text-slate-400 dark:text-zinc-500 italic bg-slate-50 dark:bg-zinc-800/40 p-4 rounded-2xl border border-slate-100 dark:border-zinc-800">
-                لا توجد شعب مسجلة حالياً لهذه المادة. اضغط على "إضافة شعبة جديدة" لإضافة أول شعبة!
-              </p>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {sections.map((sec, idx) => (
-                  <div
-                    key={sec.id || idx}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/50 border border-slate-200/80 dark:border-zinc-800 gap-3"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="px-2.5 py-0.5 bg-[var(--color-imamu-brown)] text-white text-xs font-bold rounded-lg">
-                          {sec.sectionName}
-                        </span>
-                        {sec.publishedByUserId && (
-                          <span className="text-[11px] text-slate-500 dark:text-zinc-400 flex items-center gap-1 font-mono">
-                            <User className="w-3 h-3 text-slate-400" />
-                            <span>معرّف الناشر (User ID): <strong className="text-slate-800 dark:text-zinc-200">{sec.publishedByUserId}</strong></span>
-                          </span>
-                        )}
-                      </div>
-                      {sec.phone && (
-                        <p className="text-xs text-slate-600 dark:text-zinc-400 flex items-center gap-1">
-                          <Phone className="w-3 h-3 text-slate-400" />
-                          <span>التواصل / الهاتف: <span className="font-mono font-bold" dir="ltr">{sec.phone}</span></span>
-                        </p>
-                      )}
-                    </div>
-
-                    {sec.whatsappLink && (
-                      <a
-                        href={parseResourceUrl(sec.whatsappLink).url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all duration-200 hover:scale-[1.03] active:scale-95 cursor-pointer shrink-0"
-                      >
-                        <WhatsappIcon className="w-3.5 h-3.5 fill-current" />
-                        <span>انضمام للشعبة عبر الواتساب</span>
-                      </a>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
           </motion.div>
         )}
 
@@ -793,7 +673,7 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
 export function CourseDetailsModal({ isOpen, onClose, courseIdOrCode, initialData }: CourseDetailsModalProps) {
   const [course, setCourse] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'sections' | 'explanations' | 'files' | 'syllabus'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'explanations' | 'files' | 'syllabus'>('overview');
   const [contentHeight, setContentHeight] = useState<number | 'auto'>('auto');
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -828,76 +708,82 @@ export function CourseDetailsModal({ isOpen, onClose, courseIdOrCode, initialDat
     }
 
     // Populate initial course data immediately if provided (0ms instant render)
-    if (initialData) {
-      const isNonCourse = !initialData.subjectId || initialData.isAcademicSubject === false || initialData.courseCode === 'مجموعة طلابية' || initialData.courseCode === 'مصدر أكاديمي';
-      const initObj = {
-        id: initialData.subjectId || initialData.id,
-        subjectId: initialData.subjectId || null,
-        code: initialData.courseCode || initialData.code || String(courseIdOrCode),
-        name: initialData.title || initialData.name || initialData.courseName,
-        title: initialData.title || initialData.name,
-        isAcademicSubject: !isNonCourse,
-        avatarUrl: initialData.avatarUrl,
-        bannerUrl: initialData.bannerUrl,
-        whatsappLink: initialData.whatsappLink || initialData.whatsappUrl,
-        boxLink: initialData.boxLink || initialData.driveLink,
-        freeResourcesUrl: initialData.freeResourcesUrl,
-        paidResourcesUrl: initialData.paidResourcesUrl,
-        description: initialData.description,
-        creditHours: initialData.creditHours,
-        level: initialData.level,
-        resources: initialData.resources || [],
-        sectionsEnabled: initialData.sectionsEnabled !== false
-      };
+    const isNonCourseInitial = initialData ? (!initialData.subjectId || initialData.isAcademicSubject === false || initialData.courseCode === 'مجموعة طلابية' || initialData.courseCode === 'مصدر أكاديمي') : false;
+    const initObj = initialData ? {
+      id: initialData.subjectId || initialData.id,
+      subjectId: initialData.subjectId || null,
+      code: initialData.courseCode || initialData.code || String(courseIdOrCode),
+      name: initialData.title || initialData.name || initialData.courseName,
+      title: initialData.title || initialData.name,
+      isAcademicSubject: !isNonCourseInitial,
+      avatarUrl: initialData.avatarUrl || null,
+      bannerUrl: initialData.bannerUrl || null,
+      whatsappLink: initialData.whatsappLink || initialData.whatsappUrl || null,
+      boxLink: initialData.boxLink || initialData.driveLink || null,
+      freeResourcesUrl: initialData.freeResourcesUrl || null,
+      paidResourcesUrl: initialData.paidResourcesUrl || null,
+      description: initialData.description || null,
+      creditHours: initialData.creditHours || null,
+      level: initialData.level || null,
+      resources: initialData.resources || [],
+      sectionsEnabled: initialData.sectionsEnabled !== false
+    } : null;
+
+    if (initObj) {
       setCourse(initObj);
       setLoading(false);
     } else {
+      setCourse(null);
       setLoading(true);
     }
 
     // Silent background fetch to enrich with prerequisites & extra details
+    const abortController = new AbortController();
     const token = localStorage.getItem('token');
     const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
     const targetCode = typeof courseIdOrCode === 'object' ? (courseIdOrCode as any).courseCode || (courseIdOrCode as any).code || (courseIdOrCode as any).id : courseIdOrCode;
 
-    fetch(`/api/subjects/${encodeURIComponent(String(targetCode))}/details`, { headers })
+    fetch(`/api/subjects/${encodeURIComponent(String(targetCode))}/details`, { headers, signal: abortController.signal })
       .then(res => res.ok ? res.json() : null)
       .then(data => {
+        if (abortController.signal.aborted) return;
         if (data?.course) {
-          setCourse((prev: any) => {
-            const isNonCourse = (prev && (!prev.subjectId || prev.isAcademicSubject === false || prev.code === 'مجموعة طلابية' || prev.code === 'مصدر أكاديمي')) || data.course.isAcademicSubject === false;
-            
-            const prevDesc = prev?.description?.trim();
-            const apiDesc = data.course.description?.trim();
-            const prevDescValid = prevDesc && !prevDesc.startsWith('المتطلبات السابقة:') && !prevDesc.startsWith('المتطلب السابق:');
-            const apiDescValid = apiDesc && !apiDesc.startsWith('المتطلبات السابقة:') && !apiDesc.startsWith('المتطلب السابق:');
+          const isNonCourse = isNonCourseInitial || data.course.isAcademicSubject === false;
+          
+          const initDesc = initObj?.description?.trim();
+          const apiDesc = data.course.description?.trim();
+          const initDescValid = initDesc && !initDesc.startsWith('المتطلبات السابقة:') && !initDesc.startsWith('المتطلب السابق:');
+          const apiDescValid = apiDesc && !apiDesc.startsWith('المتطلبات السابقة:') && !apiDesc.startsWith('المتطلب السابق:');
 
-            const chosenDescription = prevDescValid
-              ? prevDesc
-              : (apiDescValid ? apiDesc : (prevDesc || apiDesc || null));
+          const chosenDescription = initDescValid
+            ? initDesc
+            : (apiDescValid ? apiDesc : (initDesc || apiDesc || null));
 
-            return {
-              ...data.course,
-              ...(prev || {}),
-              sectionsEnabled: data.course.sectionsEnabled !== false && (prev?.sectionsEnabled !== false),
-              name: (isNonCourse && (prev?.name || prev?.title)) ? (prev.name || prev.title) : (data.course.name || prev?.name || prev?.title),
-              description: chosenDescription,
-              code: (isNonCourse && prev?.code) ? prev.code : (data.course.code || prev?.code),
-              freeResourcesUrl: data.course.freeResourcesUrl || prev?.freeResourcesUrl,
-              paidResourcesUrl: data.course.paidResourcesUrl || prev?.paidResourcesUrl,
-              boxLink: data.course.boxLink || prev?.boxLink,
-              whatsappLink: data.course.whatsappLink || prev?.whatsappLink,
-              avatarUrl: data.course.avatarUrl || prev?.avatarUrl,
-              bannerUrl: data.course.bannerUrl || prev?.bannerUrl
-            };
+          setCourse({
+            ...data.course,
+            sectionsEnabled: data.course.sectionsEnabled !== false && (initObj ? initObj.sectionsEnabled !== false : true),
+            name: (isNonCourse && (initObj?.name || initObj?.title)) ? (initObj.name || initObj.title) : (data.course.name || initObj?.name || initObj?.title),
+            description: chosenDescription,
+            code: (isNonCourse && initObj?.code) ? initObj.code : (data.course.code || initObj?.code),
+            freeResourcesUrl: data.course.freeResourcesUrl || initObj?.freeResourcesUrl || null,
+            paidResourcesUrl: data.course.paidResourcesUrl || initObj?.paidResourcesUrl || null,
+            boxLink: data.course.boxLink || initObj?.boxLink || null,
+            whatsappLink: data.course.whatsappLink || initObj?.whatsappLink || null,
+            avatarUrl: data.course.avatarUrl || initObj?.avatarUrl || null,
+            bannerUrl: data.course.bannerUrl || initObj?.bannerUrl || null
           });
         }
         setLoading(false);
       })
       .catch(err => {
+        if (abortController.signal.aborted) return;
         console.error('Failed to load course details:', err);
         setLoading(false);
       });
+
+    return () => {
+      abortController.abort();
+    };
   }, [isOpen, courseIdOrCode, initialData]);
 
   if (!isOpen) return null;
@@ -924,7 +810,7 @@ export function CourseDetailsModal({ isOpen, onClose, courseIdOrCode, initialDat
             ease: [0.4, 0, 0.2, 1],
             layout: { duration: 0.28, ease: [0.4, 0, 0.2, 1] } 
           }}
-          className="relative bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh] z-10"
+          className="relative bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh] z-10"
         >
           {/* Close Button */}
           <button
@@ -940,7 +826,7 @@ export function CourseDetailsModal({ isOpen, onClose, courseIdOrCode, initialDat
             <div className="absolute inset-0 overflow-hidden">
               <CourseBannerPattern courseCode={course?.code} courseName={course?.name} />
               {course?.bannerUrl && (
-                <img src={course.bannerUrl} alt="Banner" className="w-full h-full object-cover opacity-20 mix-blend-overlay" />
+                <img key={course.bannerUrl} src={course.bannerUrl} alt="Banner" className="w-full h-full object-cover opacity-20 mix-blend-overlay" />
               )}
             </div>
             
@@ -951,6 +837,7 @@ export function CourseDetailsModal({ isOpen, onClose, courseIdOrCode, initialDat
                   <div className="w-full h-full bg-slate-200 dark:bg-zinc-800 animate-pulse" />
                 ) : (
                   <CourseAvatar 
+                    key={String(course?.avatarUrl || course?.bannerUrl || course?.code || course?.id || 'avatar')}
                     avatarUrl={course?.avatarUrl} 
                     whatsappUrl={course?.whatsappLink || course?.whatsappUrl || course?.resources?.find((r: any) => r.whatsappUrl || r.whatsappLink || (r.url && r.url.includes('whatsapp')))?.whatsappUrl || course?.resources?.find((r: any) => r.whatsappUrl || r.whatsappLink || (r.url && r.url.includes('whatsapp')))?.whatsappLink} 
                     bannerUrl={course?.bannerUrl}
@@ -1003,7 +890,12 @@ export function CourseDetailsModal({ isOpen, onClose, courseIdOrCode, initialDat
                   </button>
                 </div>
               ) : (
-                <CourseContentDetails course={course} activeTab={activeTab} setActiveTab={setActiveTab} />
+                <CourseContentDetails 
+                  key={String(course.id || course.code || course.subjectId || 'details')} 
+                  course={course} 
+                  activeTab={activeTab} 
+                  setActiveTab={setActiveTab} 
+                />
               )}
             </div>
           </motion.div>

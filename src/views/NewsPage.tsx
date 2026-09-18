@@ -67,6 +67,7 @@ export function NewsPage() {
   const { user, dbUser } = useAuth();
   const [news, setNews] = useState<NewsItem[]>([]);
   const [accounts, setAccounts] = useState<AccountItem[]>([]);
+  const [followingAccIds, setFollowingAccIds] = useState<Set<number>>(new Set());
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
@@ -117,6 +118,12 @@ export function NewsPage() {
       setAccounts(accountsData);
     }
   }, [accountsData]);
+
+  useEffect(() => {
+    if (user) {
+      refreshAccounts();
+    }
+  }, [user, refreshAccounts]);
 
   const fetchNews = async () => {
     refreshNews();
@@ -207,6 +214,29 @@ export function NewsPage() {
       router.push('/login');
       return;
     }
+    if (followingAccIds.has(accId)) return;
+    setFollowingAccIds(prev => new Set(prev).add(accId));
+
+    const targetAcc = accounts.find(a => a.id === accId);
+    if (!targetAcc) {
+      setFollowingAccIds(prev => {
+        const next = new Set(prev);
+        next.delete(accId);
+        return next;
+      });
+      return;
+    }
+
+    const prevFollowing = !!targetAcc.isFollowing;
+    const prevCount = targetAcc.followersCount || 0;
+    const nextFollowing = !prevFollowing;
+    const nextCount = nextFollowing ? prevCount + 1 : Math.max(0, prevCount - 1);
+
+    // Immediate optimistic update
+    setAccounts(prev => prev.map(a => 
+      a.id === accId ? { ...a, isFollowing: nextFollowing, followersCount: nextCount } : a
+    ));
+
     try {
       const token = await user.getIdToken();
       const res = await fetch(`/api/authenticated-accounts/${accId}/follow`, {
@@ -225,9 +255,25 @@ export function NewsPage() {
           }
           return a;
         }));
+        // Re-sync SWR
+        refreshAccounts();
+      } else {
+        // Rollback on server error
+        setAccounts(prev => prev.map(a => 
+          a.id === accId ? { ...a, isFollowing: prevFollowing, followersCount: prevCount } : a
+        ));
       }
     } catch (e) {
       console.error('Failed to follow account', e);
+      setAccounts(prev => prev.map(a => 
+        a.id === accId ? { ...a, isFollowing: prevFollowing, followersCount: prevCount } : a
+      ));
+    } finally {
+      setFollowingAccIds(prev => {
+        const next = new Set(prev);
+        next.delete(accId);
+        return next;
+      });
     }
   };
 
@@ -474,15 +520,16 @@ export function NewsPage() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={(e) => handleFollowAccount(acc.id, e)}
-                        className={`px-3 py-1 rounded-full text-xs font-bold transition flex items-center gap-1 ${
+                        disabled={followingAccIds.has(acc.id)}
+                        className={`btn-rise px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-200 flex items-center gap-1 cursor-pointer active:scale-95 disabled:opacity-75 ${
                           acc.isFollowing
-                            ? 'bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300 border border-slate-300 dark:border-zinc-600'
-                            : 'bg-[var(--color-imamu-brown)] text-white hover:opacity-90 shadow-2xs'
+                            ? 'bg-slate-200 dark:bg-zinc-700 hover:bg-slate-300 dark:hover:bg-zinc-600 text-slate-700 dark:text-zinc-300 border border-slate-300 dark:border-zinc-600'
+                            : 'bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white shadow-2xs'
                         }`}
                       >
                         {acc.isFollowing ? (
                           <>
-                            <UserCheck className="w-3.5 h-3.5" />
+                            <UserCheck className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
                             <span>مُتابع</span>
                           </>
                         ) : (
@@ -511,11 +558,11 @@ export function NewsPage() {
             {/* Featured Hero Card (Only when not searching or on main view) */}
             {!isSearching && featuredItem && (
               <InView preset="fade-up" delay={0.1} className="w-full">
-                <div className="bg-white dark:bg-zinc-900 border border-slate-200/90 dark:border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-2xs relative overflow-hidden">
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                <div className="bg-white dark:bg-zinc-900 border border-slate-200/90 dark:border-zinc-800 rounded-3xl p-5 sm:p-6 shadow-2xs relative overflow-hidden">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-7 items-center">
                     
-                    <div className={`${(featuredItem.videoUrl || (featuredItem.imageUrl && isFeaturedImageValid)) ? 'lg:col-span-7' : 'lg:col-span-12'} flex flex-col items-start text-right order-2 lg:order-1`}>
-                      <div className="flex items-center justify-between gap-2 mb-3 w-full">
+                    <div className={`${(featuredItem.videoUrl || (featuredItem.imageUrl && isFeaturedImageValid)) ? 'lg:col-span-7' : 'lg:col-span-12'} flex flex-col items-start justify-center text-right order-2 lg:order-1 self-center`}>
+                      <div className="flex items-center gap-2 mb-3 flex-wrap">
                         <span className="px-3 py-1 rounded-full bg-stone-50 dark:bg-stone-950/50 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] text-xs font-bold border border-slate-200/80 dark:border-zinc-700/80">
                           أبرز التحديثات
                         </span>
@@ -527,7 +574,7 @@ export function NewsPage() {
                       {featuredItem.title && featuredItem.title !== featuredItem.author && (
                         <h2 
                           onClick={() => handleOpenNewsModal(featuredItem)}
-                          className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-3 leading-snug cursor-pointer hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)] transition-colors"
+                          className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mb-2.5 leading-snug cursor-pointer hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)] transition-colors"
                         >
                           {featuredItem.title}
                         </h2>
@@ -535,7 +582,7 @@ export function NewsPage() {
 
                       <div 
                         onClick={() => handleOpenNewsModal(featuredItem)}
-                        className="mb-6 cursor-pointer w-full"
+                        className="mb-4 cursor-pointer w-full"
                       >
                         <FormattedNewsContent 
                           content={featuredItem.content} 
@@ -544,7 +591,7 @@ export function NewsPage() {
                         />
                       </div>
 
-                      <div className="flex items-center justify-between w-full border-t border-slate-100 dark:border-zinc-800 pt-4 mt-auto">
+                      <div className="flex items-center justify-between w-full border-t border-slate-100 dark:border-zinc-800 pt-3.5 mt-2">
                         <div 
                           onClick={(e) => handleAuthorClick(featuredItem.authorHandle || featuredItem.source || '@IMAMU', e)}
                           className="flex items-center gap-3 cursor-pointer group/author"
@@ -598,7 +645,7 @@ export function NewsPage() {
                         {featuredItem.videoUrl ? (
                           <div 
                             onClick={() => setSelectedNews(featuredItem)}
-                            className="w-full aspect-video lg:aspect-square rounded-2xl overflow-hidden bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 relative group cursor-pointer"
+                            className="w-full aspect-video rounded-2xl overflow-hidden bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 relative group cursor-pointer shadow-xs"
                           >
                             <iframe 
                               src={featuredItem.videoUrl} 
@@ -616,7 +663,7 @@ export function NewsPage() {
                               e.stopPropagation();
                               setViewerImageUrl(featuredItem.imageUrl || null);
                             }}
-                            className="w-full aspect-video lg:aspect-square rounded-2xl overflow-hidden bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 relative group cursor-pointer"
+                            className="w-full aspect-video sm:aspect-[16/10] lg:aspect-[4/3] max-h-64 sm:max-h-72 rounded-2xl overflow-hidden bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 relative group cursor-pointer shadow-xs"
                           />
                         )}
                       </div>
@@ -964,10 +1011,11 @@ export function NewsPage() {
 
                       <button
                         onClick={(e) => handleFollowAccount(acc.id, e)}
-                        className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition shrink-0 ${
+                        disabled={followingAccIds.has(acc.id)}
+                        className={`btn-rise px-3 py-1 rounded-full text-[11px] font-bold transition-all duration-200 shrink-0 cursor-pointer active:scale-95 disabled:opacity-75 ${
                           acc.isFollowing
-                            ? 'bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-300 dark:border-zinc-700'
-                            : 'bg-[var(--color-imamu-brown)] text-white hover:opacity-90 shadow-2xs'
+                            ? 'bg-slate-200 dark:bg-zinc-800 hover:bg-slate-300 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 border border-slate-300 dark:border-zinc-700'
+                            : 'bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white shadow-2xs'
                         }`}
                       >
                         {acc.isFollowing ? 'مُتابع' : 'متابعة'}
