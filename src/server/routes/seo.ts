@@ -34,8 +34,7 @@ export function createSeoRouter(db: any) {
         { url: '/how-to', priority: '0.8', changefreq: 'weekly' },
         { url: '/newbie', priority: '0.7', changefreq: 'monthly' },
         { url: '/contributors', priority: '0.7', changefreq: 'monthly' },
-        { url: '/numbers', priority: '0.6', changefreq: 'monthly' },
-        { url: '/emails', priority: '0.6', changefreq: 'monthly' },
+
       ];
 
       // Fetch dynamic database items safely

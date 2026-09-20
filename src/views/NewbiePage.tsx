@@ -791,51 +791,7 @@ export function NewbiePage() {
 
       {/* TAB 4: DIRECTORIES & LINKS */}
       {activeTab === 'links' && (
-        <div className="space-y-6">
-          {/* University Phone & Email Directories */}
-          <div className="bg-white dark:bg-zinc-900/50 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 sm:p-8 shadow-2xs">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
-              <Compass className="w-4.5 h-4.5 text-[var(--color-imamu-accent)]" /> أدلة الاتصال الرسمية بالجامعة 📞
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-zinc-400 mb-6">
-              تصفح أدلة الهواتف والبريد الإلكتروني للوصول السريع إلى شؤون الطلاب، العمادات، والأقسام الأكاديمية:
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <button 
-                onClick={() => router.push('/numbers')}
-                className="flex items-center justify-between p-4 bg-slate-50/80 hover:bg-slate-100/80 dark:bg-zinc-950/40 dark:hover:bg-zinc-800/60 border border-slate-200 dark:border-zinc-800 rounded-xl transition text-right group w-full shadow-2xs cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 flex items-center justify-center shrink-0">
-                    <Phone className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-xs text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">دليل الأرقام الهاتفية والتحويلات</h4>
-                    <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">أرقام الكليات، العمادات، وخطوط الطوارئ والسلامة.</p>
-                  </div>
-                </div>
-                <ChevronDown className="w-4 h-4 text-slate-400 -rotate-90 group-hover:text-emerald-600 transition" />
-              </button>
-
-              <button 
-                onClick={() => router.push('/emails')}
-                className="flex items-center justify-between p-4 bg-slate-50/80 hover:bg-slate-100/80 dark:bg-zinc-950/40 dark:hover:bg-zinc-800/60 border border-slate-200 dark:border-zinc-800 rounded-xl transition text-right group w-full shadow-2xs cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-stone-50 dark:bg-stone-950/40 text-[var(--color-imamu-accent)] border border-slate-200/80 dark:border-zinc-700/80 flex items-center justify-center shrink-0">
-                    <Mail className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-xs text-slate-900 dark:text-white group-hover:text-[var(--color-imamu-accent)] transition-colors">دليل البريد الإلكتروني الأكاديمي</h4>
-                    <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">إيميلات شؤون الطلاب، العميد، ومسؤولي التخصصات.</p>
-                  </div>
-                </div>
-                <ChevronDown className="w-4 h-4 text-slate-400 -rotate-90 group-hover:text-[var(--color-imamu-accent)] transition" />
-              </button>
-            </div>
-          </div>
-        </div>
+        <div className="space-y-6" />
       )}
     </div>
   );

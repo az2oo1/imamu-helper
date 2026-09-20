@@ -2457,18 +2457,6 @@ export function AnaPage() {
             </div>
           ) : (
             <>
-              {/* Semester title */}
-              <div className="flex items-center gap-3 mb-5">
-                <div className="flex-1">
-                  <p className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-0.5">الفصل الحالي</p>
-                  <h2 className="text-base font-bold text-slate-900 dark:text-white">{activeSemester.label}</h2>
-                  <p className="text-xs text-slate-400 dark:text-zinc-500 mt-0.5">
-                    {activeSemester.courses.length} مادة
-                    {loadingSections && <Loader2 className="w-3 h-3 inline animate-spin mr-2" />}
-                  </p>
-                </div>
-              </div>
-
               {/* Weekly schedule */}
               <WeeklySchedule sections={effectiveSections} />
             </>

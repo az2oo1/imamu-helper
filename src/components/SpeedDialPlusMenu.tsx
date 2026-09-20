@@ -150,10 +150,10 @@ export function SpeedDialPlusMenu({
         <button
           type="button"
           onClick={onToggle}
-          className={`relative z-50 flex items-center justify-center w-10 h-10 rounded-xl shadow-md transition-all active:scale-95 cursor-pointer shrink-0 ${
+          className={`relative flex items-center justify-center w-10 h-10 rounded-xl shadow-md transition-all active:scale-95 cursor-pointer shrink-0 ${
             isOpen
-              ? 'bg-[#8a532d] hover:bg-[#724424] text-white ring-2 ring-amber-500/40 shadow-amber-900/40'
-              : 'bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white'
+              ? 'z-50 bg-[var(--color-imamu-accent)] hover:opacity-90 text-white ring-2 ring-[var(--color-imamu-accent)]/40'
+              : 'z-10 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white'
           }`}
           title={isOpen ? 'إغلاق' : 'إضافة...'}
           aria-expanded={isOpen}

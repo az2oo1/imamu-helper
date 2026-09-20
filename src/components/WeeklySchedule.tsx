@@ -351,12 +351,6 @@ export function WeeklySchedule({ sections, className = '' }: WeeklyScheduleProps
               <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
                 الجدول الأسبوعي
               </h3>
-              {isTodayInSchoolWeek && (
-                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold border border-emerald-500/20">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>اليوم الدراسي: {activeTodayDay?.label}</span>
-                </span>
-              )}
             </div>
             <p className="text-[11px] text-slate-400 dark:text-zinc-500">
               {todayClassesCount > 0
@@ -366,15 +360,6 @@ export function WeeklySchedule({ sections, className = '' }: WeeklyScheduleProps
           </div>
         </div>
 
-        {/* Legend / Live Indicator note */}
-        <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-zinc-400">
-          {isTodayInSchoolWeek && isCurrentTimeWithinGrid && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 text-[11px] font-semibold">
-              <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping shrink-0" />
-              <span>الوقت الحالي: {formatMinutesToTime(currentTotalMinutes)}</span>
-            </div>
-          )}
-        </div>
       </div>
 
       {/* ─── Main Timetable Frame with Seamlessly Integrated Time Axis ─── */}
@@ -553,40 +538,31 @@ export function WeeklySchedule({ sections, className = '' }: WeeklyScheduleProps
                             width: `calc(${widthPercent}% - 4px)`
                           }}
                         >
-                          {/* Top: Course code + Now active indicator */}
-                          <div className="min-w-0">
-                            <div className="flex items-center justify-between gap-1 mb-0.5">
-                              <span
-                                className="text-xs font-black truncate text-slate-900 dark:text-white"
-                                dir="ltr"
-                              >
-                                {slot.courseCode}
+                          {/* Top: Start time + Now badge */}
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="text-[10px] font-bold text-slate-600 dark:text-zinc-300 tabular-nums" dir="ltr">
+                              {formatMinutesToTime(slot.startMinutes, true)}
+                            </span>
+
+                            {isNowActive && (
+                              <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[8px] font-black shrink-0 shadow-xs animate-pulse">
+                                <span className="w-1 h-1 rounded-full bg-white" />
+                                الآن
                               </span>
-
-                              {isNowActive ? (
-                                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[8px] font-black shrink-0 shadow-xs animate-pulse">
-                                  <span className="w-1 h-1 rounded-full bg-white" />
-                                  الآن
-                                </span>
-                              ) : slot.sectionNumber ? (
-                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-md bg-white/60 dark:bg-zinc-800/60 text-slate-600 dark:text-zinc-300 shrink-0">
-                                  ش {slot.sectionNumber}
-                                </span>
-                              ) : null}
-                            </div>
-
-                            {/* Course Title - shown when height is adequate */}
-                            {height >= 60 && (
-                              <p className="text-[11px] font-semibold text-slate-700 dark:text-zinc-200 truncate leading-tight">
-                                {slot.courseTitle}
-                              </p>
                             )}
                           </div>
 
-                          {/* Bottom info: Time range & Room */}
+                          {/* Course Title - shown when height is adequate */}
+                          {height >= 60 && (
+                            <p className="text-[11px] font-semibold text-slate-700 dark:text-zinc-200 truncate leading-tight mt-0.5">
+                              {slot.courseTitle}
+                            </p>
+                          )}
+
+                          {/* Bottom: End time (left) + Room (right) */}
                           <div className="pt-0.5 mt-0.5 flex items-center justify-between text-[10px] text-slate-500 dark:text-zinc-400 gap-1 border-t border-black/5 dark:border-white/5">
-                            <span className="font-semibold truncate" dir="ltr">
-                              {formatMinutesToTime(slot.startMinutes, true)}
+                            <span className="font-semibold tabular-nums" dir="ltr">
+                              {formatMinutesToTime(slot.endMinutes, true)}
                             </span>
 
                             {slot.room && (

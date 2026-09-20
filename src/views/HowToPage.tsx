@@ -780,47 +780,7 @@ export function HowToPage() {
               )}
             </InView>
 
-            {/* Directories Banners Grid */}
-            <div className="w-full max-w-4xl mx-auto mt-16 border-t border-slate-200 dark:border-zinc-800 pt-10 text-right">
-              <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2 pr-1">
-                <Compass className="w-5 h-5 text-teal-600 dark:text-teal-400" /> وسائل الاتصال بالجامعة 📞
-              </h2>
-              <p className="text-xs text-slate-600 dark:text-zinc-400 mb-6">
-                سواء كنت بحاجة للاتصال بهاتف جهة أكاديمية أو العثور على البريد الإلكتروني الرسمي لكليتك، اختر الدليل المناسب أدناه:
-              </p>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <SpotlightCard 
-                  onClick={() => router.push('/numbers')}
-                  className="cursor-pointer border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-2xs group hover:border-emerald-500/40 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 flex items-center justify-center shrink-0">
-                      <Icons.Phone className="w-5 h-5" />
-                    </div>
-                    <div className="text-right">
-                      <h4 className="font-bold text-xs text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">دليل الأرقام الهاتفية والتحويلات 📞</h4>
-                      <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">أرقام الكليات، العمادات، والتحويلات.</p>
-                    </div>
-                  </div>
-                </SpotlightCard>
 
-                <SpotlightCard 
-                  onClick={() => router.push('/emails')}
-                  className="cursor-pointer border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-2xs group hover:border-[var(--color-imamu-accent)]/50 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-stone-50 dark:bg-stone-950/50 text-[var(--color-imamu-accent)] border border-slate-200/80 dark:border-zinc-700/80 flex items-center justify-center shrink-0">
-                      <Icons.Mail className="w-5 h-5" />
-                    </div>
-                    <div className="text-right">
-                      <h4 className="font-bold text-xs text-slate-900 dark:text-white group-hover:text-[var(--color-imamu-accent)] transition-colors">دليل البريد الإلكتروني الأكاديمي ✉️</h4>
-                      <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">إيميلات شؤون الطلاب والأقسام.</p>
-                    </div>
-                  </div>
-                </SpotlightCard>
-              </div>
-            </div>
           </motion.div>
         )}
       </AnimatePresence>

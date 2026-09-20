@@ -63,7 +63,6 @@ export const dynamic = 'force-dynamic';
 import { TopBar } from '../src/components/TopBar';
 import { Footer } from '../src/components/Footer';
 import { PwaRegister } from '../src/components/PwaRegister';
-import { PwaInstallPrompt } from '../src/components/PwaInstallPrompt';
 
 export default function RootLayout({
   children,
@@ -107,7 +106,6 @@ export default function RootLayout({
               </div>
               <Footer />
               <PwaRegister />
-              <PwaInstallPrompt />
             </div>
           </AuthProvider>
         </ThemeProvider>
