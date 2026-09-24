@@ -17,7 +17,6 @@ import { StudentTask, TASK_CATEGORIES, getCourseColor } from '../lib/task-utils'
 
 export function CalendarPage() {
   const [events, setEvents] = useState<any[]>([]);
-  const [localEvents, setLocalEvents] = useState<any[]>([]);
   const [taskEvents, setTaskEvents] = useState<any[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewState, setViewState] = useState<'month' | 'week'>('month');
@@ -55,48 +54,10 @@ export function CalendarPage() {
     }
   };
 
-  const loadLocalEvents = () => {
-    if (typeof window === 'undefined') return;
-    try {
-      const saved = localStorage.getItem('imamu_local_events');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        const cleanEvents = Array.isArray(parsed)
-          ? parsed.filter((e: any) => !e.isTask && !String(e.id).startsWith('task-') && !e.isExam && !String(e.id).startsWith('exam-'))
-          : [];
-        if (cleanEvents.length !== parsed.length) {
-          localStorage.setItem('imamu_local_events', JSON.stringify(cleanEvents));
-        }
-        setLocalEvents(cleanEvents);
-
-        const token = localStorage.getItem('token') || localStorage.getItem('imamu_token') || '';
-        if (token && cleanEvents.length > 0) {
-          fetch('/api/user-events/sync', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify({ events: cleanEvents })
-          }).then(r => {
-            if (r.ok) {
-              localStorage.removeItem('imamu_local_events');
-              setLocalEvents([]);
-              mutate();
-            }
-          }).catch(() => {});
-        }
-      } else {
-        setLocalEvents([]);
-      }
-    } catch {
-      setLocalEvents([]);
-    }
-  };
-
   const loadTaskEvents = () => {
     if (typeof window === 'undefined') return;
     try {
+      // Load unified student tasks and personal appointments
       const saved = localStorage.getItem('imamu_student_tasks');
       if (!saved) {
         setTaskEvents([]);
@@ -107,18 +68,19 @@ export function CalendarPage() {
         .filter(t => t.dueDate && !t.completed)
         .map(t => {
           const dateTime = t.dueTime ? `${t.dueDate}T${t.dueTime}` : t.dueDate;
+          const isPersonalEvent = t.category === 'Event' || t.category === 'موعد شخصي';
           const categoryObj = TASK_CATEGORIES.find(c => c.key === t.category);
-          const catLabel = categoryObj ? categoryObj.label : (t.categoryLabel || t.category || 'مهمة');
+          const catLabel = categoryObj ? categoryObj.label : (t.categoryLabel || t.category || (isPersonalEvent ? 'موعد شخصي' : 'مهمة'));
           return {
             id: `task-${t.id}`,
             taskId: t.id,
             title: `${t.title}${t.courseName ? ` – ${t.courseName}` : ''}`,
             date: dateTime,
             time: t.dueTime || undefined,
-            description: `${catLabel}${t.courseName ? ` | مقرر: ${t.courseName}` : ''}${t.priority ? ` [أهمية: ${t.priority}]` : ''}`,
+            description: t.description || `${catLabel}${t.courseName ? ` | مقرر: ${t.courseName}` : ''}${t.priority ? ` [أهمية: ${t.priority}]` : ''}`,
             calendarType: 'user' as const,
-            color: t.color || getCourseColor(t.courseCode),
-            isTask: true,
+            color: t.color || (t.courseCode ? getCourseColor(t.courseCode) : '#0284c7'),
+            isTask: !isPersonalEvent,
             priority: t.priority,
             category: catLabel,
             courseCode: t.courseCode
@@ -160,10 +122,8 @@ export function CalendarPage() {
   }, [isAddPopoverOpen]);
 
   useEffect(() => {
-    loadLocalEvents();
     loadTaskEvents();
     const handleUpdate = () => {
-      loadLocalEvents();
       loadTaskEvents();
     };
     window.addEventListener('storage', handleUpdate);
@@ -178,18 +138,13 @@ export function CalendarPage() {
 
   useEffect(() => {
     const combined = [...(Array.isArray(eventsData) ? eventsData : [])];
-    localEvents.forEach(le => {
-      if (!combined.some(e => e.id === le.id)) {
-        combined.push(le);
-      }
-    });
     taskEvents.forEach(te => {
       if (!combined.some(e => e.id === te.id)) {
         combined.push(te);
       }
     });
     setEvents(combined.sort((a, b) => (parseDate(a.date)?.getTime() || 0) - (parseDate(b.date)?.getTime() || 0)));
-  }, [eventsData, localEvents, taskEvents]);
+  }, [eventsData, taskEvents]);
 
   const handleAddPersonalEvent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -202,45 +157,43 @@ export function CalendarPage() {
     setAddEventError('');
 
     try {
-      const dateTime = newEventTime ? `${newEventDate}T${newEventTime}:00` : newEventDate;
-      const payload = {
+      const newTask: StudentTask = {
+        id: Date.now().toString(),
         title: newEventTitle.trim(),
-        date: dateTime,
-        description: newEventDesc.trim(),
-        calendarType: 'user'
+        completed: false,
+        dueDate: newEventDate,
+        dueTime: newEventTime || undefined,
+        description: newEventDesc.trim() || undefined,
+        category: 'Event',
+        categoryLabel: 'موعد شخصي',
+        color: '#0284c7',
+        createdAt: new Date().toISOString()
       };
+
+      const raw = localStorage.getItem('imamu_student_tasks');
+      const prev: StudentTask[] = raw ? JSON.parse(raw) : [];
+      const updated = [newTask, ...prev];
+      localStorage.setItem('imamu_student_tasks', JSON.stringify(updated));
+
+      window.dispatchEvent(new Event('imamu_tasks_updated'));
+      window.dispatchEvent(new Event('storage'));
 
       const token = localStorage.getItem('token') || localStorage.getItem('imamu_token') || '';
       if (token) {
-        const res = await fetch('/api/user-events', {
+        fetch('/api/user-tasks', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`
           },
-          body: JSON.stringify(payload)
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || 'فشل حفظ الموعد');
-        }
-      } else {
-        // Fallback to local storage for guests
-        const local = JSON.parse(localStorage.getItem('imamu_local_events') || '[]');
-        local.push({
-          id: `local-${Date.now()}`,
-          ...payload,
-          calendarType: 'user',
-          createdAt: new Date().toISOString()
-        });
-        localStorage.setItem('imamu_local_events', JSON.stringify(local));
+          body: JSON.stringify({ tasks: updated })
+        }).catch(() => {});
       }
 
       setNewEventTitle('');
       setNewEventDesc('');
       setIsAddPopoverOpen(false);
-      mutate();
-      loadLocalEvents();
+      loadTaskEvents();
     } catch (err: any) {
       setAddEventError(err.message || 'حدث خطأ أثناء حفظ الموعد');
     } finally {
@@ -402,27 +355,7 @@ export function CalendarPage() {
       const evTaskIdStr = String(ev.taskId || '');
       const evDateOnly = String(ev.date || '').split('T')[0];
 
-      // 1. Clean from localStorage: imamu_local_events
-      try {
-        const rawLocal = localStorage.getItem('imamu_local_events');
-        if (rawLocal) {
-          const parsed = JSON.parse(rawLocal);
-          if (Array.isArray(parsed)) {
-            const remaining = parsed.filter((le: any) => {
-              const leId = String(le.id || '');
-              if (leId === evIdStr) return false;
-              if (le.title === ev.title && le.date === ev.date) return false;
-              return true;
-            });
-            localStorage.setItem('imamu_local_events', JSON.stringify(remaining));
-            setLocalEvents(remaining);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to clean local_events:', err);
-      }
-
-      // 2. Clean from localStorage: imamu_student_tasks
+      // 1. Clean from unified student tasks & personal events
       try {
         const rawTasks = localStorage.getItem('imamu_student_tasks');
         if (rawTasks) {
@@ -456,9 +389,9 @@ export function CalendarPage() {
         console.error('Failed to clean student_tasks:', err);
       }
 
-      // 3. Clean from server DB (if numeric ID)
+      // 2. Also clean from server DB (if numeric ID)
       const numId = Number(ev.id);
-      if (!isNaN(numId) && numId > 0 && !evIdStr.startsWith('local-') && !evIdStr.startsWith('task-') && !evIdStr.startsWith('exam-')) {
+      if (!isNaN(numId) && numId > 0 && !evIdStr.startsWith('task-') && !evIdStr.startsWith('exam-')) {
         const token = localStorage.getItem('token') || localStorage.getItem('imamu_token') || '';
         try {
           await fetch(`/api/user-events/${numId}`, {
@@ -470,14 +403,13 @@ export function CalendarPage() {
         }
       }
 
-      // 4. Optimistically remove from state & mutate SWR
+      // 3. Optimistically remove from state & mutate SWR
       setEvents(prev => prev.filter(e => {
         if (String(e.id) === evIdStr) return false;
         if (evTaskIdStr && String(e.taskId) === evTaskIdStr) return false;
         if (e.title === ev.title && e.date === ev.date) return false;
         return true;
       }));
-      setLocalEvents(prev => prev.filter(e => String(e.id) !== evIdStr && !(e.title === ev.title && e.date === ev.date)));
       setTaskEvents(prev => prev.filter(e => String(e.id) !== evIdStr && String(e.taskId || '') !== evTaskIdStr && !(e.title === ev.title && e.date === ev.date)));
       
       setSelectedEvent(null);
@@ -502,7 +434,7 @@ export function CalendarPage() {
           onOpenAddEvent={() => setIsAddPopoverOpen(true)}
           onEventCreated={() => {
             mutate();
-            loadLocalEvents();
+            loadTaskEvents();
           }}
         />
         

@@ -36,6 +36,7 @@ export const TASK_CATEGORIES = [
   { key: 'Research', label: 'بحث', en: 'Research' },
   { key: 'Essay', label: 'مقال', en: 'Essay' },
   { key: 'Case Study', label: 'دراسة حالة', en: 'Case Study' },
+  { key: 'Event', label: 'موعد شخصي', en: 'Personal Event' },
 ];
 
 export const COURSE_HEX_COLORS = [
@@ -152,19 +153,6 @@ export function formatTaskDuePill(dueDate?: string, dueTime?: string): string | 
 
 function notifyTaskChange() {
   if (typeof window === 'undefined') return;
-
-  try {
-    const existing: any[] = JSON.parse(localStorage.getItem('imamu_local_events') || '[]');
-    const cleaned = existing.filter((e: any) => 
-      !e.isTask && 
-      !String(e.id).startsWith('task-') &&
-      !e.isExam &&
-      !String(e.id).startsWith('exam-')
-    );
-    if (cleaned.length !== existing.length) {
-      localStorage.setItem('imamu_local_events', JSON.stringify(cleaned));
-    }
-  } catch {}
   window.dispatchEvent(new Event('imamu_tasks_updated'));
   window.dispatchEvent(new Event('storage'));
 }

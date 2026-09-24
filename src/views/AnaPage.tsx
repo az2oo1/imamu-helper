@@ -3004,23 +3004,6 @@ export function AnaPage() {
 
   // SWR: Fetch semesters from server and reconcile with local cache
   useEffect(() => {
-    // Purge any legacy exam leftovers from imamu_local_events
-    if (typeof window !== 'undefined') {
-      try {
-        const raw = localStorage.getItem('imamu_local_events');
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          const cleaned = Array.isArray(parsed)
-            ? parsed.filter((e: any) => !e.isExam && !String(e.id).startsWith('exam-') && !e.isTask && !String(e.id).startsWith('task-'))
-            : [];
-          if (cleaned.length !== parsed.length) {
-            localStorage.setItem('imamu_local_events', JSON.stringify(cleaned));
-            window.dispatchEvent(new Event('storage'));
-          }
-        }
-      } catch {}
-    }
-
     if (!user && !dbUser) return;
     let isCancelled = false;
 

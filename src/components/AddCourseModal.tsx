@@ -2159,7 +2159,7 @@ export function AddCourseModal({
                   onDeleteCourseFromSemester(selectedSemId, initialCourse.courseCode, initialCourse.crn);
                   handleModalClose();
                 }}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40 text-xs font-bold transition cursor-pointer active:scale-98"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-slate-500 hover:text-rose-600 dark:text-zinc-400 dark:hover:text-rose-400 hover:bg-rose-500/10 text-xs font-bold transition cursor-pointer active:scale-95"
                 title="حذف المقرر من الفصل"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -2172,7 +2172,7 @@ export function AddCourseModal({
                 type="button"
                 onClick={handleCheckCourseUpdates}
                 disabled={isCheckingUpdates}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 text-xs font-bold transition cursor-pointer active:scale-98 disabled:opacity-60"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 text-xs font-bold transition cursor-pointer active:scale-95 disabled:opacity-50"
                 title="التحقق من وجود تحديثات للمقرر وتطبيقها"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isCheckingUpdates ? 'animate-spin' : ''}`} />
