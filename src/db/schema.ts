@@ -26,6 +26,9 @@ export const users = pgTable('users', {
   currentGpa: varchar('current_gpa', { length: 10 }),
   finishedHours: integer('finished_hours'),
   completedCourses: text('completed_courses'), // JSON array of course codes
+  semesters: text('semesters'), // JSON array of user semesters
+  activeSemId: text('active_sem_id'), // currently selected semester id
+  studentTasks: text('student_tasks'), // JSON array of student tasks (independent from semesters)
   isAdmin: boolean('is_admin').default(false),
   isBanned: boolean('is_banned').default(false),
   adminPermissions: text('admin_permissions'), // JSON array string of granted permission keys

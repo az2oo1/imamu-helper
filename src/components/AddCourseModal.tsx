@@ -73,7 +73,7 @@ interface AddCourseModalProps {
   semesters: { id: string; label: string; term?: string; academicYear?: string; semester?: string; courses?: CourseEntry[] }[];
   activeSemId: string | null;
   initialCourse?: CourseEntry | null;
-  onAddCourseToSemester: (semesterId: string, course: CourseEntry) => void;
+  onAddCourseToSemester: (semesterId: string, course: CourseEntry, originalCourseCode?: string) => void;
   onDeleteCourseFromSemester?: (semesterId: string, courseCode: string, crn?: string) => void;
   onOpenCreateSemester: () => void;
   allSubjects?: any[];
@@ -672,7 +672,7 @@ export function AddCourseModal({
           onAddCourseToSemester(selectedSemId, {
             ...existingCourse,
             color: hex
-          });
+          }, initialCourse?.courseCode);
         }
       }
     }
@@ -962,15 +962,15 @@ export function AddCourseModal({
       crn: String(fetchedSection.crn || crnInput || initialCourse?.crn || '').trim(),
       creditHours: fetchedSection.creditHours || initialCourse?.creditHours || 3,
       sectionNumber: (fetchedSection.sectionNumber ? String(fetchedSection.sectionNumber).trim() : undefined) || initialCourse?.sectionNumber,
-      examDate: examDate || initialCourse?.examDate,
-      examTime: examTime || initialCourse?.examTime,
+      examDate: examDate || fetchedSection.examDate || initialCourse?.examDate,
+      examTime: examTime || fetchedSection.examTime || initialCourse?.examTime,
       customSchedule: customSchedules,
       whatsappLink: customWaLink || initialCourse?.whatsappLink || undefined,
       color: selectedColor || initialCourse?.color || undefined,
       primaryInstructor: courseInstructors.find(i => i.isPrimary)?.name || courseInstructors[0]?.name || fetchedSection.primaryInstructor || initialCourse?.primaryInstructor,
       instructors: courseInstructors.length > 0 ? courseInstructors : (fetchedSection.instructors || initialCourse?.instructors)
     };
-    onAddCourseToSemester(selectedSemId, course);
+    onAddCourseToSemester(selectedSemId, course, initialCourse?.courseCode);
     handleModalClose();
   };
 
@@ -993,7 +993,7 @@ export function AddCourseModal({
       primaryInstructor: courseInstructors.find(i => i.isPrimary)?.name || courseInstructors[0]?.name || manualSchedules.find(s => s.teacher)?.teacher || initialCourse?.primaryInstructor,
       instructors: courseInstructors.length > 0 ? courseInstructors : undefined
     };
-    onAddCourseToSemester(selectedSemId, course);
+    onAddCourseToSemester(selectedSemId, course, initialCourse?.courseCode);
     handleModalClose();
   };
 

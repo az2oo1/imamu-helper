@@ -135,7 +135,6 @@ export default function AdminSectionsTab({
   // Import Modal State
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [directSyncing, setDirectSyncing] = useState(false);
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
@@ -419,71 +418,6 @@ export default function AdminSectionsTab({
     }
   };
 
-  // Direct 1-Click Server Sync from Banner
-  const handleDirectServerSync = async () => {
-    let finalYear = '';
-    let finalSemester = '';
-    let finalTerm = '';
-
-    if (uploadFolderMode === 'existing') {
-      const existing = folders.find(f => f.id === selectedExistingFolderId) || folders[0];
-      if (existing) {
-        finalYear = existing.academicYear || '';
-        finalSemester = existing.semester || '';
-        finalTerm = existing.term || existing.name;
-      }
-    } else {
-      finalYear = newFolderYear.trim();
-      finalSemester = newFolderSemester.trim();
-      finalTerm = finalYear && finalSemester ? `${finalYear} - ${finalSemester}` : (finalYear || finalSemester || '1448 - الفصل الأول');
-    }
-
-    setDirectSyncing(true);
-    setImportResult(null);
-
-    try {
-      const token = await getToken();
-      const res = await fetch('/api/admin/sync-direct', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          academicYear: finalYear || '1448',
-          semester: finalSemester || 'الفصل الأول',
-          term: finalTerm || '1448 - الفصل الأول'
-        })
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setImportResult(data);
-        toast('success', `اكتملت المزامنة الفورية من بانر بنجاح! تم تحديث ${data.coursesCount} مقرر و ${data.sectionsCount} شعبة.`);
-        const newFolderObj: FolderItem = {
-          id: finalTerm || '1448 - الفصل الأول',
-          name: finalTerm || '1448 - الفصل الأول',
-          academicYear: finalYear || '1448',
-          semester: finalSemester || 'الفصل الأول',
-          term: finalTerm || '1448 - الفصل الأول',
-          count: data.sectionsCount || 0
-        };
-        const currentSaved = loadSharedFolders();
-        saveSharedFolders([newFolderObj, ...currentSaved.filter(f => f.term !== finalTerm && f.name !== finalTerm)]);
-        fetchSections();
-        fetchTerms();
-        fetchTeachers();
-      } else {
-        toast('error', data.error || 'فشلت المزامنة المباشرة');
-      }
-    } catch (err: any) {
-      console.error(err);
-      toast('error', 'حدث خطأ أثناء المزامنة المباشرة من الخادم');
-    } finally {
-      setDirectSyncing(false);
-    }
-  };
-
   // Handle File Upload and Import
   const handleUploadAndImport = async () => {
     if (!importFile) {
@@ -560,31 +494,28 @@ export default function AdminSectionsTab({
     <div className="space-y-6 animate-fadeIn" dir="rtl">
       {/* Top View Toggle: Sections vs Teachers */}
       <div className="flex items-center justify-between flex-wrap gap-3 pb-2 border-b border-slate-200 dark:border-zinc-800">
-        <div className="flex items-center gap-1.5 p-1 rounded-2xl border bg-slate-100/80 dark:bg-zinc-800/80 border-slate-200 dark:border-zinc-700 w-fit">
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('sections')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
-              activeSubTab === 'sections'
-                ? 'bg-white dark:bg-zinc-900 text-amber-700 dark:text-amber-400 shadow-sm'
-                : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <Layers className="w-4 h-4" />
-            <span>الشعب والمواعيد</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('teachers')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
-              activeSubTab === 'teachers'
-                ? 'bg-white dark:bg-zinc-900 text-amber-700 dark:text-amber-400 shadow-sm'
-                : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <UserCheck className="w-4 h-4" />
-            <span>هيئة التدريس</span>
-          </button>
+        <div className="flex items-center gap-2.5">
+          {activeSubTab === 'teachers' ? (
+            <>
+              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                <UserCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <h1 className="text-base font-black" style={{ color: 'var(--text-main)' }}>هيئة التدريس</h1>
+                <p className="text-[11px] text-slate-500 dark:text-zinc-400 font-medium">كشف ومتابعة أعضاء هيئة التدريس والمحاضرين</p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                <Layers className="w-5 h-5" />
+              </div>
+              <div>
+                <h1 className="text-base font-black" style={{ color: 'var(--text-main)' }}>الشعب والمواعيد</h1>
+                <p className="text-[11px] text-slate-500 dark:text-zinc-400 font-medium">إدارة مجلدات الشعب الدراسية واستيراد البيانات</p>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -1643,47 +1574,6 @@ export default function AdminSectionsTab({
               </p>
             </div>
 
-            {/* Option 1: 1-Click Direct Server Sync from Banner */}
-            <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 space-y-3">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-amber-500" />
-                    <span>مزامنة فورية ومباشرة من نظام بانر (Direct Server Sync)</span>
-                  </h4>
-                  <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-1 leading-relaxed">
-                    مزامنة وتحديث تلقائي لكافة مقررات وشُعب الفصل (15,000+ شُعبة) مباشرة من بيانات بانر النقية بدون الحاجة لرفع ملفات، مع حفظ جميع الأساتذة، القاعات، والمواعيد الرسمية بدقة 100%.
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                disabled={directSyncing || importing}
-                onClick={handleDirectServerSync}
-                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 transition flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer"
-              >
-                {directSyncing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>جاري المزامنة المباشرة من نظام بانر...</span>
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="w-4 h-4" />
-                    <span>بدء المزامنة الفورية المباشرة الآن (خيار موصى به)</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* Divider */}
-            <div className="relative flex py-0.5 items-center">
-              <div className="flex-grow border-t border-slate-200 dark:border-zinc-800"></div>
-              <span className="flex-shrink mx-3 text-[11px] font-semibold text-slate-400">أو رفع ملف JSON يدوياً</span>
-              <div className="flex-grow border-t border-slate-200 dark:border-zinc-800"></div>
-            </div>
-
             {/* Drop Zone */}
             <div
               onClick={() => fileInputRef.current?.click()}
@@ -1744,14 +1634,14 @@ export default function AdminSectionsTab({
             {/* Action Buttons */}
             <div className="flex items-center justify-end gap-2 pt-2 border-t" style={{ borderColor: 'var(--border-color)' }}>
               <button
-                disabled={importing || directSyncing}
+                disabled={importing}
                 onClick={() => setIsImportModalOpen(false)}
                 className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition disabled:opacity-40 cursor-pointer"
               >
                 إلغاء
               </button>
               <button
-                disabled={!importFile || importing || directSyncing}
+                disabled={!importFile || importing}
                 onClick={handleUploadAndImport}
                 className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold text-white bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] transition shadow-md disabled:opacity-50 cursor-pointer"
               >

@@ -127,11 +127,34 @@ export function createNewsRouter(db: any) {
         return res.status(401).json({ error: "Unauthorized" });
       }
       const eventId = Number(req.params.id);
+      if (isNaN(eventId)) {
+        return res.status(400).json({ error: "معرف الموعد غير صالح" });
+      }
       const [existing] = await db.select().from(events).where(eq(events.id, eventId));
       if (!existing) {
         return res.status(404).json({ error: "الموعد غير موجود" });
       }
-      if (existing.userId !== currentUserId) {
+
+      // Check ownership or admin privilege
+      let isAllowed = !existing.userId || existing.userId === currentUserId;
+      if (!isAllowed) {
+        const [currUser] = await db.select().from(users).where(
+          or(eq(users.uid, currentUserId), eq(users.id, Number(currentUserId) || 0))
+        );
+        if (currUser) {
+          if (currUser.isAdmin) {
+            isAllowed = true;
+          } else if (
+            String(currUser.id) === String(existing.userId) ||
+            currUser.email === existing.userId ||
+            currUser.uid === existing.userId
+          ) {
+            isAllowed = true;
+          }
+        }
+      }
+
+      if (!isAllowed) {
         return res.status(403).json({ error: "غير مصرح بحذف هذا الموعد" });
       }
       await db.delete(events).where(eq(events.id, eventId));

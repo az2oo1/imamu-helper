@@ -61,7 +61,9 @@ export function CalendarPage() {
       const saved = localStorage.getItem('imamu_local_events');
       if (saved) {
         const parsed = JSON.parse(saved);
-        const cleanEvents = Array.isArray(parsed) ? parsed.filter((e: any) => !e.isTask && !String(e.id).startsWith('task-')) : [];
+        const cleanEvents = Array.isArray(parsed)
+          ? parsed.filter((e: any) => !e.isTask && !String(e.id).startsWith('task-') && !e.isExam && !String(e.id).startsWith('exam-'))
+          : [];
         if (cleanEvents.length !== parsed.length) {
           localStorage.setItem('imamu_local_events', JSON.stringify(cleanEvents));
         }
@@ -278,7 +280,16 @@ export function CalendarPage() {
   };
 
   const downloadSingleIcs = (ev: any) => {
-    const d = parseISO(ev.date);
+    const d = parseDate(ev.date) || parseISO(ev.date);
+    if (!d || isNaN(d.getTime())) return;
+
+    if (ev.time && typeof ev.time === 'string' && ev.time.includes(':')) {
+      const [h, m] = ev.time.split(':').map(Number);
+      if (!isNaN(h) && !isNaN(m)) {
+        d.setHours(h, m, 0, 0);
+      }
+    }
+
     const formatDatePart = (dateObj: Date) => {
       const year = dateObj.getFullYear();
       const month = String(dateObj.getMonth() + 1).padStart(2, '0');
@@ -387,29 +398,93 @@ export function CalendarPage() {
   const handleDeletePersonalEvent = async (ev: any) => {
     if (!window.confirm('هل أنت متأكد من الحذف؟')) return;
     try {
-      if (ev.isTask || (typeof ev.id === 'string' && ev.id.startsWith('task-'))) {
-        const raw = localStorage.getItem('imamu_student_tasks');
-        if (raw) {
-          const tasks = JSON.parse(raw).filter((t: any) => `task-${t.id}` !== ev.id && t.id !== ev.taskId);
-          localStorage.setItem('imamu_student_tasks', JSON.stringify(tasks));
-          window.dispatchEvent(new Event('imamu_tasks_updated'));
-          window.dispatchEvent(new Event('storage'));
+      const evIdStr = String(ev.id || '');
+      const evTaskIdStr = String(ev.taskId || '');
+      const evDateOnly = String(ev.date || '').split('T')[0];
+
+      // 1. Clean from localStorage: imamu_local_events
+      try {
+        const rawLocal = localStorage.getItem('imamu_local_events');
+        if (rawLocal) {
+          const parsed = JSON.parse(rawLocal);
+          if (Array.isArray(parsed)) {
+            const remaining = parsed.filter((le: any) => {
+              const leId = String(le.id || '');
+              if (leId === evIdStr) return false;
+              if (le.title === ev.title && le.date === ev.date) return false;
+              return true;
+            });
+            localStorage.setItem('imamu_local_events', JSON.stringify(remaining));
+            setLocalEvents(remaining);
+          }
         }
-      } else if (typeof ev.id === 'string' && ev.id.startsWith('local-')) {
-        const remaining = localEvents.filter(le => le.id !== ev.id);
-        setLocalEvents(remaining);
-        localStorage.setItem('imamu_local_events', JSON.stringify(remaining));
-      } else {
-        const token = localStorage.getItem('token') || localStorage.getItem('imamu_token') || '';
-        await fetch(`/api/user-events/${ev.id}`, {
-          method: 'DELETE',
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
-        });
-        mutate();
+      } catch (err) {
+        console.error('Failed to clean local_events:', err);
       }
+
+      // 2. Clean from localStorage: imamu_student_tasks
+      try {
+        const rawTasks = localStorage.getItem('imamu_student_tasks');
+        if (rawTasks) {
+          const parsed = JSON.parse(rawTasks);
+          if (Array.isArray(parsed)) {
+            const remaining = parsed.filter((t: any) => {
+              const tId = String(t.id || '');
+              if (tId === evIdStr || `task-${tId}` === evIdStr) return false;
+              if (evTaskIdStr && (tId === evTaskIdStr || `task-${tId}` === evTaskIdStr)) return false;
+              if (t.title === ev.title && t.dueDate === evDateOnly) return false;
+              if (ev.title && t.courseName && (ev.title.includes(t.courseName) || ev.title.includes(t.title)) && t.dueDate === evDateOnly) return false;
+              return true;
+            });
+            localStorage.setItem('imamu_student_tasks', JSON.stringify(remaining));
+            setTaskEvents(prev => prev.filter(t => t.id !== evIdStr && t.taskId !== evTaskIdStr));
+            window.dispatchEvent(new Event('imamu_tasks_updated'));
+            window.dispatchEvent(new Event('storage'));
+
+            // Also sync remaining tasks to server if logged in
+            const token = localStorage.getItem('token') || localStorage.getItem('imamu_token') || '';
+            if (token) {
+              fetch('/api/user-tasks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ tasks: remaining })
+              }).catch(() => {});
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to clean student_tasks:', err);
+      }
+
+      // 3. Clean from server DB (if numeric ID)
+      const numId = Number(ev.id);
+      if (!isNaN(numId) && numId > 0 && !evIdStr.startsWith('local-') && !evIdStr.startsWith('task-') && !evIdStr.startsWith('exam-')) {
+        const token = localStorage.getItem('token') || localStorage.getItem('imamu_token') || '';
+        try {
+          await fetch(`/api/user-events/${numId}`, {
+            method: 'DELETE',
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+          });
+        } catch (err) {
+          console.error('Failed to delete user event from server:', err);
+        }
+      }
+
+      // 4. Optimistically remove from state & mutate SWR
+      setEvents(prev => prev.filter(e => {
+        if (String(e.id) === evIdStr) return false;
+        if (evTaskIdStr && String(e.taskId) === evTaskIdStr) return false;
+        if (e.title === ev.title && e.date === ev.date) return false;
+        return true;
+      }));
+      setLocalEvents(prev => prev.filter(e => String(e.id) !== evIdStr && !(e.title === ev.title && e.date === ev.date)));
+      setTaskEvents(prev => prev.filter(e => String(e.id) !== evIdStr && String(e.taskId || '') !== evTaskIdStr && !(e.title === ev.title && e.date === ev.date)));
+      
       setSelectedEvent(null);
+      mutate();
     } catch (e) {
       console.error(e);
+      setSelectedEvent(null);
     }
   };
 

@@ -756,51 +756,5 @@ export function createSectionsRouter(db: any) {
     }
   });
 
-  // ============================================================================
-  // 10. ADMIN: POST /admin/sync-direct - 1-Click fast sync from Banner JSON
-  // ============================================================================
-  router.post('/admin/sync-direct', requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
-    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: 'Admin only' });
-
-    try {
-      const fs = await import('fs');
-      const path = await import('path');
-      const catalogCandidates = [
-        path.resolve(process.cwd(), '../scratch/imamu-sections-api/output/imamu_helper_catalog.json'),
-        '/home/interstellar/.gemini/antigravity/scratch/imamu-sections-api/output/imamu_helper_catalog.json',
-        '/home/interstellar/.gemini/antigravity/scratch/imamu-sections-api/data/sections.json',
-        path.resolve(process.cwd(), 'data/sections.json')
-      ];
-
-      let catalogPath: string | null = null;
-      for (const p of catalogCandidates) {
-        if (fs.existsSync(p)) {
-          catalogPath = p;
-          break;
-        }
-      }
-
-      if (!catalogPath) {
-        return res.status(404).json({ error: 'لم يتم العثور على ملف شُعب ومقررات بانر على الخادم.' });
-      }
-
-      const fileBuffer = fs.readFileSync(catalogPath);
-      const termInfo = {
-        academicYear: req.body?.academicYear || '1448',
-        semester: req.body?.semester || 'الفصل الأول',
-        term: req.body?.term || '1448 - الفصل الأول'
-      };
-
-      const result = await processAndUpsertCatalog(fileBuffer, termInfo, db, path.basename(catalogPath));
-      res.json({
-        ...result,
-        message: 'تمت المزامنة المباشرة من ملفات بانر بنجاح تام!'
-      });
-    } catch (err: any) {
-      console.error('[Admin Direct Sync Error]', err);
-      res.status(500).json({ error: `فشل المزامنة المباشرة: ${err.message || err}` });
-    }
-  });
-
   return router;
 }

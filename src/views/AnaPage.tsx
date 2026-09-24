@@ -109,11 +109,138 @@ interface SectionData {
 const STORAGE_KEY = 'imamu_my_semesters';
 const ACTIVE_SEM_KEY = 'imamu_active_semester_id';
 
+export function normalizeCourseCode(code?: string): string {
+  if (!code) return '';
+  return code.replace(/[\s\-_]+/g, '').toLowerCase();
+}
+
+export function normalizeCourseName(name?: string): string {
+  if (!name) return '';
+  return name
+    .trim()
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+}
+
+export function getBaseCourseName(name?: string): string {
+  if (!name) return '';
+  const norm = normalizeCourseName(name);
+  return norm.replace(/[\s(]+[1-9١-٩][)]?$/, '').trim();
+}
+
+export function isSameCourseEntry(c1: CourseEntry, c2: CourseEntry, originalCode?: string): boolean {
+  if (!c1 || !c2) return false;
+
+  if (originalCode) {
+    const normOrig = normalizeCourseCode(originalCode);
+    if (c1.courseCode === originalCode || normalizeCourseCode(c1.courseCode) === normOrig) {
+      return true;
+    }
+  }
+
+  const crn1 = String(c1.crn || '').trim();
+  const crn2 = String(c2.crn || '').trim();
+  if (crn1 && crn2 && crn1 === crn2) {
+    return true;
+  }
+
+  const code1 = normalizeCourseCode(c1.courseCode);
+  const code2 = normalizeCourseCode(c2.courseCode);
+  if (code1 && code2 && code1 === code2) {
+    return true;
+  }
+
+  const name1 = normalizeCourseName(c1.courseName);
+  const name2 = normalizeCourseName(c2.courseName);
+  if (name1 && name2 && name1 === name2) {
+    return true;
+  }
+
+  const base1 = getBaseCourseName(c1.courseName);
+  const base2 = getBaseCourseName(c2.courseName);
+  if (base1 && base2 && base1 === base2 && base1.length >= 4) {
+    const prefix1 = code1.replace(/\d+/g, '');
+    const prefix2 = code2.replace(/\d+/g, '');
+    if (!prefix1 || !prefix2 || prefix1 === prefix2) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export function mergeCourseEntries(older: CourseEntry, newer: CourseEntry): CourseEntry {
+  const courseName = newer.courseName || older.courseName;
+  const courseCode = newer.courseCode || older.courseCode;
+  const crn = (newer.crn && String(newer.crn).trim()) || (older.crn && String(older.crn).trim()) || '';
+  const creditHours = newer.creditHours || older.creditHours || 3;
+  const sectionNumber = newer.sectionNumber || older.sectionNumber;
+  const examDate = newer.examDate || older.examDate;
+  const examTime = newer.examTime || older.examTime;
+  const customSchedule = (newer.customSchedule && newer.customSchedule.length > 0)
+    ? newer.customSchedule
+    : older.customSchedule;
+  const whatsappLink = newer.whatsappLink || older.whatsappLink;
+  const color = newer.color || older.color;
+  const primaryInstructor = newer.primaryInstructor || older.primaryInstructor;
+  const instructors = (newer.instructors && newer.instructors.length > 0)
+    ? newer.instructors
+    : older.instructors;
+
+  return {
+    ...older,
+    ...newer,
+    courseCode,
+    courseName,
+    crn,
+    creditHours,
+    sectionNumber,
+    examDate,
+    examTime,
+    customSchedule,
+    whatsappLink,
+    color,
+    primaryInstructor,
+    instructors
+  };
+}
+
+export function dedupeSemesterCourses(courses: CourseEntry[]): CourseEntry[] {
+  if (!Array.isArray(courses) || courses.length <= 1) return courses || [];
+  const deduped: CourseEntry[] = [];
+
+  for (const c of courses) {
+    const existingIdx = deduped.findIndex(item => isSameCourseEntry(item, c));
+    if (existingIdx >= 0) {
+      deduped[existingIdx] = mergeCourseEntries(deduped[existingIdx], c);
+    } else {
+      deduped.push({ ...c });
+    }
+  }
+
+  return deduped;
+}
+
 function loadSemesters(): MySemester[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const list: MySemester[] = JSON.parse(raw);
+    let hasChanges = false;
+    const cleaned = list.map(sem => {
+      const origCount = sem.courses?.length || 0;
+      const deduped = dedupeSemesterCourses(sem.courses || []);
+      if (deduped.length !== origCount) hasChanges = true;
+      return { ...sem, courses: deduped };
+    });
+    if (hasChanges) {
+      saveSemesters(cleaned);
+    }
+    return cleaned;
   } catch { return []; }
 }
 
@@ -531,7 +658,7 @@ function EditSemesterModal({
                       onClick={e => e.stopPropagation()}
                     >
                       <p className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 mb-2 px-1">اختر أيقونة الفصل الدراسي:</p>
-                      <div className="grid grid-cols-6 gap-1.5 max-h-44 overflow-y-auto pr-0.5 custom-scrollbar">
+                      <div className="grid grid-cols-6 gap-1.5 p-1 max-h-48 overflow-y-auto custom-scrollbar">
                         {SEMESTER_EMOJIS.map(em => (
                           <button
                             key={em}
@@ -539,7 +666,7 @@ function EditSemesterModal({
                             onClick={() => { setEmoji(em); setShowEmojiPicker(false); }}
                             className={clsx(
                               "w-8 h-8 rounded-xl flex items-center justify-center text-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer",
-                              emoji === em && "bg-[var(--color-imamu-accent)]/15 ring-2 ring-[var(--color-imamu-accent)]"
+                              emoji === em && "bg-[var(--color-imamu-accent)]/15 ring-2 ring-inset ring-[var(--color-imamu-accent)]"
                             )}
                           >
                             {em}
@@ -767,6 +894,7 @@ function SidebarInsights({
   onEditTask,
   onRename,
   onUpdateSemester,
+  onOpenNewSemesterModal,
   subjects = [],
 }: {
   events: any[];
@@ -778,6 +906,7 @@ function SidebarInsights({
   onEditTask?: (task: StudentTask) => void;
   onRename?: (newLabel: string) => void;
   onUpdateSemester?: (newLabel: string, newCourses: CourseEntry[], newEmoji?: string) => void;
+  onOpenNewSemesterModal?: () => void;
   subjects?: any[];
 }) {
   const now = useCurrentTime();
@@ -1268,45 +1397,68 @@ function SidebarInsights({
       </AnimatePresence>
 
       {/* ── Card 1: Semester overview ── */}
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800/90 rounded-2xl overflow-hidden shadow-xs">
-        <div className="p-4">
-          {/* Top header row */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-zinc-800 flex items-center justify-center border border-slate-200/60 dark:border-zinc-700/50 text-base leading-none select-none">
-              {activeSemester?.emoji ? (
-                <span>{activeSemester.emoji}</span>
-              ) : (
-                <Tv className="w-4 h-4 text-slate-600 dark:text-zinc-300" />
-              )}
+      {activeSemester ? (
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800/90 rounded-2xl overflow-hidden shadow-xs">
+          <div className="p-4">
+            {/* Top header row */}
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-zinc-800 flex items-center justify-center border border-slate-200/60 dark:border-zinc-700/50 text-base leading-none select-none">
+                {activeSemester.emoji ? (
+                  <span>{activeSemester.emoji}</span>
+                ) : (
+                  <Tv className="w-4 h-4 text-slate-600 dark:text-zinc-300" />
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowEditModal(true)}
+                className="w-8 h-8 rounded-xl bg-slate-100/50 dark:bg-zinc-800/50 flex items-center justify-center text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+                title="إدارة وتعديل الفصل والمواد"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => setShowEditModal(true)}
-              className="w-8 h-8 rounded-xl bg-slate-100/50 dark:bg-zinc-800/50 flex items-center justify-center text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
-              title="إدارة وتعديل الفصل والمواد"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-            </button>
-          </div>
 
-          {/* Title row */}
-          <div className="flex items-center gap-2 mb-3 flex-wrap">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
-              {activeSemester?.label || 'المستوى الحالي'}
-            </h3>
-            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-              (الفصل الحالي)
-            </span>
-          </div>
+            {/* Title row */}
+            <div className="flex items-center gap-2 mb-3 flex-wrap">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
+                {activeSemester.label}
+              </h3>
+              <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                (الفصل الحالي)
+              </span>
+            </div>
 
-          {/* 3 Stats row */}
-          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400 pt-1 pb-3">
-            <span className="font-semibold">{semesterCreditHours > 0 ? `${semesterCreditHours} ساعة` : '0 ساعة'}</span>
-            <span className="font-semibold">{gpa > 0 ? `${gpa.toFixed(2)} GPA` : '— GPA'}</span>
-            <span className="font-semibold">{finishedHours > 0 ? `${finishedHours} منجز` : '0 منجز'}</span>
+            {/* 3 Stats row */}
+            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400 pt-1 pb-3">
+              <span className="font-semibold">{semesterCreditHours > 0 ? `${semesterCreditHours} ساعة` : '0 ساعة'}</span>
+              <span className="font-semibold">{gpa > 0 ? `${gpa.toFixed(2)} GPA` : '— GPA'}</span>
+              <span className="font-semibold">{finishedHours > 0 ? `${finishedHours} منجز` : '0 منجز'}</span>
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800/90 rounded-2xl p-4 shadow-xs flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-[var(--color-imamu-brown)]/10 text-[var(--color-imamu-brown)] flex items-center justify-center shrink-0">
+              <BookOpen className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-slate-900 dark:text-white">لا يوجد فصل محدد</p>
+              <p className="text-[11px] text-slate-400 dark:text-zinc-500">مهامك محفوظة ومستقلة تماماً</p>
+            </div>
+          </div>
+          {onOpenNewSemesterModal && (
+            <button
+              type="button"
+              onClick={onOpenNewSemesterModal}
+              className="px-3 py-1.5 rounded-xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-xs font-bold transition shadow-xs cursor-pointer shrink-0"
+            >
+              إضافة فصل
+            </button>
+          )}
+        </div>
+      )}
 
       {/* ── Progress Section Controls (Tabs) ── */}
       <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-zinc-900/90 rounded-xl border border-slate-200/70 dark:border-zinc-800/80">
@@ -1695,15 +1847,26 @@ function SidebarInsights({
           <div className="flex flex-col px-1">
             {/* Header: المهام */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800">
-              <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                المهام
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                  المهام
+                </h3>
+                {tasks.filter(t => !t.completed).length > 0 && (
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300">
+                    {tasks.filter(t => !t.completed).length}
+                  </span>
+                )}
+              </div>
 
-              {tasks.filter(t => !t.completed).length > 0 && (
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300">
-                  {tasks.filter(t => !t.completed).length}
-                </span>
-              )}
+              <button
+                type="button"
+                onClick={() => onOpenNewTaskModal?.()}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--color-imamu-brown)]/10 hover:bg-[var(--color-imamu-brown)]/20 text-[var(--color-imamu-brown)] dark:text-[var(--color-imamu-accent)] text-xs font-bold transition cursor-pointer"
+                title="إضافة مهمة جديدة"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>مهمة جديدة</span>
+              </button>
             </div>
 
             {/* Tasks list items */}
@@ -2356,7 +2519,7 @@ function SemesterWizard({ onClose, onSave, subjects }: WizardProps) {
                               onClick={e => e.stopPropagation()}
                             >
                               <p className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 mb-2 px-1">اختر أيقونة الفصل الدراسي:</p>
-                              <div className="grid grid-cols-6 gap-1.5 max-h-44 overflow-y-auto pr-0.5 custom-scrollbar">
+                              <div className="grid grid-cols-6 gap-1.5 p-1 max-h-48 overflow-y-auto custom-scrollbar">
                                 {SEMESTER_EMOJIS.map(em => (
                                   <button
                                     key={em}
@@ -2364,7 +2527,7 @@ function SemesterWizard({ onClose, onSave, subjects }: WizardProps) {
                                     onClick={() => { setEmoji(em); setShowEmojiPicker(false); }}
                                     className={clsx(
                                       "w-8 h-8 rounded-xl flex items-center justify-center text-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer",
-                                      emoji === em && "bg-[var(--color-imamu-accent)]/15 ring-2 ring-[var(--color-imamu-accent)]"
+                                      emoji === em && "bg-[var(--color-imamu-accent)]/15 ring-2 ring-inset ring-[var(--color-imamu-accent)]"
                                     )}
                                   >
                                     {em}
@@ -2805,8 +2968,14 @@ export function AnaPage() {
   const router = useRouter();
   const { user, dbUser, loading: authLoading } = useAuth();
 
-  const [semesters, setSemesters] = useState<MySemester[]>([]);
-  const [activeSemId, setActiveSemId] = useState<string | null>(null);
+  // Instant cache load (SWR pattern)
+  const [semesters, setSemesters] = useState<MySemester[]>(() => loadSemesters());
+  const [activeSemId, setActiveSemId] = useState<string | null>(() => {
+    const activeId = loadActiveSemId();
+    const saved = loadSemesters();
+    if (activeId && saved.find(s => s.id === activeId)) return activeId;
+    return saved[0]?.id || null;
+  });
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [isSemDropdownOpen, setIsSemDropdownOpen] = useState(false);
   const [subjects, setSubjects] = useState<any[]>([]);
@@ -2823,27 +2992,113 @@ export function AnaPage() {
 
   const activeSemester = semesters.find(s => s.id === activeSemId) || semesters[0] || null;
 
-  // Load localStorage
-  useEffect(() => {
-    const saved = loadSemesters();
-    setSemesters(saved);
-    const activeId = loadActiveSemId();
-    if (activeId && saved.find(s => s.id === activeId)) {
-      setActiveSemId(activeId);
-    } else if (saved.length > 0) {
-      setActiveSemId(saved[0].id);
-    }
-  }, []);
+  const getToken = useCallback(async () => {
+    if (user) return await user.getIdToken();
+    return localStorage.getItem('token') || '';
+  }, [user]);
 
   // Auth guard
   useEffect(() => {
     if (!authLoading && !user) router.push('/login');
   }, [authLoading, user, router]);
 
-  const getToken = useCallback(async () => {
-    if (user) return await user.getIdToken();
-    return localStorage.getItem('token') || '';
-  }, [user]);
+  // SWR: Fetch semesters from server and reconcile with local cache
+  useEffect(() => {
+    // Purge any legacy exam leftovers from imamu_local_events
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('imamu_local_events');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const cleaned = Array.isArray(parsed)
+            ? parsed.filter((e: any) => !e.isExam && !String(e.id).startsWith('exam-') && !e.isTask && !String(e.id).startsWith('task-'))
+            : [];
+          if (cleaned.length !== parsed.length) {
+            localStorage.setItem('imamu_local_events', JSON.stringify(cleaned));
+            window.dispatchEvent(new Event('storage'));
+          }
+        }
+      } catch {}
+    }
+
+    if (!user && !dbUser) return;
+    let isCancelled = false;
+
+    getToken().then(async (token) => {
+      if (!token || isCancelled) return;
+      try {
+        const res = await fetch('/api/user-semesters', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok || isCancelled) return;
+        const data = await res.json();
+        const serverSemesters = Array.isArray(data.semesters) ? data.semesters : [];
+        const serverActiveId = data.activeSemId;
+
+        if (serverSemesters.length > 0) {
+          const dedupedServer = serverSemesters.map((sem: MySemester) => ({
+            ...sem,
+            courses: dedupeSemesterCourses(sem.courses || [])
+          }));
+          setSemesters(dedupedServer);
+          saveSemesters(dedupedServer);
+          const nextActiveId = (serverActiveId && dedupedServer.some((s: MySemester) => s.id === serverActiveId))
+            ? serverActiveId
+            : (dedupedServer[0]?.id || null);
+          setActiveSemId(nextActiveId);
+          saveActiveSemId(nextActiveId);
+        } else {
+          // If server has no semesters yet, upload local cache to server so no data is lost
+          const localSaved = loadSemesters();
+          if (localSaved.length > 0) {
+            const currentActive = loadActiveSemId() || localSaved[0]?.id || null;
+            fetch('/api/user-semesters', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                semesters: localSaved,
+                activeSemId: currentActive
+              })
+            }).catch(() => {});
+          }
+        }
+        // Sync tasks from server (independent from semesters)
+        if (Array.isArray(data.tasks)) {
+          if (data.tasks.length > 0) {
+            localStorage.setItem('imamu_student_tasks', JSON.stringify(data.tasks));
+            window.dispatchEvent(new Event('imamu_tasks_updated'));
+          } else {
+            // If server has no tasks yet, push local tasks to server
+            const localTasksRaw = localStorage.getItem('imamu_student_tasks');
+            if (localTasksRaw) {
+              try {
+                const localTasks = JSON.parse(localTasksRaw);
+                if (Array.isArray(localTasks) && localTasks.length > 0) {
+                  fetch('/api/user-tasks', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      Authorization: `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ tasks: localTasks })
+                  }).catch(() => {});
+                }
+              } catch {}
+            }
+          }
+        }
+      } catch (err) {
+        console.error("[SWR Semesters Sync Error]", err);
+      }
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [user, dbUser, getToken]);
 
   // Subjects
   const { data: subjectsData } = useSWR(user ? '/api/subjects' : null, async (url: string) => {
@@ -2944,36 +3199,31 @@ export function AnaPage() {
     return () => document.removeEventListener('mousedown', h);
   }, [isSemDropdownOpen]);
 
-  const syncExamToEvents = (course: CourseEntry) => {
-    if (!course.examDate) return;
-    try {
-      const id = `exam-${course.courseCode}-${course.examDate}`;
-      const existing: any[] = JSON.parse(localStorage.getItem('imamu_local_events') || '[]');
-      const eventIdx = existing.findIndex((e: any) => e.id === id);
-      if (eventIdx >= 0) {
-        existing[eventIdx] = {
-          ...existing[eventIdx],
-          title: 'أختبار نهائي',
-        };
-      } else {
-        existing.push({
-          id,
-          date: course.examTime ? `${course.examDate}T${course.examTime}:00` : course.examDate,
-          time: course.examTime,
-          title: 'أختبار نهائي',
-          description: `اختبار نهائي مقرر ${course.courseName} (${course.courseCode})${course.crn ? ` - CRN: ${course.crn}` : ''}`,
-          calendarType: 'user',
-          isExam: true,
-          courseCode: course.courseCode
-        });
-      }
-      localStorage.setItem('imamu_local_events', JSON.stringify(existing));
-      window.dispatchEvent(new Event('storage'));
-    } catch {}
-  };
+  const syncSemesters = useCallback((next: MySemester[], targetActiveId?: string | null) => {
+    saveSemesters(next);
+    setSemesters(next);
+    if (targetActiveId !== undefined) {
+      setActiveSemId(targetActiveId);
+      saveActiveSemId(targetActiveId);
+    }
+    getToken().then(token => {
+      if (!token) return;
+      const curActiveId = targetActiveId !== undefined ? targetActiveId : (loadActiveSemId() || (next[0]?.id ?? null));
+      fetch('/api/user-semesters', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          semesters: next,
+          activeSemId: curActiveId
+        })
+      }).catch(err => console.error('[Sync Semesters Error]', err));
+    });
+  }, [getToken]);
 
   const syncExam = (course: CourseEntry, allCourses?: CourseEntry[]) => {
-    syncExamToEvents(course);
     syncExamToStudentTasks(course, allCourses || activeSemester?.courses, effectiveSections);
   };
 
@@ -2984,54 +3234,58 @@ export function AnaPage() {
 
   const addSemester = (sem: MySemester) => {
     const next = [...semesters, sem];
-    saveSemesters(next); setSemesters(next);
-    setActiveSemId(sem.id); saveActiveSemId(sem.id);
+    syncSemesters(next, sem.id);
     sem.courses.forEach(c => syncExam(c, sem.courses));
   };
 
   const selectSemester = (id: string) => {
-    setActiveSemId(id); saveActiveSemId(id); setIsSemDropdownOpen(false);
+    setActiveSemId(id);
+    saveActiveSemId(id);
+    setIsSemDropdownOpen(false);
+    getToken().then(token => {
+      if (!token) return;
+      fetch('/api/user-semesters', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ activeSemId: id })
+      }).catch(() => {});
+    });
   };
 
   const deleteSemester = (id: string) => {
     if (!confirm('حذف هذا الفصل؟')) return;
     const next = semesters.filter(s => s.id !== id);
-    saveSemesters(next); setSemesters(next);
-    if (activeSemId === id) {
-      const nid = next[0]?.id || null;
-      setActiveSemId(nid);
-      if (nid) saveActiveSemId(nid);
-    }
+    const nid = activeSemId === id ? (next[0]?.id || null) : activeSemId;
+    syncSemesters(next, nid);
     setIsSemDropdownOpen(false);
   };
 
   const renameSemester = (id: string, newLabel: string) => {
     const next = semesters.map(s => s.id === id ? { ...s, label: newLabel } : s);
-    saveSemesters(next); setSemesters(next);
+    syncSemesters(next);
   };
 
   const updateSemesterDetails = (id: string, newLabel: string, newCourses: CourseEntry[], newEmoji?: string) => {
-    const next = semesters.map(s => s.id === id ? { ...s, label: newLabel, courses: newCourses, emoji: newEmoji ?? s.emoji } : s);
-    saveSemesters(next); setSemesters(next);
-    newCourses.forEach(c => syncExam(c, newCourses));
+    const dedupedCourses = dedupeSemesterCourses(newCourses);
+    const next = semesters.map(s => s.id === id ? { ...s, label: newLabel, courses: dedupedCourses, emoji: newEmoji ?? s.emoji } : s);
+    syncSemesters(next);
+    dedupedCourses.forEach(c => syncExam(c, dedupedCourses));
   };
 
-  const handleAddCourseToSemester = (semesterId: string, course: CourseEntry) => {
+  const handleAddCourseToSemester = (semesterId: string, course: CourseEntry, originalCourseCode?: string) => {
     syncExam(course);
     const next = semesters.map(s => {
       if (s.id !== semesterId) return s;
-      const exists = s.courses.some(c => c.courseCode === course.courseCode);
-      const updatedCourses = exists
-        ? s.courses.map(c => c.courseCode === course.courseCode ? { ...c, ...course } : c)
+      const existingIdx = s.courses.findIndex(c => isSameCourseEntry(c, course, originalCourseCode));
+      const updatedCourses = existingIdx >= 0
+        ? s.courses.map((c, i) => i === existingIdx ? mergeCourseEntries(c, course) : c)
         : [...s.courses, course];
-      return { ...s, courses: updatedCourses };
+      return { ...s, courses: dedupeSemesterCourses(updatedCourses) };
     });
-    saveSemesters(next);
-    setSemesters(next);
-    if (activeSemId !== semesterId) {
-      setActiveSemId(semesterId);
-      saveActiveSemId(semesterId);
-    }
+    syncSemesters(next, semesterId);
   };
 
   const handleDeleteCourseFromSemester = (semesterId: string, courseCode: string, crn?: string) => {
@@ -3045,9 +3299,42 @@ export function AnaPage() {
       });
       return { ...s, courses: updatedCourses };
     });
-    saveSemesters(next);
-    setSemesters(next);
+    syncSemesters(next);
   };
+
+  const syncTasksToServer = useCallback((tasksToSync: StudentTask[]) => {
+    getToken().then(token => {
+      if (!token) return;
+      fetch('/api/user-tasks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ tasks: tasksToSync })
+      }).catch(err => console.error('[Sync Tasks Error]', err));
+    });
+  }, [getToken]);
+
+  useEffect(() => {
+    let timer: any = null;
+    const handleTasksSync = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        try {
+          const raw = localStorage.getItem('imamu_student_tasks');
+          if (raw) {
+            syncTasksToServer(JSON.parse(raw));
+          }
+        } catch {}
+      }, 500);
+    };
+    window.addEventListener('imamu_tasks_updated', handleTasksSync);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('imamu_tasks_updated', handleTasksSync);
+    };
+  }, [syncTasksToServer]);
 
   const handleSaveNewTask = (taskData: Omit<StudentTask, 'id' | 'completed' | 'createdAt'>) => {
     try {
@@ -3241,6 +3528,7 @@ export function AnaPage() {
             }}
             onRename={(newLabel) => activeSemester && renameSemester(activeSemester.id, newLabel)}
             onUpdateSemester={(newLabel, newCourses, newEmoji) => activeSemester && updateSemesterDetails(activeSemester.id, newLabel, newCourses, newEmoji)}
+            onOpenNewSemesterModal={() => setIsWizardOpen(true)}
             subjects={subjects}
           />
         </div>

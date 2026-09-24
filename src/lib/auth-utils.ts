@@ -31,6 +31,11 @@ export function isSmImamuEmail(email?: string): boolean {
 export function sanitizeUser(user: any) {
   if (!user) return user;
   const { passwordHash, ...sanitized } = user;
+  if (sanitized.semesters && typeof sanitized.semesters === 'string') {
+    try {
+      sanitized.semesters = JSON.parse(sanitized.semesters);
+    } catch {}
+  }
   return sanitized;
 }
 

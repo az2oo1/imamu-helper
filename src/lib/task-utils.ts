@@ -155,7 +155,12 @@ function notifyTaskChange() {
 
   try {
     const existing: any[] = JSON.parse(localStorage.getItem('imamu_local_events') || '[]');
-    const cleaned = existing.filter((e: any) => !e.isTask && !String(e.id).startsWith('task-'));
+    const cleaned = existing.filter((e: any) => 
+      !e.isTask && 
+      !String(e.id).startsWith('task-') &&
+      !e.isExam &&
+      !String(e.id).startsWith('exam-')
+    );
     if (cleaned.length !== existing.length) {
       localStorage.setItem('imamu_local_events', JSON.stringify(cleaned));
     }

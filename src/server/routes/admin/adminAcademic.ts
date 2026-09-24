@@ -341,6 +341,43 @@ export function createAdminAcademicRouter(db: any) {
           return ev.calendarType === 'user' && ev.userId && validIds.has(String(ev.userId));
         });
 
+        // Include final exams from user's account semesters
+        if (u && u.semesters) {
+          try {
+            const userSemesters = typeof u.semesters === 'string' ? JSON.parse(u.semesters) : u.semesters;
+            if (Array.isArray(userSemesters)) {
+              for (const sem of userSemesters) {
+                if (Array.isArray(sem?.courses)) {
+                  for (const c of sem.courses) {
+                    if (c && c.examDate) {
+                      const examDateStr = c.examTime ? `${c.examDate}T${c.examTime}:00` : c.examDate;
+                      const courseName = c.courseName || c.courseCode || 'المقرر';
+                      const details = [
+                        `اختبار نهائي مقرر ${courseName} (${c.courseCode || ''})`,
+                        c.crn ? `CRN: ${c.crn}` : '',
+                        c.sectionNumber ? `الشعبة: ${c.sectionNumber}` : '',
+                        c.classroom ? `القاعة: ${c.classroom}` : ''
+                      ].filter(Boolean).join(' | ');
+
+                      userEvents.push({
+                        id: `exam-${c.courseCode || 'course'}-${c.examDate}`,
+                        title: `اختبار نهائي - ${courseName}`,
+                        date: examDateStr,
+                        description: details,
+                        calendarType: 'user',
+                        userId: u.uid || userId,
+                        createdAt: new Date().toISOString()
+                      });
+                    }
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            console.error("[ICS User Semesters Error]", e);
+          }
+        }
+
         if (includeAcademic) {
           const academicEvents = allEvents.filter((ev: any) => !ev.calendarType || ev.calendarType === 'academic');
           filtered = [...academicEvents, ...userEvents];

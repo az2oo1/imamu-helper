@@ -60,15 +60,29 @@ export function NewTaskModal({
     }
   }, [isOpen, taskToEdit, initialCourseCode, initialDate]);
 
+  const availableCourses = React.useMemo(() => {
+    const list = [...courses];
+    if (taskToEdit?.courseCode && !list.some(c => c.courseCode === taskToEdit.courseCode)) {
+      list.unshift({
+        courseCode: taskToEdit.courseCode,
+        courseName: taskToEdit.courseName || taskToEdit.courseCode,
+        creditHours: 3,
+        crn: '',
+        color: taskToEdit.color
+      });
+    }
+    return list;
+  }, [courses, taskToEdit]);
+
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
 
-    const matchedCourse = courses.find(c => c.courseCode === selectedCourseCode);
+    const matchedCourse = availableCourses.find(c => c.courseCode === selectedCourseCode);
     const catObj = TASK_CATEGORIES.find(c => c.key === category);
-    const effectiveColor = selectedCourseCode ? getCourseColor(selectedCourseCode, courses) : '#8c6239';
+    const effectiveColor = selectedCourseCode ? getCourseColor(selectedCourseCode, availableCourses) : '#8c6239';
 
     onSaveTask({
       title: title.trim(),
@@ -76,7 +90,7 @@ export function NewTaskModal({
       category: category || undefined,
       categoryLabel: catObj ? catObj.label : (category || undefined),
       courseCode: selectedCourseCode || undefined,
-      courseName: matchedCourse ? (matchedCourse.courseName || matchedCourse.courseCode) : undefined,
+      courseName: matchedCourse ? (matchedCourse.courseName || matchedCourse.courseCode) : (taskToEdit?.courseCode === selectedCourseCode ? taskToEdit.courseName : undefined),
       dueDate: dueDate || undefined,
       dueTime: dueTime || undefined,
       color: effectiveColor,
@@ -244,7 +258,7 @@ export function NewTaskModal({
                   </div>
 
                   {/* Course Selection */}
-                  {courses.length > 0 && (
+                  {availableCourses.length > 0 && (
                     <div className="space-y-1.5 p-3 rounded-xl bg-slate-50/60 dark:bg-zinc-900/40 border border-slate-200/80 dark:border-zinc-800/80">
                       <div className="flex items-center justify-between">
                         <label className="text-xs font-bold text-slate-700 dark:text-zinc-300">
@@ -253,9 +267,9 @@ export function NewTaskModal({
                         <span className="text-[10px] text-slate-400 dark:text-zinc-500">اختياري</span>
                       </div>
                       <div className="flex flex-wrap gap-1.5">
-                        {courses.map(c => {
+                        {availableCourses.map(c => {
                           const isActive = selectedCourseCode === c.courseCode;
-                          const cColor = getCourseColor(c.courseCode, courses);
+                          const cColor = getCourseColor(c.courseCode, availableCourses);
                           return (
                             <button
                               key={c.courseCode}

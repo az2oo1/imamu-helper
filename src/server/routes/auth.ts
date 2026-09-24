@@ -365,7 +365,7 @@ export function createAuthRouter(db: any) {
   router.post(["/users/me", "/auth/users/me"], requireAuth, async (req: AuthRequest, res): Promise<any> => {
     try {
       if (!req.user) return res.status(401).json({ error: "No user" });
-      let { phone, major, currentGpa, finishedHours, completedCourses, profilePicUrl, userName } = req.body;
+      let { phone, major, currentGpa, finishedHours, completedCourses, profilePicUrl, userName, semesters, activeSemId } = req.body;
 
       const [existingUser] = await db.select().from(users).where(eq(users.uid, req.user.uid));
 
@@ -390,9 +390,23 @@ export function createAuthRouter(db: any) {
         if (stored) profilePicUrl = stored;
       }
 
-      const result = await db.update(users).set({
-        phone, major, currentGpa, finishedHours, completedCourses: completedCourses ? (typeof completedCourses === 'string' ? completedCourses : JSON.stringify(completedCourses)) : null, profilePicUrl, userName
-      }).where(eq(users.uid, req.user.uid)).returning();
+      const updateFields: any = {
+        phone,
+        major,
+        currentGpa,
+        finishedHours,
+        completedCourses: completedCourses ? (typeof completedCourses === 'string' ? completedCourses : JSON.stringify(completedCourses)) : null,
+        profilePicUrl,
+        userName
+      };
+      if (semesters !== undefined) {
+        updateFields.semesters = typeof semesters === 'string' ? semesters : JSON.stringify(semesters);
+      }
+      if (activeSemId !== undefined) {
+        updateFields.activeSemId = activeSemId;
+      }
+
+      const result = await db.update(users).set(updateFields).where(eq(users.uid, req.user.uid)).returning();
 
       const updatedUser = result[0];
 
@@ -445,6 +459,101 @@ export function createAuthRouter(db: any) {
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
+  // Get user saved semesters and tasks
+  router.get(["/user-semesters", "/auth/user-semesters"], requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    try {
+      if (!req.user) return res.status(401).json({ error: "No user" });
+      const records = await db.select({
+        semesters: users.semesters,
+        activeSemId: users.activeSemId,
+        studentTasks: users.studentTasks
+      }).from(users).where(eq(users.uid, req.user.uid));
+
+      if (records.length === 0) return res.json({ semesters: [], activeSemId: null, tasks: [] });
+      const u = records[0];
+      let parsedSemesters: any[] = [];
+      let parsedTasks: any[] = [];
+      if (u.semesters) {
+        try {
+          parsedSemesters = typeof u.semesters === 'string' ? JSON.parse(u.semesters) : u.semesters;
+        } catch {
+          parsedSemesters = [];
+        }
+      }
+      if (u.studentTasks) {
+        try {
+          parsedTasks = typeof u.studentTasks === 'string' ? JSON.parse(u.studentTasks) : u.studentTasks;
+        } catch {
+          parsedTasks = [];
+        }
+      }
+      res.json({ semesters: parsedSemesters, activeSemId: u.activeSemId || null, tasks: parsedTasks });
+    } catch (error: any) {
+      console.error("[Get Semesters Error]", error);
+      res.status(500).json({ error: "Failed to fetch user semesters" });
+    }
+  });
+
+  // Update user saved semesters and tasks
+  router.post(["/user-semesters", "/auth/user-semesters"], requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    try {
+      if (!req.user) return res.status(401).json({ error: "No user" });
+      const { semesters, activeSemId, tasks } = req.body;
+      const updateData: any = {};
+      if (semesters !== undefined) {
+        updateData.semesters = typeof semesters === 'string' ? semesters : JSON.stringify(semesters);
+      }
+      if (activeSemId !== undefined) {
+        updateData.activeSemId = activeSemId;
+      }
+      if (tasks !== undefined) {
+        updateData.studentTasks = typeof tasks === 'string' ? tasks : JSON.stringify(tasks);
+      }
+      if (Object.keys(updateData).length > 0) {
+        await db.update(users).set(updateData).where(eq(users.uid, req.user.uid));
+      }
+      res.json({ success: true, activeSemId: activeSemId || null });
+    } catch (error: any) {
+      console.error("[Save Semesters Error]", error);
+      res.status(500).json({ error: "Failed to save user semesters" });
+    }
+  });
+
+  // Dedicated Tasks endpoints (independent from semesters)
+  router.get(["/user-tasks", "/auth/user-tasks"], requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    try {
+      if (!req.user) return res.status(401).json({ error: "No user" });
+      const records = await db.select({ studentTasks: users.studentTasks }).from(users).where(eq(users.uid, req.user.uid));
+      if (records.length === 0) return res.json({ tasks: [] });
+      let tasks: any[] = [];
+      if (records[0].studentTasks) {
+        try {
+          tasks = typeof records[0].studentTasks === 'string' ? JSON.parse(records[0].studentTasks) : records[0].studentTasks;
+        } catch {
+          tasks = [];
+        }
+      }
+      res.json({ tasks });
+    } catch (err: any) {
+      console.error("[Get Tasks Error]", err);
+      res.status(500).json({ error: "Failed to fetch user tasks" });
+    }
+  });
+
+  router.post(["/user-tasks", "/auth/user-tasks"], requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    try {
+      if (!req.user) return res.status(401).json({ error: "No user" });
+      const { tasks } = req.body;
+      await db.update(users).set({
+        studentTasks: typeof tasks === 'string' ? tasks : JSON.stringify(tasks || [])
+      }).where(eq(users.uid, req.user.uid));
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("[Save Tasks Error]", err);
+      res.status(500).json({ error: "Failed to save user tasks" });
     }
   });
 
