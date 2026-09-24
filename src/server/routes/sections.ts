@@ -6,6 +6,7 @@ import { matchId } from '../../lib/auth-utils';
 import { requireAuth, AuthRequest } from '../../middleware/auth';
 import { checkAdmin } from './admin/common';
 import { normalizeFormattedSchedules, processAndUpsertCatalog } from '../services/sections-importer';
+import { extractFinalExamInfo } from '../../lib/schedule-utils';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -40,6 +41,7 @@ export function formatSectionRow(item: any) {
   const schedules = normalizeFormattedSchedules(item.schedules);
 
   // 3. Final Exam object
+  const { examDate, examTime } = extractFinalExamInfo(item);
   let finalExam = item.finalExam;
   try {
     if (typeof finalExam === 'string' && finalExam.startsWith('{')) {
@@ -51,8 +53,126 @@ export function formatSectionRow(item: any) {
     ...item,
     schedules,
     instructors,
-    finalExam
+    finalExam,
+    examDate: examDate || item.examDate || null,
+    examTime: examTime || item.examTime || null
   };
+}
+
+function isPlaceholderInstructor(name: string): boolean {
+  if (!name) return true;
+  const n = name.trim().toLowerCase();
+  return (
+    n === 'غير محدد' ||
+    n === 'لم يحدد' ||
+    n === 'staff' ||
+    n === 'faculty' ||
+    n === 'tba' ||
+    n === 'tbd' ||
+    n === 'n/a' ||
+    n === 'null' ||
+    n === 'undefined' ||
+    n === '-' ||
+    n === 'بدون محاضر'
+  );
+}
+
+export function aggregateTeachersFromSections(sections: any[]) {
+  const teacherMap = new Map<string, {
+    name: string;
+    email: string | null;
+    campuses: Set<string>;
+    coursesMap: Map<string, {
+      courseCode: string;
+      courseTitle: string;
+      creditHours?: number;
+      sections: any[];
+    }>;
+  }>();
+
+  for (const rawSec of sections) {
+    const sec = formatSectionRow(rawSec);
+    const instructorsList = [...(sec.instructors || [])];
+    if (instructorsList.length === 0 && sec.primaryInstructor && sec.primaryInstructor !== 'غير محدد') {
+      instructorsList.push({
+        name: sec.primaryInstructor,
+        email: sec.primaryInstructorEmail || null
+      });
+    }
+
+    const courseCode = String(sec.courseCode || 'بدون رمز').trim();
+    const courseTitle = String(sec.courseTitle || courseCode).trim();
+    const crn = String(sec.crn || '').trim();
+    const sectionNumber = String(sec.sectionNumber || '').trim();
+    const campus = sec.campus ? String(sec.campus).trim() : null;
+
+    const sectionObj = {
+      crn,
+      sectionNumber,
+      courseCode,
+      courseTitle,
+      campus,
+      instructionalMethod: sec.instructionalMethod || sec.scheduleType || null,
+      creditHours: Number(sec.creditHours) || 3,
+      schedules: sec.schedules || [],
+      scheduleSummary: sec.scheduleSummary || null,
+      academicYear: sec.academicYear || null,
+      semester: sec.semester || null,
+      term: sec.term || null
+    };
+
+    for (const inst of instructorsList) {
+      const rawName = String(inst.name || inst.displayName || '').trim();
+      if (!rawName || isPlaceholderInstructor(rawName)) continue;
+
+      const key = rawName.toLowerCase();
+      if (!teacherMap.has(key)) {
+        teacherMap.set(key, {
+          name: rawName,
+          email: inst.email || null,
+          campuses: new Set(),
+          coursesMap: new Map()
+        });
+      }
+
+      const tEntry = teacherMap.get(key)!;
+      if (!tEntry.email && inst.email) tEntry.email = inst.email;
+      if (campus) tEntry.campuses.add(campus);
+
+      if (!tEntry.coursesMap.has(courseCode)) {
+        tEntry.coursesMap.set(courseCode, {
+          courseCode,
+          courseTitle,
+          creditHours: sectionObj.creditHours,
+          sections: []
+        });
+      }
+
+      const cEntry = tEntry.coursesMap.get(courseCode)!;
+      if (!cEntry.sections.some(s => (crn && s.crn === crn) || s.sectionNumber === sectionNumber)) {
+        cEntry.sections.push(sectionObj);
+      }
+    }
+  }
+
+  const result: any[] = [];
+  teacherMap.forEach((entry, key) => {
+    const courses = Array.from(entry.coursesMap.values());
+    let totalSections = 0;
+    courses.forEach(c => { totalSections += c.sections.length; });
+    result.push({
+      id: key,
+      name: entry.name,
+      email: entry.email,
+      courses,
+      totalCoursesCount: courses.length,
+      totalSectionsCount: totalSections,
+      campuses: Array.from(entry.campuses)
+    });
+  });
+
+  result.sort((a, b) => b.totalSectionsCount - a.totalSectionsCount);
+  return result;
 }
 
 export interface SectionQueryParams {
@@ -441,6 +561,106 @@ export function createSectionsRouter(db: any) {
       res.status(500).json({ error: 'Failed to fetch sections' });
     }
   });
+
+  // ============================================================================
+  // 6.5. ADMIN: GET /admin/teachers - Faculty & instructors aggregated from sections
+  // ============================================================================
+  router.get('/admin/teachers', requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: 'Admin only' });
+    try {
+      const term = String(req.query.term || '').trim();
+      const academicYear = String(req.query.academicYear || '').trim();
+      const semester = String(req.query.semester || '').trim();
+      const campus = String(req.query.campus || '').trim();
+
+      let conditions: any[] = [];
+      if (term && term !== 'all') conditions.push(eq(course_sections.term, term));
+      if (academicYear) conditions.push(eq(course_sections.academicYear, academicYear));
+      if (semester) conditions.push(eq(course_sections.semester, semester));
+      if (campus && campus !== 'all') conditions.push(ilike(course_sections.campus, `%${campus}%`));
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const items = await db
+        .select()
+        .from(course_sections)
+        .where(whereClause);
+
+      const teachers = aggregateTeachersFromSections(items);
+
+      res.json({
+        success: true,
+        teachers,
+        totalTeachers: teachers.length,
+        totalSections: items.length
+      });
+    } catch (err: any) {
+      console.error('[Admin Teachers Error]', err);
+      res.status(500).json({ error: 'Failed to fetch teachers' });
+    }
+  });
+
+  // ============================================================================
+  // 6.6. PUBLIC: GET /teachers & /sections/teachers - Searchable Teachers DB
+  // ============================================================================
+  let cachedAllTeachers: any[] | null = null;
+  let lastTeachersCacheTime = 0;
+  const TEACHERS_CACHE_TTL = 10 * 60 * 1000; // 10 minutes cache
+
+  const handleGetPublicTeachers = async (req: express.Request, res: express.Response): Promise<any> => {
+    try {
+      const search = String(req.query.search || '').trim().toLowerCase();
+      const courseCode = String(req.query.courseCode || '').trim();
+      const term = String(req.query.term || '').trim();
+
+      let teachers: any[];
+      if (!term && !courseCode && cachedAllTeachers && (Date.now() - lastTeachersCacheTime < TEACHERS_CACHE_TTL)) {
+        teachers = cachedAllTeachers;
+      } else {
+        let conditions: any[] = [];
+        if (term && term !== 'all') conditions.push(eq(course_sections.term, term));
+        if (courseCode) conditions.push(ilike(course_sections.courseCode, `%${courseCode}%`));
+        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+        const items = await db.select().from(course_sections).where(whereClause);
+        teachers = aggregateTeachersFromSections(items);
+        if (!term && !courseCode) {
+          cachedAllTeachers = teachers;
+          lastTeachersCacheTime = Date.now();
+        }
+      }
+
+      if (search) {
+        teachers = teachers.filter(t =>
+          t.name.toLowerCase().includes(search) ||
+          (t.email && t.email.toLowerCase().includes(search)) ||
+          t.courses.some((c: any) =>
+            c.courseCode.toLowerCase().includes(search) ||
+            c.courseTitle.toLowerCase().includes(search)
+          )
+        );
+      }
+
+      res.json({
+        success: true,
+        teachers: teachers.map(t => ({
+          id: t.id,
+          name: t.name,
+          email: t.email,
+          courses: t.courses.map((c: any) => ({
+            courseCode: c.courseCode,
+            courseTitle: c.courseTitle
+          }))
+        }))
+      });
+    } catch (err: any) {
+      console.error('[Public Teachers Error]', err);
+      res.status(500).json({ error: 'Failed to fetch teachers' });
+    }
+  };
+
+  router.get('/teachers', handleGetPublicTeachers);
+  router.get('/sections/teachers', handleGetPublicTeachers);
 
   // ============================================================================
   // 7. ADMIN: GET /admin/sections/stats - Metrics overview

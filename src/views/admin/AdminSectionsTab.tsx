@@ -1,14 +1,15 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Calendar, Search, Filter, RefreshCw, Upload, CheckCircle2,
   AlertTriangle, Trash2, Clock, MapPin, User, Users,
   BookOpen, ChevronRight, ChevronLeft, Eye, X, FileText, Loader2,
   Check, Layers, Sparkles, Folder, FolderOpen, FolderPlus, ArrowRight,
-  Copy, Mail
+  Copy, Mail, UserCheck, ChevronDown, ChevronUp
 } from 'lucide-react';
 import clsx from 'clsx';
+import { motion, AnimatePresence } from 'framer-motion';
 import { formatScheduleDaysDisplay } from '../../lib/schedule-utils';
 
 interface ScheduleMeeting {
@@ -89,11 +90,27 @@ export function loadSharedFolders(): Array<{ name: string; academicYear?: string
 
 export default function AdminSectionsTab({
   getToken,
-  toast
+  toast,
+  defaultSubTab = 'sections'
 }: {
   getToken: () => Promise<string>;
   toast: (type: 'success' | 'error' | 'info' | 'warning', message: string) => void;
+  defaultSubTab?: 'sections' | 'teachers';
 }) {
+  const [activeSubTab, setActiveSubTab] = useState<'sections' | 'teachers'>(defaultSubTab);
+  const [teachers, setTeachers] = useState<any[]>([]);
+  const [teachersLoading, setTeachersLoading] = useState(false);
+  const [teacherSearch, setTeacherSearch] = useState('');
+  const [expandedTeacherIds, setExpandedTeacherIds] = useState<Record<string, boolean>>({});
+
+  const toggleTeacherExpanded = (id: string) => {
+    setExpandedTeacherIds(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  useEffect(() => {
+    setActiveSubTab(defaultSubTab);
+  }, [defaultSubTab]);
+
   const [sections, setSections] = useState<SectionItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
@@ -189,6 +206,44 @@ export default function AdminSectionsTab({
       setSelectedExistingFolderId(selectedFolder && selectedFolder !== 'all' ? selectedFolder.id : folders[0].id);
     }
   }, [folders, selectedFolder, selectedExistingFolderId]);
+
+  // Fetch teachers list from backend API
+  const fetchTeachers = useCallback(async () => {
+    setTeachersLoading(true);
+    try {
+      const token = await getToken();
+      const termParam = selectedFolder && selectedFolder !== 'all' ? (selectedFolder.term || selectedFolder.name) : '';
+      const url = termParam ? `/api/admin/teachers?term=${encodeURIComponent(termParam)}` : '/api/admin/teachers';
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const data = await res.json();
+        setTeachers(data.teachers || []);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setTeachersLoading(false);
+    }
+  }, [getToken, selectedFolder]);
+
+  useEffect(() => {
+    if (activeSubTab === 'teachers') {
+      fetchTeachers();
+    }
+  }, [activeSubTab, fetchTeachers]);
+
+  const filteredTeachers = useMemo(() => {
+    if (!teacherSearch.trim()) return teachers;
+    const q = teacherSearch.trim().toLowerCase();
+    return teachers.filter(t =>
+      t.name.toLowerCase().includes(q) ||
+      (t.email && t.email.toLowerCase().includes(q)) ||
+      (t.courses && t.courses.some((c: any) =>
+        c.courseCode.toLowerCase().includes(q) ||
+        c.courseTitle.toLowerCase().includes(q)
+      ))
+    );
+  }, [teachers, teacherSearch]);
 
   // Fetch sections list (only invoked when a folder is selected)
   const fetchSections = useCallback(async () => {
@@ -417,6 +472,7 @@ export default function AdminSectionsTab({
         saveSharedFolders([newFolderObj, ...currentSaved.filter(f => f.term !== finalTerm && f.name !== finalTerm)]);
         fetchSections();
         fetchTerms();
+        fetchTeachers();
       } else {
         toast('error', data.error || 'فشلت المزامنة المباشرة');
       }
@@ -488,6 +544,7 @@ export default function AdminSectionsTab({
         saveSharedFolders([newFolderObj, ...currentSaved.filter(f => f.term !== finalTerm && f.name !== finalTerm)]);
         fetchSections();
         fetchTerms();
+        fetchTeachers();
       } else {
         toast('error', data.error || 'فشل استيراد البيانات');
       }
@@ -501,7 +558,224 @@ export default function AdminSectionsTab({
 
   return (
     <div className="space-y-6 animate-fadeIn" dir="rtl">
-      {selectedFolder === null ? (
+      {/* Top View Toggle: Sections vs Teachers */}
+      <div className="flex items-center justify-between flex-wrap gap-3 pb-2 border-b border-slate-200 dark:border-zinc-800">
+        <div className="flex items-center gap-1.5 p-1 rounded-2xl border bg-slate-100/80 dark:bg-zinc-800/80 border-slate-200 dark:border-zinc-700 w-fit">
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('sections')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+              activeSubTab === 'sections'
+                ? 'bg-white dark:bg-zinc-900 text-amber-700 dark:text-amber-400 shadow-sm'
+                : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Layers className="w-4 h-4" />
+            <span>الشعب والمواعيد</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('teachers')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+              activeSubTab === 'teachers'
+                ? 'bg-white dark:bg-zinc-900 text-amber-700 dark:text-amber-400 shadow-sm'
+                : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <UserCheck className="w-4 h-4" />
+            <span>هيئة التدريس</span>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => {
+              setUploadFolderMode('existing');
+              setImportFile(null);
+              setImportResult(null);
+              setIsImportModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl transition shadow-md border border-amber-700/30 cursor-pointer"
+          >
+            <Upload className="w-4 h-4" />
+            <span>استيراد شعب (JSON)</span>
+          </button>
+          <button
+            onClick={() => {
+              if (activeSubTab === 'teachers') fetchTeachers();
+              else { fetchSections(); fetchTerms(); }
+            }}
+            disabled={loading || teachersLoading}
+            className="p-2 rounded-xl border transition hover:bg-slate-100 dark:hover:bg-zinc-800"
+            style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
+            title="تحديث البيانات"
+          >
+            <RefreshCw className={`w-4 h-4 ${(loading || teachersLoading) ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+      </div>
+
+      {activeSubTab === 'teachers' ? (
+        <div className="space-y-6">
+          {/* Header & Term Selector for Teachers */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <div>
+              <h2 className="text-xl font-black" style={{ color: 'var(--text-main)' }}>
+                أعضاء هيئة التدريس والمحاضرين
+              </h2>
+              <p className="text-xs sm:text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                كشف بجميع أعضاء هيئة التدريس والمقررات والشُعب المسندة لهم من واقع بيانات الشُعب المسجلة.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold text-slate-500">الفصل الدراسي:</span>
+              <select
+                value={selectedFolder && selectedFolder !== 'all' ? selectedFolder.id : 'all'}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === 'all') handleSelectFolder('all');
+                  else {
+                    const f = folders.find(x => x.id === val);
+                    if (f) handleSelectFolder(f);
+                  }
+                }}
+                className="px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer"
+                style={{ background: 'var(--bg-main)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
+              >
+                <option value="all">كافة الفصول المسجلة</option>
+                {folders.map(f => (
+                  <option key={f.id} value={f.id}>{f.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Search Box */}
+          <div className="relative">
+            <Search className="w-4 h-4 absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={teacherSearch}
+              onChange={(e) => setTeacherSearch(e.target.value)}
+              placeholder="ابحث باسم المحاضر، البريد، أو رمز المقرر..."
+              className="w-full pr-10 pl-4 py-2.5 rounded-xl border text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+              style={{ background: 'var(--bg-main)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
+            />
+          </div>
+
+          {/* Loading or Empty or Cards */}
+          {teachersLoading ? (
+            <div className="p-12 text-center">
+              <RefreshCw className="w-6 h-6 animate-spin mx-auto text-amber-600 mb-2" />
+              <p className="text-xs font-bold text-slate-500">جاري تحميل قائمة المحاضرين...</p>
+            </div>
+          ) : filteredTeachers.length === 0 ? (
+            <div className="p-12 text-center border rounded-2xl" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-card)' }}>
+              <Users className="w-10 h-10 mx-auto text-slate-300 dark:text-zinc-600 mb-2" />
+              <p className="text-sm font-bold" style={{ color: 'var(--text-main)' }}>
+                {teachers.length === 0 ? 'لا توجد شُعب مسجلة لاستخراج المحاضرين منها' : 'لا توجد نتائج مطابقة لبحثك'}
+              </p>
+              {teachers.length === 0 && (
+                <button
+                  onClick={() => setIsImportModalOpen(true)}
+                  className="mt-3 px-4 py-2 bg-[var(--color-imamu-brown)] text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
+                >
+                  استيراد ملف الشُعب الآن
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredTeachers.map((teacher: any) => (
+                <div
+                  key={teacher.id}
+                  className="p-4 rounded-2xl border transition hover:shadow-md flex flex-col justify-between gap-3"
+                  style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h3 className="text-sm font-black" style={{ color: 'var(--text-main)' }}>
+                          {teacher.name}
+                        </h3>
+                        {teacher.email ? (
+                          <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5">
+                            <Mail className="w-3 h-3 text-[var(--color-imamu-accent)]" />
+                            <span dir="ltr" className="font-mono text-[11px]">{teacher.email}</span>
+                            <button
+                              onClick={() => copyEmail(teacher.email)}
+                              className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-zinc-700"
+                              title="نسخ البريد"
+                            >
+                              {copiedEmail === teacher.email ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3 text-slate-400" />}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-slate-400">البريد غير متوفر</span>
+                        )}
+                      </div>
+                      <span
+                        className="px-2.5 py-1 rounded-xl text-xs font-black shrink-0"
+                        style={{
+                          backgroundColor: 'color-mix(in srgb, var(--color-imamu-accent) 12%, transparent)',
+                          color: 'var(--color-imamu-accent)',
+                        }}
+                      >
+                        {teacher.courses?.length || 0} مقررات
+                      </span>
+                    </div>
+
+                    {/* Slide down button to show what they teach */}
+                    {teacher.courses && teacher.courses.length > 0 && (
+                      <div className="pt-1">
+                        <button
+                          type="button"
+                          onClick={() => toggleTeacherExpanded(teacher.id)}
+                          className="flex items-center gap-1.5 text-xs font-bold text-[var(--color-imamu-accent)] hover:underline cursor-pointer select-none py-1"
+                        >
+                          <span>{expandedTeacherIds[teacher.id] ? 'إخفاء ما يدرّسه' : 'عرض ما يدرّسه'}</span>
+                          {expandedTeacherIds[teacher.id] ? (
+                            <ChevronUp className="w-3.5 h-3.5" />
+                          ) : (
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+
+                        <AnimatePresence>
+                          {expandedTeacherIds[teacher.id] && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              exit={{ opacity: 0, height: 0 }}
+                              className="overflow-hidden"
+                            >
+                              <div className="flex flex-wrap gap-1.5 pt-2 border-t mt-1" style={{ borderColor: 'var(--border-color)' }}>
+                                {teacher.courses.map((c: any) => (
+                                  <div
+                                    key={c.courseCode}
+                                    className="px-2.5 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5"
+                                    style={{ background: 'var(--bg-main)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
+                                  >
+                                    <BookOpen className="w-3.5 h-3.5 text-[var(--color-imamu-accent)] shrink-0" />
+                                    <span className="font-bold text-[var(--color-imamu-accent)]">{c.courseCode}</span>
+                                    <span>{c.courseTitle}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        selectedFolder === null ? (
         /* ================================================================ */
         /* VIEW A: Folders Explorer (استعراض الفصول كمجلدات فقط)             */
         /* ================================================================ */
@@ -1048,7 +1322,7 @@ export default function AdminSectionsTab({
             )}
           </div>
         </div>
-      )}
+      ))}
 
       {/* ==================================================================== */}
       {/* MODAL 1: Section Details (المواعيد والقاعات التفصيلية) */}

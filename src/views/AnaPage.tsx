@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../lib/AuthContext';
 import {
@@ -8,7 +9,7 @@ import {
   BookOpen, GraduationCap, Sparkles, X, Check, ChevronRight,
   ChevronLeft, Search, Loader2, AlertCircle, CalendarPlus,
   Trash2, TrendingUp, Tv, Settings, Folder, FolderOpen, FolderPlus,
-  CheckSquare, Pencil, MoreVertical
+  Pencil, MoreVertical
 } from 'lucide-react';
 import { SpotlightCard, AnimatedNumber } from '../components/ui';
 import { motion, AnimatePresence } from 'motion/react';
@@ -21,7 +22,18 @@ import { TimingEditor, ScheduleItem } from '../components/TimingEditor';
 import { AddCourseModal } from '../components/AddCourseModal';
 import { SpeedDialPlusMenu } from '../components/SpeedDialPlusMenu';
 import { WeeklySchedule } from '../components/WeeklySchedule';
-import { parseScheduleDays, parseTimeRange, COURSE_CARD_PALETTES } from '../lib/schedule-utils';
+import { parseScheduleDays, parseTimeRange, COURSE_CARD_PALETTES, extractFinalExamInfo, parseTimeToMinutes, DAY_MAP_AR, formatMinutesToTime } from '../lib/schedule-utils';
+import { NewTaskModal } from '../components/NewTaskModal';
+import {
+  StudentTask,
+  TASK_CATEGORIES,
+  formatTaskCountdown,
+  formatTaskDuePill,
+  syncTaskToCalendar,
+  removeTaskFromCalendar,
+  getCourseColor,
+  COURSE_HEX_COLORS
+} from '../lib/task-utils';
 
 // ─────────────────────────────────────────────
 // Types
@@ -39,11 +51,20 @@ interface CourseEntry {
   whatsappLink?: string;
   primaryInstructor?: string;
   instructors?: { name: string; email?: string; isPrimary?: boolean }[];
+  color?: string;
 }
+
+const SEMESTER_EMOJIS = [
+  '🎓', '📚', '💻', '🔬', '⚡', '💡',
+  '🏛️', '📝', '🎯', '🌟', '🚀', '🏆',
+  '🎨', '🧠', '🌿', '☕', '🪐', '🧭',
+  '📖', '🧪', '📐', '📊', '💼', '🥇'
+];
 
 interface MySemester {
   id: string;
   label: string;
+  emoji?: string;
   academicYear: string;
   semester: string;
   term: string;
@@ -79,6 +100,7 @@ interface SectionData {
   academicYear?: string;
   semester?: string;
   term?: string;
+  color?: string;
 }
 
 // ─────────────────────────────────────────────
@@ -112,6 +134,69 @@ function saveActiveSemId(id: string | null) {
 
 function genId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+export function syncExamToStudentTasks(course: CourseEntry, allCourses?: CourseEntry[], effectiveSections?: SectionData[]) {
+  if (!course.examDate) return;
+  try {
+    const taskId = `exam-${course.courseCode}`;
+    const dismissed: string[] = JSON.parse(localStorage.getItem('imamu_dismissed_exam_tasks') || '[]');
+    if (dismissed.includes(taskId)) return;
+
+    const raw = localStorage.getItem('imamu_student_tasks');
+    const curTasks: StudentTask[] = raw ? JSON.parse(raw) : [];
+    const existingIndex = curTasks.findIndex(t => t.id === taskId);
+
+    let taskColor = '#8c6239';
+    if (effectiveSections && effectiveSections.length > 0) {
+      const secIdx = effectiveSections.findIndex(s => {
+        const sCode = s.courseCode?.trim().toLowerCase();
+        const sTitle = s.courseTitle?.trim().toLowerCase();
+        const cCode = course.courseCode?.trim().toLowerCase();
+        const cTitle = course.courseName?.trim().toLowerCase();
+        if (course.crn && s.crn && String(s.crn) === String(course.crn)) return true;
+        if (cCode && sCode && (sCode === cCode || sCode.includes(cCode) || cCode.includes(sCode))) return true;
+        if (cTitle && sTitle && (sTitle === cTitle || sTitle.includes(cTitle) || cTitle.includes(sTitle))) return true;
+        return false;
+      });
+      if (secIdx >= 0) {
+        taskColor = COURSE_HEX_COLORS[secIdx % COURSE_HEX_COLORS.length];
+      }
+    }
+    if (taskColor === '#8c6239') {
+      taskColor = getCourseColor(course.courseCode, allCourses);
+    }
+    const taskData: StudentTask = {
+      id: taskId,
+      title: 'أختبار نهائي',
+      completed: existingIndex >= 0 ? curTasks[existingIndex].completed : false,
+      priority: 'high',
+      category: 'Final Exam',
+      categoryLabel: 'اختبار نهائي',
+      courseCode: course.courseCode,
+      courseName: course.courseName,
+      dueDate: course.examDate,
+      dueTime: course.examTime,
+      color: taskColor,
+      createdAt: existingIndex >= 0 ? curTasks[existingIndex].createdAt : new Date().toISOString(),
+    };
+
+    let updatedTasks: StudentTask[];
+    if (existingIndex >= 0) {
+      updatedTasks = [...curTasks];
+      updatedTasks[existingIndex] = {
+        ...updatedTasks[existingIndex],
+        ...taskData,
+        title: 'أختبار نهائي',
+        completed: curTasks[existingIndex].completed,
+      };
+    } else {
+      updatedTasks = [taskData, ...curTasks];
+    }
+    localStorage.setItem('imamu_student_tasks', JSON.stringify(updatedTasks));
+    syncTaskToCalendar();
+    window.dispatchEvent(new Event('imamu_tasks_updated'));
+  } catch {}
 }
 
 // ─────────────────────────────────────────────
@@ -186,7 +271,7 @@ function SegmentedBar({ percent, total = 22 }: { percent: number; total?: number
           key={i}
           className={`flex-1 h-3.5 rounded-[2.5px] transition-colors ${
             i < filled
-              ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.25)]'
+              ? 'bg-emerald-500'
               : 'bg-slate-200 dark:bg-zinc-800 border border-slate-300/40 dark:border-zinc-700/50'
           }`}
         />
@@ -232,7 +317,7 @@ function ProgressMetricCard({
   };
 
   return (
-    <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800/90 rounded-2xl p-4 flex flex-col gap-3 shadow-xs transition hover:border-slate-300 dark:hover:border-zinc-700">
+    <div className="flex flex-col gap-2.5 py-3 transition-colors">
       {/* Top row */}
       <div className="flex items-center justify-between text-xs font-bold text-slate-900 dark:text-white">
         <div className="flex items-center gap-1.5 min-w-0">
@@ -275,9 +360,11 @@ function EditSemesterModal({
   semester: MySemester;
   allSubjects: any[];
   onClose: () => void;
-  onSave: (newLabel: string, newCourses: CourseEntry[]) => void;
+  onSave: (newLabel: string, newCourses: CourseEntry[], newEmoji?: string) => void;
 }) {
   const [label, setLabel] = useState(semester.label || '');
+  const [emoji, setEmoji] = useState(semester.emoji || '🎓');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [courses, setCourses] = useState<CourseEntry[]>(semester.courses || []);
   const [crnInput, setCrnInput] = useState('');
   const [isFetchingCrn, setIsFetchingCrn] = useState(false);
@@ -318,12 +405,15 @@ function EditSemesterModal({
             const crn = String(sec.crn || '').trim();
             const exists = next.some(c => c.courseCode === courseCode || (crn && c.crn === crn));
             if (!exists) {
+              const { examDate, examTime } = extractFinalExamInfo(sec);
               next.push({
                 subjectId: sec.subjectId,
                 courseCode: courseCode,
                 courseName: sec.courseTitle || courseCode,
                 crn: crn,
                 creditHours: sec.creditHours || 3,
+                examDate,
+                examTime,
               });
               addedCount++;
             }
@@ -378,13 +468,20 @@ function EditSemesterModal({
   const totalHours = courses.reduce((sum, c) => sum + (c.creditHours || 0), 0);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose} dir="rtl">
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center" dir="rtl">
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        transition={{ duration: 0.15 }}
-        className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-5 sm:p-6 w-full max-w-lg shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-slate-900/50 dark:bg-black/70 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <motion.div
+        initial={{ opacity: 0, y: 48 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 24 }}
+        transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+        className="relative w-full sm:max-w-lg bg-white dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800 rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 shadow-2xl flex flex-col max-h-[88vh] overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -407,57 +504,127 @@ function EditSemesterModal({
           </button>
         </div>
 
-        {/* Body (scrollable) */}
-        <div className="flex-1 overflow-y-auto py-4 space-y-4 min-h-0 pr-1 pl-1">
-          {/* Semester Name input */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">اسم الفصل</label>
+        {/* Pinned: Semester Name & Emoji Picker */}
+        <div className="pt-3 pb-3 border-b border-slate-100 dark:border-zinc-800/80 shrink-0">
+          <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">اسم الفصل</label>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowEmojiPicker(prev => !prev)}
+                className="w-12 h-10 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 flex items-center justify-center text-xl hover:bg-slate-100 dark:hover:bg-zinc-700/60 transition cursor-pointer shrink-0 shadow-2xs"
+                title="تغيير إيموجي الفصل"
+              >
+                <span>{emoji || '🎓'}</span>
+              </button>
+              <AnimatePresence>
+                {showEmojiPicker && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowEmojiPicker(false)} />
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute top-full mt-2 right-0 z-50 p-2.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xl w-64"
+                      dir="rtl"
+                      onClick={e => e.stopPropagation()}
+                    >
+                      <p className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 mb-2 px-1">اختر أيقونة الفصل الدراسي:</p>
+                      <div className="grid grid-cols-6 gap-1.5 max-h-44 overflow-y-auto pr-0.5 custom-scrollbar">
+                        {SEMESTER_EMOJIS.map(em => (
+                          <button
+                            key={em}
+                            type="button"
+                            onClick={() => { setEmoji(em); setShowEmojiPicker(false); }}
+                            className={clsx(
+                              "w-8 h-8 rounded-xl flex items-center justify-center text-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer",
+                              emoji === em && "bg-[var(--color-imamu-accent)]/15 ring-2 ring-[var(--color-imamu-accent)]"
+                            )}
+                          >
+                            {em}
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
+
             <input
               type="text"
               value={label}
               onChange={e => setLabel(e.target.value)}
               placeholder="مثال: المستوى الثاني"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800/80 text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:ring-2 focus:ring-[var(--color-imamu-accent)]/30 focus:border-[var(--color-imamu-accent)] transition"
+              className="flex-1 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800/80 text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:ring-2 focus:ring-[var(--color-imamu-accent)]/30 focus:border-[var(--color-imamu-accent)] transition"
             />
           </div>
+        </div>
 
-          {/* Quick CRN Lookup Box */}
-          <div className="bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/60 rounded-2xl p-3.5 flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                إضافة مادة بالـ CRN (رقم الشعبة)
-              </span>
-              <span className="text-[10px] text-emerald-600 dark:text-emerald-400">
-                يجلب المادة وبياناتها تلقائياً
-              </span>
+        {/* Body (scrollable) */}
+        <div className="flex-1 overflow-y-auto py-3 space-y-4 min-h-0 pr-1 pl-1">
+          {/* Quick CRN Lookup Box (Gray style - matching AddCourseModal) */}
+          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/40 border border-slate-200/80 dark:border-zinc-800 space-y-3">
+            <div>
+              <label className="text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-2 mb-1">
+                <span>الرقم المرجعي للشعبة (CRN)</span>
+              </label>
             </div>
+
             <div className="flex gap-2">
-              <input
-                type="text"
-                value={crnInput}
-                onChange={e => setCrnInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleFetchCrn(); } }}
-                placeholder="أدخل الـ CRN (مثال: 21045, 21048)..."
-                className="flex-1 px-3 py-2 bg-white dark:bg-zinc-900 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs font-mono text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:ring-2 focus:ring-emerald-500/30"
-              />
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={crnInput}
+                  onChange={e => {
+                    setCrnInput(e.target.value);
+                    if (crnFeedback) setCrnFeedback(null);
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleFetchCrn();
+                    }
+                  }}
+                  placeholder="أدخل الـ CRN (مثال: 10245)"
+                  className="w-full px-4 py-2.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none focus:border-[var(--color-imamu-accent)] focus:ring-1 focus:ring-[var(--color-imamu-accent)] shadow-xs transition text-center sm:text-right"
+                />
+              </div>
               <button
                 type="button"
                 disabled={isFetchingCrn || !crnInput.trim()}
                 onClick={handleFetchCrn}
-                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shrink-0 shadow-xs"
+                className="px-4 py-2.5 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] disabled:opacity-40 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shrink-0 shadow-xs"
               >
                 {isFetchingCrn ? (
-                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> جارٍ الجلب...</>
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>جلب...</span>
+                  </>
                 ) : (
-                  <><Plus className="w-3.5 h-3.5" /> جلب وإضافة</>
+                  <>
+                    <Search className="w-4 h-4" />
+                    <span>جلب البيانات</span>
+                  </>
                 )}
               </button>
             </div>
+
             {crnFeedback && (
-              <p className={clsx("text-[11px] font-semibold mt-0.5", crnFeedback.type === 'success' ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400")}>
-                {crnFeedback.msg}
-              </p>
+              <div className={clsx(
+                "p-3 rounded-xl border text-xs flex items-center gap-2",
+                crnFeedback.type === 'success'
+                  ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                  : "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
+              )}>
+                {crnFeedback.type === 'success' ? (
+                  <Check className="w-4 h-4 shrink-0 text-emerald-500" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 shrink-0 text-amber-500" />
+                )}
+                <span>{crnFeedback.msg}</span>
+              </div>
             )}
           </div>
 
@@ -567,7 +734,7 @@ function EditSemesterModal({
           <button
             type="button"
             onClick={() => {
-              onSave(label.trim() || semester.label, courses);
+              onSave(label.trim() || semester.label, courses, emoji);
             }}
             className="flex-1 py-2.5 rounded-xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
           >
@@ -596,7 +763,8 @@ function SidebarInsights({
   dbUser,
   effectiveSections = [],
   onOpenCourseDetails,
-  onAddExam,
+  onOpenNewTaskModal,
+  onEditTask,
   onRename,
   onUpdateSemester,
   subjects = [],
@@ -606,9 +774,10 @@ function SidebarInsights({
   dbUser: any;
   effectiveSections?: SectionData[];
   onOpenCourseDetails?: (course: CourseEntry) => void;
-  onAddExam?: (course: CourseEntry) => void;
+  onOpenNewTaskModal?: () => void;
+  onEditTask?: (task: StudentTask) => void;
   onRename?: (newLabel: string) => void;
-  onUpdateSemester?: (newLabel: string, newCourses: CourseEntry[]) => void;
+  onUpdateSemester?: (newLabel: string, newCourses: CourseEntry[], newEmoji?: string) => void;
   subjects?: any[];
 }) {
   const now = useCurrentTime();
@@ -624,21 +793,49 @@ function SidebarInsights({
   // Edit Semester & Courses modal state
   const [showEditModal, setShowEditModal] = useState(false);
 
-
-  // Tasks state with localStorage persistence
-  const [tasks, setTasks] = useState<{ id: string; title: string; completed: boolean }[]>([]);
-  const [newTaskTitle, setNewTaskTitle] = useState('');
+  // Tasks state with localStorage persistence & category collapse
+  const [tasks, setTasks] = useState<StudentTask[]>([]);
+  const [isUpcomingOpen, setIsUpcomingOpen] = useState(true);
+  const [isLateOpen, setIsLateOpen] = useState(true);
+  const [isFinishedOpen, setIsFinishedOpen] = useState(false);
+  const [activeTaskMenu, setActiveTaskMenu] = useState<{
+    task: StudentTask;
+    x: number;
+    y: number;
+    openUpwards: boolean;
+  } | null>(null);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('imamu_student_tasks');
-      if (raw) setTasks(JSON.parse(raw));
-    } catch {
-      // ignore
-    }
+    const handleCloseMenu = () => setActiveTaskMenu(null);
+    window.addEventListener('click', handleCloseMenu);
+    window.addEventListener('scroll', handleCloseMenu, true);
+    window.addEventListener('resize', handleCloseMenu);
+    return () => {
+      window.removeEventListener('click', handleCloseMenu);
+      window.removeEventListener('scroll', handleCloseMenu, true);
+      window.removeEventListener('resize', handleCloseMenu);
+    };
   }, []);
 
-  const saveTasks = (newTasks: { id: string; title: string; completed: boolean }[]) => {
+  useEffect(() => {
+    const loadTasks = () => {
+      try {
+        const raw = localStorage.getItem('imamu_student_tasks');
+        if (raw) setTasks(JSON.parse(raw));
+      } catch {
+        // ignore
+      }
+    };
+    loadTasks();
+    window.addEventListener('storage', loadTasks);
+    window.addEventListener('imamu_tasks_updated', loadTasks);
+    return () => {
+      window.removeEventListener('storage', loadTasks);
+      window.removeEventListener('imamu_tasks_updated', loadTasks);
+    };
+  }, []);
+
+  const saveTasks = (newTasks: StudentTask[]) => {
     setTasks(newTasks);
     try {
       localStorage.setItem('imamu_student_tasks', JSON.stringify(newTasks));
@@ -647,23 +844,34 @@ function SidebarInsights({
     }
   };
 
-  const handleAddTask = (e: React.FormEvent) => {
-    e.preventDefault();
-    const t = newTaskTitle.trim();
-    if (!t) return;
-    const updated = [{ id: Date.now().toString(), title: t, completed: false }, ...tasks];
-    saveTasks(updated);
-    setNewTaskTitle('');
-  };
 
   const toggleTask = (id: string) => {
-    const updated = tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t);
+    const updated = tasks.map(t => {
+      if (t.id === id) {
+        const next = { ...t, completed: !t.completed };
+        syncTaskToCalendar();
+        return next;
+      }
+      return t;
+    });
     saveTasks(updated);
+    window.dispatchEvent(new Event('imamu_tasks_updated'));
   };
 
   const deleteTask = (id: string) => {
+    removeTaskFromCalendar();
+    if (id.startsWith('exam-')) {
+      try {
+        const dismissed: string[] = JSON.parse(localStorage.getItem('imamu_dismissed_exam_tasks') || '[]');
+        if (!dismissed.includes(id)) {
+          dismissed.push(id);
+          localStorage.setItem('imamu_dismissed_exam_tasks', JSON.stringify(dismissed));
+        }
+      } catch {}
+    }
     const updated = tasks.filter(t => t.id !== id);
     saveTasks(updated);
+    window.dispatchEvent(new Event('imamu_tasks_updated'));
   };
 
   useEffect(() => {
@@ -816,6 +1024,208 @@ function SidebarInsights({
   const finishedHours = dbUser?.finishedHours || 0;
   const semesterCreditHours = activeSemester?.courses.reduce((sum, c) => sum + (c.creditHours || 0), 0) || 0;
 
+  // Extract today's classes/lectures
+  const todayDayOfWeek = now.getDay(); // 0: Sun, 1: Mon, ...
+  const todayClasses = useMemo(() => {
+    const list: {
+      id: string;
+      courseCode: string;
+      courseName: string;
+      startTimeStr: string;
+      endTimeStr: string;
+      startMinutes: number;
+      endMinutes: number;
+      room?: string;
+      color: string;
+      isOngoing: boolean;
+      isUpcoming: boolean;
+      isPassed: boolean;
+    }[] = [];
+
+    const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
+
+    // Map through effectiveSections
+    (effectiveSections || []).forEach((sec, sIdx) => {
+      const matchedIdx = sec.color ? COURSE_HEX_COLORS.indexOf(sec.color) : -1;
+      const color = sec.color || COURSE_HEX_COLORS[(matchedIdx >= 0 ? matchedIdx : sIdx) % COURSE_HEX_COLORS.length];
+      const schedList = Array.isArray(sec.schedules) ? sec.schedules : [];
+
+      schedList.forEach((sch, scIdx) => {
+        const rawDays = parseScheduleDays(sch);
+        const { startTime, endTime, startMinutes, endMinutes } = parseTimeRange(
+          sch.timeRange,
+          sch.startTime || '08:00 am',
+          sch.endTime || '09:50 am'
+        );
+
+        const isToday = rawDays.some(d => {
+          const mapped = DAY_MAP_AR[d] || d;
+          if (mapped === 'الأحد' && todayDayOfWeek === 0) return true;
+          if (mapped === 'الاثنين' && todayDayOfWeek === 1) return true;
+          if (mapped === 'الثلاثاء' && todayDayOfWeek === 2) return true;
+          if (mapped === 'الأربعاء' && todayDayOfWeek === 3) return true;
+          if (mapped === 'الخميس' && todayDayOfWeek === 4) return true;
+          if (mapped === 'الجمعة' && todayDayOfWeek === 5) return true;
+          if (mapped === 'السبت' && todayDayOfWeek === 6) return true;
+          return false;
+        });
+
+        if (isToday) {
+          list.push({
+            id: `${sec.id || sec.courseCode}_${scIdx}_${startMinutes}`,
+            courseCode: sec.courseCode,
+            courseName: sec.courseTitle || sec.courseCode,
+            startTimeStr: startTime,
+            endTimeStr: endTime,
+            startMinutes,
+            endMinutes,
+            room: sch.room,
+            color,
+            isOngoing: currentTotalMinutes >= startMinutes && currentTotalMinutes <= endMinutes,
+            isUpcoming: currentTotalMinutes < startMinutes,
+            isPassed: currentTotalMinutes > endMinutes,
+          });
+        }
+      });
+    });
+
+    // Fallback to activeSemester.courses if effectiveSections had no schedules for today
+    if (list.length === 0 && activeSemester?.courses) {
+      activeSemester.courses.forEach((c, cIdx) => {
+        const color = c.color || COURSE_HEX_COLORS[cIdx % COURSE_HEX_COLORS.length];
+        const customSched = Array.isArray(c.customSchedule) ? c.customSchedule : [];
+        customSched.forEach((sch: any, scIdx: number) => {
+          const rawDays = parseScheduleDays(sch.days || sch);
+          const { startTime, endTime, startMinutes, endMinutes } = parseTimeRange(
+            undefined,
+            sch.startTime || '08:00 am',
+            sch.endTime || '09:50 am'
+          );
+
+          const isToday = rawDays.some(d => {
+            const mapped = DAY_MAP_AR[d] || d;
+            if (mapped === 'الأحد' && todayDayOfWeek === 0) return true;
+            if (mapped === 'الاثنين' && todayDayOfWeek === 1) return true;
+            if (mapped === 'الثلاثاء' && todayDayOfWeek === 2) return true;
+            if (mapped === 'الأربعاء' && todayDayOfWeek === 3) return true;
+            if (mapped === 'الخميس' && todayDayOfWeek === 4) return true;
+            if (mapped === 'الجمعة' && todayDayOfWeek === 5) return true;
+            if (mapped === 'السبت' && todayDayOfWeek === 6) return true;
+            return false;
+          });
+
+          if (isToday) {
+            list.push({
+              id: `${c.courseCode}_${scIdx}_${startMinutes}`,
+              courseCode: c.courseCode,
+              courseName: c.courseName || c.courseCode,
+              startTimeStr: startTime,
+              endTimeStr: endTime,
+              startMinutes,
+              endMinutes,
+              room: sch.classroom,
+              color,
+              isOngoing: currentTotalMinutes >= startMinutes && currentTotalMinutes <= endMinutes,
+              isUpcoming: currentTotalMinutes < startMinutes,
+              isPassed: currentTotalMinutes > endMinutes,
+            });
+          }
+        });
+      });
+    }
+
+    return list.sort((a, b) => a.startMinutes - b.startMinutes);
+  }, [effectiveSections, activeSemester?.courses, todayDayOfWeek, now]);
+
+  const todayDateKey = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }, []);
+
+  const [manualCheckedClasses, setManualCheckedClasses] = useState<Record<string, boolean>>(() => {
+    if (typeof window === 'undefined') return {};
+    try {
+      const raw = localStorage.getItem(`imamu_attended_classes_${todayDateKey}`);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const toggleClassCheck = useCallback((slotId: string, isAutoPassed: boolean) => {
+    setManualCheckedClasses(prev => {
+      const currentChecked = prev[slotId] !== undefined ? prev[slotId] : isAutoPassed;
+      const nextVal = !currentChecked;
+      const next = { ...prev, [slotId]: nextVal };
+      try {
+        localStorage.setItem(`imamu_attended_classes_${todayDateKey}`, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, [todayDateKey]);
+
+  const resolveTaskColor = useCallback((t: StudentTask): string => {
+    if (effectiveSections && effectiveSections.length > 0) {
+      const sec = effectiveSections.find(s => {
+        const secCode = s.courseCode?.trim().toLowerCase();
+        const secTitle = s.courseTitle?.trim().toLowerCase();
+        const tCode = t.courseCode?.trim().toLowerCase();
+        const tName = t.courseName?.trim().toLowerCase();
+        if (tCode && secCode && (secCode === tCode || secCode.includes(tCode) || tCode.includes(secCode))) return true;
+        if (tName && secTitle && (secTitle === tName || secTitle.includes(tName) || tName.includes(secTitle))) return true;
+        return false;
+      });
+      if (sec) {
+        if (sec.color) return sec.color;
+        const secIdx = effectiveSections.indexOf(sec);
+        return COURSE_HEX_COLORS[secIdx % COURSE_HEX_COLORS.length];
+      }
+    }
+
+    if (activeSemester?.courses && activeSemester.courses.length > 0) {
+      const course = activeSemester.courses.find(c => {
+        const cCode = c.courseCode?.trim().toLowerCase();
+        const cName = c.courseName?.trim().toLowerCase();
+        const tCode = t.courseCode?.trim().toLowerCase();
+        const tName = t.courseName?.trim().toLowerCase();
+        if (tCode && cCode && (cCode === tCode || cCode.includes(tCode) || tCode.includes(cCode))) return true;
+        if (tName && cName && (cName === tName || cName.includes(tName) || tName.includes(cName))) return true;
+        return false;
+      });
+      if (course) {
+        if (course.color) return course.color;
+        const cIdx = activeSemester.courses.indexOf(course);
+        return COURSE_HEX_COLORS[cIdx % COURSE_HEX_COLORS.length];
+      }
+    }
+
+    return t.color || '#8c6239';
+  }, [effectiveSections, activeSemester?.courses]);
+
+  const todayTasks = useMemo(() => {
+    return tasks.filter(t => {
+      if (!t.dueDate) return false;
+      const countdown = formatTaskCountdown(t.dueDate, t.dueTime);
+      return Boolean(countdown?.isToday);
+    });
+  }, [tasks]);
+
+  const todayDoneClassesCount = useMemo(() => {
+    return todayClasses.filter(slot => {
+      if (manualCheckedClasses[slot.id] !== undefined) {
+        return manualCheckedClasses[slot.id];
+      }
+      return slot.isPassed;
+    }).length;
+  }, [todayClasses, manualCheckedClasses]);
+
+  const todayDoneTasksCount = useMemo(() => {
+    return todayTasks.filter(t => t.completed).length;
+  }, [todayTasks]);
+
+  const totalTodayItems = todayClasses.length + todayTasks.length;
+  const doneTodayItems = todayDoneClassesCount + todayDoneTasksCount;
+
   const formatDaysPhrase = (count: number, prefix: string) => {
     if (count === 0) return prefix === 'بدأ قبل' ? 'يبدأ اليوم' : 'ينتهي اليوم';
     if (count === 1) return prefix === 'بدأ قبل' ? 'بدأ قبل يوم واحد' : 'ينتهي خلال يوم واحد';
@@ -843,25 +1253,31 @@ function SidebarInsights({
     <div className="flex flex-col gap-3.5 w-full">
 
       {/* ── Edit Semester & Courses Modal ── */}
-      {showEditModal && activeSemester && (
-        <EditSemesterModal
-          semester={activeSemester}
-          allSubjects={subjects}
-          onClose={() => setShowEditModal(false)}
-          onSave={(newLabel, newCourses) => {
-            onUpdateSemester?.(newLabel, newCourses);
-            setShowEditModal(false);
-          }}
-        />
-      )}
+      <AnimatePresence>
+        {showEditModal && activeSemester && (
+          <EditSemesterModal
+            semester={activeSemester}
+            allSubjects={subjects}
+            onClose={() => setShowEditModal(false)}
+            onSave={(newLabel, newCourses, newEmoji) => {
+              onUpdateSemester?.(newLabel, newCourses, newEmoji);
+              setShowEditModal(false);
+            }}
+          />
+        )}
+      </AnimatePresence>
 
       {/* ── Card 1: Semester overview ── */}
       <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800/90 rounded-2xl overflow-hidden shadow-xs">
         <div className="p-4">
           {/* Top header row */}
           <div className="flex items-center justify-between mb-3">
-            <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-zinc-800 flex items-center justify-center border border-slate-200/60 dark:border-zinc-700/50">
-              <Tv className="w-4 h-4 text-slate-600 dark:text-zinc-300" />
+            <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-zinc-800 flex items-center justify-center border border-slate-200/60 dark:border-zinc-700/50 text-base leading-none select-none">
+              {activeSemester?.emoji ? (
+                <span>{activeSemester.emoji}</span>
+              ) : (
+                <Tv className="w-4 h-4 text-slate-600 dark:text-zinc-300" />
+              )}
             </div>
             <button
               type="button"
@@ -936,307 +1352,662 @@ function SidebarInsights({
       <div className="flex flex-col gap-3">
         {/* 1. UPCOMING TAB */}
         {progressView === 'upcoming' && (
-          <>
-            {/* Semester End Progress Card */}
-            <ProgressMetricCard
-              icon="📚"
-              title="نهاية الفصل الدراسي"
-              passedDays={passedDays}
-              totalDays={totalDays}
-              remainingDays={remainingDays}
-              percent={progressPercent}
-              startDate={semesterStart || new Date(Date.now() - 25 * 86400000)}
-              endDate={semesterEnd || new Date(Date.now() + 112 * 86400000)}
-              remainingColor="text-slate-900 dark:text-white"
-            />
+          <div className="flex flex-col px-1 gap-6">
+            {/* ── Today's Schedule & Tasks Section ── */}
+            <div className="flex flex-col">
+              {/* Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-[var(--color-imamu-accent)] animate-pulse" />
+                  <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                    اليوم
+                  </h3>
+                  <span className="text-[11px] text-slate-400 dark:text-zinc-500 font-medium">
+                    ({['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'][todayDayOfWeek]})
+                  </span>
+                </div>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300">
+                  {totalTodayItems > 0 ? (doneTodayItems > 0 ? `${doneTodayItems}/${totalTodayItems}` : `${totalTodayItems}`) : '0'}
+                </span>
+              </div>
 
-            {/* Vacation Card: turns into "نهاية الإجازة" in red when active, otherwise shows next upcoming vacation */}
-            {activeHoliday && vacationEnd ? (() => {
-              const vTotalDays = Math.max(1, Math.round((vacationEnd.getTime() - activeHoliday.date.getTime()) / 86400000));
-              const vPassedDays = Math.max(0, Math.min(vTotalDays, Math.round((now.getTime() - activeHoliday.date.getTime()) / 86400000)));
-              const vRemainingDays = Math.max(0, Math.round((vacationEnd.getTime() - now.getTime()) / 86400000));
-              const vPercent = Math.min(100, Math.round((vPassedDays / vTotalDays) * 100));
-              return (
-                <ProgressMetricCard
-                  icon="🌴"
-                  title={`نهاية ${activeHoliday.title}`}
-                  passedDays={vPassedDays}
-                  totalDays={vTotalDays}
-                  remainingDays={vRemainingDays}
-                  percent={vPercent}
-                  startDate={activeHoliday.date}
-                  endDate={vacationEnd}
-                  remainingColor="text-red-500 dark:text-red-400"
-                />
-              );
-            })() : nextHoliday ? (
+              {/* Items list: Today's Classes + Today's Tasks */}
+              {totalTodayItems === 0 ? (
+                <div className="text-center py-6">
+                  <p className="text-xs text-slate-400 dark:text-zinc-500 font-medium">
+                    لا توجد محاضرات أو مهام مجدولة لهذا اليوم 🎉
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-col divide-y divide-slate-100 dark:divide-zinc-800/60">
+                  {/* 1. Today's Classes */}
+                  {todayClasses.map(slot => {
+                    const isDone = manualCheckedClasses[slot.id] !== undefined ? manualCheckedClasses[slot.id] : slot.isPassed;
+                    return (
+                      <div
+                        key={slot.id}
+                        className={clsx(
+                          "group relative flex items-start gap-2.5 py-2.5 transition-colors",
+                          isDone && "opacity-50"
+                        )}
+                      >
+                        {/* Interactive Checkmark: Clickable to toggle, auto-checked if class time is passed */}
+                        <button
+                          type="button"
+                          onClick={() => toggleClassCheck(slot.id, slot.isPassed)}
+                          className="mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-transform active:scale-90 cursor-pointer shadow-2xs"
+                          style={{
+                            borderColor: slot.color,
+                            backgroundColor: isDone ? slot.color : 'transparent'
+                          }}
+                          title={isDone ? 'تم الانتهاء (انقر للإلغاء)' : 'انقر للتحديد كمكتملة'}
+                        >
+                          {isDone && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
+                        </button>
+
+                        {/* Class details */}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            {/* Course Title */}
+                            <span
+                              className={clsx(
+                                "text-xs sm:text-sm font-bold leading-snug truncate",
+                                isDone
+                                  ? "text-slate-400 dark:text-zinc-500 line-through"
+                                  : "text-slate-900 dark:text-white"
+                              )}
+                            >
+                              {slot.courseName}
+                            </span>
+
+                            {/* Timing & Status badge */}
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className="text-[10.5px] font-medium text-slate-500 dark:text-zinc-400 inline-flex items-center gap-1" dir="ltr">
+                                <Clock className="w-3 h-3 text-slate-400 dark:text-zinc-500 shrink-0" />
+                                <span>{formatMinutesToTime(slot.startMinutes, true)}</span>
+                                <span className="text-slate-400 font-normal">→</span>
+                                <span>{formatMinutesToTime(slot.endMinutes, true)}</span>
+                              </span>
+
+                              {slot.isOngoing && !isDone && (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 shrink-0">
+                                  الآن
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Tags in pills: Course Code & Classroom */}
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1.5 text-[11px]">
+                            <span
+                              className="px-2 py-0.5 rounded-lg font-bold text-white shadow-2xs text-[10px]"
+                              style={{ backgroundColor: slot.color }}
+                            >
+                              {slot.courseCode}
+                            </span>
+
+                            {slot.room && (
+                              <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-medium text-[10px] flex items-center gap-1">
+                                <MapPin className="w-2.5 h-2.5 text-slate-400" />
+                                <span>{slot.room}</span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* 2. Today's Tasks */}
+                  {todayTasks.map(t => {
+                    const taskColor = resolveTaskColor(t);
+                    const duePill = formatTaskDuePill(t.dueDate, t.dueTime);
+                    const categoryLabel = TASK_CATEGORIES.find(c => c.key === t.category || c.label === t.category)?.label || t.categoryLabel || t.category;
+
+                    return (
+                      <div
+                        key={t.id}
+                        className={clsx(
+                          "group relative flex items-start gap-2.5 py-2.5 transition-colors",
+                          t.completed && "opacity-50"
+                        )}
+                      >
+                        {/* Circle checkbox with colored border */}
+                        <button
+                          type="button"
+                          onClick={() => toggleTask(t.id)}
+                          className="mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-transform active:scale-90 cursor-pointer shadow-2xs"
+                          style={{
+                            borderColor: taskColor,
+                            backgroundColor: t.completed ? taskColor : 'transparent'
+                          }}
+                          title={t.completed ? 'إلغاء الإكمال' : 'تحديد كمكتمل'}
+                        >
+                          {t.completed && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
+                        </button>
+
+                        {/* Task info */}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            {/* Title */}
+                            <span
+                              className={clsx(
+                                "text-xs sm:text-sm font-bold leading-snug truncate",
+                                t.completed
+                                  ? "line-through text-slate-400 dark:text-zinc-500"
+                                  : "text-slate-900 dark:text-white"
+                              )}
+                            >
+                              {t.title}
+                            </span>
+
+                            {/* Time / Countdown */}
+                            {duePill && (
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="text-[10.5px] font-medium text-slate-500 dark:text-zinc-400 flex items-center gap-1">
+                                  <Clock className="w-3 h-3 text-slate-400 dark:text-zinc-500 shrink-0" />
+                                  <span dir="rtl">{duePill}</span>
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Tags in pills: Course, Category */}
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1.5 text-[11px]">
+                            {t.courseName && (
+                              <span
+                                className="px-2.5 py-0.5 rounded-lg font-bold text-white shadow-2xs truncate max-w-[140px] text-[10px]"
+                                style={{ backgroundColor: taskColor }}
+                                title={t.courseName}
+                              >
+                                {t.courseName}
+                              </span>
+                            )}
+
+                            {categoryLabel && (
+                              <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-medium text-[10px]">
+                                {categoryLabel}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* ── Milestones Section (نهاية الفصل، الإجازة، المكافأة) ── */}
+            <div className="flex flex-col">
+              {/* Header: القادم */}
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800">
+                <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                  القادم
+                </h3>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300">
+                  {2 + (activeHoliday ? 1 : nextHoliday ? 1 : 0)}
+                </span>
+              </div>
+
+              <div className="flex flex-col divide-y divide-slate-100 dark:divide-zinc-800/60 max-h-[500px] overflow-y-auto pr-0.5 custom-scrollbar">
+              {/* Semester End Progress Card */}
               <ProgressMetricCard
-                icon="🌴"
-                title={nextHoliday.title || 'أقرب إجازة'}
-                passedDays={holidayPassedDays}
-                totalDays={holidayTotalDays}
-                remainingDays={holidayRemainingDays}
-                percent={holidayPercent}
-                startDate={holidayStart || new Date(Date.now() - 25 * 86400000)}
-                endDate={nextHoliday.date}
+                icon="📚"
+                title="نهاية الفصل الدراسي"
+                passedDays={passedDays}
+                totalDays={totalDays}
+                remainingDays={remainingDays}
+                percent={progressPercent}
+                startDate={semesterStart || new Date(Date.now() - 25 * 86400000)}
+                endDate={semesterEnd || new Date(Date.now() + 112 * 86400000)}
                 remainingColor="text-emerald-600 dark:text-emerald-400"
               />
-            ) : (
-              <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800/90 rounded-2xl p-4 shadow-xs text-xs text-center text-slate-400 dark:text-zinc-500">
-                🌴 لا توجد إجازات قادمة مجدولة حالياً
-              </div>
-            )}
 
-            {/* Next Mokafaa Progress Card */}
-            <ProgressMetricCard
-              icon="💰"
-              title="المكافأة الجامعية"
-              passedDays={mokafaaPassedDays}
-              totalDays={mokafaaTotalDays}
-              remainingDays={mokafaaRemainingDays}
-              percent={mokafaaPercent}
-              startDate={prevMokafaa || new Date(Date.now() - 25 * 86400000)}
-              endDate={nextMokafaa || new Date(Date.now() + 5 * 86400000)}
-              remainingColor="text-emerald-600 dark:text-emerald-400"
-            />
+              {/* Vacation Card */}
+              {activeHoliday && vacationEnd ? (() => {
+                const vTotalDays = Math.max(1, Math.round((vacationEnd.getTime() - activeHoliday.date.getTime()) / 86400000));
+                const vPassedDays = Math.max(0, Math.min(vTotalDays, Math.round((now.getTime() - activeHoliday.date.getTime()) / 86400000)));
+                const vRemainingDays = Math.max(0, Math.round((vacationEnd.getTime() - now.getTime()) / 86400000));
+                const vPercent = Math.min(100, Math.round((vPassedDays / vTotalDays) * 100));
+                return (
+                  <ProgressMetricCard
+                    icon="🌴"
+                    title={`نهاية ${activeHoliday.title}`}
+                    passedDays={vPassedDays}
+                    totalDays={vTotalDays}
+                    remainingDays={vRemainingDays}
+                    percent={vPercent}
+                    startDate={activeHoliday.date}
+                    endDate={vacationEnd}
+                    remainingColor="text-red-500 dark:text-red-400"
+                  />
+                );
+              })() : nextHoliday ? (
+                <ProgressMetricCard
+                  icon="🌴"
+                  title={nextHoliday.title || 'أقرب إجازة'}
+                  passedDays={holidayPassedDays}
+                  totalDays={holidayTotalDays}
+                  remainingDays={holidayRemainingDays}
+                  percent={holidayPercent}
+                  startDate={holidayStart || new Date(Date.now() - 25 * 86400000)}
+                  endDate={nextHoliday.date}
+                  remainingColor="text-emerald-600 dark:text-emerald-400"
+                />
+              ) : null}
 
-            {/* Nearest Exam if set */}
-            {nearestExam && (
-              <div className="bg-white dark:bg-zinc-900 border border-amber-200/80 dark:border-amber-900/40 rounded-2xl p-4 shadow-xs flex flex-col gap-2">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-900 dark:text-white">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-sm">📝</span>
-                    <span>أقرب اختبار ({nearestExam.course.courseCode})</span>
-                  </div>
-                  <span className="text-amber-600 dark:text-amber-400 font-bold">
-                    {formatCountdownPhrase(nearestExam.daysRemaining)}
-                  </span>
-                </div>
-                <p className="text-xs font-semibold text-slate-700 dark:text-zinc-300 truncate">
-                  {nearestExam.course.courseName}
-                </p>
-                <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-zinc-500 pt-1.5 border-t border-slate-100 dark:border-zinc-800">
-                  <span className="flex items-center gap-1">
-                    <Calendar className="w-3 h-3 text-slate-400" />
-                    {nearestExam.course.examDate}
-                  </span>
-                  {nearestExam.course.examTime && (
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-slate-400" />
-                      {nearestExam.course.examTime}
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-          </>
+              {/* Next Mokafaa Progress Card */}
+              <ProgressMetricCard
+                icon="💰"
+                title="المكافأة الجامعية"
+                passedDays={mokafaaPassedDays}
+                totalDays={mokafaaTotalDays}
+                remainingDays={mokafaaRemainingDays}
+                percent={mokafaaPercent}
+                startDate={prevMokafaa || new Date(Date.now() - 25 * 86400000)}
+                endDate={nextMokafaa || new Date(Date.now() + 5 * 86400000)}
+                remainingColor="text-emerald-600 dark:text-emerald-400"
+              />
+            </div>
+          </div>
+        </div>
         )}
 
         {/* 2. COURSES TAB */}
         {progressView === 'courses' && (
-          <>
-            {/* Registered Courses — reference-style list with bold title + checkbox */}
-            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800/90 rounded-2xl p-4 shadow-xs flex flex-col gap-0">
-              <div className="flex items-center justify-between text-xs font-bold text-slate-900 dark:text-white pb-3 border-b border-slate-100 dark:border-zinc-800 mb-1">
-                <div className="flex items-center gap-1.5">
-                  <BookOpen className="w-3.5 h-3.5 text-[var(--color-imamu-brown)] dark:text-[var(--color-imamu-accent)]" />
-                  <span>المواد المسجلة</span>
-                </div>
-                <span className="text-[11px] font-semibold text-slate-500 dark:text-zinc-400">
-                  {activeSemester?.courses.length || 0} مواد · {semesterCreditHours} ساعة
-                </span>
-              </div>
-              {(!activeSemester || !activeSemester.courses.length) ? (
-                <p className="text-xs text-slate-400 dark:text-zinc-500 text-center py-4">
-                  لم تقم بإضافة مواد لهذا الفصل بعد.
-                </p>
-              ) : (
-                <div className="flex flex-col max-h-72 overflow-y-auto">
-                  {activeSemester.courses.map((c, idx) => {
-                    const matchingSecIdx = effectiveSections?.findIndex(
-                      s => (c.crn && String(s.crn) === String(c.crn)) || s.courseCode === c.courseCode
-                    ) ?? -1;
-                    const colorIdx = (matchingSecIdx >= 0 ? matchingSecIdx : idx) % COURSE_CARD_PALETTES.length;
-                    const palette = COURSE_CARD_PALETTES[colorIdx];
-
-                    return (
-                      <div
-                        key={idx}
-                        className="flex items-center gap-2.5 py-2 sm:py-2.5 border-b border-slate-100 dark:border-zinc-800/60 last:border-b-0 group"
-                      >
-                        {/* Checkbox box matching schedule color */}
-                        <div
-                          className={`w-5 h-5 rounded-md border-2 ${palette.boxBorder} ${palette.boxBg} shrink-0 transition-transform duration-150 group-hover:scale-105 shadow-2xs`}
-                        />
-
-                        {/* Course info (compressed, removed course code) */}
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white leading-snug truncate">
-                            {c.courseName}
-                          </p>
-                        </div>
-
-                        {/* Three dots action button */}
-                        <button
-                          type="button"
-                          onClick={() => onOpenCourseDetails?.(c)}
-                          className="p-1 sm:p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
-                          title="تفاصيل وخيارات المقرر"
-                          aria-label="تفاصيل وخيارات المقرر"
-                        >
-                          <MoreVertical className="w-4 h-4" />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+          <div className="flex flex-col px-1">
+            {/* Header: المواد المسجلة */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800">
+              <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                المواد المسجلة
+              </h3>
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300">
+                {activeSemester?.courses.length || 0} مواد · {semesterCreditHours} ساعة
+              </span>
             </div>
-          </>
+
+            {(!activeSemester || !activeSemester.courses.length) ? (
+              <p className="text-xs text-slate-400 dark:text-zinc-500 text-center py-6">
+                لم تقم بإضافة مواد لهذا الفصل بعد.
+              </p>
+            ) : (
+              <div className="flex flex-col divide-y divide-slate-100 dark:divide-zinc-800/60 max-h-[500px] overflow-y-auto pr-0.5 custom-scrollbar pt-1">
+                {activeSemester.courses.map((c, idx) => {
+                  const matchingSec = effectiveSections?.find(
+                    s => (c.crn && String(s.crn) === String(c.crn)) || s.courseCode === c.courseCode
+                  );
+                  const matchingSecIdx = effectiveSections?.findIndex(
+                    s => (c.crn && String(s.crn) === String(c.crn)) || s.courseCode === c.courseCode
+                  ) ?? -1;
+                  const colorIdx = (matchingSecIdx >= 0 ? matchingSecIdx : idx) % COURSE_HEX_COLORS.length;
+                  const courseColor = c.color || matchingSec?.color || COURSE_HEX_COLORS[colorIdx];
+
+                  return (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2.5 py-2.5 transition-colors group"
+                    >
+                      {/* Square indicator with matching schedule color */}
+                      <button
+                        type="button"
+                        onClick={() => onOpenCourseDetails?.(c)}
+                        className="w-5 h-5 rounded-md border-2 shrink-0 transition-transform duration-150 group-hover:scale-105 shadow-2xs cursor-pointer"
+                        style={{
+                          borderColor: courseColor,
+                          backgroundColor: `${courseColor}20`
+                        }}
+                        title="تفاصيل المقرر"
+                        aria-label="تفاصيل المقرر"
+                      />
+
+                      {/* Course title - click to open info */}
+                      <div
+                        onClick={() => onOpenCourseDetails?.(c)}
+                        className="min-w-0 flex-1 cursor-pointer"
+                        title="عرض تفاصيل المقرر"
+                      >
+                        <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white leading-snug truncate hover:text-[var(--color-imamu-accent)] transition-colors">
+                          {c.courseName}
+                        </p>
+                      </div>
+
+                      {/* Three dots action button */}
+                      <button
+                        type="button"
+                        onClick={() => onOpenCourseDetails?.(c)}
+                        className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer shrink-0"
+                        title="تفاصيل وخيارات المقرر"
+                        aria-label="تفاصيل وخيارات المقرر"
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         )}
 
         {/* 3. TASKS TAB */}
         {progressView === 'tasks' && (
-          <>
-            {/* Exams Schedule Card */}
-            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800/90 rounded-2xl p-4 shadow-xs flex flex-col gap-3">
-              <div className="flex items-center justify-between text-xs font-bold text-slate-900 dark:text-white pb-2 border-b border-slate-100 dark:border-zinc-800">
-                <div className="flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-[var(--color-imamu-brown)] dark:text-[var(--color-imamu-accent)]" />
-                  <span>مواعيد الاختبارات</span>
-                </div>
-                <span className="text-[11px] font-semibold text-slate-400 dark:text-zinc-500">
-                  {upcomingExams.length} محددة
+          <div className="flex flex-col px-1">
+            {/* Header: المهام */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800">
+              <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                المهام
+              </h3>
+
+              {tasks.filter(t => !t.completed).length > 0 && (
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300">
+                  {tasks.filter(t => !t.completed).length}
                 </span>
-              </div>
-              {(!activeSemester || !activeSemester.courses.length) ? (
-                <p className="text-xs text-slate-400 dark:text-zinc-500 text-center py-3">
-                  أضف مواد دراسية لإدارة مواعيد اختباراتها.
-                </p>
-              ) : (
-                <div className="flex flex-col gap-2 max-h-52 overflow-y-auto pr-0.5">
-                  {activeSemester.courses.map((c, i) => {
-                    const hasExam = !!c.examDate;
-                    const exDate = hasExam ? parseDate(c.examDate!) : null;
-                    const daysRem = exDate ? Math.round((exDate.getTime() - now.getTime()) / 86400000) : null;
-                    return (
-                      <div key={i} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-800/50 border border-slate-100 dark:border-zinc-800 text-xs">
-                        <div className="min-w-0 flex-1 ml-2">
-                          <div className="flex items-center gap-1.5 font-bold text-slate-900 dark:text-white truncate">
-                            <span className="text-[var(--color-imamu-accent)] shrink-0">{c.courseCode}</span>
-                            <span className="truncate">{c.courseName}</span>
-                          </div>
-                          {hasExam ? (
-                            <div className="flex items-center gap-2 text-[10px] text-slate-400 dark:text-zinc-500 mt-0.5">
-                              <span>{c.examDate}</span>
-                              {c.examTime && <span>{c.examTime}</span>}
-                              {daysRem !== null && daysRem >= 0 && (
-                                <span className="text-amber-600 dark:text-amber-400 font-semibold">
-                                  ({formatCountdownPhrase(daysRem)})
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <p className="text-[10px] text-slate-400 dark:text-zinc-500 mt-0.5">لم يُحدد موعد بعد</p>
-                          )}
-                        </div>
-                        {onAddExam && (
-                          <button
-                            type="button"
-                            onClick={() => onAddExam(c)}
-                            className="text-[11px] font-bold px-2 py-1 rounded-lg bg-[var(--color-imamu-brown)]/10 dark:bg-[var(--color-imamu-brown)]/20 text-[var(--color-imamu-brown)] dark:text-[var(--color-imamu-accent)] hover:bg-[var(--color-imamu-brown)]/20 transition cursor-pointer shrink-0"
-                          >
-                            {hasExam ? 'تعديل' : '+ تحديد'}
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
               )}
             </div>
 
-            {/* Interactive Tasks List */}
-            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800/90 rounded-2xl p-4 shadow-xs flex flex-col gap-3">
-              <div className="flex items-center justify-between text-xs font-bold text-slate-900 dark:text-white pb-2 border-b border-slate-100 dark:border-zinc-800">
-                <div className="flex items-center gap-1.5">
-                  <CheckSquare className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                  <span>المهام والواجبات</span>
-                </div>
-                <span className="text-[11px] font-semibold text-slate-400 dark:text-zinc-500">
-                  {tasks.filter(t => !t.completed).length} متبقية
-                </span>
-              </div>
-
-              {/* Add task input */}
-              <form onSubmit={handleAddTask} className="flex items-center gap-1.5">
-                <input
-                  type="text"
-                  value={newTaskTitle}
-                  onChange={e => setNewTaskTitle(e.target.value)}
-                  placeholder="أضف مهمة أو واجباً..."
-                  className="flex-1 px-3 py-1.5 text-xs bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-[var(--color-imamu-accent)] text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500"
-                />
-                <button
-                  type="submit"
-                  disabled={!newTaskTitle.trim()}
-                  className="w-8 h-8 rounded-xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] disabled:opacity-50 text-white flex items-center justify-center transition cursor-pointer shrink-0"
-                  title="إضافة مهمة"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </form>
-
-              {/* Task list items */}
-              {tasks.length === 0 ? (
-                <p className="text-[11px] text-slate-400 dark:text-zinc-500 text-center py-3">
-                  لا توجد مهام مسجلة. أضف واجباتك وتكاليفك لتتابع إنجازها!
+            {/* Tasks list items */}
+            {tasks.length === 0 ? (
+              <div className="text-center py-6 px-4">
+                <p className="text-xs text-slate-400 dark:text-zinc-500 mb-2">
+                  لا توجد مهام حالياً.
                 </p>
-              ) : (
-                <div className="flex flex-col gap-1.5 max-h-56 overflow-y-auto pr-0.5">
-                  {tasks.map(t => (
-                    <div
-                      key={t.id}
-                      className="group flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-zinc-800/40 border border-slate-100 dark:border-zinc-800 hover:border-slate-200 dark:hover:border-zinc-700 transition text-xs"
+                <button
+                  type="button"
+                  onClick={() => onOpenNewTaskModal?.()}
+                  className="text-xs font-bold text-[var(--color-imamu-accent)] hover:underline cursor-pointer"
+                >
+                  + أضف أول مهمة أو واجب دراسي
+                </button>
+              </div>
+            ) : (() => {
+              const getTaskTimestamp = (t: StudentTask): number => {
+                if (!t.dueDate) return Infinity;
+                const parts = t.dueDate.split('-');
+                if (parts.length === 3) {
+                  const y = parseInt(parts[0], 10);
+                  const m = parseInt(parts[1], 10) - 1;
+                  const d = parseInt(parts[2], 10);
+                  let h = 23;
+                  let min = 59;
+                  if (t.dueTime) {
+                    const parsedMin = parseTimeToMinutes(t.dueTime);
+                    if (parsedMin !== null) {
+                      h = Math.floor(parsedMin / 60);
+                      min = parsedMin % 60;
+                    }
+                  }
+                  return new Date(y, m, d, h, min).getTime();
+                }
+                const parsed = new Date(t.dueDate).getTime();
+                return isNaN(parsed) ? Infinity : parsed;
+              };
+
+              const lateTasks = tasks
+                .filter(t => !t.completed && Boolean(formatTaskCountdown(t.dueDate, t.dueTime)?.isOverdue))
+                .sort((a, b) => getTaskTimestamp(a) - getTaskTimestamp(b));
+
+              const upcomingTasks = tasks
+                .filter(t => !t.completed && !formatTaskCountdown(t.dueDate, t.dueTime)?.isOverdue)
+                .sort((a, b) => getTaskTimestamp(a) - getTaskTimestamp(b));
+
+              const finishedTasks = tasks
+                .filter(t => t.completed)
+                .sort((a, b) => getTaskTimestamp(b) - getTaskTimestamp(a));
+
+              const renderTaskItem = (t: StudentTask) => {
+                const countdown = formatTaskCountdown(t.dueDate, t.dueTime);
+                const duePill = formatTaskDuePill(t.dueDate, t.dueTime);
+                const taskColor = resolveTaskColor(t);
+                const categoryLabel = TASK_CATEGORIES.find(c => c.key === t.category || c.label === t.category)?.label || t.categoryLabel || t.category;
+
+                return (
+                  <div
+                    key={t.id}
+                    className={`group relative flex items-start gap-2.5 py-2.5 transition-colors ${
+                      t.completed ? 'opacity-50' : ''
+                    }`}
+                  >
+                    {/* Circle checkbox with colored border */}
+                    <button
+                      type="button"
+                      onClick={() => toggleTask(t.id)}
+                      className="mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-transform active:scale-90 cursor-pointer shadow-2xs"
+                      style={{
+                        borderColor: taskColor,
+                        backgroundColor: t.completed ? taskColor : 'transparent'
+                      }}
                     >
-                      <button
-                        type="button"
-                        onClick={() => toggleTask(t.id)}
-                        className="flex items-center gap-2 text-right min-w-0 flex-1 cursor-pointer"
-                      >
-                        <div className={clsx(
-                          "w-4 h-4 rounded-md border flex items-center justify-center shrink-0 transition",
-                          t.completed
-                            ? "bg-emerald-500 border-emerald-500 text-white"
-                            : "border-slate-300 dark:border-zinc-600 bg-white dark:bg-zinc-800"
-                        )}>
-                          {t.completed && <Check className="w-3 h-3 stroke-[3]" />}
-                        </div>
-                        <span className={clsx(
-                          "truncate font-medium transition",
-                          t.completed
-                            ? "line-through text-slate-400 dark:text-zinc-500"
-                            : "text-slate-800 dark:text-zinc-200"
-                        )}>
+                      {t.completed && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
+                    </button>
+
+                    {/* Task info */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        {/* Title */}
+                        <span
+                          className={`text-xs sm:text-sm font-bold leading-snug transition-colors truncate ${
+                            t.completed
+                              ? 'line-through text-slate-400 dark:text-zinc-500'
+                              : 'text-slate-900 dark:text-white'
+                          }`}
+                        >
                           {t.title}
                         </span>
-                      </button>
+
+                        {/* Date, Time & Countdown ("غداً") placed together */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {duePill && (
+                            <span className="text-[10.5px] font-medium text-slate-500 dark:text-zinc-400 flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-slate-400 dark:text-zinc-500 shrink-0" />
+                              <span dir="rtl">{duePill}</span>
+                            </span>
+                          )}
+
+                          {countdown && (
+                            <span
+                              className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0 ${
+                                countdown.isOverdue
+                                  ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+                                  : countdown.isToday
+                                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                                  : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400'
+                              }`}
+                            >
+                              {countdown.text}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Tags in pills: Course, Category, Priority */}
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1.5 text-[11px]">
+                        {/* Course / Class Pill */}
+                        {t.courseName && (
+                          <span
+                            className="px-2.5 py-0.5 rounded-lg font-bold text-white shadow-2xs truncate max-w-[140px]"
+                            style={{ backgroundColor: taskColor }}
+                            title={t.courseName}
+                          >
+                            {t.courseName}
+                          </span>
+                        )}
+
+                        {/* Category Pill in Arabic */}
+                        {categoryLabel && (
+                          <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-medium">
+                            {categoryLabel}
+                          </span>
+                        )}
+
+                        {/* Priority Pill in Arabic */}
+                        {t.priority === 'high' && (
+                          <span className="px-1.5 py-0.5 rounded-md bg-rose-500/15 text-rose-600 dark:text-rose-400 font-bold border border-rose-500/20 text-[10px]">
+                            عالية !!!
+                          </span>
+                        )}
+                        {t.priority === 'medium' && (
+                          <span className="px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/20 text-[10px]">
+                            متوسطة !!
+                          </span>
+                        )}
+                        {t.priority === 'low' && (
+                          <span className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 font-medium text-[10px]">
+                            منخفضة !
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Three dots action button */}
+                    <div className="relative shrink-0">
                       <button
                         type="button"
-                        onClick={() => deleteTask(t.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-red-500 dark:text-zinc-600 dark:hover:text-red-400 transition cursor-pointer shrink-0"
-                        title="حذف المهمة"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (activeTaskMenu?.task.id === t.id) {
+                            setActiveTaskMenu(null);
+                          } else {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const menuHeight = 84;
+                            const menuWidth = 112;
+                            const spaceBelow = window.innerHeight - rect.bottom;
+                            const openUpwards = spaceBelow < (menuHeight + 10) && rect.top > menuHeight;
+                            const x = Math.max(8, Math.min(rect.left, window.innerWidth - menuWidth - 8));
+                            const y = openUpwards ? rect.top - 4 : rect.bottom + 4;
+                            setActiveTaskMenu({ task: t, x, y, openUpwards });
+                          }
+                        }}
+                        className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+                        title="خيارات المهمة"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <MoreVertical className="w-4 h-4" />
                       </button>
                     </div>
-                  ))}
+                  </div>
+                );
+              };
+
+              return (
+                <div className="flex flex-col gap-3 max-h-[500px] overflow-y-auto pr-0.5 custom-scrollbar pt-2">
+                  {/* 1. LATE TASKS (Open by default, only shown if tasks exist under it) */}
+                  {lateTasks.length > 0 && (
+                    <div className="flex flex-col">
+                      <button
+                        type="button"
+                        onClick={() => setIsLateOpen(!isLateOpen)}
+                        className="flex items-center justify-between py-1 text-xs font-bold text-rose-600 dark:text-rose-400 cursor-pointer select-none group"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isLateOpen ? '' : '-rotate-90'}`} />
+                          <span>متأخرة</span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400">
+                            {lateTasks.length}
+                          </span>
+                        </div>
+                      </button>
+                      {isLateOpen && (
+                        <div className="flex flex-col divide-y divide-slate-100 dark:divide-zinc-800/60">
+                          {lateTasks.map(renderTaskItem)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 2. UPCOMING TASKS (Open by default, only shown if tasks exist under it) */}
+                  {upcomingTasks.length > 0 && (
+                    <div className="flex flex-col">
+                      <button
+                        type="button"
+                        onClick={() => setIsUpcomingOpen(!isUpcomingOpen)}
+                        className="flex items-center justify-between py-1 text-xs font-bold text-slate-700 dark:text-zinc-300 cursor-pointer select-none group"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isUpcomingOpen ? '' : '-rotate-90'}`} />
+                          <span>القادمة</span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300">
+                            {upcomingTasks.length}
+                          </span>
+                        </div>
+                      </button>
+                      {isUpcomingOpen && (
+                        <div className="flex flex-col divide-y divide-slate-100 dark:divide-zinc-800/60">
+                          {upcomingTasks.map(renderTaskItem)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 3. FINISHED TASKS (Compressed by default, only shown if tasks exist under it) */}
+                  {finishedTasks.length > 0 && (
+                    <div className="flex flex-col">
+                      <button
+                        type="button"
+                        onClick={() => setIsFinishedOpen(!isFinishedOpen)}
+                        className="flex items-center justify-between py-1 text-xs font-bold text-slate-500 dark:text-zinc-400 cursor-pointer select-none group"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isFinishedOpen ? '' : '-rotate-90'}`} />
+                          <span>المكتملة</span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400">
+                            {finishedTasks.length}
+                          </span>
+                        </div>
+                      </button>
+                      {isFinishedOpen && (
+                        <div className="flex flex-col divide-y divide-slate-100 dark:divide-zinc-800/60">
+                          {finishedTasks.map(renderTaskItem)}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </>
+              );
+            })()}
+          </div>
         )}
       </div>
+
+      {/* ── Fixed Portal for 3-dots Task Action Menu ── */}
+      {activeTaskMenu && typeof document !== 'undefined' && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            top: activeTaskMenu.openUpwards ? undefined : `${activeTaskMenu.y}px`,
+            bottom: activeTaskMenu.openUpwards ? `${window.innerHeight - activeTaskMenu.y}px` : undefined,
+            left: `${activeTaskMenu.x}px`,
+            zIndex: 99999,
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="w-28 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-2xl py-1 flex flex-col text-xs"
+        >
+          <button
+            type="button"
+            onClick={() => {
+              const taskToEdit = activeTaskMenu.task;
+              setActiveTaskMenu(null);
+              onEditTask?.(taskToEdit);
+            }}
+            className="flex items-center gap-2 px-3 py-1.5 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-800/80 transition cursor-pointer text-right w-full font-medium"
+          >
+            <Pencil className="w-3.5 h-3.5 text-slate-400" />
+            <span>تعديل</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const taskId = activeTaskMenu.task.id;
+              setActiveTaskMenu(null);
+              deleteTask(taskId);
+            }}
+            className="flex items-center gap-2 px-3 py-1.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer text-right w-full font-medium"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+            <span>حذف</span>
+          </button>
+        </div>,
+        document.body
+      )}
 
     </div>
   );
@@ -1278,6 +2049,8 @@ function SemesterWizard({ onClose, onSave, subjects }: WizardProps) {
 
   // Step 1: free-text label + folder/term selection (Dropdown Slider)
   const [label, setLabel] = useState('');
+  const [emoji, setEmoji] = useState('🎓');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [academicYear, setAcademicYear] = useState(initialFolder?.academicYear || '1448');
   const [semesterName, setSemesterName] = useState(initialFolder?.semester || 'الفصل الأول');
   const [selectedFolderTerm, setSelectedFolderTerm] = useState(
@@ -1287,8 +2060,6 @@ function SemesterWizard({ onClose, onSave, subjects }: WizardProps) {
     return storedInitial;
   });
   const [isFolderDropdownOpen, setIsFolderDropdownOpen] = useState(false);
-  const [isCustomFolder, setIsCustomFolder] = useState(false);
-  const [customFolderInput, setCustomFolderInput] = useState('');
 
   // Step 2: course picking
   const [searchSubject, setSearchSubject] = useState('');
@@ -1352,7 +2123,6 @@ function SemesterWizard({ onClose, onSave, subjects }: WizardProps) {
 
   const selectFolder = (termStr: string) => {
     setSelectedFolderTerm(termStr);
-    setIsCustomFolder(false);
     setIsFolderDropdownOpen(false);
 
     const match = displayedFolders.find(f => (f.term || f.name) === termStr);
@@ -1375,9 +2145,7 @@ function SemesterWizard({ onClose, onSave, subjects }: WizardProps) {
     }
   };
 
-  const term = isCustomFolder
-    ? customFolderInput.trim() || 'فصل مخصص'
-    : selectedFolderTerm || (academicYear && semesterName ? `${academicYear}-${semesterName}` : label);
+  const term = selectedFolderTerm || (academicYear && semesterName ? `${academicYear}-${semesterName}` : label);
   const finalLabel = label.trim() || `${academicYear} ${semesterName}`.trim() || 'فصل جديد';
 
   const filteredSubjects = subjects.filter(s => {
@@ -1405,7 +2173,7 @@ function SemesterWizard({ onClose, onSave, subjects }: WizardProps) {
     setSelectedCourses(prev => prev.map(c => c.courseCode === code ? { ...c, crn } : c));
   };
 
-  const [wizardMode, setWizardMode] = useState<'crn' | 'catalog'>('crn');
+  const [isBrowsingCatalog, setIsBrowsingCatalog] = useState(false);
   const [courseTimings, setCourseTimings] = useState<Record<string, ScheduleItem[]>>({});
   const [crnBatchInput, setCrnBatchInput] = useState('');
   const [isFetchingCrn, setIsFetchingCrn] = useState(false);
@@ -1462,6 +2230,7 @@ function SemesterWizard({ onClose, onSave, subjects }: WizardProps) {
                 });
               });
 
+              const { examDate, examTime } = extractFinalExamInfo(sec);
               next.push({
                 subjectId: sec.subjectId,
                 courseCode: courseCode,
@@ -1469,6 +2238,8 @@ function SemesterWizard({ onClose, onSave, subjects }: WizardProps) {
                 crn: crn,
                 creditHours: sec.creditHours || 3,
                 sectionNumber: sec.sectionNumber,
+                examDate,
+                examTime,
                 primaryInstructor: sec.primaryInstructor || (sec.instructors?.[0]?.name) || '',
                 instructors: Array.isArray(sec.instructors) && sec.instructors.length > 0
                   ? sec.instructors
@@ -1508,6 +2279,7 @@ function SemesterWizard({ onClose, onSave, subjects }: WizardProps) {
       semester: semesterName,
       term,
       courses: finalCourses,
+      emoji: emoji || '🎓',
       createdAt: new Date().toISOString()
     });
     onClose();
@@ -1560,26 +2332,72 @@ function SemesterWizard({ onClose, onSave, subjects }: WizardProps) {
                   <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">
                     اسم الفصل الدراسي <span className="text-red-400">*</span>
                   </label>
-                  <input
-                    type="text"
-                    autoFocus
-                    value={label}
-                    onChange={e => setLabel(e.target.value)}
-                    placeholder="مثال: المستوى الأول، مستواي الثالث..."
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none focus:ring-2 focus:ring-[var(--color-imamu-accent)]/30 focus:border-[var(--color-imamu-accent)] transition"
-                  />
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowEmojiPicker(prev => !prev)}
+                        className="w-12 h-11 rounded-xl bg-slate-50 dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 flex items-center justify-center text-xl hover:bg-slate-100 dark:hover:bg-zinc-800 hover:border-[var(--color-imamu-accent)] transition cursor-pointer shrink-0 shadow-2xs"
+                        title="اختر إيموجي للفصل الدراسي"
+                      >
+                        <span>{emoji || '🎓'}</span>
+                      </button>
+                      <AnimatePresence>
+                        {showEmojiPicker && (
+                          <>
+                            <div className="fixed inset-0 z-40" onClick={() => setShowEmojiPicker(false)} />
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                              transition={{ duration: 0.15 }}
+                              className="absolute top-full mt-2 right-0 z-50 p-2.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xl w-64"
+                              dir="rtl"
+                              onClick={e => e.stopPropagation()}
+                            >
+                              <p className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 mb-2 px-1">اختر أيقونة الفصل الدراسي:</p>
+                              <div className="grid grid-cols-6 gap-1.5 max-h-44 overflow-y-auto pr-0.5 custom-scrollbar">
+                                {SEMESTER_EMOJIS.map(em => (
+                                  <button
+                                    key={em}
+                                    type="button"
+                                    onClick={() => { setEmoji(em); setShowEmojiPicker(false); }}
+                                    className={clsx(
+                                      "w-8 h-8 rounded-xl flex items-center justify-center text-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer",
+                                      emoji === em && "bg-[var(--color-imamu-accent)]/15 ring-2 ring-[var(--color-imamu-accent)]"
+                                    )}
+                                  >
+                                    {em}
+                                  </button>
+                                ))}
+                              </div>
+                            </motion.div>
+                          </>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    <input
+                      type="text"
+                      autoFocus
+                      value={label}
+                      onChange={e => setLabel(e.target.value)}
+                      placeholder="مثال: المستوى الأول، مستواي الثالث..."
+                      className="flex-1 px-4 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none focus:ring-2 focus:ring-[var(--color-imamu-accent)]/30 focus:border-[var(--color-imamu-accent)] transition"
+                    />
+                  </div>
                   <p className="text-[11px] text-slate-400 dark:text-zinc-500 mt-1.5">سمّه كيفما تريد، هذا الاسم هو ما سيظهر لك في لوحتك وقوائمك.</p>
                 </div>
 
-                {/* Dropdown Slider: Section Folder / Term Selector */}
-                <div className="space-y-2.5 p-4 rounded-2xl bg-slate-50 dark:bg-zinc-900/70 border border-slate-200/80 dark:border-zinc-800">
+                {/* Section Folder / Term Selector */}
+                <div className="space-y-2.5 p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/40 border border-slate-200/80 dark:border-zinc-800">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
-                      <Folder className="w-3.5 h-3.5 text-amber-500" />
+                      <Folder className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
                       <span>الترم الدراسي:</span>
                     </label>
-                    <span className="text-[11px] font-bold text-[var(--color-imamu-accent)] font-mono">
-                      {isCustomFolder ? (customFolderInput || 'مخصص') : (selectedFolderTerm || 'اختر الترم')}
+                    <span className="text-[11px] font-bold text-[var(--color-imamu-accent)]">
+                      {selectedFolderTerm || 'اختر الترم'}
                     </span>
                   </div>
 
@@ -1588,19 +2406,17 @@ function SemesterWizard({ onClose, onSave, subjects }: WizardProps) {
                     <button
                       type="button"
                       onClick={() => setIsFolderDropdownOpen(prev => !prev)}
-                      className="w-full flex items-center justify-between px-3.5 py-2.5 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 rounded-xl text-xs font-bold text-slate-800 dark:text-white hover:bg-slate-50 dark:hover:bg-zinc-800 transition cursor-pointer shadow-xs"
+                      className="w-full flex items-center justify-between px-3.5 py-2.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-bold text-slate-800 dark:text-white hover:bg-slate-50 dark:hover:bg-zinc-800 transition cursor-pointer"
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        <FolderOpen className="w-4 h-4 text-amber-500 shrink-0" />
+                        <FolderOpen className="w-4 h-4 text-[var(--color-imamu-accent)] shrink-0" />
                         <span className="truncate">
-                          {isCustomFolder 
-                            ? (customFolderInput ? `مجلد مخصص: ${customFolderInput}` : 'مجلد مخصص: لم يُحدد بعد') 
-                            : (selectedFolderTerm || 'اختر الترم الدراسي المتاح...')}
+                          {selectedFolderTerm || 'اختر الترم الدراسي المتاح...'}
                         </span>
                         {(() => {
                           const curr = displayedFolders.find(f => (f.term || f.name) === selectedFolderTerm);
                           return curr?.count ? (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-[var(--color-imamu-accent)] font-mono">
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--color-imamu-accent)]/10 text-[var(--color-imamu-accent)] font-bold">
                               {curr.count} شعبة
                             </span>
                           ) : null;
@@ -1609,39 +2425,39 @@ function SemesterWizard({ onClose, onSave, subjects }: WizardProps) {
                       <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${isFolderDropdownOpen ? 'rotate-180' : ''}`} />
                     </button>
 
-                    {/* Dropdown Menu (sliding) */}
+                    {/* Inline Expandable List (Never behind footer or clipped) */}
                     <AnimatePresence>
                       {isFolderDropdownOpen && (
                         <motion.div
-                          initial={{ opacity: 0, y: -6, height: 0 }}
-                          animate={{ opacity: 1, y: 0, height: 'auto' }}
-                          exit={{ opacity: 0, y: -6, height: 0 }}
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
                           transition={{ duration: 0.18 }}
-                          className="absolute right-0 left-0 top-full mt-1.5 bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xl z-50 overflow-hidden py-1.5 max-h-56 overflow-y-auto"
+                          className="overflow-hidden mt-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl divide-y divide-slate-100 dark:divide-zinc-800 shadow-sm max-h-56 overflow-y-auto"
                         >
                           {displayedFolders.length > 0 ? (
                             displayedFolders.map(f => {
                               const val = f.term || f.name;
-                              const isSel = !isCustomFolder && selectedFolderTerm === val;
+                              const isSel = selectedFolderTerm === val;
                               return (
                                 <button
                                   key={val}
                                   type="button"
                                   onClick={() => selectFolder(val)}
                                   className={clsx(
-                                    "w-full flex items-center justify-between px-3.5 py-2 text-xs font-semibold text-right transition cursor-pointer",
+                                    "w-full flex items-center justify-between px-3.5 py-2.5 text-xs font-semibold text-right transition cursor-pointer",
                                     isSel
-                                      ? "bg-amber-500/10 text-[var(--color-imamu-accent)] font-bold"
-                                      : "text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-900"
+                                      ? "bg-[var(--color-imamu-accent)]/10 text-[var(--color-imamu-accent)] font-bold"
+                                      : "text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800"
                                   )}
                                 >
                                   <div className="flex items-center gap-2">
-                                    <Folder className="w-3.5 h-3.5 text-amber-500" />
+                                    <Folder className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
                                     <span>{f.name}</span>
                                   </div>
                                   <div className="flex items-center gap-1.5">
                                     {f.count ? (
-                                      <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-500">
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-500 font-sans">
                                         {f.count} شعبة
                                       </span>
                                     ) : null}
@@ -1655,183 +2471,174 @@ function SemesterWizard({ onClose, onSave, subjects }: WizardProps) {
                               لا توجد مجلدات شعب متاحة حالياً
                             </div>
                           )}
-
-                          <div className="border-t border-slate-100 dark:border-zinc-800 mt-1 pt-1">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setIsCustomFolder(true);
-                                setIsFolderDropdownOpen(false);
-                              }}
-                              className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-[var(--color-imamu-accent)] hover:bg-amber-500/5 transition cursor-pointer"
-                            >
-                              <FolderPlus className="w-3.5 h-3.5" />
-                              <span>إدخال مجلد أو فصل مخصص...</span>
-                            </button>
-                          </div>
                         </motion.div>
                       )}
                     </AnimatePresence>
                   </div>
-
-                  {/* Custom Folder Input if selected */}
-                  {isCustomFolder && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="space-y-1.5 pt-1"
-                    >
-                      <label className="block text-[11px] font-semibold text-slate-500 dark:text-zinc-400">
-                        أدخل اسم المجلد أو الفصل المخصص:
-                      </label>
-                      <input
-                        type="text"
-                        value={customFolderInput}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setCustomFolderInput(val);
-                          setSelectedFolderTerm(val);
-                          const parts = val.split(/[-–]/).map(s => s.trim());
-                          if (parts.length >= 2) {
-                            setAcademicYear(parts[0]);
-                            setSemesterName(parts.slice(1).join(' '));
-                          } else {
-                            setAcademicYear(val);
-                            setSemesterName('');
-                          }
-                        }}
-                        placeholder="مثال: 1448 - الفصل الأول"
-                        className="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:ring-1 focus:ring-[var(--color-imamu-accent)]/30 focus:border-[var(--color-imamu-accent)] transition"
-                      />
-                    </motion.div>
-                  )}
                 </div>
               </motion.div>
             )}
 
             {step === 2 && (
               <motion.div key="s2" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.18 }} className="flex flex-col gap-4">
-                {/* Mode switch pills */}
-                <div className="grid grid-cols-2 gap-2 bg-zinc-900 p-1 rounded-2xl border border-zinc-800">
-                  <button
-                    type="button"
-                    onClick={() => setWizardMode('crn')}
-                    className={`py-2 text-xs font-bold rounded-xl transition cursor-pointer flex items-center justify-center gap-2 ${
-                      wizardMode === 'crn'
-                        ? 'bg-amber-500 text-zinc-950 shadow-sm'
-                        : 'text-zinc-400 hover:text-white'
-                    }`}
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    إضافة سريعة بالـ CRN
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setWizardMode('catalog')}
-                    className={`py-2 text-xs font-bold rounded-xl transition cursor-pointer flex items-center justify-center gap-2 ${
-                      wizardMode === 'catalog'
-                        ? 'bg-amber-500 text-zinc-950 shadow-sm'
-                        : 'text-zinc-400 hover:text-white'
-                    }`}
-                  >
-                    <BookOpen className="w-3.5 h-3.5" />
-                    اختيار من دليل المواد
-                  </button>
-                </div>
+                {!isBrowsingCatalog ? (
+                  <div className="space-y-4">
+                    {/* 1. CRN Text Box (Matching AddCourseModal) */}
+                    <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/40 border border-slate-200/80 dark:border-zinc-800 space-y-3">
+                      <div>
+                        <label className="text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-2 mb-1">
+                          <span>الرقم المرجعي للشعبة (CRN)</span>
+                        </label>
+                      </div>
 
-                {wizardMode === 'crn' ? (
-                  /* CRN Card Themed */
-                  <div className="bg-[#18181b] border border-zinc-800 rounded-2xl p-4 flex flex-col gap-2.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                        إضافة سريعة بأرقام الشعب (CRN)
-                      </span>
-                      <span className="text-[10px] text-zinc-400">
-                        أدخل رقماً أو أكثر مفصولة بفواصل
-                      </span>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <input
+                            type="text"
+                            value={crnBatchInput}
+                            onChange={e => {
+                              setCrnBatchInput(e.target.value);
+                              if (crnFeedback) setCrnFeedback(null);
+                            }}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleFetchCrnBatch();
+                              }
+                            }}
+                            placeholder="أدخل الـ CRN (مثال: 10245)"
+                            className="w-full px-4 py-2.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none focus:border-[var(--color-imamu-accent)] focus:ring-1 focus:ring-[var(--color-imamu-accent)] shadow-xs transition text-center sm:text-right"
+                            autoFocus
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          disabled={isFetchingCrn || !crnBatchInput.trim()}
+                          onClick={handleFetchCrnBatch}
+                          className="px-4 py-2.5 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] disabled:opacity-40 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shrink-0 shadow-xs"
+                        >
+                          {isFetchingCrn ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>جلب...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Search className="w-4 h-4" />
+                              <span>جلب البيانات</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      {crnFeedback && (
+                        <div className={clsx(
+                          "p-3 rounded-xl border text-xs flex items-center gap-2",
+                          crnFeedback.type === 'success'
+                            ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                            : "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
+                        )}>
+                          {crnFeedback.type === 'success' ? <Check className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+                          <span>{crnFeedback.msg}</span>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={crnBatchInput}
-                        onChange={e => setCrnBatchInput(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleFetchCrnBatch(); } }}
-                        placeholder="أدخل أرقام الـ CRN (مثال: 21045, 21048)..."
-                        className="flex-1 px-3.5 py-2.5 bg-zinc-900 border border-zinc-700/80 rounded-xl text-xs font-mono text-white placeholder-zinc-500 outline-none focus:border-amber-500"
-                      />
-                      <button
-                        type="button"
-                        disabled={isFetchingCrn || !crnBatchInput.trim()}
-                        onClick={handleFetchCrnBatch}
-                        className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-zinc-950 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shrink-0 shadow-sm"
-                      >
-                        {isFetchingCrn ? (
-                          <><Loader2 className="w-3.5 h-3.5 animate-spin" /> جلب...</>
-                        ) : (
-                          <><Sparkles className="w-3.5 h-3.5" /> جلب المقررات</>
-                        )}
-                      </button>
+
+                    {/* Divider */}
+                    <div className="relative flex items-center my-1.5">
+                      <div className="flex-grow border-t border-slate-200 dark:border-zinc-800"></div>
+                      <span className="flex-shrink mx-3 text-[11px] font-bold text-slate-400 dark:text-zinc-500">أو</span>
+                      <div className="flex-grow border-t border-slate-200 dark:border-zinc-800"></div>
                     </div>
-                    {crnFeedback && (
-                      <p className={clsx("text-[11px] font-semibold mt-0.5", crnFeedback.type === 'success' ? "text-emerald-400" : "text-amber-400")}>
-                        {crnFeedback.msg}
-                      </p>
-                    )}
+
+                    {/* 2. Catalog Card (Matching AddCourseModal) */}
+                    <button
+                      type="button"
+                      onClick={() => setIsBrowsingCatalog(true)}
+                      className="w-full p-3.5 rounded-2xl bg-slate-50 hover:bg-stone-50/80 dark:bg-zinc-800/40 dark:hover:bg-zinc-800/70 border border-slate-200/80 hover:border-[var(--color-imamu-accent)] dark:border-zinc-800 dark:hover:border-[var(--color-imamu-accent)]/60 transition-all duration-200 flex items-center justify-between gap-3 cursor-pointer group shadow-xs text-right"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-stone-100 dark:bg-stone-900/60 border border-[var(--color-imamu-accent)]/20 text-[var(--color-imamu-accent)] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                          <BookOpen className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white group-hover:text-[var(--color-imamu-accent)] transition-colors truncate">
+                            تصفح واختيار المقرر من الدليل
+                          </h4>
+                          <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5 truncate">
+                            استعراض قائمة المواد وتحديد المواعيد يدوياً
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs font-bold text-[var(--color-imamu-accent)] shrink-0 pl-1">
+                        <span>فتح الدليل</span>
+                        <span className="group-hover:-translate-x-1 transition-transform">←</span>
+                      </div>
+                    </button>
                   </div>
                 ) : (
-                  /* Catalog Grid Mode (matching Image 1) */
+                  /* Catalog Browser Mode (Matching AddCourseModal) */
                   <div className="space-y-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
+                        <BookOpen className="w-4 h-4 text-[var(--color-imamu-accent)]" />
+                        <span>دليل المقررات الجامعية</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsBrowsingCatalog(false)}
+                        className="text-xs text-[var(--color-imamu-accent)] font-bold hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>رجوع للإدخال بالـ CRN</span>
+                        <span>←</span>
+                      </button>
+                    </div>
+
                     <div className="relative">
-                      <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
+                      <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                       <input
                         type="text"
                         value={searchSubject}
                         onChange={e => setSearchSubject(e.target.value)}
                         placeholder="ابحث برمز المادة أو اسمها في الدليل..."
-                        className="w-full pr-10 pl-4 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-white placeholder-zinc-500 outline-none focus:border-amber-500 transition"
+                        className="w-full pr-10 pl-4 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:border-[var(--color-imamu-accent)] transition"
                       />
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[380px] overflow-y-auto pr-1 pl-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[320px] overflow-y-auto pr-1 pl-1">
                       {filteredSubjects.map(s => {
                         const selected = isSelected(s);
                         return (
                           <div
                             key={s.id}
                             onClick={() => toggleSubject(s)}
-                            className={`bg-[#121214] border rounded-2xl p-4 text-right flex flex-col justify-between min-h-[135px] transition cursor-pointer select-none ${
+                            className={clsx(
+                              "rounded-2xl p-3.5 text-right flex flex-col justify-between min-h-[120px] transition cursor-pointer select-none border",
                               selected
-                                ? 'border-amber-500 shadow-md ring-1 ring-amber-500/50'
-                                : 'border-zinc-800/80 hover:border-zinc-700'
-                            }`}
+                                ? "bg-[var(--color-imamu-brown)]/10 border-[var(--color-imamu-accent)] shadow-xs ring-1 ring-[var(--color-imamu-accent)]/50"
+                                : "bg-slate-50 dark:bg-zinc-800/40 border-slate-200/80 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700"
+                            )}
                           >
-                            {/* Top line: Code + dot + credit hours */}
-                            <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-amber-500">
+                            <div className="flex items-center justify-between text-xs font-mono font-bold text-[var(--color-imamu-accent)]">
                               <span>{s.code}</span>
-                              <span>·</span>
-                              <span>{s.creditHours || 2} س</span>
+                              <span className="text-[10.5px] px-2 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-500 font-sans">
+                                {s.creditHours || 3} س
+                              </span>
                             </div>
 
-                            {/* Middle line: Course Name */}
-                            <h4 className="text-base font-bold text-white leading-tight my-2">
+                            <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white leading-tight my-2">
                               {s.name}
                             </h4>
 
-                            {/* Divider line */}
-                            <div className="border-t border-zinc-800/80 my-2" />
-
-                            {/* Bottom CTA */}
-                            <div className="text-xs text-zinc-400 flex items-center justify-between">
+                            <div className="text-[11px] text-slate-500 dark:text-zinc-400 flex items-center justify-between border-t border-slate-200/60 dark:border-zinc-800 pt-2">
                               <span>{selected ? 'تم تحديد المادة' : 'انقر لتحديد المادة'}</span>
-                              {selected && <Check className="w-3.5 h-3.5 text-amber-500" />}
+                              {selected && <Check className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />}
                             </div>
                           </div>
                         );
                       })}
                       {filteredSubjects.length === 0 && (
-                        <p className="col-span-2 text-center text-xs text-zinc-500 py-6">لم يتم العثور على مواد تطابق البحث</p>
+                        <p className="col-span-2 text-center text-xs text-slate-400 py-6">لم يتم العثور على مواد تطابق البحث</p>
                       )}
                     </div>
                   </div>
@@ -1839,24 +2646,39 @@ function SemesterWizard({ onClose, onSave, subjects }: WizardProps) {
 
                 {/* Selected courses preview with CRN */}
                 {selectedCourses.length > 0 && (
-                  <div className="pt-2 border-t border-zinc-800/80">
-                    <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">
-                      المواد المختارة ({selectedCourses.length})
+                  <div className="pt-3 border-t border-slate-200/80 dark:border-zinc-800">
+                    <p className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                      <span>المواد المضافة لهذا الفصل ({selectedCourses.length})</span>
+                      <span className="text-[10px] text-slate-400 font-normal">يمكنك مراجعة الجدول في الخطوة التالية</span>
                     </p>
-                    <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1">
+                    <div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
                       {selectedCourses.map(c => (
-                        <div key={c.courseCode} className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2">
-                          <span className="text-[11px] font-bold font-mono text-amber-500 shrink-0 w-16 truncate">{c.courseCode}</span>
-                          <span className="text-[11px] text-zinc-300 flex-1 truncate">{c.courseName}</span>
-                          <input
-                            type="text"
-                            value={c.crn}
-                            onChange={e => updateCrn(c.courseCode, e.target.value.trim())}
-                            placeholder="CRN"
-                            className="w-20 px-2 py-1 bg-zinc-950 border border-zinc-700 rounded-lg text-xs font-mono text-center text-white outline-none focus:border-amber-500 shrink-0"
-                          />
-                          <button type="button" onClick={() => toggleSubject({ code: c.courseCode, name: c.courseName })} className="p-1 text-zinc-500 hover:text-red-400 rounded-lg transition cursor-pointer shrink-0">
-                            <X className="w-3.5 h-3.5" />
+                        <div
+                          key={c.courseCode}
+                          className="flex items-center gap-2.5 bg-slate-50 dark:bg-zinc-800/50 border border-slate-200/80 dark:border-zinc-800 rounded-xl px-3.5 py-2.5"
+                        >
+                          <span className="text-xs font-bold font-mono text-[var(--color-imamu-accent)] shrink-0">
+                            {c.courseCode}
+                          </span>
+                          <span className="text-xs font-bold text-slate-800 dark:text-white flex-1 truncate">
+                            {c.courseName}
+                          </span>
+                          {c.crn ? (
+                            <span className="text-[10.5px] font-mono font-bold px-2 py-0.5 rounded-lg bg-[var(--color-imamu-accent)]/10 text-[var(--color-imamu-accent)] shrink-0">
+                              CRN: {c.crn}
+                            </span>
+                          ) : (
+                            <span className="text-[10.5px] text-slate-400 dark:text-zinc-500 shrink-0">
+                              دليل المواد
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => toggleSubject({ code: c.courseCode, name: c.courseName })}
+                            className="p-1 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 rounded-lg transition cursor-pointer shrink-0"
+                            title="حذف المادة من القائمة"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       ))}
@@ -1977,143 +2799,6 @@ function SemesterWizard({ onClose, onSave, subjects }: WizardProps) {
 
 
 // ─────────────────────────────────────────────
-// Exam modal
-// ─────────────────────────────────────────────
-function ExamModal({ course, onClose, onSave }: { course: CourseEntry; onClose: () => void; onSave: (d: string, t: string) => void }) {
-  const [date, setDate] = useState(course.examDate || '');
-  const [time, setTime] = useState(course.examTime || '09:00');
-  const [saved, setSaved] = useState(false);
-
-  const save = () => {
-    if (!date) return;
-    try {
-      const existing: any[] = JSON.parse(localStorage.getItem('imamu_local_events') || '[]');
-      const id = `exam-${course.courseCode}-${date}`;
-      const filtered = existing.filter((e: any) => e.id !== id);
-      filtered.push({
-        id, date, time,
-        title: `امتحان ${course.courseCode} – ${course.courseName}`,
-        description: `امتحان مادة ${course.courseName} (${course.courseCode})${course.crn ? ` - CRN: ${course.crn}` : ''}`,
-        calendarType: 'user',
-        isExam: true,
-      });
-      localStorage.setItem('imamu_local_events', JSON.stringify(filtered));
-    } catch { }
-
-    const token = typeof window !== 'undefined' ? (localStorage.getItem('token') || localStorage.getItem('imamu_token') || '') : '';
-    if (token) {
-      fetch('/api/user-events', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          title: `امتحان ${course.courseCode} – ${course.courseName}`,
-          date: time ? `${date}T${time}:00` : date,
-          description: `امتحان مادة ${course.courseName} (${course.courseCode})${course.crn ? ` - CRN: ${course.crn}` : ''}`,
-          calendarType: 'user'
-        })
-      }).catch(console.error);
-    }
-
-    onSave(date, time);
-    setSaved(true);
-    setTimeout(onClose, 700);
-  };
-
-  return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center" dir="rtl">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
-      <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }} transition={{ duration: 0.16 }} className="relative bg-white dark:bg-zinc-950 rounded-2xl shadow-2xl border border-slate-200 dark:border-zinc-800 w-full max-w-sm mx-4 p-6">
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-sm font-bold text-slate-900 dark:text-white">موعد الامتحان</h3>
-          <button onClick={onClose} className="p-1.5 rounded-xl text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-900 transition cursor-pointer"><X className="w-4 h-4" /></button>
-        </div>
-        <div className="bg-[var(--color-imamu-brown)]/8 border border-[var(--color-imamu-brown)]/20 rounded-xl p-3 mb-5">
-          <p className="text-[11px] font-bold text-[var(--color-imamu-accent)]">{course.courseCode}</p>
-          <p className="text-xs text-slate-500 dark:text-zinc-400">{course.courseName}</p>
-        </div>
-        <div className="flex flex-col gap-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-600 dark:text-zinc-300 mb-1.5">التاريخ</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full px-3 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[var(--color-imamu-accent)]/30 focus:border-[var(--color-imamu-accent)] transition" />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-600 dark:text-zinc-300 mb-1.5">الوقت</label>
-            <input type="time" value={time} onChange={e => setTime(e.target.value)} className="w-full px-3 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[var(--color-imamu-accent)]/30 focus:border-[var(--color-imamu-accent)] transition" />
-          </div>
-        </div>
-        <div className="flex gap-2 mt-5">
-          <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-800 text-xs font-bold text-slate-600 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-900 transition cursor-pointer">إلغاء</button>
-          <button onClick={save} disabled={!date || saved} className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-xs font-bold transition disabled:opacity-50 cursor-pointer shadow-sm">
-            {saved ? <><Check className="w-4 h-4" />تم!</> : <><CalendarPlus className="w-4 h-4" />حفظ في التقويم</>}
-          </button>
-        </div>
-      </motion.div>
-    </div>
-  );
-}
-
-function NewTaskModal({ isOpen, onClose, onAddTask }: { isOpen: boolean; onClose: () => void; onAddTask: (title: string) => void }) {
-  const [title, setTitle] = useState('');
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" dir="rtl" onClick={onClose}>
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        onClick={e => e.stopPropagation()}
-        className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 w-full max-w-sm shadow-2xl space-y-3.5"
-      >
-        <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5">
-          <span className="text-xs font-bold text-white flex items-center gap-1.5">
-            <CheckSquare className="w-4 h-4 text-sky-400" />
-            إضافة مهمة جديدة
-          </span>
-          <button type="button" onClick={onClose} className="p-1 rounded-lg text-zinc-400 hover:text-white cursor-pointer">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        <input
-          type="text"
-          value={title}
-          onChange={e => setTitle(e.target.value)}
-          placeholder="عنوان المهمة (مثل: مراجعة الكويز الأول)..."
-          className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-white placeholder-zinc-500 outline-none focus:border-sky-500"
-          autoFocus
-          onKeyDown={e => {
-            if (e.key === 'Enter' && title.trim()) {
-              onAddTask(title.trim());
-              setTitle('');
-              onClose();
-            }
-          }}
-        />
-        <div className="flex justify-end gap-2 pt-1">
-          <button type="button" onClick={onClose} className="px-3 py-1.5 text-xs text-zinc-400 hover:text-white cursor-pointer">
-            إلغاء
-          </button>
-          <button
-            type="button"
-            disabled={!title.trim()}
-            onClick={() => {
-              onAddTask(title.trim());
-              setTitle('');
-              onClose();
-            }}
-            className="px-4 py-1.5 bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
-          >
-            إضافة المهمة
-          </button>
-        </div>
-      </motion.div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────
 // Main page
 // ─────────────────────────────────────────────
 export function AnaPage() {
@@ -2127,7 +2812,6 @@ export function AnaPage() {
   const [subjects, setSubjects] = useState<any[]>([]);
   const [sections, setSections] = useState<SectionData[]>([]);
   const [loadingSections, setLoadingSections] = useState(false);
-  const [examCourse, setExamCourse] = useState<CourseEntry | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Plus Action Menu (4 actions) & New Modals
@@ -2135,6 +2819,7 @@ export function AnaPage() {
   const [isAddCourseOpen, setIsAddCourseOpen] = useState(false);
   const [selectedCourseForDetails, setSelectedCourseForDetails] = useState<CourseEntry | null>(null);
   const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false);
+  const [taskToEdit, setTaskToEdit] = useState<StudentTask | null>(null);
 
   const activeSemester = semesters.find(s => s.id === activeSemId) || semesters[0] || null;
 
@@ -2194,8 +2879,15 @@ export function AnaPage() {
     const list: SectionData[] = [...sections];
     if (activeSemester?.courses) {
       activeSemester.courses.forEach((c, idx) => {
+        const existingIdx = list.findIndex(s => (c.crn && s.crn === c.crn) || s.courseCode === c.courseCode);
+        if (existingIdx >= 0 && c.color) {
+          list[existingIdx] = {
+            ...list[existingIdx],
+            color: c.color
+          };
+        }
+
         if (c.customSchedule && c.customSchedule.length > 0) {
-          const existingIdx = list.findIndex(s => (c.crn && s.crn === c.crn) || s.courseCode === c.courseCode);
           const mappedSchedules = c.customSchedule.map(cs => ({
             days: cs.days,
             startTime: cs.startTime,
@@ -2220,7 +2912,8 @@ export function AnaPage() {
               primaryInstructor: c.primaryInstructor || teacher || list[existingIdx].primaryInstructor,
               instructors: (c.instructors && c.instructors.length > 0) ? c.instructors : list[existingIdx].instructors,
               whatsappLink: c.whatsappLink || list[existingIdx].whatsappLink,
-              sectionNumber: c.sectionNumber || list[existingIdx].sectionNumber
+              sectionNumber: c.sectionNumber || list[existingIdx].sectionNumber,
+              color: c.color || list[existingIdx].color
             };
           } else {
             list.push({
@@ -2232,7 +2925,8 @@ export function AnaPage() {
               primaryInstructor: c.primaryInstructor || teacher || '',
               instructors: (c.instructors && c.instructors.length > 0) ? c.instructors : (teacher ? [{ name: teacher }] : []),
               schedules: mappedSchedules,
-              whatsappLink: c.whatsappLink
+              whatsappLink: c.whatsappLink,
+              color: c.color
             });
           }
         }
@@ -2250,10 +2944,49 @@ export function AnaPage() {
     return () => document.removeEventListener('mousedown', h);
   }, [isSemDropdownOpen]);
 
+  const syncExamToEvents = (course: CourseEntry) => {
+    if (!course.examDate) return;
+    try {
+      const id = `exam-${course.courseCode}-${course.examDate}`;
+      const existing: any[] = JSON.parse(localStorage.getItem('imamu_local_events') || '[]');
+      const eventIdx = existing.findIndex((e: any) => e.id === id);
+      if (eventIdx >= 0) {
+        existing[eventIdx] = {
+          ...existing[eventIdx],
+          title: 'أختبار نهائي',
+        };
+      } else {
+        existing.push({
+          id,
+          date: course.examTime ? `${course.examDate}T${course.examTime}:00` : course.examDate,
+          time: course.examTime,
+          title: 'أختبار نهائي',
+          description: `اختبار نهائي مقرر ${course.courseName} (${course.courseCode})${course.crn ? ` - CRN: ${course.crn}` : ''}`,
+          calendarType: 'user',
+          isExam: true,
+          courseCode: course.courseCode
+        });
+      }
+      localStorage.setItem('imamu_local_events', JSON.stringify(existing));
+      window.dispatchEvent(new Event('storage'));
+    } catch {}
+  };
+
+  const syncExam = (course: CourseEntry, allCourses?: CourseEntry[]) => {
+    syncExamToEvents(course);
+    syncExamToStudentTasks(course, allCourses || activeSemester?.courses, effectiveSections);
+  };
+
+  useEffect(() => {
+    if (!activeSemester?.courses?.length) return;
+    activeSemester.courses.forEach(c => syncExam(c, activeSemester.courses));
+  }, [activeSemester?.id, activeSemester?.courses, effectiveSections]);
+
   const addSemester = (sem: MySemester) => {
     const next = [...semesters, sem];
     saveSemesters(next); setSemesters(next);
     setActiveSemId(sem.id); saveActiveSemId(sem.id);
+    sem.courses.forEach(c => syncExam(c, sem.courses));
   };
 
   const selectSemester = (id: string) => {
@@ -2277,12 +3010,14 @@ export function AnaPage() {
     saveSemesters(next); setSemesters(next);
   };
 
-  const updateSemesterDetails = (id: string, newLabel: string, newCourses: CourseEntry[]) => {
-    const next = semesters.map(s => s.id === id ? { ...s, label: newLabel, courses: newCourses } : s);
+  const updateSemesterDetails = (id: string, newLabel: string, newCourses: CourseEntry[], newEmoji?: string) => {
+    const next = semesters.map(s => s.id === id ? { ...s, label: newLabel, courses: newCourses, emoji: newEmoji ?? s.emoji } : s);
     saveSemesters(next); setSemesters(next);
+    newCourses.forEach(c => syncExam(c, newCourses));
   };
 
   const handleAddCourseToSemester = (semesterId: string, course: CourseEntry) => {
+    syncExam(course);
     const next = semesters.map(s => {
       if (s.id !== semesterId) return s;
       const exists = s.courses.some(c => c.courseCode === course.courseCode);
@@ -2314,25 +3049,31 @@ export function AnaPage() {
     setSemesters(next);
   };
 
-  const handleQuickAddTask = (title: string) => {
+  const handleSaveNewTask = (taskData: Omit<StudentTask, 'id' | 'completed' | 'createdAt'>) => {
     try {
       const raw = localStorage.getItem('imamu_student_tasks');
-      const prev = raw ? JSON.parse(raw) : [];
-      const updated = [{ id: Date.now().toString(), title, completed: false }, ...prev];
-      localStorage.setItem('imamu_student_tasks', JSON.stringify(updated));
+      const prev: StudentTask[] = raw ? JSON.parse(raw) : [];
+      if (taskToEdit) {
+        const updated = prev.map(t => t.id === taskToEdit.id ? { ...t, ...taskData } : t);
+        localStorage.setItem('imamu_student_tasks', JSON.stringify(updated));
+        const updatedTask = updated.find(t => t.id === taskToEdit.id);
+        if (updatedTask) syncTaskToCalendar();
+        setTaskToEdit(null);
+      } else {
+        const newTask: StudentTask = {
+          id: Date.now().toString(),
+          ...taskData,
+          completed: false,
+          createdAt: new Date().toISOString()
+        };
+        const updated = [newTask, ...prev];
+        localStorage.setItem('imamu_student_tasks', JSON.stringify(updated));
+        syncTaskToCalendar();
+      }
+      window.dispatchEvent(new Event('imamu_tasks_updated'));
       window.dispatchEvent(new Event('storage'));
     } catch {}
   };
-
-  const saveExam = (date: string, time: string) => {
-    if (!activeSemester || !examCourse) return;
-    const next = semesters.map(s => s.id !== activeSemester.id ? s : {
-      ...s,
-      courses: s.courses.map(c => c.courseCode === examCourse.courseCode ? { ...c, examDate: date, examTime: time } : c)
-    });
-    saveSemesters(next); setSemesters(next);
-  };
-
 
   // Events (for sidebar)
   const { data: eventsData } = useSWR<any[]>('/api/events');
@@ -2407,7 +3148,7 @@ export function AnaPage() {
             </AnimatePresence>
           </div>
 
-          {/* Radial Speed-Dial Plus Menu (4 orbiting actions) */}
+          {/* Radial Speed-Dial Plus Menu (3 orbiting actions) */}
           <SpeedDialPlusMenu
             isOpen={isPlusMenuOpen}
             onToggle={() => setIsPlusMenuOpen(!isPlusMenuOpen)}
@@ -2417,14 +3158,9 @@ export function AnaPage() {
               setIsAddCourseOpen(true);
             }}
             onAddSemester={() => setIsWizardOpen(true)}
-            onAddTask={() => setIsNewTaskModalOpen(true)}
-            onAddExam={() => {
-              if (activeSemester?.courses?.[0]) {
-                setExamCourse(activeSemester.courses[0]);
-              } else {
-                setSelectedCourseForDetails(null);
-                setIsAddCourseOpen(true);
-              }
+            onAddTask={() => {
+              setTaskToEdit(null);
+              setIsNewTaskModalOpen(true);
             }}
           />
         </div>
@@ -2470,12 +3206,41 @@ export function AnaPage() {
             dbUser={dbUser}
             effectiveSections={effectiveSections}
             onOpenCourseDetails={(c) => {
-              setSelectedCourseForDetails(c);
+              const matchingSec = effectiveSections?.find(s =>
+                (c.crn && s.crn && String(s.crn) === String(c.crn)) ||
+                (c.courseCode && s.courseCode && s.courseCode === c.courseCode)
+              );
+              const enriched: CourseEntry = matchingSec ? {
+                ...c,
+                primaryInstructor: (matchingSec as any).primaryInstructor || (matchingSec as any).instructor || c.primaryInstructor,
+                instructors: (Array.isArray((matchingSec as any).instructors) && (matchingSec as any).instructors.length > 0)
+                  ? (matchingSec as any).instructors
+                  : c.instructors,
+                sectionNumber: matchingSec.sectionNumber || c.sectionNumber,
+                customSchedule: (c.customSchedule && c.customSchedule.length > 0)
+                  ? c.customSchedule
+                  : (matchingSec.schedules || []).map((s: any, sIdx: number) => ({
+                      id: String(sIdx + 1),
+                      days: Array.isArray(s.days) ? s.days : (s.days ? [String(s.days)] : ['الأحد']),
+                      startTime: s.startTime || '08:25 am',
+                      endTime: s.endTime || '09:15 am',
+                      classroom: s.room || s.classroom || s.building || '',
+                      teacher: s.instructor || (matchingSec as any).primaryInstructor || ''
+                    }))
+              } : c;
+              setSelectedCourseForDetails(enriched);
               setIsAddCourseOpen(true);
             }}
-            onAddExam={c => setExamCourse(c)}
+            onOpenNewTaskModal={() => {
+              setTaskToEdit(null);
+              setIsNewTaskModalOpen(true);
+            }}
+            onEditTask={(task) => {
+              setTaskToEdit(task);
+              setIsNewTaskModalOpen(true);
+            }}
             onRename={(newLabel) => activeSemester && renameSemester(activeSemester.id, newLabel)}
-            onUpdateSemester={(newLabel, newCourses) => activeSemester && updateSemesterDetails(activeSemester.id, newLabel, newCourses)}
+            onUpdateSemester={(newLabel, newCourses, newEmoji) => activeSemester && updateSemesterDetails(activeSemester.id, newLabel, newCourses, newEmoji)}
             subjects={subjects}
           />
         </div>
@@ -2515,18 +3280,23 @@ export function AnaPage() {
         {isNewTaskModalOpen && (
           <NewTaskModal
             isOpen={isNewTaskModalOpen}
-            onClose={() => setIsNewTaskModalOpen(false)}
-            onAddTask={handleQuickAddTask}
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {examCourse && (
-          <ExamModal
-            course={examCourse}
-            onClose={() => setExamCourse(null)}
-            onSave={(d, t) => { saveExam(d, t); setExamCourse(null); }}
+            onClose={() => {
+              setIsNewTaskModalOpen(false);
+              setTaskToEdit(null);
+            }}
+            onSaveTask={handleSaveNewTask}
+            courses={(activeSemester?.courses || []).map(c => {
+              const secIdx = effectiveSections?.findIndex(s =>
+                (c.crn && s.crn && String(s.crn) === String(c.crn)) ||
+                (c.courseCode && s.courseCode && s.courseCode === c.courseCode) ||
+                (c.courseName && s.courseTitle && (s.courseTitle === c.courseName || s.courseTitle.includes(c.courseName) || c.courseName.includes(s.courseTitle)))
+              ) ?? -1;
+              const color = secIdx >= 0
+                ? COURSE_HEX_COLORS[secIdx % COURSE_HEX_COLORS.length]
+                : getCourseColor(c.courseCode, activeSemester?.courses);
+              return { ...c, color };
+            })}
+            taskToEdit={taskToEdit}
           />
         )}
       </AnimatePresence>

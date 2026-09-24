@@ -20,6 +20,7 @@ import {
   COURSE_CARD_PALETTES,
   type CoursePalette
 } from '../lib/schedule-utils';
+import { COURSE_HEX_COLORS } from '../lib/task-utils';
 
 export { parseTimeToMinutes, formatMinutesToTime, COURSE_CARD_PALETTES, type CoursePalette };
 
@@ -48,6 +49,7 @@ export interface SectionDataForSchedule {
   instructors?: { name: string; email?: string; isPrimary?: boolean }[];
   schedules?: ScheduleSlotRaw[];
   whatsappLink?: string;
+  color?: string;
 }
 
 export interface PositionedSlot {
@@ -76,6 +78,7 @@ export interface PositionedSlot {
 interface WeeklyScheduleProps {
   sections: SectionDataForSchedule[];
   className?: string;
+  loading?: boolean;
 }
 
 // ─────────────────────────────────────────────
@@ -90,14 +93,13 @@ export function formatHourLabel(hour: number): string {
   const isPm = hour >= 12;
   const h12 = hour % 12 === 0 ? 12 : hour % 12;
   const period = isPm ? 'م' : 'ص';
-  const padded = h12 < 10 ? `0${h12}` : `${h12}`;
-  return `${padded}:00 ${period}`;
+  return `${h12}${period}`;
 }
 
 // ─────────────────────────────────────────────
 // Component: WeeklySchedule
 // ─────────────────────────────────────────────
-export function WeeklySchedule({ sections, className = '' }: WeeklyScheduleProps) {
+export function WeeklySchedule({ sections, className = '', loading = false }: WeeklyScheduleProps) {
   const [selectedSlot, setSelectedSlot] = useState<PositionedSlot | null>(null);
   const [now, setNow] = useState<Date>(new Date());
   const gridContainerRef = useRef<HTMLDivElement>(null);
@@ -128,7 +130,8 @@ export function WeeklySchedule({ sections, className = '' }: WeeklyScheduleProps
     let overallMax = 14 * 60;  // default 2:00 PM
 
     sections.forEach((sec, secIdx) => {
-      const colorIndex = secIdx % COURSE_CARD_PALETTES.length;
+      const matchedIdx = sec.color ? COURSE_HEX_COLORS.indexOf(sec.color) : -1;
+      const colorIndex = (matchedIdx >= 0 ? matchedIdx : secIdx) % COURSE_CARD_PALETTES.length;
       const schedList = Array.isArray(sec.schedules) ? sec.schedules : [];
 
       schedList.forEach(sch => {
@@ -184,9 +187,9 @@ export function WeeklySchedule({ sections, className = '' }: WeeklyScheduleProps
       const hasClass = allSlots.some(
         s => s.startMinutes < (h + 1) * 60 && s.endMinutes > h * 60
       );
-      // When there's something: BIGGER (108px)
-      // When there's nothing: SMALLER (34px)
-      const height = hasClass ? 108 : 34;
+      // When there's something: BIGGER (90px)
+      // When there's nothing: SMALLER (16px)
+      const height = hasClass ? 90 : 16;
       hours.push({
         hour: h,
         hasClass,
@@ -322,6 +325,115 @@ export function WeeklySchedule({ sections, className = '' }: WeeklyScheduleProps
   const totalClassesCount = allSlots.length;
   const todayClassesCount = activeTodayDay ? dayPositionedSlots[activeTodayDay.key]?.length || 0 : 0;
 
+  // Compute real gaps between consecutive classes/clusters for each day
+  // Uses accurate pixel coordinates (top, height) rather than grid hour cells
+  const dayGaps = useMemo(() => {
+    const result: Record<string, { top: number; height: number; durationStr: string }[]> = {};
+    SCHEDULE_DAYS.forEach(sd => {
+      result[sd.key] = [];
+      const slots = dayPositionedSlots[sd.key] || [];
+      if (slots.length <= 1) return;
+
+      // Merge overlapping or concurrent slot time intervals to find true free time
+      const intervals = slots
+        .map(s => ({ start: s.startMinutes, end: s.endMinutes }))
+        .sort((a, b) => a.start - b.start);
+
+      const merged: { start: number; end: number }[] = [];
+      intervals.forEach(curr => {
+        if (merged.length === 0) {
+          merged.push({ ...curr });
+        } else {
+          const last = merged[merged.length - 1];
+          if (curr.start < last.end) {
+            last.end = Math.max(last.end, curr.end);
+          } else {
+            merged.push({ ...curr });
+          }
+        }
+      });
+
+      // Gaps between consecutive merged intervals
+      for (let i = 0; i < merged.length - 1; i++) {
+        const gapStart = merged[i].end;
+        const gapEnd = merged[i + 1].start;
+        const gapMinutes = gapEnd - gapStart;
+        if (gapMinutes > 10) {
+          const top = getY(gapStart);
+          const bottom = getY(gapEnd);
+          const height = bottom - top;
+          const hrs = Math.floor(gapMinutes / 60);
+          const mins = gapMinutes % 60;
+          let durationStr = '';
+          if (hrs > 0 && mins > 0) {
+            durationStr = `${hrs}س ${mins}د`;
+          } else if (hrs > 0) {
+            if (hrs === 1) durationStr = 'ساعة';
+            else if (hrs === 2) durationStr = 'ساعتان';
+            else if (hrs >= 3 && hrs <= 10) durationStr = `${hrs} ساعات`;
+            else durationStr = `${hrs} ساعة`;
+          } else {
+            durationStr = `${mins} دقيقة`;
+          }
+
+          result[sd.key].push({
+            top,
+            height,
+            durationStr
+          });
+        }
+      }
+    });
+    return result;
+  }, [dayPositionedSlots, getY]);
+
+  // ── Skeleton loading ──
+  if (loading) {
+    return (
+      <div className={`mb-8 space-y-3 ${className}`} dir="rtl">
+        <div className="flex items-center gap-2.5 px-1">
+          <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-zinc-800 animate-pulse" />
+          <div className="space-y-1.5">
+            <div className="w-28 h-3.5 rounded-md bg-slate-100 dark:bg-zinc-800 animate-pulse" />
+            <div className="w-20 h-2.5 rounded-md bg-slate-100 dark:bg-zinc-800 animate-pulse" />
+          </div>
+        </div>
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl overflow-hidden">
+          <div className="grid grid-cols-[36px_repeat(5,1fr)] border-b border-slate-200 dark:border-zinc-800">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="py-4 px-2 border-l border-slate-200/80 dark:border-zinc-800/80">
+                <div className="h-3 rounded bg-slate-100 dark:bg-zinc-800 animate-pulse mx-auto w-3/4" />
+                <div className="h-2 rounded bg-slate-100 dark:bg-zinc-800 animate-pulse mx-auto w-1/2 mt-1.5" />
+              </div>
+            ))}
+          </div>
+          <div className="p-4 grid grid-cols-[36px_repeat(5,1fr)] gap-2 min-h-[240px]">
+            {[...Array(6)].map((_, col) => (
+              <div key={col} className="flex flex-col gap-2 pt-2">
+                {col === 0 ? (
+                  [8, 9, 10, 11].map(h => (
+                    <div key={h} className="text-[10px] text-slate-300 dark:text-zinc-700 font-bold text-center animate-pulse">{h}ص</div>
+                  ))
+                ) : (
+                  [...Array(Math.floor(Math.random() * 2) + 1)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="rounded-2xl animate-pulse"
+                      style={{
+                        height: `${60 + i * 20}px`,
+                        background: 'linear-gradient(90deg, rgb(var(--color-skeleton-from, 241 245 249)) 25%, rgb(var(--color-skeleton-to, 226 232 240)) 50%, rgb(var(--color-skeleton-from, 241 245 249)) 75%)',
+                      }}
+                    />
+                  ))
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (sections.length === 0 || allSlots.length === 0) {
     return (
       <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-10 text-center mb-6 shadow-xs">
@@ -371,11 +483,10 @@ export function WeeklySchedule({ sections, className = '' }: WeeklyScheduleProps
         >
           <div className="min-w-[760px]">
             {/* ─── 1. Day Column Headers + Integrated Time Header ─── */}
-            <div className="grid grid-cols-[64px_repeat(5,1fr)] border-b border-slate-200 dark:border-zinc-800 bg-slate-50/80 dark:bg-zinc-950/60 sticky top-0 z-20 backdrop-blur-xs">
+            <div className="grid grid-cols-[36px_repeat(5,1fr)] border-b border-slate-200 dark:border-zinc-800 bg-slate-50/80 dark:bg-zinc-950/60 sticky top-0 z-20 backdrop-blur-xs">
               {/* Rightmost integrated cell: Time header */}
-              <div className="py-3 px-2 text-center border-l border-slate-200/80 dark:border-zinc-800/80 flex items-center justify-center gap-1 text-slate-500 dark:text-zinc-400 font-bold text-xs">
-                <Clock className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
-                <span>الوقت</span>
+              <div className="py-3 border-l border-slate-200/80 dark:border-zinc-800/80 flex items-center justify-center">
+                <Clock className="w-3 h-3 text-[var(--color-imamu-accent)]" />
               </div>
 
               {/* 5 Day Headers */}
@@ -417,7 +528,7 @@ export function WeeklySchedule({ sections, className = '' }: WeeklyScheduleProps
 
             {/* ─── 2. Grid Body: Integrated Time Column + 5 Day Columns ─── */}
             <div
-              className="grid grid-cols-[64px_repeat(5,1fr)] relative"
+              className="grid grid-cols-[36px_repeat(5,1fr)] relative"
               style={{ height: `${totalGridHeight}px` }}
             >
               {/* ── Integrated Time Column (Right Side - Shares same style and background) ── */}
@@ -425,36 +536,20 @@ export function WeeklySchedule({ sections, className = '' }: WeeklyScheduleProps
                 {hourConfigs.hours.map(item => (
                   <div
                     key={item.hour}
-                    className={`absolute inset-x-0 flex items-center justify-center transition-colors border-t border-slate-100/80 dark:border-zinc-800/60 ${
-                      item.hasClass
-                        ? 'pt-2 items-start'
-                        : 'bg-slate-50/40 dark:bg-zinc-950/25'
+                    className={`absolute inset-x-0 flex items-center justify-center transition-colors ${
+                      item.hasClass ? 'pt-1.5 items-start border-t border-slate-100/80 dark:border-zinc-800/60' : ''
                     }`}
                     style={{ top: `${item.y}px`, height: `${item.height}px` }}
                   >
-                    <span
-                      className={
-                        item.hasClass
-                          ? 'text-[11px] font-black text-slate-800 dark:text-zinc-200'
-                          : 'text-[10px] font-semibold text-slate-400 dark:text-zinc-600'
-                      }
-                    >
-                      {formatHourLabel(item.hour)}
-                    </span>
+                    {item.hasClass && (
+                      <span className="text-[10px] font-black text-slate-700 dark:text-zinc-300 leading-none">
+                        {formatHourLabel(item.hour)}
+                      </span>
+                    )}
                   </div>
                 ))}
 
-                {/* Live Current Time Badge in Time Column */}
-                {isTodayInSchoolWeek && isCurrentTimeWithinGrid && (
-                  <div
-                    className="absolute inset-x-0 z-20 pointer-events-none flex items-center justify-center -translate-y-1/2"
-                    style={{ top: `${currentTimeY}px` }}
-                  >
-                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-rose-500 text-white shadow-xs">
-                      {formatMinutesToTime(currentTotalMinutes).replace(/\s+/g, '')}
-                    </span>
-                  </div>
-                )}
+
               </div>
 
               {/* ── 5 Day Columns ── */}
@@ -471,38 +566,43 @@ export function WeeklySchedule({ sections, className = '' }: WeeklyScheduleProps
                         : 'hover:bg-slate-50/20 dark:hover:bg-zinc-800/5'
                     }`}
                   >
-                    {/* Horizontal Hour Lines & Empty Row Tints */}
+                    {/* Horizontal Hour Lines */}
                     {hourConfigs.hours.map(item => (
                       <div
                         key={item.hour}
-                        className={`absolute inset-x-0 border-t pointer-events-none transition-colors ${
+                        className={`absolute inset-x-0 pointer-events-none transition-colors ${
                           item.hasClass
-                            ? 'border-slate-100 dark:border-zinc-800/60'
-                            : 'border-slate-100/60 dark:border-zinc-800/30 bg-slate-50/30 dark:bg-zinc-950/20'
+                            ? 'border-t border-slate-100 dark:border-zinc-800/60'
+                            : ''
                         }`}
                         style={{ top: `${item.y}px`, height: `${item.height}px` }}
                       />
                     ))}
 
-                    {/* Subtle Current Time Guideline across all days */}
+                    {/* Gap text between consecutive classes */}
+                    {(dayGaps[sd.key] || []).map((gap, gIdx) => (
+                      <div
+                        key={`gap_${gIdx}`}
+                        className="absolute inset-x-0 flex items-center justify-center pointer-events-none z-10"
+                        style={{ top: `${gap.top}px`, height: `${gap.height}px` }}
+                      >
+                        <span className="text-[11px] font-bold text-slate-400/90 dark:text-zinc-500 tabular-nums select-none tracking-wide">
+                          {gap.durationStr}
+                        </span>
+                      </div>
+                    ))}
+
+                    {/* ── LIVE CURRENT TIME LINE (solid for today, very transparent for other days) ── */}
                     {isCurrentTimeWithinGrid && (
                       <div
-                        className="absolute inset-x-0 z-10 pointer-events-none border-t border-rose-500/25"
-                        style={{ top: `${currentTimeY}px` }}
-                      />
-                    )}
-
-                    {/* ── LIVE CURRENT TIME INDICATOR LINE (Across Today Column) ── */}
-                    {isToday && isCurrentTimeWithinGrid && (
-                      <div
-                        className="absolute inset-x-0 z-20 pointer-events-none flex items-center"
+                        className="absolute inset-x-0 z-20 pointer-events-none"
                         style={{ top: `${currentTimeY}px` }}
                       >
-                        {/* Red Line */}
-                        <div className="w-full h-0.5 bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.8)]" />
-
-                        {/* Glowing Red Dot at the Right edge of the column */}
-                        <div className="absolute right-0 -translate-y-1/2 translate-x-1.5 w-3 h-3 rounded-full bg-rose-500 border-2 border-white dark:border-zinc-900 shadow-md ring-4 ring-rose-500/25 animate-pulse" />
+                        <div
+                          className={`w-full h-px ${
+                            isToday ? 'bg-rose-500' : 'bg-rose-500/20'
+                          }`}
+                        />
                       </div>
                     )}
 
@@ -510,7 +610,7 @@ export function WeeklySchedule({ sections, className = '' }: WeeklyScheduleProps
                     {slots.map(slot => {
                       const top = getY(slot.startMinutes);
                       const bottom = getY(slot.endMinutes);
-                      const height = Math.max(42, bottom - top - 4); // 4px margin
+                      const height = Math.max(58, bottom - top - 4); // min 58px so card always looks good
 
                       const palette = COURSE_CARD_PALETTES[slot.colorIndex];
                       const widthPercent = 100 / slot.totalCols;
@@ -528,9 +628,7 @@ export function WeeklySchedule({ sections, className = '' }: WeeklyScheduleProps
                           whileHover={{ scale: 1.015, zIndex: 30 }}
                           whileTap={{ scale: 0.985 }}
                           onClick={() => setSelectedSlot(slot)}
-                          className={`absolute p-2 sm:p-2.5 rounded-2xl border transition-all duration-150 cursor-pointer shadow-xs flex flex-col justify-between overflow-hidden group ${palette.bg} ${palette.border} ${
-                            isNowActive ? 'ring-2 ring-emerald-500 ring-offset-1 dark:ring-offset-zinc-900 shadow-md' : ''
-                          }`}
+                          className={`absolute p-2 sm:p-2.5 rounded-2xl border transition-all duration-150 cursor-pointer shadow-xs flex flex-col justify-between overflow-hidden group ${palette.bg} ${palette.border}`}
                           style={{
                             top: `${top + 2}px`,
                             height: `${height}px`,
@@ -538,39 +636,29 @@ export function WeeklySchedule({ sections, className = '' }: WeeklyScheduleProps
                             width: `calc(${widthPercent}% - 4px)`
                           }}
                         >
-                          {/* Top: Start time + Now badge */}
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="text-[10px] font-bold text-slate-600 dark:text-zinc-300 tabular-nums" dir="ltr">
+                          {/* Start time → physical LEFT (justify-end in RTL flex) */}
+                          <div className="flex justify-end">
+                            <span className="text-[9px] font-bold tabular-nums leading-tight opacity-80" dir="ltr">
                               {formatMinutesToTime(slot.startMinutes, true)}
                             </span>
-
-                            {isNowActive && (
-                              <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[8px] font-black shrink-0 shadow-xs animate-pulse">
-                                <span className="w-1 h-1 rounded-full bg-white" />
-                                الآن
-                              </span>
-                            )}
                           </div>
 
-                          {/* Course Title - shown when height is adequate */}
-                          {height >= 60 && (
-                            <p className="text-[11px] font-semibold text-slate-700 dark:text-zinc-200 truncate leading-tight mt-0.5">
-                              {slot.courseTitle}
-                            </p>
-                          )}
+                          {/* Course Title — always shown */}
+                          <p className="text-[10px] font-bold leading-tight line-clamp-2 flex-1 mt-0.5">
+                            {slot.courseTitle}
+                          </p>
 
-                          {/* Bottom: End time (left) + Room (right) */}
-                          <div className="pt-0.5 mt-0.5 flex items-center justify-between text-[10px] text-slate-500 dark:text-zinc-400 gap-1 border-t border-black/5 dark:border-white/5">
-                            <span className="font-semibold tabular-nums" dir="ltr">
-                              {formatMinutesToTime(slot.endMinutes, true)}
-                            </span>
-
-                            {slot.room && (
-                              <span className="flex items-center gap-0.5 text-slate-700 dark:text-zinc-300 font-bold truncate">
-                                <MapPin className="w-2.5 h-2.5 text-slate-400 shrink-0" />
+                          {/* Bottom: Room → physical RIGHT (first in RTL flex), End time → physical LEFT (last) */}
+                          <div className="flex items-center justify-between gap-1 mt-auto">
+                            {slot.room ? (
+                              <span className="flex items-center gap-0.5 text-[9px] font-bold opacity-80 truncate">
+                                <MapPin className="w-2 h-2 shrink-0" />
                                 <span>{slot.room}</span>
                               </span>
-                            )}
+                            ) : <span />}
+                            <span className="text-[9px] font-semibold tabular-nums opacity-70 shrink-0" dir="ltr">
+                              {formatMinutesToTime(slot.endMinutes, true)}
+                            </span>
                           </div>
                         </motion.div>
                       );
@@ -587,16 +675,23 @@ export function WeeklySchedule({ sections, className = '' }: WeeklyScheduleProps
       <AnimatePresence>
         {selectedSlot && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-xs"
-            onClick={() => setSelectedSlot(null)}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+            dir="rtl"
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              transition={{ duration: 0.2 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/50 dark:bg-black/70 backdrop-blur-sm cursor-pointer"
+              onClick={() => setSelectedSlot(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 48 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 24 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 32 }}
               onClick={e => e.stopPropagation()}
-              className="relative w-full max-w-sm bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-2xl space-y-4"
+              className="relative w-full sm:max-w-sm bg-white dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl space-y-4 z-10"
               dir="rtl"
             >
               {/* Header */}
@@ -640,8 +735,14 @@ export function WeeklySchedule({ sections, className = '' }: WeeklyScheduleProps
                     <Clock className="w-4 h-4 text-[var(--color-imamu-accent)]" />
                     <span>الموعد واليوم:</span>
                   </div>
-                  <div className="font-bold text-slate-900 dark:text-white text-left" dir="ltr">
-                    <span>{selectedSlot.day} · {formatMinutesToTime(selectedSlot.startMinutes, true)} → {formatMinutesToTime(selectedSlot.endMinutes, true)}</span>
+                  <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 text-xs">
+                    <span>{selectedSlot.day}</span>
+                    <span className="text-slate-400 font-normal">·</span>
+                    <span className="inline-flex items-center gap-1" dir="ltr">
+                      <span>{formatMinutesToTime(selectedSlot.startMinutes, true)}</span>
+                      <span className="text-slate-400 font-normal">→</span>
+                      <span>{formatMinutesToTime(selectedSlot.endMinutes, true)}</span>
+                    </span>
                   </div>
                 </div>
 
@@ -683,7 +784,10 @@ export function WeeklySchedule({ sections, className = '' }: WeeklyScheduleProps
                           <span className="font-bold text-slate-900 dark:text-white">
                             {inst.name}
                             {inst.isPrimary && selectedSlot.instructors!.length > 1 && (
-                              <span className="mr-1.5 px-1.5 py-0.5 text-[10px] font-normal rounded bg-amber-500/10 text-[var(--color-imamu-accent)]">
+                              <span
+                                className="mr-1.5 px-1.5 py-0.5 text-[10px] font-normal rounded text-[var(--color-imamu-accent)]"
+                                style={{ backgroundColor: 'color-mix(in srgb, var(--color-imamu-accent) 15%, transparent)' }}
+                              >
                                 رئيسي
                               </span>
                             )}

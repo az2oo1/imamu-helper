@@ -202,6 +202,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       appleMeta.setAttribute('content', currentTheme === 'dark' ? 'black-translucent' : 'default');
     }
 
+    root.style.setProperty('--color-imamu-brown', preset.primary);
+    root.style.setProperty('--color-imamu-brown-light', preset.primaryLight);
+    root.style.setProperty('--color-imamu-brown-dark', preset.primaryDark);
+
     if (currentTheme === 'dark') {
       root.style.setProperty('--color-imamu-accent', preset.accentDark);
       root.style.setProperty('--btn-text-primary', preset.btnTextDark);
@@ -233,13 +237,46 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
     setThemeState(initialTheme);
 
-    const savedPreset = localStorage.getItem('imamu_color_preset') as ColorPresetId | null;
-    if (savedPreset && COLOR_PRESETS.some(p => p.id === savedPreset)) {
-      setColorPresetState(savedPreset);
-      const presetObj = COLOR_PRESETS.find(p => p.id === savedPreset)!;
-      applyColorVariables(presetObj, initialTheme);
+    const now = new Date();
+    const isNationalDay = (now.getMonth() === 8 && now.getDate() === 23);
+
+    let activePresetId: ColorPresetId = 'classic-wood';
+
+    if (isNationalDay) {
+      activePresetId = 'emerald-cedar';
     } else {
-      applyColorVariables(COLOR_PRESETS[0], initialTheme);
+      const savedPreset = localStorage.getItem('imamu_color_preset') as ColorPresetId | null;
+      if (savedPreset && COLOR_PRESETS.some(p => p.id === savedPreset)) {
+        activePresetId = savedPreset;
+      }
+    }
+
+    setColorPresetState(activePresetId);
+    const presetObj = COLOR_PRESETS.find(p => p.id === activePresetId)!;
+    applyColorVariables(presetObj, initialTheme);
+
+    // Also check /api/events for dynamic national day event
+    if (!isNationalDay) {
+      fetch('/api/events')
+        .then(res => res.ok ? res.json() : [])
+        .then(events => {
+          if (Array.isArray(events)) {
+            const hasND = events.some((e: any) => {
+              if (!e.isNationalDay || !e.date) return false;
+              const d = new Date(e.date);
+              return !isNaN(d.getTime()) && 
+                     d.getFullYear() === now.getFullYear() && 
+                     d.getMonth() === now.getMonth() && 
+                     d.getDate() === now.getDate();
+            });
+            if (hasND) {
+              setColorPresetState('emerald-cedar');
+              const ndPreset = COLOR_PRESETS.find(p => p.id === 'emerald-cedar')!;
+              applyColorVariables(ndPreset, initialTheme);
+            }
+          }
+        })
+        .catch(() => {});
     }
   }, []);
 

@@ -314,13 +314,13 @@ export default function CreateResourceModal({
         {/* Modal Main Window */}
         <motion.div
           layout
-          initial={{ opacity: 0, scale: 0.96, y: 12 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.96, y: 12 }}
+          initial={{ opacity: 0, y: 48 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 24 }}
           transition={{ 
             type: "spring", 
-            duration: 0.35, 
-            bounce: 0,
+            stiffness: 380, 
+            damping: 32,
             layout: { type: "spring", stiffness: 350, damping: 28 } 
           }}
           className="relative bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col z-10 text-slate-900 dark:text-white max-h-[88vh]"

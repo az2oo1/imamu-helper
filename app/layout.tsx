@@ -77,6 +77,8 @@ export default function RootLayout({
             __html: `
               (function() {
                 try {
+                  var now = new Date();
+                  var isND = (now.getMonth() === 8 && now.getDate() === 23);
                   var savedTheme = localStorage.getItem('imamu_theme');
                   var isDark = savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches);
                   if (isDark) {
@@ -86,7 +88,14 @@ export default function RootLayout({
                   } else {
                     document.documentElement.classList.add('light');
                     document.documentElement.classList.remove('dark');
-                    document.documentElement.style.backgroundColor = '#F5F1EB';
+                    document.documentElement.style.backgroundColor = isND ? '#EEF5F1' : '#F5F1EB';
+                  }
+                  if (isND) {
+                    document.documentElement.style.setProperty('--color-imamu-brown', '#1E5631');
+                    document.documentElement.style.setProperty('--color-imamu-brown-light', '#2D7A47');
+                    document.documentElement.style.setProperty('--color-imamu-brown-dark', '#12381E');
+                    document.documentElement.style.setProperty('--color-imamu-accent', isDark ? '#62D389' : '#1A4B2B');
+                    document.documentElement.style.setProperty('--btn-text-primary', '#FFFFFF');
                   }
                 } catch(e) {}
               })();

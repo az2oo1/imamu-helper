@@ -12,11 +12,13 @@ import { parseDate, formatDate, formatHijriDate, formatHijriMonthDay, getCountdo
 import ReportDropdownMenu from '../components/ReportDropdownMenu';
 import CalendarSelector from '../components/CalendarSelector';
 import { useSWR } from '../lib/swr';
+import { StudentTask, TASK_CATEGORIES, getCourseColor } from '../lib/task-utils';
 
 
 export function CalendarPage() {
   const [events, setEvents] = useState<any[]>([]);
   const [localEvents, setLocalEvents] = useState<any[]>([]);
+  const [taskEvents, setTaskEvents] = useState<any[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewState, setViewState] = useState<'month' | 'week'>('month');
   const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
@@ -54,32 +56,75 @@ export function CalendarPage() {
   };
 
   const loadLocalEvents = () => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('imamu_local_events');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          setLocalEvents(parsed);
-
-          const token = localStorage.getItem('token') || localStorage.getItem('imamu_token') || '';
-          if (token && Array.isArray(parsed) && parsed.length > 0) {
-            fetch('/api/user-events/sync', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`
-              },
-              body: JSON.stringify({ events: parsed })
-            }).then(r => {
-              if (r.ok) {
-                localStorage.removeItem('imamu_local_events');
-                setLocalEvents([]);
-                mutate();
-              }
-            }).catch(() => {});
-          }
+    if (typeof window === 'undefined') return;
+    try {
+      const saved = localStorage.getItem('imamu_local_events');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const cleanEvents = Array.isArray(parsed) ? parsed.filter((e: any) => !e.isTask && !String(e.id).startsWith('task-')) : [];
+        if (cleanEvents.length !== parsed.length) {
+          localStorage.setItem('imamu_local_events', JSON.stringify(cleanEvents));
         }
-      } catch (e) {}
+        setLocalEvents(cleanEvents);
+
+        const token = localStorage.getItem('token') || localStorage.getItem('imamu_token') || '';
+        if (token && cleanEvents.length > 0) {
+          fetch('/api/user-events/sync', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({ events: cleanEvents })
+          }).then(r => {
+            if (r.ok) {
+              localStorage.removeItem('imamu_local_events');
+              setLocalEvents([]);
+              mutate();
+            }
+          }).catch(() => {});
+        }
+      } else {
+        setLocalEvents([]);
+      }
+    } catch {
+      setLocalEvents([]);
+    }
+  };
+
+  const loadTaskEvents = () => {
+    if (typeof window === 'undefined') return;
+    try {
+      const saved = localStorage.getItem('imamu_student_tasks');
+      if (!saved) {
+        setTaskEvents([]);
+        return;
+      }
+      const tasks: StudentTask[] = JSON.parse(saved);
+      const evs = (Array.isArray(tasks) ? tasks : [])
+        .filter(t => t.dueDate && !t.completed)
+        .map(t => {
+          const dateTime = t.dueTime ? `${t.dueDate}T${t.dueTime}` : t.dueDate;
+          const categoryObj = TASK_CATEGORIES.find(c => c.key === t.category);
+          const catLabel = categoryObj ? categoryObj.label : (t.categoryLabel || t.category || 'مهمة');
+          return {
+            id: `task-${t.id}`,
+            taskId: t.id,
+            title: `${t.title}${t.courseName ? ` – ${t.courseName}` : ''}`,
+            date: dateTime,
+            time: t.dueTime || undefined,
+            description: `${catLabel}${t.courseName ? ` | مقرر: ${t.courseName}` : ''}${t.priority ? ` [أهمية: ${t.priority}]` : ''}`,
+            calendarType: 'user' as const,
+            color: t.color || getCourseColor(t.courseCode),
+            isTask: true,
+            priority: t.priority,
+            category: catLabel,
+            courseCode: t.courseCode
+          };
+        });
+      setTaskEvents(evs);
+    } catch {
+      setTaskEvents([]);
     }
   };
 
@@ -114,6 +159,17 @@ export function CalendarPage() {
 
   useEffect(() => {
     loadLocalEvents();
+    loadTaskEvents();
+    const handleUpdate = () => {
+      loadLocalEvents();
+      loadTaskEvents();
+    };
+    window.addEventListener('storage', handleUpdate);
+    window.addEventListener('imamu_tasks_updated', handleUpdate);
+    return () => {
+      window.removeEventListener('storage', handleUpdate);
+      window.removeEventListener('imamu_tasks_updated', handleUpdate);
+    };
   }, []);
 
   const { data: eventsData, mutate } = useSWR<any[]>('/api/events');
@@ -125,9 +181,13 @@ export function CalendarPage() {
         combined.push(le);
       }
     });
-    const sorted = combined.sort((a, b) => (parseDate(a.date)?.getTime() || 0) - (parseDate(b.date)?.getTime() || 0));
-    setEvents(sorted);
-  }, [eventsData, localEvents]);
+    taskEvents.forEach(te => {
+      if (!combined.some(e => e.id === te.id)) {
+        combined.push(te);
+      }
+    });
+    setEvents(combined.sort((a, b) => (parseDate(a.date)?.getTime() || 0) - (parseDate(b.date)?.getTime() || 0)));
+  }, [eventsData, localEvents, taskEvents]);
 
   const handleAddPersonalEvent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -325,9 +385,17 @@ export function CalendarPage() {
   };
 
   const handleDeletePersonalEvent = async (ev: any) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذا الموعد الشخصي؟')) return;
+    if (!window.confirm('هل أنت متأكد من الحذف؟')) return;
     try {
-      if (String(ev.id).startsWith('local-')) {
+      if (ev.isTask || (typeof ev.id === 'string' && ev.id.startsWith('task-'))) {
+        const raw = localStorage.getItem('imamu_student_tasks');
+        if (raw) {
+          const tasks = JSON.parse(raw).filter((t: any) => `task-${t.id}` !== ev.id && t.id !== ev.taskId);
+          localStorage.setItem('imamu_student_tasks', JSON.stringify(tasks));
+          window.dispatchEvent(new Event('imamu_tasks_updated'));
+          window.dispatchEvent(new Event('storage'));
+        }
+      } else if (typeof ev.id === 'string' && ev.id.startsWith('local-')) {
         const remaining = localEvents.filter(le => le.id !== ev.id);
         setLocalEvents(remaining);
         localStorage.setItem('imamu_local_events', JSON.stringify(remaining));
@@ -448,8 +516,13 @@ export function CalendarPage() {
                         {ev.entityName || 'فعالية جهة'}
                       </span>
                     ) : ev.calendarType === 'user' ? (
-                      <span className="px-2 py-0.5 rounded-md text-[9px] font-bold border shrink-0 truncate max-w-[110px] bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30">
-                        موعد شخصي
+                      <span 
+                        className={`px-2 py-0.5 rounded-md text-[9px] font-bold border shrink-0 truncate max-w-[110px] ${
+                          ev.isTask && ev.color ? '' : 'bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30'
+                        }`}
+                        style={ev.isTask && ev.color ? { backgroundColor: `${ev.color}15`, color: ev.color, borderColor: `${ev.color}40` } : undefined}
+                      >
+                        {ev.isTask ? (ev.category || 'مهمة دراسية') : 'موعد شخصي'}
                       </span>
                     ) : null}
                   </div>
@@ -801,9 +874,15 @@ export function CalendarPage() {
                       badgeColor = 'text-emerald-700 dark:text-emerald-400';
                       activeHighlightClass = 'bg-emerald-600 dark:bg-emerald-500 text-white dark:text-zinc-950 border-r-emerald-700 dark:border-r-emerald-400 font-bold shadow-sm';
                     } else if (ev.calendarType === 'user') {
-                      lineAccentClass = 'border-r-sky-500';
-                      badgeColor = 'text-sky-700 dark:text-sky-400';
-                      activeHighlightClass = 'bg-sky-600 dark:bg-sky-500 text-white dark:text-zinc-950 border-r-sky-700 dark:border-r-sky-400 font-bold shadow-sm';
+                      if (ev.isTask && ev.color) {
+                        lineAccentClass = '';
+                        badgeColor = '';
+                        activeHighlightClass = 'text-white dark:text-zinc-950 font-bold shadow-sm';
+                      } else {
+                        lineAccentClass = 'border-r-sky-500';
+                        badgeColor = 'text-sky-700 dark:text-sky-400';
+                        activeHighlightClass = 'bg-sky-600 dark:bg-sky-500 text-white dark:text-zinc-950 border-r-sky-700 dark:border-r-sky-400 font-bold shadow-sm';
+                      }
                     } else if (ev.isHoliday || ev.isHolidayEnd || ev.isNationalDay) {
                       lineAccentClass = 'border-r-emerald-600/70 dark:border-emerald-500/60';
                       badgeColor = 'text-emerald-700 dark:text-emerald-400';
@@ -825,6 +904,13 @@ export function CalendarPage() {
                           e.stopPropagation();
                           setSelectedEvent(ev);
                         }}
+                        style={
+                          ev.isTask && ev.color
+                            ? isHighlighted
+                              ? { backgroundColor: ev.color, borderRightColor: ev.color }
+                              : { borderRightColor: ev.color }
+                            : undefined
+                        }
                         className={`w-full py-1 px-2 pr-2.5 rounded-r-none rounded-l-lg border-r-3 transition-all duration-200 cursor-pointer text-right overflow-hidden ${
                           isHighlighted
                             ? activeHighlightClass
@@ -855,8 +941,11 @@ export function CalendarPage() {
                           ) : ev.calendarType === 'user' ? (
                             <>
                               <span className="opacity-40">•</span>
-                              <span className={`font-semibold truncate ${isHighlighted ? 'text-white dark:text-zinc-950 font-bold' : badgeColor}`}>
-                                شخصي
+                              <span 
+                                className={`font-semibold truncate ${isHighlighted ? 'text-white dark:text-zinc-950 font-bold' : badgeColor}`}
+                                style={!isHighlighted && ev.isTask && ev.color ? { color: ev.color } : undefined}
+                              >
+                                {ev.isTask ? (ev.category || 'مهمة') : 'شخصي'}
                               </span>
                             </>
                           ) : null}
@@ -912,8 +1001,17 @@ export function CalendarPage() {
                 }
                 if (selectedEvent.calendarType === 'user') {
                   return (
-                    <span className="px-2.5 py-1 rounded-lg text-xs font-bold border bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30">
-                      👤 موعد شخصي
+                    <span 
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${
+                        selectedEvent.isTask && selectedEvent.color ? '' : 'bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30'
+                      }`}
+                      style={
+                        selectedEvent.isTask && selectedEvent.color
+                          ? { backgroundColor: `${selectedEvent.color}15`, color: selectedEvent.color, borderColor: `${selectedEvent.color}40` }
+                          : undefined
+                      }
+                    >
+                      {selectedEvent.isTask ? `📋 ${selectedEvent.category || 'مهمة دراسية'}` : '👤 موعد شخصي'}
                     </span>
                   );
                 }

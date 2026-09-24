@@ -338,10 +338,10 @@ export function CreateAuthenticatedAccountModal({
         dir="rtl"
       >
         <motion.div
-          initial={{ opacity: 0, scale: 0.96, y: 15 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.96, y: 15 }}
-          transition={{ type: "spring", duration: 0.35, bounce: 0 }}
+          initial={{ opacity: 0, y: 48 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 24 }}
+          transition={{ type: 'spring', stiffness: 380, damping: 32 }}
           onClick={(e) => e.stopPropagation()}
           className="relative bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col z-10 text-slate-900 dark:text-white max-h-[90vh]"
         >

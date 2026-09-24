@@ -12,8 +12,10 @@ import {
   ExternalLink, 
   ArrowUpRight, 
   Award,
-  Sun,
-  CheckCircle2
+  Palmtree,
+  CheckCircle2,
+  PartyPopper,
+  X
 } from 'lucide-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
@@ -164,6 +166,7 @@ function CountdownsSection() {
   });
   const [isNationalDayToday, setIsNationalDayToday] = useState(false);
   const [isEidToday, setIsEidToday] = useState(false);
+  const [isHolidayToday, setIsHolidayToday] = useState(false);
 
   const [windowSize, setWindowSize] = useState({
     width: typeof window !== 'undefined' ? window.innerWidth : 1200,
@@ -246,11 +249,12 @@ function CountdownsSection() {
         setNextHoliday(null);
       }
 
-      // Check for Active Celebration (National Day or Eid) strictly by boolean flags
+      // Check for Active Celebration (National Day or Eid)
       const hasNationalDay = events.some((e: any) => {
         const d = parseDate(e.date);
-        return e.isNationalDay && d && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
-      });
+        return (e.isNationalDay || (d && d.getMonth() === 8 && d.getDate() === 23)) && 
+               d && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+      }) || (now.getMonth() === 8 && now.getDate() === 23);
 
       const hasEid = events.some((e: any) => {
         const d = parseDate(e.date);
@@ -260,6 +264,12 @@ function CountdownsSection() {
       if (hasNationalDay) setIsNationalDayToday(true);
       if (hasEid) setIsEidToday(true);
       if (hasNationalDay || hasEid) setShowConfetti(true);
+
+      const holidayToday = (holidayEvents.length > 0 && 
+        now.getFullYear() === holidayEvents[0].date.getFullYear() && 
+        now.getMonth() === holidayEvents[0].date.getMonth() && 
+        now.getDate() === holidayEvents[0].date.getDate()) || hasNationalDay || hasEid;
+      setIsHolidayToday(holidayToday);
 
       // Semester Start & End Dates Calculation directly from Events table flags
       const startEvents = events
@@ -346,35 +356,7 @@ function CountdownsSection() {
         />
       )}
 
-      {/* Saudi National Day Sticky Edge-to-Edge Info Bar */}
-      {isNationalDayToday && (
-        <div className="sticky top-16 z-40 w-full bg-gradient-to-r from-emerald-950/95 via-emerald-900/95 to-emerald-950/95 border-b border-emerald-500/40 backdrop-blur-xl px-4 py-3 text-center text-white shadow-xl flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 animate-[fadeIn_0.5s_ease-out]">
-          <div className="flex items-center gap-2">
-            <span className="text-xl sm:text-2xl animate-bounce">🇸🇦</span>
-            <h2 className="text-xs sm:text-sm font-serif font-black text-emerald-300 tracking-wide">
-              نعتز بنهضتنا وهويتنا - نحتفي باليوم الوطني السعودي! 🇸🇦
-            </h2>
-          </div>
-          <p className="text-[11px] sm:text-xs text-emerald-100 font-medium max-w-xl truncate">
-            دمت يا وطني شامخاً عزيزاً، وكل عام والمملكة وشعبها المعطاء في عزة وازدهار.
-          </p>
-        </div>
-      )}
 
-      {/* Eid Celebration Sticky Edge-to-Edge Info Bar */}
-      {isEidToday && (
-        <div className="sticky top-16 z-40 w-full bg-gradient-to-r from-amber-950/95 via-amber-900/95 to-amber-950/95 border-b border-amber-500/40 backdrop-blur-xl px-4 py-3 text-center text-white shadow-xl flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 animate-[fadeIn_0.5s_ease-out]">
-          <div className="flex items-center gap-2">
-            <span className="text-xl sm:text-2xl">🌙</span>
-            <h2 className="text-xs sm:text-sm font-serif font-black text-amber-300 tracking-wide">
-              تقبل الله منا ومنكم صالح الأعمال - عيد مبارك! ✨
-            </h2>
-          </div>
-          <p className="text-[11px] sm:text-xs text-amber-100 font-medium max-w-xl truncate">
-            أسعد الله أيامكم، وكل عام وأنتم وعائلاتكم بألف خير وسعادة.
-          </p>
-        </div>
-      )}
 
       <InView preset="fade-up" delay={0.15} className="w-full max-w-6xl px-4 mt-12 sm:mt-16 flex flex-col gap-8 sm:gap-10 relative">
       
@@ -384,12 +366,13 @@ function CountdownsSection() {
         {/* Mokafaa Countdown */}
         {nextMokafaaDate && (
           <SpotlightCard 
-            spotlightColor="rgba(245, 158, 11, 0.12)"
+            spotlightColor="rgba(140, 98, 57, 0.14)"
+            hoverBorderColor="rgba(140, 98, 57, 0.45)"
             className="flex-1 bg-white/80 dark:bg-zinc-900/90 backdrop-blur-xl border border-slate-200/80 dark:border-zinc-800/80 rounded-3xl p-5 sm:p-6 shadow-sm flex flex-col items-center justify-between text-center relative overflow-hidden w-full"
           >
             <div className="w-full">
               <div className="flex items-center justify-center gap-2.5 mb-4 w-full">
-                <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] shrink-0">
+                <div className="p-2 bg-[#8C6239]/10 border border-[#8C6239]/20 rounded-2xl text-[#8C6239] dark:text-[#D4A373] shrink-0">
                   <Clock className="w-4.5 h-4.5" />
                 </div>
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white">موعد المكافأة القادمة</h3>
@@ -406,14 +389,14 @@ function CountdownsSection() {
                   </p>
                 </div>
               ) : (
-                <LiveCountdownBoxes targetDate={nextMokafaaDate} hoverBorderClass="hover:border-amber-500/40" />
+                <LiveCountdownBoxes targetDate={nextMokafaaDate} hoverBorderClass="hover:border-[#8C6239]/40" />
               )}
             </div>
 
             {/* Vertical Lines Progress Bar for Mokafaa */}
             <VerticalLinesProgressBar 
               percent={mokafaaPercent} 
-              activeColorClass="bg-amber-500 shadow-amber-500/40"
+              activeColorClass="bg-[#8C6239] shadow-[#8C6239]/40"
               lineCount={30}
             />
           </SpotlightCard>
@@ -422,6 +405,7 @@ function CountdownsSection() {
         {/* Semester Countdown */}
         <SpotlightCard 
           spotlightColor="rgba(99, 102, 241, 0.12)"
+          hoverBorderColor="rgba(99, 102, 241, 0.45)"
           className="flex-1 bg-white/80 dark:bg-zinc-900/90 backdrop-blur-xl border border-slate-200/80 dark:border-zinc-800/80 rounded-3xl p-5 sm:p-6 shadow-sm flex flex-col items-center justify-between text-center relative overflow-hidden w-full"
         >
           <div className="w-full">
@@ -453,18 +437,29 @@ function CountdownsSection() {
         {/* Next Holiday Countdown Card */}
         <SpotlightCard 
           spotlightColor="rgba(16, 185, 129, 0.12)"
+          hoverBorderColor="rgba(16, 185, 129, 0.45)"
           className="flex-1 bg-white/80 dark:bg-zinc-900/90 backdrop-blur-xl border border-slate-200/80 dark:border-zinc-800/80 rounded-3xl p-5 sm:p-6 shadow-sm flex flex-col items-center justify-between text-center relative overflow-hidden w-full"
         >
           <div className="w-full">
             <div className="flex items-center justify-center gap-2.5 mb-4 w-full">
               <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-600 dark:text-emerald-400 shrink-0">
-                <Sun className="w-4.5 h-4.5" />
+                <Palmtree className="w-4.5 h-4.5" />
               </div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate" title={nextHoliday?.title || "موعد الإجازة القادمة"}>
                 {nextHoliday?.title || "موعد الإجازة القادمة"}
               </h3>
             </div>
-            {nextHoliday?.date ? (
+            {isHolidayToday ? (
+              <div className="bg-emerald-500/10 border border-emerald-500/20 px-4 py-4 rounded-2xl shadow-2xs relative overflow-hidden flex flex-col items-center justify-center w-full">
+                <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400 z-10 flex items-center gap-1.5">
+                  <PartyPopper className="w-4.5 h-4.5 text-emerald-500" />
+                  {isNationalDayToday ? 'اليوم إجازة اليوم الوطني! 🇸🇦' : (isEidToday ? 'عيدكم مبارك وكل عام وأنتم بخير! ✨' : `اليوم إجازة ${nextHoliday?.title || ''}! 🎉`)}
+                </span>
+                <p className="text-[11px] text-emerald-600 dark:text-emerald-300 mt-1 font-medium z-10 text-center leading-relaxed">
+                  {isNationalDayToday ? 'دمت يا وطني شامخاً عزيزاً، وكل عام والمملكة وشعبها بألف خير.' : (nextHoliday?.description || 'نتمنى لكم إجازة سعيدة وممتعة!')}
+                </p>
+              </div>
+            ) : nextHoliday?.date ? (
               <LiveCountdownBoxes targetDate={nextHoliday.date} hoverBorderClass="hover:border-emerald-500/40" />
             ) : (
               <p className="text-xs text-slate-500 dark:text-zinc-400 font-medium py-3">
@@ -475,7 +470,7 @@ function CountdownsSection() {
 
           {/* Vertical Lines Progress Bar for Next Holiday */}
           <VerticalLinesProgressBar 
-            percent={holidayPercent} 
+            percent={isHolidayToday ? 100 : holidayPercent} 
             activeColorClass="bg-emerald-500 shadow-emerald-500/40"
             lineCount={30}
           />
@@ -583,11 +578,104 @@ function CountdownsSection() {
   );
 }
 
+const CelebrationTopBanner = memo(function CelebrationTopBanner() {
+  const { data: eventsData } = useSWR<any[]>('/api/events');
+  const [dismissed, setDismissed] = useState(false);
+  const [celebration, setCelebration] = useState<'national-day' | 'eid' | null>(null);
+
+  useEffect(() => {
+    if (!eventsData || !Array.isArray(eventsData)) return;
+    const now = new Date();
+    
+    // Check National Day (by event flag or Sep 23 date)
+    const hasNationalDay = eventsData.some((e: any) => {
+      const d = parseDate(e.date);
+      return (e.isNationalDay || (d && d.getMonth() === 8 && d.getDate() === 23)) && 
+             d && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+    }) || (now.getMonth() === 8 && now.getDate() === 23);
+
+    // Check Eid (by event flag)
+    const hasEid = eventsData.some((e: any) => {
+      const d = parseDate(e.date);
+      return e.isEid && d && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+    });
+
+    if (hasNationalDay) {
+      setCelebration('national-day');
+    } else if (hasEid) {
+      setCelebration('eid');
+    }
+  }, [eventsData]);
+
+  if (dismissed || !celebration) return null;
+
+  if (celebration === 'national-day') {
+    return (
+      <aside 
+        aria-label="إعلان اليوم الوطني السعودي"
+        className="sticky top-16 z-40 w-full bg-gradient-to-r from-emerald-950/95 via-emerald-900/95 to-emerald-950/95 border-b border-emerald-500/30 backdrop-blur-xl px-3 sm:px-6 py-1 sm:py-1.5 text-white shadow-xs flex items-center justify-between gap-2 animate-[fadeIn_0.3s_ease-out]"
+      >
+        <div className="flex-1 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-3 text-center min-w-0">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-sm sm:text-base select-none">🇸🇦</span>
+            <h2 className="text-[11px] sm:text-xs font-serif font-black text-emerald-300 tracking-wide">
+              نعتز بنهضتنا وهويتنا - نحتفي باليوم الوطني السعودي! 🇸🇦
+            </h2>
+          </div>
+          <p className="text-[10px] sm:text-[11px] text-emerald-100/80 font-medium truncate max-w-xl">
+            دمت يا وطني شامخاً عزيزاً، وكل عام والمملكة وشعبها المعطاء في عزة وازدهار.
+          </p>
+        </div>
+        <button
+          onClick={() => setDismissed(true)}
+          className="p-0.5 rounded hover:bg-emerald-800/50 text-emerald-300/70 hover:text-white transition cursor-pointer shrink-0"
+          aria-label="إغلاق التنبيه"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </aside>
+    );
+  }
+
+  if (celebration === 'eid') {
+    return (
+      <aside 
+        aria-label="إعلان تهنئة العيد"
+        className="sticky top-16 z-40 w-full bg-gradient-to-r from-amber-950/95 via-amber-900/95 to-amber-950/95 border-b border-amber-500/30 backdrop-blur-xl px-3 sm:px-6 py-1 sm:py-1.5 text-white shadow-xs flex items-center justify-between gap-2 animate-[fadeIn_0.3s_ease-out]"
+      >
+        <div className="flex-1 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-3 text-center min-w-0">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-sm sm:text-base select-none">🌙</span>
+            <h2 className="text-[11px] sm:text-xs font-serif font-black text-amber-300 tracking-wide">
+              تقبل الله منا ومنكم صالح الأعمال - عيد مبارك! ✨
+            </h2>
+          </div>
+          <p className="text-[10px] sm:text-[11px] text-amber-100/80 font-medium truncate max-w-xl">
+            أسعد الله أيامكم، وكل عام وأنتم وعائلاتكم بألف خير وسعادة.
+          </p>
+        </div>
+        <button
+          onClick={() => setDismissed(true)}
+          className="p-0.5 rounded hover:bg-amber-800/50 text-amber-300/70 hover:text-white transition cursor-pointer shrink-0"
+          aria-label="إغلاق التنبيه"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </aside>
+    );
+  }
+
+  return null;
+});
+
 export function Home() {
   return (
-    <div className="flex flex-col items-center flex-1 w-full pt-16 sm:pt-28 pb-0 bg-transparent" dir="rtl">
+    <div className="flex flex-col items-center flex-1 w-full pb-0 bg-transparent" dir="rtl">
+      {/* Edge-to-Edge Sticky Celebration Top Bar directly under navbar */}
+      <CelebrationTopBanner />
+
       {/* Hero Section */}
-      <div className="text-center max-w-4xl px-4 flex flex-col items-center relative z-10">
+      <div className="text-center max-w-4xl px-4 flex flex-col items-center relative z-10 pt-10 sm:pt-16">
         
         {/* Clean Eyebrow Title */}
         <InView preset="fade-down" delay={0.05}>

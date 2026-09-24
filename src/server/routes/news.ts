@@ -91,7 +91,7 @@ export function createNewsRouter(db: any) {
       const items = Array.isArray(req.body?.events) ? req.body.events : [];
       let syncedCount = 0;
       for (const item of items) {
-        if (!item.title || !item.date) continue;
+        if (!item.title || !item.date || item.isTask || (typeof item.id === 'string' && item.id.startsWith('task-'))) continue;
         const dateTime = item.time && !item.date.includes('T') ? `${item.date}T${item.time}:00` : item.date;
         const existing = await db.select().from(events).where(
           and(

@@ -749,9 +749,10 @@ export function AuthenticatedAccountProfileModal({
 
   const modalBodyContent = (
     <motion.div
-      initial={{ opacity: 0, y: 25, scale: 0.97 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 20, scale: 0.97 }}
+      initial={{ opacity: 0, y: 48 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 24 }}
+      transition={{ type: 'spring', stiffness: 380, damping: 32 }}
       onClick={(e) => e.stopPropagation()}
       className="relative bg-neutral-950 border border-neutral-800 rounded-[2.5rem] w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden shadow-2xl text-right text-white"
     >

@@ -529,10 +529,10 @@ export function NewsArticleModal({
           onClick={onClose}
         >
           <motion.div
-            initial={{ opacity: 0, y: 30, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.98 }}
-            transition={{ type: "spring", damping: 25, stiffness: 220 }}
+            initial={{ opacity: 0, y: 48 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 24 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 32 }}
             onClick={(e) => e.stopPropagation()}
             className="relative bg-neutral-950 border border-neutral-800 rounded-[2.5rem] w-full max-w-4xl max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl p-6 sm:p-10 text-left"
             dir="ltr"

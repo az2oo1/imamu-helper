@@ -7,7 +7,7 @@ import {
   Trash2, Link as LinkIcon, Download, Upload, Plus, X,
   Users, Settings, HelpCircle, ExternalLink, Server, Command,
   CheckCircle2, AlertTriangle, Info, XCircle, RefreshCw, Zap, Loader2,
-  LayoutDashboard, Newspaper, GraduationCap, Link2, Folder, Edit3, Send, Mail, HeartHandshake, MessageSquare, Layers
+  LayoutDashboard, Newspaper, GraduationCap, Link2, Folder, Edit3, Send, Mail, HeartHandshake, MessageSquare, Layers, UserCheck
 } from 'lucide-react';
 import { TutorialsTab } from '../components/TutorialsTab';
 import CreateCourseModal from '../components/CreateCourseModal';
@@ -25,7 +25,7 @@ import AdminSectionsTab from './admin/AdminSectionsTab';
 import CommandPalette from './admin/CommandPalette';
 import { parseDate, formatDate } from '../lib/date-utils';
 
-type Tab = 'dashboard' | 'users' | 'contributors' | 'news_sources' | 'majors' | 'events' | 'subjects' | 'sections' | 'resources' | 'tutorials' | 'feedback' | 'settings';
+type Tab = 'dashboard' | 'users' | 'contributors' | 'news_sources' | 'majors' | 'events' | 'subjects' | 'sections' | 'teachers' | 'resources' | 'tutorials' | 'feedback' | 'settings';
 
 interface Toast {
   id: string;
@@ -222,7 +222,7 @@ export function AdminPage() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get('tab') as Tab;
-      if (tabParam && ['dashboard', 'users', 'news_sources', 'majors', 'events', 'subjects', 'resources', 'tutorials', 'feedback', 'settings'].includes(tabParam)) {
+      if (tabParam && ['dashboard', 'users', 'contributors', 'news_sources', 'majors', 'events', 'subjects', 'sections', 'teachers', 'resources', 'tutorials', 'feedback', 'settings'].includes(tabParam)) {
         setActiveTab(tabParam);
       }
     }
@@ -247,6 +247,7 @@ export function AdminPage() {
     { id: 'events', label: 'المواعيد والتقويم', icon: <Calendar className="w-5 h-5" /> },
     { id: 'subjects', label: 'المقررات الأكاديمية', icon: <BookOpen className="w-5 h-5" /> },
     { id: 'sections', label: 'الشعب والمواعيد', icon: <Layers className="w-5 h-5" /> },
+    { id: 'teachers', label: 'هيئة التدريس', icon: <UserCheck className="w-5 h-5" /> },
     { id: 'resources', label: 'المصادر والمراجع', icon: <Folder className="w-5 h-5" /> },
     { id: 'tutorials', label: 'إدارة شروحات الدليلة', icon: <HelpCircle className="w-5 h-5" /> },
     { id: 'feedback', label: 'البلاغات والتقييمات', icon: <MessageSquare className="w-5 h-5" /> },
@@ -270,7 +271,7 @@ export function AdminPage() {
     if (!userPerms || userPerms.length === 0 || userPerms.includes('*') || userPerms.includes('all')) return true;
     if (tabId === 'dashboard') return true;
     if (tabId === 'users' || tabId === 'contributors') return userPerms.includes('users') || userPerms.includes('contributors');
-    if (tabId === 'majors' || tabId === 'subjects' || tabId === 'sections') return userPerms.includes('courses');
+    if (tabId === 'majors' || tabId === 'subjects' || tabId === 'sections' || tabId === 'teachers') return userPerms.includes('courses') || userPerms.includes('teachers');
     if (tabId === 'resources') return userPerms.includes('resources');
     if (tabId === 'events') return userPerms.includes('dates');
     if (tabId === 'news_sources') return userPerms.includes('news');
@@ -1498,7 +1499,8 @@ export function AdminPage() {
       case 'majors': return renderMajors();
       case 'events': return renderEvents();
       case 'subjects': return renderSubjects();
-      case 'sections': return <AdminSectionsTab getToken={getToken} toast={toast} />;
+      case 'sections': return <AdminSectionsTab getToken={getToken} toast={toast} defaultSubTab="sections" />;
+      case 'teachers': return <AdminSectionsTab getToken={getToken} toast={toast} defaultSubTab="teachers" />;
       case 'resources': return renderResources();
       case 'tutorials': return <TutorialsTab user={user} sections={tutorialSections} tutorials={tutorials} onRefresh={fetchData} />;
       case 'feedback': return <AdminFeedbackTab getToken={getToken} />;

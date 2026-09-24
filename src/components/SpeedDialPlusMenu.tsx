@@ -11,7 +11,6 @@ interface SpeedDialPlusMenuProps {
   onAddCourse: () => void;
   onAddSemester: () => void;
   onAddTask: () => void;
-  onAddExam: () => void;
 }
 
 interface ActionItem {
@@ -29,7 +28,6 @@ export function SpeedDialPlusMenu({
   onAddCourse,
   onAddSemester,
   onAddTask,
-  onAddExam,
 }: SpeedDialPlusMenuProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -67,7 +65,7 @@ export function SpeedDialPlusMenu({
     },
     {
       id: 'task',
-      label: 'إضافة مهمة جديدة',
+      label: 'إضافة مهمة أو موعد',
       icon: <CheckSquare className="w-4 h-4 text-sky-400" />,
       iconBg: 'bg-sky-500/15 text-sky-400 group-hover:bg-sky-500/25',
       onClick: () => {
@@ -75,31 +73,17 @@ export function SpeedDialPlusMenu({
         onAddTask();
       },
     },
-    {
-      id: 'exam',
-      label: 'إضافة موعد أو اختبار',
-      icon: <CalendarPlus className="w-4 h-4 text-purple-400" />,
-      iconBg: 'bg-purple-500/15 text-purple-400 group-hover:bg-purple-500/25',
-      onClick: () => {
-        onClose();
-        onAddExam();
-      },
-    },
   ];
 
   // Arrowhead positions (< pointing to the left):
-  // 4 items arranged along an arrow head:
+  // 3 items arranged along an elegant arc:
   // Item 0 (إضافة مادة): top wing
-  // Item 1 (إضافة فصل دراسي): tip of the arrow (furthest left)
-  // Item 2 (إضافة مهمة جديدة): lower middle tip
-  // Item 3 (إضافة موعد أو اختبار): bottom wing
-  // Increased vertical separation (38px gap between rows) to completely prevent overlapping
-  // With distinctive horizontal offsets forming a clear '<' arrow pointing left:
+  // Item 1 (إضافة فصل دراسي): arrow tip (furthest left)
+  // Item 2 (إضافة مهمة أو موعد): bottom wing
   const arrowTargets = [
-    { x: -16, y: -62 },  // Top wing: sits closer to button
-    { x: -44, y: -21 },  // Arrow tip: projects boldly to the left
-    { x: -44, y: 21 },   // Arrow tip: projects boldly to the left
-    { x: -16, y: 62 },   // Bottom wing: sits closer to button
+    { x: -20, y: -48 },  // Top: إضافة مادة
+    { x: -44, y: 0 },    // Middle tip: إضافة فصل دراسي
+    { x: -20, y: 48 },   // Bottom: إضافة مهمة أو موعد
   ];
 
   const itemVariants: Variants = {

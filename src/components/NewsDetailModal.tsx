@@ -267,10 +267,10 @@ export function NewsDetailModal({
         dir="rtl"
       >
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 15 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 15 }}
-          transition={{ duration: 0.25, ease: 'easeOut' }}
+          initial={{ opacity: 0, y: 48 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 24 }}
+          transition={{ type: 'spring', stiffness: 380, damping: 32 }}
           onClick={(e) => e.stopPropagation()}
           className={`relative w-full ${hasMedia ? 'max-w-6xl md:flex-row' : 'max-w-xl flex-col'} bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl border border-slate-200/90 dark:border-zinc-800 overflow-hidden flex h-[85vh] md:h-[88vh] max-h-[850px] min-h-[480px] text-right`}
         >

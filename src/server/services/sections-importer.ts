@@ -211,6 +211,7 @@ export function parseRawCatalog(input: any, filename?: string): ParsedCatalog {
             if (!s) continue;
             sections.push({
               ...s,
+              finalExam: s.finalExam || s.final_exam || s.examDate || s.finalExamDate || item.finalExam || item.final_exam || item.examDate || item.finalExamDate,
               courseCode: s.courseCode || courseCode,
               courseTitle: s.courseTitle || item.name || item.courseTitle || courseCode,
               creditHours: s.creditHours || item.creditHours || 3
@@ -285,7 +286,18 @@ export async function processAndUpsertCatalog(
     const curr = s.currentEnrollment ?? s.enrollmentCount ?? s.enrollment?.current ?? null;
     const avail = s.seatsAvailable ?? s.enrollment?.seatsAvailable ?? (max !== null && curr !== null ? max - curr : null);
     const isOpen = s.isOpen !== undefined ? Boolean(s.isOpen) : (avail !== null ? avail > 0 : true);
-    const finalExam = s.finalExam ? (typeof s.finalExam === 'string' ? s.finalExam : JSON.stringify(s.finalExam)) : null;
+
+    let finalExam = s.finalExam ?? s.final_exam ?? s.examDate ?? s.exam_date ?? s.finalExamDate ?? null;
+    if (finalExam && typeof finalExam === 'object') {
+      finalExam = JSON.stringify(finalExam);
+    } else if (!finalExam && (s.examDate || s.finalExamDate)) {
+      finalExam = JSON.stringify({
+        examDate: s.examDate || s.finalExamDate,
+        examTime: s.examTime || s.finalExamTime || null
+      });
+    } else if (typeof finalExam === 'string' && finalExam.trim()) {
+      finalExam = finalExam.trim();
+    }
 
     const key = `${crn}___${secTerm}`;
     if (!sectionsMap.has(key)) {

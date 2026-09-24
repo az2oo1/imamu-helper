@@ -6,7 +6,7 @@ import {
   Folder, HelpCircle, Calendar, Command
 } from 'lucide-react';
 
-export type Tab = 'dashboard' | 'users' | 'contributors' | 'news_sources' | 'majors' | 'events' | 'subjects' | 'sections' | 'resources' | 'tutorials' | 'feedback' | 'settings';
+export type Tab = 'dashboard' | 'users' | 'contributors' | 'news_sources' | 'majors' | 'events' | 'subjects' | 'sections' | 'teachers' | 'resources' | 'tutorials' | 'feedback' | 'settings';
 
 export interface SearchResultItem {
   id: string;

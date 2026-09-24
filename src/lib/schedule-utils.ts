@@ -99,7 +99,60 @@ export const COURSE_CARD_PALETTES: CoursePalette[] = [
     gradient: 'from-rose-500/5 to-transparent',
     boxBorder: 'border-rose-500 dark:border-rose-400',
     boxBg: 'bg-rose-500/15 dark:bg-rose-500/25'
+  },
+  {
+    bg: 'bg-teal-500/10 dark:bg-teal-500/15',
+    border: 'border-teal-500/30 dark:border-teal-500/40 hover:border-teal-500/60',
+    accent: 'text-teal-700 dark:text-teal-400',
+    badge: 'bg-teal-500/20 text-teal-800 dark:text-teal-300',
+    dot: 'bg-teal-500',
+    gradient: 'from-teal-500/5 to-transparent',
+    boxBorder: 'border-teal-500 dark:border-teal-400',
+    boxBg: 'bg-teal-500/15 dark:bg-teal-500/25'
+  },
+  {
+    bg: 'bg-pink-500/10 dark:bg-pink-500/15',
+    border: 'border-pink-500/30 dark:border-pink-500/40 hover:border-pink-500/60',
+    accent: 'text-pink-700 dark:text-pink-400',
+    badge: 'bg-pink-500/20 text-pink-800 dark:text-pink-300',
+    dot: 'bg-pink-500',
+    gradient: 'from-pink-500/5 to-transparent',
+    boxBorder: 'border-pink-500 dark:border-pink-400',
+    boxBg: 'bg-pink-500/15 dark:bg-pink-500/25'
+  },
+  {
+    bg: 'bg-orange-500/10 dark:bg-orange-500/15',
+    border: 'border-orange-500/30 dark:border-orange-500/40 hover:border-orange-500/60',
+    accent: 'text-orange-700 dark:text-orange-400',
+    badge: 'bg-orange-500/20 text-orange-800 dark:text-orange-300',
+    dot: 'bg-orange-500',
+    gradient: 'from-orange-500/5 to-transparent',
+    boxBorder: 'border-orange-500 dark:border-orange-400',
+    boxBg: 'bg-orange-500/15 dark:bg-orange-500/25'
+  },
+  {
+    bg: 'bg-[#8c6239]/10 dark:bg-[#8c6239]/15',
+    border: 'border-[#8c6239]/30 dark:border-[#8c6239]/40 hover:border-[#8c6239]/60',
+    accent: 'text-[#8c6239] dark:text-[#d4af37]',
+    badge: 'bg-[#8c6239]/20 text-[#8c6239] dark:text-[#d4af37]',
+    dot: 'bg-[#8c6239]',
+    gradient: 'from-[#8c6239]/5 to-transparent',
+    boxBorder: 'border-[#8c6239] dark:border-[#d4af37]',
+    boxBg: 'bg-[#8c6239]/15 dark:bg-[#8c6239]/25'
   }
+];
+
+export const COURSE_COLOR_OPTIONS = [
+  { hex: '#10b981', label: 'زمردي', name: 'emerald' },
+  { hex: '#0ea5e9', label: 'سماوي', name: 'sky' },
+  { hex: '#f59e0b', label: 'كهرماني', name: 'amber' },
+  { hex: '#6366f1', label: 'نيلي', name: 'indigo' },
+  { hex: '#8b5cf6', label: 'بنفسجي', name: 'purple' },
+  { hex: '#f43f5e', label: 'وردي', name: 'rose' },
+  { hex: '#14b8a6', label: 'تيل', name: 'teal' },
+  { hex: '#ec4899', label: 'فوشي', name: 'pink' },
+  { hex: '#f97316', label: 'برتقالي', name: 'orange' },
+  { hex: '#8c6239', label: 'بني الإمام', name: 'imamu' },
 ];
 
 /**
@@ -283,5 +336,72 @@ export function parseTimeRange(
     endTime: formatMinutesToTime(endMin, false),
     startMinutes: startMin,
     endMinutes: endMin,
+  };
+}
+
+/**
+ * Extracts normalized examDate and examTime from a section or exam object
+ */
+export function extractFinalExamInfo(sec: any): { examDate?: string; examTime?: string } {
+  if (!sec) return {};
+  let examDate: string | undefined = sec.examDate || sec.finalExamDate;
+  let examTime: string | undefined = sec.examTime || sec.finalExamTime;
+
+  let fe = sec.finalExam || sec.final_exam;
+  if (typeof fe === 'string' && fe.startsWith('{')) {
+    try {
+      fe = JSON.parse(fe);
+    } catch {}
+  }
+
+  if (fe && typeof fe === 'object') {
+    examDate = examDate || fe.examDate || fe.date || fe.finalExamDate || fe.startDate;
+    examTime = examTime || fe.examTime || fe.time || fe.finalExamTime || fe.startTime;
+    if (!examTime && fe.timeRange) {
+      examTime = String(fe.timeRange).split(/[-–—]/)[0].trim();
+    }
+  } else if (typeof fe === 'string' && fe.trim()) {
+    const trimmed = fe.trim();
+    const parts = trimmed.split(/[\sT]+/);
+    if (parts[0] && (parts[0].includes('-') || parts[0].includes('/'))) {
+      examDate = examDate || parts[0];
+      if (parts[1]) examTime = examTime || parts[1];
+    } else {
+      examDate = examDate || trimmed;
+    }
+  }
+
+  // Normalize date format if it's MM/DD/YYYY, DD/MM/YYYY, or YYYY/MM/DD
+  if (examDate) {
+    let dStr = String(examDate).trim();
+    if (dStr.includes('/')) {
+      const p = dStr.split('/');
+      if (p.length === 3) {
+        if (p[2].length === 4) {
+          const mOrD1 = parseInt(p[0], 10);
+          const mOrD2 = parseInt(p[1], 10);
+          if (mOrD1 > 12) {
+            // DD/MM/YYYY -> YYYY-MM-DD
+            dStr = `${p[2]}-${String(mOrD2).padStart(2, '0')}-${String(mOrD1).padStart(2, '0')}`;
+          } else {
+            // MM/DD/YYYY -> YYYY-MM-DD
+            dStr = `${p[2]}-${String(mOrD1).padStart(2, '0')}-${String(mOrD2).padStart(2, '0')}`;
+          }
+        } else if (p[0].length === 4) {
+          // YYYY/MM/DD -> YYYY-MM-DD
+          dStr = `${p[0]}-${String(p[1]).padStart(2, '0')}-${String(p[2]).padStart(2, '0')}`;
+        }
+      }
+    }
+    examDate = dStr;
+  }
+
+  if (examTime) {
+    examTime = String(examTime).trim();
+  }
+
+  return {
+    examDate: examDate ? String(examDate).trim() : undefined,
+    examTime: examTime ? String(examTime).trim() : undefined
   };
 }

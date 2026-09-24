@@ -573,13 +573,16 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
                                 setCopiedCode(item.code!);
                                 setTimeout(() => setCopiedCode(null), 2000);
                               }}
-                              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-stone-100 dark:bg-stone-900/50 hover:bg-stone-200 dark:hover:bg-stone-800 text-[var(--color-imamu-accent)] text-xs font-bold transition-all duration-200 cursor-pointer border border-amber-500/30 dark:border-amber-400/30 group/btn shadow-2xs"
+                              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-stone-100 dark:bg-stone-900/50 hover:bg-stone-200 dark:hover:bg-stone-800 text-[var(--color-imamu-accent)] text-xs font-bold transition-all duration-200 cursor-pointer border border-[var(--color-imamu-accent)]/30 group/btn shadow-2xs"
                               title="انقر لنسخ كود الخصم"
                             >
                               <Tag className="w-3 h-3 text-[var(--color-imamu-accent)] transition-colors" />
                               <span>كود الخصم: <span className="font-mono tracking-wider font-extrabold">{item.code}</span></span>
                               {item.discount && (
-                                <span className="bg-amber-500/20 dark:bg-amber-400/20 text-[var(--color-imamu-accent)] text-[10px] px-1.5 py-0.5 rounded-md font-extrabold mr-0.5">
+                                <span
+                                  className="text-[var(--color-imamu-accent)] text-[10px] px-1.5 py-0.5 rounded-md font-extrabold mr-0.5"
+                                  style={{ backgroundColor: 'color-mix(in srgb, var(--color-imamu-accent) 20%, transparent)' }}
+                                >
                                   {item.discount.includes('%') || item.discount.includes('خصم') || item.discount.includes('ريال') ? item.discount : `خصم ${item.discount}`}
                                 </span>
                               )}
@@ -790,27 +793,23 @@ export function CourseDetailsModal({ isOpen, onClose, courseIdOrCode, initialDat
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" dir="rtl">
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
-          className="fixed inset-0 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm cursor-pointer"
+          className="absolute inset-0 bg-slate-900/50 dark:bg-black/70 backdrop-blur-sm cursor-pointer"
         />
 
         {/* Modal Window Container */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 15 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 15 }}
-          transition={{ 
-            duration: 0.28,
-            ease: [0.4, 0, 0.2, 1],
-            layout: { duration: 0.28, ease: [0.4, 0, 0.2, 1] } 
-          }}
-          className="relative bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh] z-10"
+          initial={{ opacity: 0, y: 48 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 24 }}
+          transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+          className="relative bg-white dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800 rounded-t-3xl sm:rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] z-10"
         >
           {/* Close Button */}
           <button
