@@ -235,6 +235,35 @@ export function createSubjectsRouter(db: any) {
       let allResources = subject.id 
         ? await db.select().from(course_resources).where(matchId(course_resources.subjectId, subject.id))
         : [];
+
+      // Link resources by course name or sister subject representations (e.g. 'علوم الحاسب 1140' <=> 'عال 1140')
+      if (subject.name) {
+        const cleanSubjName = subject.name.trim();
+        const sisterSubjs = await db.select().from(subjects).where(
+          sql`LOWER(TRIM(${subjects.name})) = LOWER(TRIM(${cleanSubjName}))`
+        );
+        const sisterIds = sisterSubjs.map((s: any) => s.id).filter(Boolean);
+
+        let additionalResources: any[] = [];
+        if (sisterIds.length > 0) {
+          additionalResources = await db.select().from(course_resources).where(
+            sql`${inArray(course_resources.subjectId, sisterIds)} OR LOWER(TRIM(${course_resources.title})) = LOWER(TRIM(${cleanSubjName}))`
+          );
+        } else {
+          additionalResources = await db.select().from(course_resources).where(
+            sql`LOWER(TRIM(${course_resources.title})) = LOWER(TRIM(${cleanSubjName}))`
+          );
+        }
+
+        const existingIds = new Set(allResources.map((r: any) => String(r.id)));
+        for (const r of additionalResources) {
+          if (!existingIds.has(String(r.id))) {
+            allResources.push(r);
+            existingIds.add(String(r.id));
+          }
+        }
+      }
+
       const connectUrl = process.env.CONNECT_APP_URL || 'http://localhost:3000';
 
       const subjectMajorLinks = await db.select().from(majorCourses).where(matchId(majorCourses.subjectId, subject.id));
@@ -303,6 +332,10 @@ export function createSubjectsRouter(db: any) {
           avatarUrl: firstAvatar,
           bannerUrl: firstBanner,
           whatsappLink: resolvedWhatsappLink,
+          freeResourcesUrl: subject.freeResourcesUrl || allResources.find((r: any) => r.freeResourcesUrl)?.freeResourcesUrl || null,
+          paidResourcesUrl: subject.paidResourcesUrl || allResources.find((r: any) => r.paidResourcesUrl)?.paidResourcesUrl || null,
+          boxLink: subject.boxLink || allResources.find((r: any) => r.boxLink)?.boxLink || null,
+          driveLink: subject.driveLink || allResources.find((r: any) => r.driveLink)?.driveLink || null,
           isAcademicSubject: true,
           resources: allResources,
           sections: sectionsList,
@@ -335,9 +368,21 @@ export function createSubjectsRouter(db: any) {
       if (isNumeric) {
         filtered = await db.select().from(course_resources).where(matchId(course_resources.subjectId, realId));
       } else {
-        const sub = (await db.select({ id: subjects.id }).from(subjects).where(sql`REPLACE(REPLACE(LOWER(${subjects.code}), ' ', ''), '-', '') = ${realId.toLowerCase().replace(/[\s\-]/g, '')}`))[0];
+        const cleanTarget = realId.toLowerCase().replace(/[\s\-]/g, '');
+        const sub = (await db.select().from(subjects).where(sql`REPLACE(REPLACE(LOWER(${subjects.code}), ' ', ''), '-', '') = ${cleanTarget}`))[0];
         if (sub?.id) {
           filtered = await db.select().from(course_resources).where(matchId(course_resources.subjectId, sub.id));
+          if (filtered.length === 0 && sub.name) {
+            const sisterSubjs = await db.select({ id: subjects.id }).from(subjects).where(sql`LOWER(TRIM(${subjects.name})) = LOWER(TRIM(${sub.name.trim()}))`);
+            const sisterIds = sisterSubjs.map((s: any) => s.id).filter(Boolean);
+            if (sisterIds.length > 0) {
+              filtered = await db.select().from(course_resources).where(
+                sql`${inArray(course_resources.subjectId, sisterIds)} OR LOWER(TRIM(${course_resources.title})) = LOWER(TRIM(${sub.name.trim()}))`
+              );
+            }
+          }
+        } else {
+          filtered = await db.select().from(course_resources).where(sql`LOWER(TRIM(${course_resources.title})) = LOWER(TRIM(${realId}))`);
         }
       }
       res.json(filtered);

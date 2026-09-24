@@ -246,7 +246,7 @@ export function AddCourseModal({
     const updateHeight = () => {
       if (element) {
         const fullHeight = element.scrollHeight;
-        const maxHeight = window.innerHeight * 0.85 - 144;
+        const maxHeight = Math.max(200, window.innerHeight * 0.85 - 120);
         setContentHeight(Math.min(fullHeight, maxHeight));
       }
     };
@@ -255,8 +255,15 @@ export function AddCourseModal({
     observer.observe(element);
     updateHeight();
 
+    const raf1 = requestAnimationFrame(updateHeight);
+    const tm1 = setTimeout(updateHeight, 50);
+    const tm2 = setTimeout(updateHeight, 220);
+
     window.addEventListener('resize', updateHeight);
     return () => {
+      cancelAnimationFrame(raf1);
+      clearTimeout(tm1);
+      clearTimeout(tm2);
       observer.disconnect();
       window.removeEventListener('resize', updateHeight);
     };
@@ -268,7 +275,8 @@ export function AddCourseModal({
     isEditingTimings,
     isEditingWaLink,
     loadingDetails,
-    crnError
+    crnError,
+    courseDetails
   ]);
 
   // Sync selectedSemId with activeSemId
@@ -438,16 +446,17 @@ export function AddCourseModal({
     }
   }, [isOpen, initialCourse]);
 
-  // When a section is fetched, load course details (sections, tutorials, files) from API
+  // When a section or course is available, load course details (sections, tutorials, files, avatar) from API
   useEffect(() => {
-    if (!fetchedSection?.courseCode) return;
+    const code = fetchedSection?.courseCode || initialCourse?.courseCode || selectedSubject?.code;
+    const name = fetchedSection?.courseTitle || initialCourse?.courseName || selectedSubject?.name;
+    const target = code || name;
+    if (!target) return;
     let cancelled = false;
     setLoadingDetails(true);
 
-    const code = fetchedSection.courseCode;
-
     // Fetch details (resources, tutorials, files)
-    fetch(`/api/subjects/${encodeURIComponent(code)}/details`)
+    fetch(`/api/subjects/${encodeURIComponent(target)}/details`)
       .then(res => (res.ok ? res.json() : null))
       .then(data => {
         if (!cancelled && data?.course) {
@@ -459,12 +468,10 @@ export function AddCourseModal({
         if (!cancelled) setLoadingDetails(false);
       });
 
-
-
     return () => {
       cancelled = true;
     };
-  }, [fetchedSection?.courseCode]);
+  }, [fetchedSection?.courseCode, fetchedSection?.courseTitle, initialCourse?.courseCode, initialCourse?.courseName, selectedSubject?.code, selectedSubject?.name]);
 
   // Reset modal state on close
   const handleModalClose = () => {
@@ -1060,22 +1067,28 @@ export function AddCourseModal({
   const hasCourse = Boolean(fetchedSection || selectedSubject || initialCourse);
 
   const courseImage = useMemo(() => {
-    if (courseDetails?.avatarUrl) return courseDetails.avatarUrl;
-    if (courseDetails?.bannerUrl) return courseDetails.bannerUrl;
+    if (courseDetails?.avatarUrl || courseDetails?.avatar_url) {
+      return courseDetails.avatarUrl || courseDetails.avatar_url;
+    }
+    if (courseDetails?.bannerUrl || courseDetails?.banner_url) {
+      return courseDetails.bannerUrl || courseDetails.banner_url;
+    }
     if (Array.isArray(courseDetails?.resources)) {
       const resWithImg = courseDetails.resources.find((r: any) => r.avatarUrl || r.avatar_url || r.imageUrl || r.image_url);
-      if (resWithImg?.avatarUrl || resWithImg?.avatar_url || resWithImg?.imageUrl || resWithImg?.image_url) {
+      if (resWithImg) {
         return resWithImg.avatarUrl || resWithImg.avatar_url || resWithImg.imageUrl || resWithImg.image_url;
       }
     }
+    const activeName = (fetchedSection?.courseTitle || initialCourse?.courseName || selectedSubject?.name || '').trim().toLowerCase();
     const matchingSub = allSubjects?.find(s =>
       (s.code && s.code === activeCourseCode) ||
-      (s.id && (s.id === (fetchedSection as any)?.subjectId || s.id === initialCourse?.subjectId))
+      (s.id && (s.id === (fetchedSection as any)?.subjectId || s.id === initialCourse?.subjectId)) ||
+      (activeName && s.name && s.name.trim().toLowerCase() === activeName)
     );
-    if (matchingSub?.avatarUrl) return matchingSub.avatarUrl;
-    if (matchingSub?.bannerUrl) return matchingSub.bannerUrl;
+    if (matchingSub?.avatarUrl || matchingSub?.avatar_url) return matchingSub.avatarUrl || matchingSub.avatar_url;
+    if (matchingSub?.bannerUrl || matchingSub?.banner_url) return matchingSub.bannerUrl || matchingSub.banner_url;
     return null;
-  }, [courseDetails, allSubjects, activeCourseCode, fetchedSection, initialCourse]);
+  }, [courseDetails, allSubjects, activeCourseCode, fetchedSection, initialCourse, selectedSubject]);
 
   const [imgError, setImgError] = useState(false);
   useEffect(() => {
@@ -1253,8 +1266,12 @@ export function AddCourseModal({
           </button>
         </div>
 
-        {/* ─── Body Content ─── */}
-        <div className="overflow-hidden flex-1 flex flex-col">
+        {/* ─── Body Content with Smooth Height Animation ─── */}
+        <motion.div 
+          animate={{ height: contentHeight }}
+          transition={{ duration: 0.28, ease: [0.4, 0.2, 0.2, 1] }}
+          className="overflow-hidden"
+        >
           <div ref={contentRef} className="p-5 sm:p-6 overflow-y-auto max-h-[calc(85vh-7rem)] custom-scrollbar space-y-5">
             {/* Success message banner when updates applied */}
             {updateSuccessMessage && (
@@ -2147,7 +2164,7 @@ export function AddCourseModal({
             )}
             <div className="h-10 shrink-0" />
           </div>
-        </div>
+        </motion.div>
 
         {/* ─── Bottom Action Bar ─── */}
         <div className="px-5 py-3.5 border-t border-slate-200/80 dark:border-zinc-800 bg-slate-50/60 dark:bg-zinc-900/60 backdrop-blur-md flex items-center justify-between gap-2.5 shrink-0">

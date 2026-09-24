@@ -8,98 +8,7 @@ import { ChevronDown, ChevronUp, UserCircle2, Mail, Phone, BookOpen, Calculator,
 import { useRouter } from 'next/navigation';
 import { AnimatedNumber } from '../components/ui';
 
-function extractPrereqCodes(description?: string | null): string[] {
-  if (!description) return [];
-  const match = description.match(/(?:المتطلبات السابقة:|prereq:?)\s*([A-Z0-9,\s\u0600-\u06FF]+)/i);
-  if (!match) return [];
-  const codes = match[1].match(/[A-Z]{2,4}\s*\d{3,4}|[\u0600-\u06FF]{2,4}\s*\d{3,4}/g);
-  return codes ? Array.from(new Set(codes.map(c => c.trim()))) : [];
-}
 
-function getSubjectPrereqs(s: any): string[] {
-  if (s.prereq) {
-    return s.prereq.split(/[,|،+/]+/).map((c: string) => c.trim()).filter(Boolean);
-  }
-  return extractPrereqCodes(s.description);
-}
-
-function isCourseCompleted(completedCourses: string[], targetCode: string): boolean {
-  if (!targetCode || !completedCourses) return false;
-  const targetNorm = targetCode.replace(/\s+/g, '').toLowerCase();
-  return completedCourses.some(c => c && c.replace(/\s+/g, '').toLowerCase() === targetNorm);
-}
-
-function computeAcademicProgress(majors: any[], subjects: any[], majorName: string, completedCourses: string[]) {
-  const userMajor = majors.find(m => m.name === majorName || m.name?.trim() === majorName?.trim());
-  const displayedSubjects = userMajor && userMajor.courseIds && userMajor.courseIds.length > 0
-    ? subjects.filter(s => userMajor.courseIds.some((cid: any) => String(cid) === String(s.id)))
-    : subjects;
-
-  const groups = (Object.entries(
-    displayedSubjects.reduce((acc, s) => {
-      let g = s.level ? `المستوى ${s.level}` : 'المتطلبات العامة';
-      let reqCount = 0;
-      let prereq = s.prereq || null;
-      if (userMajor && userMajor.courses) {
-        const c = userMajor.courses.find((mc: any) => String(mc.subjectId) === String(s.id));
-        if (c) {
-          if (c.prereq) prereq = c.prereq;
-          if (c.optionalGroup && c.optionalGroup !== 'المتطلبات العامة') {
-            g = c.optionalGroup;
-            reqCount = Number(c.optionalGroupReqCount) || 0;
-          } else if (c.optionalGroupReqCount) {
-            reqCount = Number(c.optionalGroupReqCount) || 0;
-          }
-        }
-      }
-      if (!acc[g]) acc[g] = [];
-      acc[g].push({...s, reqCount, prereq});
-      return acc;
-    }, {} as Record<string, any[]>)
-  ) as [string, any[]][]).sort((a, b) => {
-    const matchA = a[0].match(/المستوى\s+(\d+)/);
-    const matchB = b[0].match(/المستوى\s+(\d+)/);
-    if (matchA && matchB) return parseInt(matchA[1]) - parseInt(matchB[1]);
-    if (matchA) return -1;
-    if (matchB) return 1;
-    return a[0].localeCompare(b[0], 'ar');
-  });
-
-  let totalReq = 0;
-  let totalFinishedInReq = 0;
-  let totalFinishedHours = 0;
-
-  displayedSubjects.forEach(s => {
-    if (isCourseCompleted(completedCourses, s.code)) {
-      totalFinishedHours += Number(s.creditHours || 3);
-    }
-  });
-
-  groups.forEach(([groupName, groupSubjects]) => {
-    const totalInGroup = groupSubjects.length;
-    const declaredReqCount = Number(groupSubjects[0]?.reqCount) || 0;
-    const isLevelGroup = groupName.startsWith('المستوى');
-    const reqCount = (declaredReqCount > 0 && !isLevelGroup) ? declaredReqCount : totalInGroup;
-    const selectedInGroup = groupSubjects.filter(s => completedCourses.includes(s.code)).length;
-    
-    totalReq += Number(reqCount);
-    totalFinishedInReq += Math.min(selectedInGroup, Number(reqCount));
-  });
-
-  const percentFinished = totalReq > 0 ? Math.round((totalFinishedInReq / totalReq) * 100) : 0;
-  const allGroupNames = groups.map(g => g[0]);
-
-  return {
-    userMajor,
-    displayedSubjects,
-    groups,
-    totalReq,
-    totalFinishedInReq,
-    totalFinishedHours,
-    percentFinished,
-    allGroupNames
-  };
-}
 
 export function ProfilePage() {
   const { user, dbUser, signOut, refreshToken, loading: authLoading } = useAuth();
@@ -127,20 +36,19 @@ export function ProfilePage() {
     userName: dbUser?.userName || '',
   });
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'progress'>('progress');
+  const [activeTab, setActiveTab] = useState<'profile'>('profile');
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
   const [phoneEditable, setPhoneEditable] = useState(false);
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get('tab');
-      if (tabParam === 'profile' || tabParam === 'progress') {
-        setActiveTab(tabParam);
+      if (tabParam === 'progress') {
+        router.replace('/ana?tab=progress');
       }
     }
-  }, []);
+  }, [router]);
 
   // Username check removed as display names are non-unique
 
@@ -223,9 +131,6 @@ export function ProfilePage() {
       setIsSaving(false);
     }
   };
-
-
-  const progressData = computeAcademicProgress(majors, subjects, profileForm.major, profileForm.completedCourses);
 
   return (
     <div className="flex flex-col flex-1 max-w-6xl w-full mx-auto pb-24 px-4 sm:px-6" dir="rtl">
@@ -316,46 +221,29 @@ export function ProfilePage() {
 
         {/* Right Side: Form & Progress */}
         <div className="w-full flex-1 min-w-0">
-          {/* Animated Tab Bar with Icons & Sliding Indicator */}
+          {/* Animated Tab Bar with Icons & Direct Link to Ana */}
           <div className="relative flex items-center gap-1 border-b border-slate-200 dark:border-zinc-800/80 mb-8 pb-0" dir="rtl">
             <button 
               type="button"
-              onClick={() => setActiveTab('progress')} 
-              className={`relative pb-3.5 px-4 font-bold transition-colors duration-200 text-sm flex items-center gap-2 select-none cursor-pointer ${
-                activeTab === 'progress' 
-                  ? 'text-[var(--color-imamu-accent)]' 
-                  : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
-              }`}
+              className="relative pb-3.5 px-4 font-bold text-sm flex items-center gap-2 select-none cursor-pointer text-[var(--color-imamu-accent)]"
             >
-              <GraduationCap className={`w-4.5 h-4.5 transition-colors ${activeTab === 'progress' ? 'text-[var(--color-imamu-accent)]' : 'text-slate-400 dark:text-zinc-500'}`} />
-              <span>التقدم والمقررات</span>
-              {activeTab === 'progress' && (
-                <motion.div
-                  layoutId="activeTabUnderline"
-                  className="absolute bottom-0 right-0 left-0 h-0.5 bg-[var(--color-imamu-brown)] dark:bg-[var(--color-imamu-brown)] rounded-full shadow-xs shadow-[var(--color-imamu-brown)/20]"
-                  transition={{ type: "spring", stiffness: 400, damping: 32 }}
-                />
-              )}
+              <Settings className="w-4.5 h-4.5 text-[var(--color-imamu-accent)]" />
+              <span>إعدادات الحساب</span>
+              <motion.div
+                layoutId="profileActiveTabUnderline"
+                className="absolute bottom-0 right-0 left-0 h-0.5 bg-[var(--color-imamu-brown)] dark:bg-[var(--color-imamu-brown)] rounded-full shadow-xs shadow-[var(--color-imamu-brown)/20]"
+                transition={{ type: "spring", stiffness: 400, damping: 32 }}
+              />
             </button>
 
             <button 
               type="button"
-              onClick={() => setActiveTab('profile')} 
-              className={`relative pb-3.5 px-4 font-bold transition-colors duration-200 text-sm flex items-center gap-2 select-none cursor-pointer ${
-                activeTab === 'profile' 
-                  ? 'text-[var(--color-imamu-accent)]' 
-                  : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
-              }`}
+              onClick={() => router.push('/ana?tab=progress')} 
+              className="relative pb-3.5 px-4 font-bold transition-colors duration-200 text-sm flex items-center gap-2 select-none cursor-pointer text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200 group"
             >
-              <Settings className={`w-4.5 h-4.5 transition-colors ${activeTab === 'profile' ? 'text-[var(--color-imamu-accent)]' : 'text-slate-400 dark:text-zinc-500'}`} />
-              <span>إعدادات الحساب</span>
-              {activeTab === 'profile' && (
-                <motion.div
-                  layoutId="activeTabUnderline"
-                  className="absolute bottom-0 right-0 left-0 h-0.5 bg-[var(--color-imamu-brown)] dark:bg-[var(--color-imamu-brown)] rounded-full shadow-xs shadow-[var(--color-imamu-brown)/20]"
-                  transition={{ type: "spring", stiffness: 400, damping: 32 }}
-                />
-              )}
+              <GraduationCap className="w-4.5 h-4.5 text-slate-400 dark:text-zinc-500 group-hover:text-slate-800 dark:group-hover:text-zinc-200 transition-colors" />
+              <span>التقدم والمقررات</span>
+              <ArrowUpRight className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 group-hover:text-slate-800 dark:group-hover:text-zinc-200 transition-colors -mr-1" />
             </button>
           </div>
 
@@ -378,8 +266,7 @@ export function ProfilePage() {
           </AnimatePresence>
 
           <form className="space-y-6" onSubmit={e => { e.preventDefault(); saveProfile(); }}>
-            {activeTab === 'profile' && (
-              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
                 {/* Personal Details Section (No Card Box) */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 pb-2 border-b border-slate-200/60 dark:border-zinc-800/60">
@@ -500,6 +387,27 @@ export function ProfilePage() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Quick navigation to Academic Progress in Ana */}
+                    <div className="p-4 rounded-2xl bg-[var(--color-imamu-brown)]/5 border border-[var(--color-imamu-brown)]/15 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-xl bg-[var(--color-imamu-brown)]/10 text-[var(--color-imamu-accent)]">
+                          <GraduationCap className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-900 dark:text-white">الخطة الأكاديمية والتقدم في المواد</h4>
+                          <p className="text-[11px] text-slate-500 dark:text-zinc-400">انتقلت متابعة الخطة والمواد المنجزة إلى صفحتك الشخصية (أنا).</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => router.push('/ana?tab=progress')}
+                        className="btn-rise inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[var(--color-imamu-accent)] text-white hover:opacity-90 transition cursor-pointer self-start sm:self-auto shrink-0 shadow-2xs"
+                      >
+                        <span>عرض التقدم والمقررات</span>
+                        <ArrowUpRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -564,261 +472,6 @@ export function ProfilePage() {
                   </div>
                 </div>
               </div>
-            )}
-
-            {activeTab === 'progress' && (
-              <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                {!profileForm.major ? (
-                  <div className="bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-8 text-center">
-                    <p className="text-slate-600 dark:text-zinc-400 text-sm font-medium">يرجى اختيار التخصص في تبويب الإعدادات أولاً.</p>
-                  </div>
-                ) : subjects.length > 0 ? (
-                  <div className="space-y-6">
-                    {/* Progress Header - Seamless Page Integration (No Box / Border / Gradient) */}
-                    <div className="mb-8 space-y-4">
-                      <div className="flex flex-col sm:flex-row justify-between sm:items-end gap-3">
-                        <div>
-                          <span className="text-slate-900 dark:text-white font-bold block text-base sm:text-lg">نسبة إنجاز الخطة الأكاديمية</span>
-                          <span className="text-xs text-slate-500 dark:text-zinc-400 font-medium">
-                            اجتزت <AnimatedNumber value={progressData.totalFinishedInReq} /> من {progressData.totalReq} مقرر (إجمالي <AnimatedNumber value={progressData.totalFinishedHours} /> ساعة معتمدة)
-                          </span>
-                        </div>
-                        <span className="text-[var(--color-imamu-accent)] font-black text-2xl"><AnimatedNumber value={progressData.percentFinished} />%</span>
-                      </div>
-
-                      {/* Solid Color Progress Bar (No Gradient) */}
-                      <div className="w-full bg-slate-200/80 dark:bg-zinc-800 rounded-full h-3 overflow-hidden">
-                        <motion.div 
-                          className="bg-[var(--color-imamu-accent)] h-full rounded-full"
-                          initial={{ width: 0 }}
-                          animate={{ width: `${progressData.percentFinished}%` }}
-                          transition={{ duration: 0.8, ease: "easeOut" }}
-                        />
-                      </div>
-
-                      {/* Global Accordion Toggle Bar with Msari Button */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 text-xs">
-                        <span className="text-slate-500 dark:text-zinc-400 font-medium">إجمالي {progressData.groups.length} حزمة ومستوى</span>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <a
-                            href="https://msari.vercel.app/index.html"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="btn-rise inline-flex items-center gap-2 text-xs font-bold text-white bg-[#0E352C] hover:bg-[#13493d] px-4 py-2 rounded-full border border-[#3DC9B0]/40 shadow-sm shadow-[#0E352C]/30 transition-all cursor-pointer shrink-0"
-                          >
-                            <Sparkles className="w-3.5 h-3.5 text-[#3DC9B0] shrink-0" />
-                            <span>تعمّق مع مساري</span>
-                            <ArrowUpRight className="w-3.5 h-3.5 text-slate-300 shrink-0" />
-                          </a>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const nextState: Record<string, boolean> = {};
-                              progressData.allGroupNames.forEach(n => { nextState[n] = false; });
-                              setCollapsedGroups(nextState);
-                            }}
-                            className="text-xs font-bold text-[var(--color-imamu-accent)] hover:underline px-3 py-1.5 rounded-xl bg-stone-50 dark:bg-stone-950/40 border border-slate-200/80 dark:border-zinc-700/80 cursor-pointer"
-                          >
-                            توسيع الكل
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const nextState: Record<string, boolean> = {};
-                              progressData.allGroupNames.forEach(n => { nextState[n] = true; });
-                              setCollapsedGroups(nextState);
-                            }}
-                            className="text-xs font-bold text-slate-600 dark:text-zinc-400 hover:underline px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-800/80 border border-slate-200/80 dark:border-zinc-700/80 cursor-pointer"
-                          >
-                            طي الكل
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Groups / Batches Collapsible List */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-                      {[
-                        progressData.groups.filter((_, idx) => idx % 2 === 0),
-                        progressData.groups.filter((_, idx) => idx % 2 === 1)
-                      ].map((columnGroups, colIdx) => (
-                        <div key={colIdx} className="flex flex-col gap-4 w-full">
-                          {columnGroups.map(([groupName, groupSubjects]: [string, any[]]) => {
-                            const totalInGroup = groupSubjects.length;
-                            const declaredReqCount = groupSubjects[0]?.reqCount || 0;
-                            const isLevelGroup = groupName.startsWith('المستوى');
-                            const reqCount = (declaredReqCount > 0 && !isLevelGroup) ? declaredReqCount : totalInGroup;
-                            
-                            const selectedInGroup = groupSubjects.filter(s => isCourseCompleted(profileForm.completedCourses, s.code)).length;
-                            const isGroupFull = selectedInGroup >= reqCount;
-
-                            // Calculate if ALL courses in this batch are locked
-                            const allCoursesInGroupLocked = groupSubjects.length > 0 && groupSubjects.every(s => {
-                              if (isCourseCompleted(profileForm.completedCourses, s.code)) return false;
-                              const prereqs = getSubjectPrereqs(s);
-                              return prereqs.length > 0 && prereqs.some(p => !isCourseCompleted(profileForm.completedCourses, p));
-                            });
-
-                            // Calculate batch completion ratio
-                            const completionRatio = totalInGroup > 0 ? selectedInGroup / totalInGroup : 0;
-                            const isAtLeast33Percent = completionRatio >= 0.33;
-
-                            const defaultCollapsed = isGroupFull || allCoursesInGroupLocked || !isAtLeast33Percent;
-
-                            const isCollapsed = collapsedGroups[groupName] ?? defaultCollapsed;
-
-                            return (
-                              <div 
-                                key={groupName} 
-                                className={`border rounded-2xl overflow-hidden transition-all duration-300 h-fit ${
-                                  isGroupFull 
-                                    ? 'bg-emerald-50/30 border-emerald-200/80 dark:bg-emerald-950/15 dark:border-emerald-900/40' 
-                                    : allCoursesInGroupLocked
-                                      ? 'bg-slate-100/50 dark:bg-zinc-950/40 border-slate-200 dark:border-zinc-800/60 opacity-85'
-                                      : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800'
-                                }`}
-                              >
-                                {/* Collapsible Accordion Header */}
-                                <div 
-                                  onClick={() => setCollapsedGroups(prev => ({ ...prev, [groupName]: !isCollapsed }))}
-                                  className="p-3.5 sm:p-4 flex items-center justify-between gap-3 cursor-pointer select-none hover:bg-slate-50/80 dark:hover:bg-zinc-800/40 transition"
-                                >
-                                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                    <div className={`p-1 rounded-lg text-slate-400 dark:text-zinc-500 shrink-0 transition-transform duration-200 ${!isCollapsed ? 'rotate-180' : ''}`}>
-                                      <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500 dark:text-zinc-400" />
-                                    </div>
-                                    <h4 className={`font-bold text-xs sm:text-sm leading-snug truncate flex items-center gap-1.5 ${isGroupFull ? 'text-emerald-800 dark:text-emerald-400' : 'text-slate-900 dark:text-white'}`} title={groupName}>
-                                      <span className="truncate">{groupName}</span>
-                                      {isGroupFull && <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />}
-                                    </h4>
-                                  </div>
-
-                                  <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
-                                    {allCoursesInGroupLocked && !isGroupFull && (
-                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200/80 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border border-slate-300/60 dark:border-zinc-700 whitespace-nowrap flex items-center gap-1">
-                                        🔒 مغلقة
-                                      </span>
-                                    )}
-                                    <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap ${
-                                      isGroupFull 
-                                        ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' 
-                                        : 'bg-stone-50 dark:bg-stone-950/50 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] border-slate-200/80 dark:border-zinc-700/80'
-                                    }`}>
-                                      المنجز: {selectedInGroup} / {reqCount}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                {/* Accordion Body */}
-                                <AnimatePresence initial={false}>
-                                  {!isCollapsed && (
-                                    <motion.div
-                                      key="accordion-body"
-                                      initial={{ height: 0, opacity: 0 }}
-                                      animate={{ height: 'auto', opacity: 1 }}
-                                      exit={{ height: 0, opacity: 0 }}
-                                      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                                      className="overflow-hidden"
-                                    >
-                                      <div className="p-4 sm:p-5 pt-0 border-t border-slate-100 dark:border-zinc-800/80 mt-2">
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3">
-                                          {groupSubjects.map((s: any) => {
-                                            const isChecked = isCourseCompleted(profileForm.completedCourses, s.code);
-                                            const prereqCodes = getSubjectPrereqs(s);
-                                            const unmetPrereqs = prereqCodes.filter(p => !isCourseCompleted(profileForm.completedCourses, p));
-                                            const isLocked = !isChecked && unmetPrereqs.length > 0;
-
-                                            return (
-                                              <div 
-                                                key={s.id} 
-                                                onClick={() => {
-                                                  if (isLocked) {
-                                                    setFeedback({
-                                                      type: 'error',
-                                                      message: `لا يمكن تحديد المادة (${s.code}) قبل اجتياز المتطلبات السابقة: ${unmetPrereqs.join(', ')}`
-                                                    });
-                                                    return;
-                                                  }
-                                                  const checked = !isChecked;
-                                                  const updatedCourses = checked 
-                                                    ? [...profileForm.completedCourses, s.code]
-                                                    : profileForm.completedCourses.filter(c => c !== s.code);
-                                                  
-                                                  let newFinishedHours = 0;
-                                                  progressData.displayedSubjects.forEach((subj: any) => {
-                                                    if (updatedCourses.includes(subj.code)) {
-                                                      newFinishedHours += Number(subj.creditHours || 3);
-                                                    }
-                                                  });
-
-                                                  const newHoursStr = newFinishedHours.toString();
-                                                  setProfileForm(p => ({
-                                                    ...p,
-                                                    completedCourses: updatedCourses,
-                                                    finishedHours: newHoursStr
-                                                  }));
-                                                  saveProfile({
-                                                    completedCourses: updatedCourses,
-                                                    finishedHours: newHoursStr
-                                                  });
-                                                }}
-                                                className={`p-3.5 rounded-xl border transition-all duration-200 flex flex-col justify-between gap-2.5 select-none ${
-                                                  isChecked 
-                                                    ? 'bg-emerald-50/70 border-emerald-400 dark:bg-emerald-950/40 dark:border-emerald-700 shadow-xs cursor-pointer hover:bg-emerald-100/60 dark:hover:bg-emerald-900/50' 
-                                                    : isLocked 
-                                                      ? 'bg-slate-100/70 border-slate-200 dark:bg-zinc-950/70 dark:border-zinc-800/80 cursor-not-allowed opacity-75' 
-                                                      : 'bg-white border-slate-200/90 hover:border-[var(--color-imamu-accent)] dark:bg-zinc-900 dark:border-zinc-800 dark:hover:border-zinc-700 cursor-pointer shadow-2xs hover:shadow-sm'
-                                                }`}
-                                              >
-                                                <div className="flex items-start justify-between gap-2">
-                                                  <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-1.5 mb-1">
-                                                      <span className="font-mono text-[11px] font-bold text-[var(--color-imamu-accent)]">{s.code}</span>
-                                                      <span className="text-[10px] text-slate-400 dark:text-zinc-500">•</span>
-                                                      <span className="text-[10px] font-semibold text-slate-500 dark:text-zinc-400">{s.creditHours || 3} س</span>
-                                                    </div>
-                                                    <h5 className="text-xs font-bold text-slate-900 dark:text-white line-clamp-1" title={s.name}>{s.name}</h5>
-                                                  </div>
-                                                </div>
-
-                                                <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-zinc-800/60 text-[11px]">
-                                                  {isChecked ? (
-                                                    <span className="inline-flex items-center gap-1 font-bold text-emerald-700 dark:text-emerald-400">
-                                                      <CheckCircle2 className="w-3.5 h-3.5" /> تم الاجتياز
-                                                    </span>
-                                                  ) : isLocked ? (
-                                                    <span className="inline-flex items-center gap-1 font-bold text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] truncate" title={`يتطلب اجتياز: ${unmetPrereqs.join(', ')}`}>
-                                                      <span>🔒 يتطلب: {unmetPrereqs.join(', ')}</span>
-                                                    </span>
-                                                  ) : (
-                                                    <span className="inline-flex items-center gap-1 font-bold text-slate-500 dark:text-zinc-400 hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)]">
-                                                      <span>انقر لتحديد المادة</span>
-                                                    </span>
-                                                  )}
-                                                </div>
-                                              </div>
-                                            );
-                                          })}
-                                        </div>
-                                      </div>
-                                    </motion.div>
-                                  )}
-                                </AnimatePresence>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-slate-500 dark:text-zinc-400 bg-slate-50 dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800 text-sm">
-                    لم يتم العثور على مقررات لتتبع التقدم.
-                  </div>
-                )}
-              </div>
-            )}
 
             <div className="flex justify-end pt-4">
               <button 

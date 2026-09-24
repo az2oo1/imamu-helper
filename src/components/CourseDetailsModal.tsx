@@ -68,7 +68,7 @@ function CourseAvatar({ avatarUrl, bannerUrl, name }: { avatarUrl?: string; what
 
   return (
     <div className="w-full h-full bg-slate-100 dark:bg-zinc-800 flex items-center justify-center text-[var(--color-imamu-accent)]">
-      <GraduationCap className="w-10 h-10" />
+      <BookOpen className="w-10 h-10" />
     </div>
   );
 }

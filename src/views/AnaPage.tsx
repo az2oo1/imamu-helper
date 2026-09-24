@@ -22,6 +22,7 @@ import { TimingEditor, ScheduleItem } from '../components/TimingEditor';
 import { AddCourseModal } from '../components/AddCourseModal';
 import { SpeedDialPlusMenu } from '../components/SpeedDialPlusMenu';
 import { WeeklySchedule } from '../components/WeeklySchedule';
+import { AcademicProgressTab } from '../components/AcademicProgressTab';
 import { parseScheduleDays, parseTimeRange, COURSE_CARD_PALETTES, extractFinalExamInfo, parseTimeToMinutes, DAY_MAP_AR, formatMinutesToTime } from '../lib/schedule-utils';
 import { NewTaskModal } from '../components/NewTaskModal';
 import {
@@ -2966,7 +2967,33 @@ function SemesterWizard({ onClose, onSave, subjects }: WizardProps) {
 // ─────────────────────────────────────────────
 export function AnaPage() {
   const router = useRouter();
-  const { user, dbUser, loading: authLoading } = useAuth();
+  const { user, dbUser, loading: authLoading, refreshToken } = useAuth();
+
+  // Tab switcher state ('schedule' | 'progress')
+  const [activeMainTab, setActiveMainTab] = useState<'schedule' | 'progress'>('schedule');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      if (tabParam === 'progress' || tabParam === 'schedule') {
+        setActiveMainTab(tabParam);
+      }
+    }
+  }, []);
+
+  const handleMainTabChange = (tab: 'schedule' | 'progress') => {
+    setActiveMainTab(tab);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      if (tab === 'schedule') {
+        url.searchParams.delete('tab');
+      } else {
+        url.searchParams.set('tab', tab);
+      }
+      window.history.replaceState({}, '', url.toString());
+    }
+  };
 
   // Instant cache load (SWR pattern)
   const [semesters, setSemesters] = useState<MySemester[]>(() => loadSemesters());
@@ -3361,7 +3388,7 @@ export function AnaPage() {
     <div className="flex flex-col flex-1 w-full pb-28 px-4 sm:px-6 lg:px-8 pt-8 relative max-w-7xl mx-auto min-h-screen text-right" dir="rtl">
 
       {/* ─── Header ─── */}
-      <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <span className="text-xs sm:text-sm font-semibold tracking-widest text-[var(--color-imamu-accent)] uppercase mb-2 block">
             لوحتي الأكاديمية
@@ -3370,152 +3397,207 @@ export function AnaPage() {
             مرحباً، {dbUser?.userName || 'طالب'} 👋
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-xl">
-            جدولك الشخصي، مواد فصلك، أسماء أساتذتك، وكل ما تحتاجه في مكان واحد.
+            {activeMainTab === 'schedule'
+              ? 'جدولك الشخصي، مواد فصلك، أسماء أساتذتك، وكل ما تحتاجه في مكان واحد.'
+              : 'تتبّع خطتك الدراسية، المواد المنجزة، وحساب الساعات المتبقية للتخرج.'}
           </p>
         </div>
 
-        {/* Semester selector */}
-        <div className="flex items-center gap-2 shrink-0 self-start md:self-auto">
-          <div className="relative" ref={dropdownRef}>
-            <button
-              type="button"
-              onClick={() => setIsSemDropdownOpen(p => !p)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs font-bold text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 transition shadow-xs cursor-pointer max-w-[220px]"
-            >
-              <BookOpen className="w-4 h-4 text-[var(--color-imamu-accent)] shrink-0" />
-              <span className="truncate">{activeSemester ? activeSemester.label : 'اختر الفصل'}</span>
-              <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${isSemDropdownOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            <AnimatePresence>
-              {isSemDropdownOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: 6, scale: 0.97 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 4, scale: 0.97 }}
-                  transition={{ duration: 0.14 }}
-                  className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xl z-50 overflow-hidden py-1.5"
-                  dir="rtl"
-                >
-                  {semesters.length === 0 ? (
-                    <p className="text-center text-xs text-slate-400 dark:text-zinc-500 py-4">لا توجد فصول بعد</p>
-                  ) : semesters.map(sem => (
-                    <div key={sem.id} className={`flex items-center gap-2 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-zinc-900 transition group ${sem.id === activeSemId ? 'bg-[var(--color-imamu-brown)]/5' : ''}`}>
-                      <button type="button" onClick={() => selectSemester(sem.id)} className="flex-1 text-right text-xs font-semibold text-slate-700 dark:text-zinc-300 truncate cursor-pointer">
-                        {sem.id === activeSemId && <Check className="w-3 h-3 text-[var(--color-imamu-accent)] inline ml-1.5" />}
-                        {sem.label}
-                      </button>
-                    </div>
-                  ))}
-                  <div className="border-t border-slate-100 dark:border-zinc-800 mt-1 pt-1">
-                    <button type="button" onClick={() => { setIsSemDropdownOpen(false); setIsWizardOpen(true); }} className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-[var(--color-imamu-accent)] hover:bg-[var(--color-imamu-brown)]/5 transition cursor-pointer">
-                      <Plus className="w-4 h-4" />
-                      إضافة فصل جديد
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Radial Speed-Dial Plus Menu (3 orbiting actions) */}
-          <SpeedDialPlusMenu
-            isOpen={isPlusMenuOpen}
-            onToggle={() => setIsPlusMenuOpen(!isPlusMenuOpen)}
-            onClose={() => setIsPlusMenuOpen(false)}
-            onAddCourse={() => {
-              setSelectedCourseForDetails(null);
-              setIsAddCourseOpen(true);
-            }}
-            onAddSemester={() => setIsWizardOpen(true)}
-            onAddTask={() => {
-              setTaskToEdit(null);
-              setIsNewTaskModalOpen(true);
-            }}
-          />
-        </div>
-      </div>
-
-      {/* ─── Two-column layout: Schedule & Courses on RIGHT, Insights strictly on LEFT ─── */}
-      <div className="flex flex-col md:flex-row gap-6 items-start w-full">
-
-        {/* RIGHT: main content (Schedule & Courses) — primary focus */}
-        <div className="flex-1 min-w-0 w-full order-1">
-          {!activeSemester ? (
-            <div className="flex flex-col items-center justify-center py-20 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl text-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-[var(--color-imamu-brown)]/10 border border-[var(--color-imamu-brown)]/20 flex items-center justify-center">
-                <GraduationCap className="w-8 h-8 text-[var(--color-imamu-accent)]" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">أضف فصلك الدراسي الأول</h3>
-                <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-xs mx-auto">
-                  انقر على زر ＋ لإضافة فصل دراسي، اختيار موادك، وإدخال رقم الـ CRN.
-                </p>
-              </div>
+        {/* Semester selector & Speed Dial (shown when schedule tab is active) */}
+        {activeMainTab === 'schedule' && (
+          <div className="flex items-center gap-2 shrink-0 self-start md:self-auto">
+            <div className="relative" ref={dropdownRef}>
               <button
                 type="button"
-                onClick={() => setIsWizardOpen(true)}
-                className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-sm font-bold transition shadow-md cursor-pointer"
+                onClick={() => setIsSemDropdownOpen(p => !p)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs font-bold text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 transition shadow-xs cursor-pointer max-w-[220px]"
               >
-                <Plus className="w-4.5 h-4.5" />
-                أضف فصلاً دراسياً
+                <BookOpen className="w-4 h-4 text-[var(--color-imamu-accent)] shrink-0" />
+                <span className="truncate">{activeSemester ? activeSemester.label : 'اختر الفصل'}</span>
+                <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${isSemDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
-            </div>
-          ) : (
-            <>
-              {/* Weekly schedule */}
-              <WeeklySchedule sections={effectiveSections} />
-            </>
-          )}
-        </div>
 
-        <div className="w-full md:w-80 lg:w-84 shrink-0 order-2">
-          <SidebarInsights
-            events={events}
-            activeSemester={activeSemester}
-            dbUser={dbUser}
-            effectiveSections={effectiveSections}
-            onOpenCourseDetails={(c) => {
-              const matchingSec = effectiveSections?.find(s =>
-                (c.crn && s.crn && String(s.crn) === String(c.crn)) ||
-                (c.courseCode && s.courseCode && s.courseCode === c.courseCode)
-              );
-              const enriched: CourseEntry = matchingSec ? {
-                ...c,
-                primaryInstructor: (matchingSec as any).primaryInstructor || (matchingSec as any).instructor || c.primaryInstructor,
-                instructors: (Array.isArray((matchingSec as any).instructors) && (matchingSec as any).instructors.length > 0)
-                  ? (matchingSec as any).instructors
-                  : c.instructors,
-                sectionNumber: matchingSec.sectionNumber || c.sectionNumber,
-                customSchedule: (c.customSchedule && c.customSchedule.length > 0)
-                  ? c.customSchedule
-                  : (matchingSec.schedules || []).map((s: any, sIdx: number) => ({
-                      id: String(sIdx + 1),
-                      days: Array.isArray(s.days) ? s.days : (s.days ? [String(s.days)] : ['الأحد']),
-                      startTime: s.startTime || '08:25 am',
-                      endTime: s.endTime || '09:15 am',
-                      classroom: s.room || s.classroom || s.building || '',
-                      teacher: s.instructor || (matchingSec as any).primaryInstructor || ''
-                    }))
-              } : c;
-              setSelectedCourseForDetails(enriched);
-              setIsAddCourseOpen(true);
-            }}
-            onOpenNewTaskModal={() => {
-              setTaskToEdit(null);
-              setIsNewTaskModalOpen(true);
-            }}
-            onEditTask={(task) => {
-              setTaskToEdit(task);
-              setIsNewTaskModalOpen(true);
-            }}
-            onRename={(newLabel) => activeSemester && renameSemester(activeSemester.id, newLabel)}
-            onUpdateSemester={(newLabel, newCourses, newEmoji) => activeSemester && updateSemesterDetails(activeSemester.id, newLabel, newCourses, newEmoji)}
-            onOpenNewSemesterModal={() => setIsWizardOpen(true)}
-            subjects={subjects}
-          />
-        </div>
+              <AnimatePresence>
+                {isSemDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 6, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 4, scale: 0.97 }}
+                    transition={{ duration: 0.14 }}
+                    className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xl z-50 overflow-hidden py-1.5"
+                    dir="rtl"
+                  >
+                    {semesters.length === 0 ? (
+                      <p className="text-center text-xs text-slate-400 dark:text-zinc-500 py-4">لا توجد فصول بعد</p>
+                    ) : semesters.map(sem => (
+                      <div key={sem.id} className={`flex items-center gap-2 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-zinc-900 transition group ${sem.id === activeSemId ? 'bg-[var(--color-imamu-brown)]/5' : ''}`}>
+                        <button type="button" onClick={() => selectSemester(sem.id)} className="flex-1 text-right text-xs font-semibold text-slate-700 dark:text-zinc-300 truncate cursor-pointer">
+                          {sem.id === activeSemId && <Check className="w-3 h-3 text-[var(--color-imamu-accent)] inline ml-1.5" />}
+                          {sem.label}
+                        </button>
+                      </div>
+                    ))}
+                    <div className="border-t border-slate-100 dark:border-zinc-800 mt-1 pt-1">
+                      <button type="button" onClick={() => { setIsSemDropdownOpen(false); setIsWizardOpen(true); }} className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-[var(--color-imamu-accent)] hover:bg-[var(--color-imamu-brown)]/5 transition cursor-pointer">
+                        <Plus className="w-4 h-4" />
+                        إضافة فصل جديد
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Radial Speed-Dial Plus Menu (3 orbiting actions) */}
+            <SpeedDialPlusMenu
+              isOpen={isPlusMenuOpen}
+              onToggle={() => setIsPlusMenuOpen(!isPlusMenuOpen)}
+              onClose={() => setIsPlusMenuOpen(false)}
+              onAddCourse={() => {
+                setSelectedCourseForDetails(null);
+                setIsAddCourseOpen(true);
+              }}
+              onAddSemester={() => setIsWizardOpen(true)}
+              onAddTask={() => {
+                setTaskToEdit(null);
+                setIsNewTaskModalOpen(true);
+              }}
+            />
+          </div>
+        )}
       </div>
+
+      {/* ─── Main Tabs Switcher ─── */}
+      <div className="relative flex items-center gap-1 border-b border-slate-200 dark:border-zinc-800/80 mb-8 pb-0" dir="rtl">
+        <button
+          type="button"
+          onClick={() => handleMainTabChange('schedule')}
+          className={`relative pb-3.5 px-4 font-bold transition-colors duration-200 text-sm flex items-center gap-2 select-none cursor-pointer ${
+            activeMainTab === 'schedule'
+              ? 'text-[var(--color-imamu-accent)]'
+              : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
+          }`}
+        >
+          <Calendar className={`w-4.5 h-4.5 transition-colors ${activeMainTab === 'schedule' ? 'text-[var(--color-imamu-accent)]' : 'text-slate-400 dark:text-zinc-500'}`} />
+          <span>الجدول الدراسي</span>
+          {activeMainTab === 'schedule' && (
+            <motion.div
+              layoutId="anaActiveTabUnderline"
+              className="absolute bottom-0 right-0 left-0 h-0.5 bg-[var(--color-imamu-brown)] dark:bg-[var(--color-imamu-brown)] rounded-full shadow-xs shadow-[var(--color-imamu-brown)/20]"
+              transition={{ type: "spring", stiffness: 400, damping: 32 }}
+            />
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleMainTabChange('progress')}
+          className={`relative pb-3.5 px-4 font-bold transition-colors duration-200 text-sm flex items-center gap-2 select-none cursor-pointer ${
+            activeMainTab === 'progress'
+              ? 'text-[var(--color-imamu-accent)]'
+              : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
+          }`}
+        >
+          <GraduationCap className={`w-4.5 h-4.5 transition-colors ${activeMainTab === 'progress' ? 'text-[var(--color-imamu-accent)]' : 'text-slate-400 dark:text-zinc-500'}`} />
+          <span>التقدم والمقررات</span>
+          {activeMainTab === 'progress' && (
+            <motion.div
+              layoutId="anaActiveTabUnderline"
+              className="absolute bottom-0 right-0 left-0 h-0.5 bg-[var(--color-imamu-brown)] dark:bg-[var(--color-imamu-brown)] rounded-full shadow-xs shadow-[var(--color-imamu-brown)/20]"
+              transition={{ type: "spring", stiffness: 400, damping: 32 }}
+            />
+          )}
+        </button>
+      </div>
+
+      {/* ─── Main Content ─── */}
+      {activeMainTab === 'schedule' ? (
+        <div className="flex flex-col md:flex-row gap-6 items-start w-full">
+          {/* RIGHT: main content (Schedule & Courses) — primary focus */}
+          <div className="flex-1 min-w-0 w-full order-1">
+            {!activeSemester ? (
+              <div className="flex flex-col items-center justify-center py-20 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl text-center gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-[var(--color-imamu-brown)]/10 border border-[var(--color-imamu-brown)]/20 flex items-center justify-center">
+                  <GraduationCap className="w-8 h-8 text-[var(--color-imamu-accent)]" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">أضف فصلك الدراسي الأول</h3>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-xs mx-auto">
+                    انقر على زر ＋ لإضافة فصل دراسي، اختيار موادك، وإدخال رقم الـ CRN.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsWizardOpen(true)}
+                  className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-sm font-bold transition shadow-md cursor-pointer"
+                >
+                  <Plus className="w-4.5 h-4.5" />
+                  أضف فصلاً دراسياً
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* Weekly schedule */}
+                <WeeklySchedule sections={effectiveSections} />
+              </>
+            )}
+          </div>
+
+          <div className="w-full md:w-80 lg:w-84 shrink-0 order-2">
+            <SidebarInsights
+              events={events}
+              activeSemester={activeSemester}
+              dbUser={dbUser}
+              effectiveSections={effectiveSections}
+              onOpenCourseDetails={(c) => {
+                const matchingSec = effectiveSections?.find(s =>
+                  (c.crn && s.crn && String(s.crn) === String(c.crn)) ||
+                  (c.courseCode && s.courseCode && s.courseCode === c.courseCode)
+                );
+                const enriched: CourseEntry = matchingSec ? {
+                  ...c,
+                  primaryInstructor: (matchingSec as any).primaryInstructor || (matchingSec as any).instructor || c.primaryInstructor,
+                  instructors: (Array.isArray((matchingSec as any).instructors) && (matchingSec as any).instructors.length > 0)
+                    ? (matchingSec as any).instructors
+                    : c.instructors,
+                  sectionNumber: matchingSec.sectionNumber || c.sectionNumber,
+                  customSchedule: (c.customSchedule && c.customSchedule.length > 0)
+                    ? c.customSchedule
+                    : (matchingSec.schedules || []).map((s: any, sIdx: number) => ({
+                        id: String(sIdx + 1),
+                        days: Array.isArray(s.days) ? s.days : (s.days ? [String(s.days)] : ['الأحد']),
+                        startTime: s.startTime || '08:25 am',
+                        endTime: s.endTime || '09:15 am',
+                        classroom: s.room || s.classroom || s.building || '',
+                        teacher: s.instructor || (matchingSec as any).primaryInstructor || ''
+                      }))
+                } : c;
+                setSelectedCourseForDetails(enriched);
+                setIsAddCourseOpen(true);
+              }}
+              onOpenNewTaskModal={() => {
+                setTaskToEdit(null);
+                setIsNewTaskModalOpen(true);
+              }}
+              onEditTask={(task) => {
+                setTaskToEdit(task);
+                setIsNewTaskModalOpen(true);
+              }}
+              onRename={(newLabel) => activeSemester && renameSemester(activeSemester.id, newLabel)}
+              onUpdateSemester={(newLabel, newCourses, newEmoji) => activeSemester && updateSemesterDetails(activeSemester.id, newLabel, newCourses, newEmoji)}
+              onOpenNewSemesterModal={() => setIsWizardOpen(true)}
+              subjects={subjects}
+            />
+          </div>
+        </div>
+      ) : (
+        <AcademicProgressTab
+          user={user}
+          dbUser={dbUser}
+          subjects={subjects}
+          refreshToken={refreshToken}
+        />
+      )}
 
       {/* Modals */}
       <AnimatePresence>

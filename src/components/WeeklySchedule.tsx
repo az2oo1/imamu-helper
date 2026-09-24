@@ -637,19 +637,21 @@ export function WeeklySchedule({ sections, className = '', loading = false }: We
                           }}
                         >
                           {/* Start time → physical LEFT (justify-end in RTL flex) */}
-                          <div className="flex justify-end">
+                          <div className="flex justify-end shrink-0">
                             <span className="text-[9px] font-bold tabular-nums leading-tight opacity-80" dir="ltr">
                               {formatMinutesToTime(slot.startMinutes, true)}
                             </span>
                           </div>
 
-                          {/* Course Title — always shown */}
-                          <p className="text-[10px] font-bold leading-tight line-clamp-2 flex-1 mt-0.5">
-                            {slot.courseTitle}
-                          </p>
+                          {/* Course Title — centered in the middle of the schedule box */}
+                          <div className="flex-1 flex items-center justify-center text-center my-auto min-h-0 px-0.5">
+                            <p className="text-[10px] sm:text-[10.5px] font-bold leading-tight line-clamp-2">
+                              {slot.courseTitle}
+                            </p>
+                          </div>
 
                           {/* Bottom: Room → physical RIGHT (first in RTL flex), End time → physical LEFT (last) */}
-                          <div className="flex items-center justify-between gap-1 mt-auto">
+                          <div className="flex items-center justify-between gap-1 mt-auto shrink-0">
                             {slot.room ? (
                               <span className="flex items-center gap-0.5 text-[9px] font-bold opacity-80 truncate">
                                 <MapPin className="w-2 h-2 shrink-0" />
