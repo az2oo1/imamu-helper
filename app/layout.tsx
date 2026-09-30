@@ -63,12 +63,16 @@ export const dynamic = 'force-dynamic';
 import { TopBar } from '../src/components/TopBar';
 import { Footer } from '../src/components/Footer';
 import { PwaRegister } from '../src/components/PwaRegister';
+import { UmamiAnalytics } from '../src/components/UmamiAnalytics';
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const umamiUrl = process.env.NEXT_PUBLIC_UMAMI_URL || process.env.UMAMI_URL;
+  const umamiWebsiteId = process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID || process.env.UMAMI_WEBSITE_ID;
+
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning>
       <head>
@@ -115,6 +119,7 @@ export default function RootLayout({
               </div>
               <Footer />
               <PwaRegister />
+              <UmamiAnalytics scriptUrl={umamiUrl} websiteId={umamiWebsiteId} />
             </div>
           </AuthProvider>
         </ThemeProvider>

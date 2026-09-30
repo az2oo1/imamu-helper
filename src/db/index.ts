@@ -467,7 +467,7 @@ function createChainBuilder(initialMethod: string, initialArgs: any[]) {
 
 /**
  * Returns the fully-initialized drizzle db instance.
- * Waits for WASM/CockroachDB/PostgreSQL init and schema migrations to complete.
+ * Waits for WASM/PostgreSQL init and schema migrations to complete.
  * Usage: const db = await getDb(); const rows = await db.select().from(myTable);
  */
 export async function getDb() {
@@ -524,14 +524,14 @@ async function initializeDatabase() {
     console.warn('[DB] Embedded database migration notice:', err.message || err);
   }
 
-  // 2. Check for CockroachDB / PostgreSQL connection configuration
-  const dbUrl = process.env.DATABASE_URL || process.env.COCKROACH_URL;
-  const primaryHost = process.env.SQL_HOST || process.env.COCKROACH_HOST;
-  const backupHost = process.env.SQL_BACKUP_HOST || process.env.COCKROACH_BACKUP_HOST;
+  // 2. Check for PostgreSQL connection configuration
+  const dbUrl = process.env.DATABASE_URL;
+  const primaryHost = process.env.SQL_HOST;
+  const backupHost = process.env.SQL_BACKUP_HOST;
 
   if (process.env.NODE_ENV !== 'test' && (dbUrl || primaryHost)) {
-    console.log('[DB] Physical Database (CockroachDB) configuration detected. Initializing connection...');
-    
+    console.log('[DB] PostgreSQL configuration detected. Initializing connection...');
+
     // Prepare list of hosts to attempt (Primary first, then Secondary/Backup server)
     const hostList: string[] = [];
     if (primaryHost) {
@@ -546,14 +546,13 @@ async function initializeDatabase() {
     }
 
     let connectedPool: Pool | null = null;
-    let isCockroachDB = false;
 
     if (dbUrl) {
       const poolConfig: PoolConfig = {
         connectionString: dbUrl,
         connectionTimeoutMillis: 3000,
       };
-      if ((process.env.SQL_SSL === 'true' || process.env.COCKROACH_SSL === 'true' || dbUrl.includes('sslmode=require')) && !dbUrl.includes('sslmode=disable')) {
+      if ((process.env.SQL_SSL === 'true' || dbUrl.includes('sslmode=require')) && !dbUrl.includes('sslmode=disable')) {
         poolConfig.ssl = {
           rejectUnauthorized: process.env.SQL_SSL_REJECT_UNAUTHORIZED === 'true',
         };
@@ -563,10 +562,9 @@ async function initializeDatabase() {
         const client = await pool.connect();
         const res = await client.query("SELECT version()");
         const versionStr = res.rows[0]?.version || '';
-        isCockroachDB = versionStr.toLowerCase().includes('cockroachdb');
         client.release();
         connectedPool = pool;
-        console.log(`[DB] Successfully connected via DATABASE_URL to ${isCockroachDB ? 'CockroachDB' : 'PostgreSQL'}`);
+        console.log(`[DB] Successfully connected via DATABASE_URL to PostgreSQL (${versionStr.split(',')[0]})`);
       } catch (err: any) {
         console.warn(`[DB] Primary DATABASE_URL connection failed: ${err.message || err}`);
         pool.end().catch(() => {});
@@ -578,22 +576,20 @@ async function initializeDatabase() {
       for (let i = 0; i < hostList.length; i++) {
         const host = hostList[i];
         const isBackupNode = i > 0;
-        console.log(`[DB] Attempting connection to ${isBackupNode ? 'Backup' : 'Primary'} CockroachDB server: ${host}...`);
+        console.log(`[DB] Attempting connection to ${isBackupNode ? 'Backup' : 'Primary'} PostgreSQL server: ${host}...`);
 
-        const isCockroach = !!(host.includes('cockroach') || process.env.COCKROACH_HOST);
-        const defaultPort = isCockroach ? 26257 : 5432;
-        const port = Number(process.env.SQL_PORT || process.env.COCKROACH_PORT) || defaultPort;
+        const port = Number(process.env.SQL_PORT) || 5432;
 
         const poolConfig: PoolConfig = {
           host,
-          user: process.env.SQL_USER || process.env.COCKROACH_USER || 'root',
-          password: process.env.SQL_PASSWORD || process.env.COCKROACH_PASSWORD || '',
-          database: process.env.SQL_DB_NAME || process.env.COCKROACH_DB_NAME || 'defaultdb',
+          user: process.env.SQL_USER || 'postgres',
+          password: process.env.SQL_PASSWORD || '',
+          database: process.env.SQL_DB_NAME || 'imamu',
           port,
           connectionTimeoutMillis: 3000,
         };
 
-        if ((process.env.SQL_SSL === 'true' || process.env.COCKROACH_SSL === 'true') && process.env.SQL_SSL !== 'false') {
+        if (process.env.SQL_SSL === 'true') {
           poolConfig.ssl = {
             rejectUnauthorized: process.env.SQL_SSL_REJECT_UNAUTHORIZED === 'true',
           };
@@ -604,11 +600,10 @@ async function initializeDatabase() {
           const client = await pool.connect();
           const res = await client.query("SELECT version()");
           const versionStr = res.rows[0]?.version || '';
-          isCockroachDB = versionStr.toLowerCase().includes('cockroachdb');
           client.release();
 
           connectedPool = pool;
-          console.log(`[DB] Successfully connected to ${isBackupNode ? 'Backup' : 'Primary'} server (${host}) running ${isCockroachDB ? 'CockroachDB' : 'PostgreSQL'}`);
+          console.log(`[DB] Successfully connected to ${isBackupNode ? 'Backup' : 'Primary'} server (${host}) running PostgreSQL (${versionStr.split(',')[0]})`);
           break; // Stop loop once connected
         } catch (err: any) {
           console.error(`[DB] Server (${host}) connection failed: ${err.message || err}`);
@@ -619,33 +614,33 @@ async function initializeDatabase() {
 
     if (connectedPool) {
       connectedPool.on('error', (err) => {
-        console.warn('[DB Resilience] CockroachDB pool connection error, falling back to PGlite:', err.message || err);
+        console.warn('[DB Resilience] PostgreSQL pool connection error, falling back to PGlite:', err.message || err);
         usingPrimary = false;
         activeDb = fallbackDb;
       });
 
       const pgDb = drizzlePg(connectedPool, { schema });
 
-      // Run migrations on physical CockroachDB / PostgreSQL database if migration folder exists
+      // Run migrations on the physical PostgreSQL database if migration folder exists
       if (fs.existsSync(migrationsFolder)) {
         try {
-          console.log(`[DB] Applying schema migrations to ${isCockroachDB ? 'CockroachDB' : 'PostgreSQL'}...`);
+          console.log('[DB] Applying schema migrations to PostgreSQL...');
           await migratePg(pgDb, { migrationsFolder });
-          console.log(`[DB] Schema migrations applied successfully.`);
+          console.log('[DB] Schema migrations applied successfully.');
         } catch (migErr: any) {
           console.warn(`[DB] Migration warning: ${migErr.message || migErr}`);
         }
       }
 
-      // Ensure all dynamically added columns and tables exist on physical CockroachDB / PostgreSQL
+      // Ensure all dynamically added columns and tables exist on PostgreSQL
       try {
         await applySchemaVerifications((sql) => connectedPool.query(sql));
-        console.log(`[DB] Schema column verifications applied to ${isCockroachDB ? 'CockroachDB' : 'PostgreSQL'}.`);
+        console.log('[DB] Schema column verifications applied to PostgreSQL.');
       } catch (altErr: any) {
         console.warn('[DB] Physical DB column verification notice:', altErr.message || altErr);
       }
 
-      // Swap activeDb to connected CockroachDB server
+      // Swap activeDb to connected PostgreSQL server
       primaryDb = pgDb;
       primaryPool = connectedPool;
       activeDb = pgDb;
@@ -653,7 +648,7 @@ async function initializeDatabase() {
       startHealthCheck();
       console.log(`[DB] Swapped active DB reference to physical database.`);
     } else {
-      console.log('[DB] All physical CockroachDB host connection attempts failed. Staying on embedded database (PGlite) fallback.');
+      console.log('[DB] All PostgreSQL host connection attempts failed. Staying on embedded database (PGlite) fallback.');
     }
   } else {
     console.log('[DB] No physical database configured. Using embedded database fallback.');

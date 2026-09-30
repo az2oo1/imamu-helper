@@ -8,7 +8,7 @@ The **imamu-helper** End-to-End (E2E) testing framework provides comprehensive a
 - **Test Runner**: Node.js 22 Native Test Runner (`node:test` + `node:assert`) executed via `tsx --test`
 - **HTTP Client**: Native `fetch` with custom cookie jar and session/token handling helper (`tests/helpers/api-client.ts`)
 - **Server Harness**: Express background server manager with readiness polling (`tests/helpers/server-runner.ts`)
-- **Database Engine**: Dual PGlite WASM (embedded) + CockroachDB fallback
+- **Database Engine**: Dual PGlite WASM (embedded) + PostgreSQL 17 fallback
 
 ---
 

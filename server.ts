@@ -21,7 +21,7 @@ import { createSeoRouter } from './src/server/routes/seo';
 import { createAuthenticatedAccountsRouter } from './src/server/routes/authenticatedAccounts';
 
 async function startServer() {
-  // Wait for DB to be fully initialized (PGlite WASM or CockroachDB / PostgreSQL)
+  // Wait for DB to be fully initialized (PGlite WASM or PostgreSQL)
   const db = await getDb();
 
   const app = express();

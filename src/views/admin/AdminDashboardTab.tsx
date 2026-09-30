@@ -89,7 +89,7 @@ export default function AdminDashboardTab({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div className="p-3 rounded-xl bg-[var(--bg-subtle)] border" style={{ borderColor: 'var(--border-color)' }}>
               <span className="block text-[11px] font-semibold text-slate-400">محرك قاعدة البيانات</span>
-              <span className="font-mono font-bold mt-0.5 block text-emerald-400">{health.database?.engine || 'PGlite Embedded / CockroachDB'}</span>
+              <span className="font-mono font-bold mt-0.5 block text-emerald-400">{health.database?.engine || 'PGlite Embedded / PostgreSQL'}</span>
             </div>
             <div className="p-3 rounded-xl bg-[var(--bg-subtle)] border" style={{ borderColor: 'var(--border-color)' }}>
               <span className="block text-[11px] font-semibold text-slate-400">استهلاك ذاكرة النظام</span>

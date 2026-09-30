@@ -75,3 +75,16 @@ docker exec -it imamu-helper bash
 # or
 docker compose exec app bash
 ```
+
+### Stack services
+
+| Service | Port | Notes |
+|---|---|---|
+| `app` | 3005 | IMAMU Helper |
+| `postgres` | 5432 | PostgreSQL 17, data in `/AppData/IMAMU/_DB` |
+| `databasus` | 4005 | Backups, state in `/AppData/IMAMU/Backupapp` |
+| `umami` | 3006 | Web analytics |
+| `open-studio` | 8080 | DB viewer, opt-in: `docker compose --profile dbview up -d open-studio` |
+
+Full setup, backup configuration and the CockroachDB → PostgreSQL data
+migration steps are in [`deploy/STACK.md`](deploy/STACK.md).

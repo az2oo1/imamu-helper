@@ -17,6 +17,9 @@
 data/
 /data/
 
+# Host-side stack state (PostgreSQL data, Databasus backups) when IMAMU_ROOT is local
+/AppData/
+
 # Agent Workspaces
 /.agents/
 

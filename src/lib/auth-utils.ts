@@ -43,7 +43,7 @@ import { or, eq, sql } from 'drizzle-orm';
 
 /**
  * Robust ID matcher that works for both standard JS integers (e.g. SQLite/PGlite unit tests)
- * and 64-bit BigInt IDs (e.g. CockroachDB production database) without floating-point precision loss.
+ * and 64-bit BigInt IDs (e.g. PostgreSQL bigint production database) without floating-point precision loss.
  */
 export function matchId(column: any, idRaw: string | number) {
   const strId = String(idRaw ?? '').trim();
@@ -71,7 +71,7 @@ export function matchSubjectIds(id1: any, id2: any): boolean {
       const b2 = BigInt(s2);
       if (b1 === b2) return true;
       const diff = b1 > b2 ? b1 - b2 : b2 - b1;
-      // Handle JavaScript float precision loss on 64-bit integers (CockroachDB INT8)
+      // Handle JavaScript float precision loss on 64-bit integers (PostgreSQL INT8)
       return diff < 200n;
     }
   } catch (_e) {}

@@ -3,7 +3,7 @@
 ## Architecture
 - Framework: Next.js / Node.js backend server (`server.ts` or `app/api`)
 - Frontend: React AuthContext (`dbUser?.role === 'ADMIN' || dbUser?.isAdmin`), pages (`PlansToolPage.tsx`, `Tools.tsx`, `Resources.tsx`, `AdminPage.tsx`, `AdminLogsPage.tsx`, `TopBar.tsx`)
-- Database: Dual DB setup (PGlite & CockroachDB) with Drizzle ORM
+- Database: Dual DB setup (PGlite & PostgreSQL 17) with Drizzle ORM, data in `/AppData/IMAMU/_DB`
 - Authorization: Middleware & route handlers checking `checkAdmin(req, db)`, UI components checking `dbUser?.role === 'ADMIN' || dbUser?.isAdmin`
 
 ## Milestones

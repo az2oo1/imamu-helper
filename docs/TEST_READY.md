@@ -16,7 +16,7 @@ The End-to-End (E2E) verification test suite for **imamu-helper** is fully imple
 
 - **Server Runner**: `tests/helpers/server-runner.ts` (Dynamic port assignment, health-check polling, process lifecycle & port clearing)
 - **API Client**: `tests/helpers/api-client.ts` (Native `fetch` wrapper supporting Cookie jar management, Bearer JWT authentication, header sanitization)
-- **Database Backend**: Dual-mode Drizzle ORM with PGlite WASM (in-memory test sandbox) and resilient CockroachDB fallback
+- **Database Backend**: Dual-mode Drizzle ORM with PGlite WASM (in-memory test sandbox) and resilient PostgreSQL fallback
 
 ---
 

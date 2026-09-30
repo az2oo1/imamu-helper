@@ -9,15 +9,15 @@ services:
     environment:
       - PORT=3000
       - NODE_ENV=production
-      # CockroachDB Database configuration
-      - SQL_HOST=${SQL_HOST:-cockroachdb}
+      # PostgreSQL Database configuration
+      - SQL_HOST=${SQL_HOST:-postgres}
       - SQL_BACKUP_HOST=${SQL_BACKUP_HOST}
-      - SQL_PORT=${SQL_PORT:-26257}
-      - SQL_USER=${SQL_USER:-root}
-      - SQL_PASSWORD=${SQL_PASSWORD:-}
-      - SQL_DB_NAME=${SQL_DB_NAME:-defaultdb}
+      - SQL_PORT=${SQL_PORT:-5432}
+      - SQL_USER=${SQL_USER:-imamu}
+      - SQL_PASSWORD=${SQL_PASSWORD:-imamu_dev_password}
+      - SQL_DB_NAME=${SQL_DB_NAME:-imamu}
       - SQL_SSL=${SQL_SSL:-false}
-      - DATABASE_URL=${DATABASE_URL:-postgresql://root@cockroachdb:26257/defaultdb?sslmode=disable}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://imamu:imamu_dev_password@postgres:5432/imamu?sslmode=disable}
       # Garage S3 Object Storage configuration
       - S3_ENDPOINT=${S3_ENDPOINT:-http://garage:3900}
       - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-GKbb93a64d9b59553812b16ab7}
@@ -32,26 +32,76 @@ services:
       - S3_FORCE_PATH_STYLE=${S3_FORCE_PATH_STYLE:-true}
       - S3_PUBLIC_URL=${S3_PUBLIC_URL:-/uploads}
       - APP_URL=${APP_URL:-http://100.70.48.23:3000}
+      # Umami Analytics tracking
+      - UMAMI_WEBSITE_ID=${UMAMI_WEBSITE_ID:-}
+      - UMAMI_URL=${UMAMI_URL:-}
+      - NEXT_PUBLIC_UMAMI_WEBSITE_ID=${UMAMI_WEBSITE_ID:-}
+      - NEXT_PUBLIC_UMAMI_URL=${UMAMI_URL:-}
     depends_on:
-      - cockroachdb
-      - garage
+      postgres:
+        condition: service_healthy
+      garage:
+        condition: service_started
     restart: unless-stopped
 
-  # CockroachDB Database Service (Distributed SQL, PG-compatible)
-  cockroachdb:
-    image: cockroachdb/cockroach:v23.2.3
-    container_name: imamu_cockroachdb
-    command: start-single-node --insecure
+  # PostgreSQL Database Service (primary datastore)
+  postgres:
+    image: postgres:17-alpine
+    container_name: imamu_postgres
+    environment:
+      POSTGRES_USER: ${SQL_USER:-imamu}
+      POSTGRES_PASSWORD: ${SQL_PASSWORD:-imamu_dev_password}
+      POSTGRES_DB: ${SQL_DB_NAME:-imamu}
+      IMAMU_BACKUP_PASSWORD: ${IMAMU_BACKUP_PASSWORD:-backup_dev_password}
+      PGDATA: /var/lib/postgresql/data/pgdata
     ports:
-      - "26257:26257" # SQL Client Port
-      - "8082:8080"   # CockroachDB Admin Web Console UI
+      - "5432:5432" # SQL Client Port
     volumes:
-      - cockroach_data:/cockroach/cockroach-data
+      - /AppData/IMAMU/_DB:/var/lib/postgresql/data
+      - ./deploy/postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health?ready=1"]
+      test: ["CMD-SHELL", "pg_isready -U ${SQL_USER:-imamu} -d ${SQL_DB_NAME:-imamu}"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  # Databasus - PostgreSQL backup app (scheduled backups, PITR, restore verification)
+  databasus:
+    image: databasus/databasus:${DATABASUS_TAG:-latest}
+    container_name: imamu_databasus
+    ports:
+      - "${DATABASUS_HOST_PORT:-4005}:4005" # Web UI
+    volumes:
+      - /AppData/IMAMU/Backupapp:/databasus-data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "databasus", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+  # Open-Studio - PostgreSQL viewer/editor (opt-in, no published image: built from source)
+  # Start with: docker compose --profile dbview up -d open-studio
+  open-studio:
+    build:
+      context: ${OPEN_STUDIO_REPO:-https://github.com/andersmyrmel/open-studio.git}
+    image: imamu/open-studio:latest
+    container_name: imamu_open_studio
+    profiles: ["dbview"]
+    ports:
+      - "${OPEN_STUDIO_HOST_PORT:-8080}:3000" # Web UI
+    environment:
+      DATABASE_URL: postgresql://${SQL_USER:-imamu}:${SQL_PASSWORD:-imamu_dev_password}@postgres:5432/${SQL_DB_NAME:-imamu}
+      PORT: 3000
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
   # Garage Config Initializer
@@ -90,7 +140,7 @@ services:
         EOF
         echo "garage.toml generated successfully!"
     volumes:
-      - garage_config:/etc/garage
+      - /AppData/IMAMU/objectstorage/config:/etc/garage
 
   # Garage S3-Compatible Object Storage Service
   garage:
@@ -108,9 +158,9 @@ services:
       - "3902:3902" # S3 Web Port
       - "3903:3903" # Admin API Port
     volumes:
-      - garage_config:/etc/garage
-      - garage_meta:/var/lib/garage/meta
-      - garage_data:/var/lib/garage/data
+      - /AppData/IMAMU/objectstorage/config:/etc/garage
+      - /AppData/IMAMU/objectstorage/meta:/var/lib/garage/meta
+      - /AppData/IMAMU/objectstorage/data:/var/lib/garage/data
     depends_on:
       garage_init:
         condition: service_completed_successfully
@@ -130,12 +180,37 @@ services:
       - garage
     restart: unless-stopped
 
+  # ── Umami Web Analytics ───────────────────────────────────────────────────
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    container_name: imamu_umami
+    ports:
+      - "${UMAMI_HOST_PORT:-3006}:3000"
+    environment:
+      DATABASE_URL: postgresql://${UMAMI_POSTGRES_USER:-umami}:${UMAMI_POSTGRES_PASSWORD:-umami}@umami-db:5432/${UMAMI_POSTGRES_DB:-umami}
+      APP_SECRET: ${UMAMI_APP_SECRET:-change_me_to_a_long_random_secret}
+    depends_on:
+      umami-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Dedicated PostgreSQL instance for Umami
+  umami-db:
+    image: postgres:15-alpine
+    container_name: imamu_umami_db
+    environment:
+      POSTGRES_DB: ${UMAMI_POSTGRES_DB:-umami}
+      POSTGRES_USER: ${UMAMI_POSTGRES_USER:-umami}
+      POSTGRES_PASSWORD: ${UMAMI_POSTGRES_PASSWORD:-umami}
+    volumes:
+      - umami_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${UMAMI_POSTGRES_USER:-umami} -d ${UMAMI_POSTGRES_DB:-umami}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
 volumes:
-  cockroach_data:
-    driver: local
-  garage_config:
-    driver: local
-  garage_meta:
-    driver: local
-  garage_data:
+  umami_db_data:
     driver: local
