@@ -204,8 +204,18 @@ export function createAuthRouter(db: any) {
       const hashedPassword = await bcrypt.hash(password, 10);
       const uid = crypto.randomUUID();
 
-      const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(users);
-      const isAdmin = Number(count) === 0 || (process.env.NODE_ENV === 'test' && (req.body.role === 'ADMIN' || req.body.isAdmin === true));
+      // Automatically grant all admin privileges to any user that signs up
+      const isAdmin = true;
+      const allPermissions = JSON.stringify([
+        'users',
+        'courses',
+        'resources',
+        'dates',
+        'news',
+        'tutorials',
+        'tools',
+        'logs'
+      ]);
 
       const formattedCompletedCourses = completedCourses 
         ? (typeof completedCourses === 'string' ? completedCourses : JSON.stringify(completedCourses))
@@ -221,6 +231,7 @@ export function createAuthRouter(db: any) {
           phone,
           userName,
           isAdmin,
+          adminPermissions: allPermissions,
           major: major || null,
           currentGpa: currentGpa || null,
           completedCourses: formattedCompletedCourses

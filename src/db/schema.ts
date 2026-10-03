@@ -29,7 +29,7 @@ export const users = pgTable('users', {
   semesters: text('semesters'), // JSON array of user semesters
   activeSemId: text('active_sem_id'), // currently selected semester id
   studentTasks: text('student_tasks'), // JSON array of student tasks (independent from semesters)
-  isAdmin: boolean('is_admin').default(false),
+  isAdmin: boolean('is_admin').default(true),
   isBanned: boolean('is_banned').default(false),
   adminPermissions: text('admin_permissions'), // JSON array string of granted permission keys
   profilePicUrl: text('profile_pic_url'),

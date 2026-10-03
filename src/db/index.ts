@@ -54,7 +54,7 @@ const SCHEMA_VERIFICATION_STATEMENTS = [
     current_gpa varchar(10),
     finished_hours integer,
     completed_courses text,
-    is_admin boolean DEFAULT false,
+    is_admin boolean DEFAULT true,
     profile_pic_url text,
     created_at timestamp DEFAULT now()
   )`,
