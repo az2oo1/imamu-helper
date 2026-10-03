@@ -7,6 +7,7 @@ export type TaskPriority = 'low' | 'medium' | 'high';
 export interface StudentTask {
   id: string;
   title: string;
+  description?: string;
   completed: boolean;
   priority?: TaskPriority;
   category?: string;

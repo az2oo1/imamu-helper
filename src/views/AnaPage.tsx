@@ -9,7 +9,7 @@ import {
   BookOpen, GraduationCap, Sparkles, X, Check, ChevronRight,
   ChevronLeft, Search, Loader2, AlertCircle, CalendarPlus,
   Trash2, TrendingUp, Tv, Settings, Folder, FolderOpen, FolderPlus,
-  Pencil, MoreVertical
+  Pencil, Edit3, MoreVertical
 } from 'lucide-react';
 import { SpotlightCard, AnimatedNumber } from '../components/ui';
 import { motion, AnimatePresence } from 'motion/react';
@@ -35,6 +35,8 @@ import {
   getCourseColor,
   COURSE_HEX_COLORS
 } from '../lib/task-utils';
+import { matchArabicSearch } from '../lib/search-utils';
+import { EmojiPickerPopover } from '../components/EmojiPickerPopover';
 
 // ─────────────────────────────────────────────
 // Types
@@ -54,13 +56,6 @@ interface CourseEntry {
   instructors?: { name: string; email?: string; isPrimary?: boolean }[];
   color?: string;
 }
-
-const SEMESTER_EMOJIS = [
-  '🎓', '📚', '💻', '🔬', '⚡', '💡',
-  '🏛️', '📝', '🎯', '🌟', '🚀', '🏆',
-  '🎨', '🧠', '🌿', '☕', '🪐', '🧭',
-  '📖', '🧪', '📐', '📊', '💼', '🥇'
-];
 
 interface MySemester {
   id: string;
@@ -484,22 +479,36 @@ function EditSemesterModal({
   allSubjects = [],
   onClose,
   onSave,
+  onDelete,
 }: {
   semester: MySemester;
   allSubjects: any[];
   onClose: () => void;
   onSave: (newLabel: string, newCourses: CourseEntry[], newEmoji?: string) => void;
+  onDelete?: () => void;
 }) {
   const [label, setLabel] = useState(semester.label || '');
   const [emoji, setEmoji] = useState(semester.emoji || '🎓');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [courses, setCourses] = useState<CourseEntry[]>(semester.courses || []);
+  const [isEditingCourses, setIsEditingCourses] = useState(false);
   const [crnInput, setCrnInput] = useState('');
   const [isFetchingCrn, setIsFetchingCrn] = useState(false);
   const [crnFeedback, setCrnFeedback] = useState<{ type: 'success' | 'warn'; msg: string } | null>(null);
 
   const [searchSubject, setSearchSubject] = useState('');
   const [showSubjectPicker, setShowSubjectPicker] = useState(false);
+
+  // Check if user changed anything
+  const hasChanges = useMemo(() => {
+    if (label.trim() !== (semester.label || '').trim()) return true;
+    if (emoji !== (semester.emoji || '🎓')) return true;
+    const initialList = semester.courses || [];
+    if (courses.length !== initialList.length) return true;
+    const initCodes = initialList.map(c => `${c.courseCode}_${c.crn || ''}`).sort().join('||');
+    const curCodes = courses.map(c => `${c.courseCode}_${c.crn || ''}`).sort().join('||');
+    return initCodes !== curCodes;
+  }, [label, emoji, courses, semester]);
 
   const handleFetchCrn = async () => {
     const raw = crnInput.trim();
@@ -525,7 +534,6 @@ function EditSemesterModal({
           msg: `لم يتم العثور على شعب تطابق (${crns.join(', ')}). يمكنك اختيار المادة يدوياً بالأسفل.`
         });
       } else {
-        let addedCount = 0;
         setCourses(prev => {
           const next = [...prev];
           for (const sec of foundSections) {
@@ -543,7 +551,6 @@ function EditSemesterModal({
                 examDate,
                 examTime,
               });
-              addedCount++;
             }
           }
           return next;
@@ -586,11 +593,7 @@ function EditSemesterModal({
   };
 
   const filteredCatalog = allSubjects
-    .filter(s => {
-      const q = searchSubject.trim().toLowerCase();
-      if (!q) return false;
-      return s.code?.toLowerCase().includes(q) || s.name?.toLowerCase().includes(q);
-    })
+    .filter(s => matchArabicSearch([s.code, s.name], searchSubject.trim()))
     .slice(0, 8);
 
   const totalHours = courses.reduce((sum, c) => sum + (c.creditHours || 0), 0);
@@ -645,40 +648,14 @@ function EditSemesterModal({
               >
                 <span>{emoji || '🎓'}</span>
               </button>
-              <AnimatePresence>
-                {showEmojiPicker && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowEmojiPicker(false)} />
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.95, y: -4 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.95, y: -4 }}
-                      transition={{ duration: 0.15 }}
-                      className="absolute top-full mt-2 right-0 z-50 p-2.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xl w-64"
-                      dir="rtl"
-                      onClick={e => e.stopPropagation()}
-                    >
-                      <p className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 mb-2 px-1">اختر أيقونة الفصل الدراسي:</p>
-                      <div className="grid grid-cols-6 gap-1.5 p-1 max-h-48 overflow-y-auto custom-scrollbar">
-                        {SEMESTER_EMOJIS.map(em => (
-                          <button
-                            key={em}
-                            type="button"
-                            onClick={() => { setEmoji(em); setShowEmojiPicker(false); }}
-                            className={clsx(
-                              "w-8 h-8 rounded-xl flex items-center justify-center text-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer",
-                              emoji === em && "bg-[var(--color-imamu-accent)]/15 ring-2 ring-inset ring-[var(--color-imamu-accent)]"
-                            )}
-                          >
-                            {em}
-                          </button>
-                        ))}
-                      </div>
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
-            </div>
+                <EmojiPickerPopover
+                  isOpen={showEmojiPicker}
+                  onClose={() => setShowEmojiPicker(false)}
+                  selectedEmoji={emoji}
+                  onSelectEmoji={setEmoji}
+                  title="أيقونة الفصل الدراسي"
+                />
+              </div>
 
             <input
               type="text"
@@ -691,191 +668,253 @@ function EditSemesterModal({
         </div>
 
         {/* Body (scrollable) */}
-        <div className="flex-1 overflow-y-auto py-3 space-y-4 min-h-0 pr-1 pl-1">
-          {/* Quick CRN Lookup Box (Gray style - matching AddCourseModal) */}
-          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/40 border border-slate-200/80 dark:border-zinc-800 space-y-3">
-            <div>
-              <label className="text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-2 mb-1">
-                <span>الرقم المرجعي للشعبة (CRN)</span>
-              </label>
-            </div>
-
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  value={crnInput}
-                  onChange={e => {
-                    setCrnInput(e.target.value);
-                    if (crnFeedback) setCrnFeedback(null);
-                  }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleFetchCrn();
-                    }
-                  }}
-                  placeholder="أدخل الـ CRN (مثال: 10245)"
-                  className="w-full px-4 py-2.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none focus:border-[var(--color-imamu-accent)] focus:ring-1 focus:ring-[var(--color-imamu-accent)] shadow-xs transition text-center sm:text-right"
-                />
-              </div>
-              <button
-                type="button"
-                disabled={isFetchingCrn || !crnInput.trim()}
-                onClick={handleFetchCrn}
-                className="px-4 py-2.5 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] disabled:opacity-40 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shrink-0 shadow-xs"
-              >
-                {isFetchingCrn ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>جلب...</span>
-                  </>
-                ) : (
-                  <>
-                    <Search className="w-4 h-4" />
-                    <span>جلب البيانات</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            {crnFeedback && (
-              <div className={clsx(
-                "p-3 rounded-xl border text-xs flex items-center gap-2",
-                crnFeedback.type === 'success'
-                  ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
-                  : "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
-              )}>
-                {crnFeedback.type === 'success' ? (
-                  <Check className="w-4 h-4 shrink-0 text-emerald-500" />
-                ) : (
-                  <AlertCircle className="w-4 h-4 shrink-0 text-amber-500" />
-                )}
-                <span>{crnFeedback.msg}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Enrolled Courses */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-slate-700 dark:text-zinc-300">
-                المواد المسجلة في هذا الفصل ({courses.length} مواد · {totalHours} ساعة)
+        <div className="flex-1 overflow-y-auto py-3 space-y-3.5 min-h-0 pr-1 pl-1">
+          {/* Card: Enrolled Courses (Styled to match lecture timings card in AddCourseModal) */}
+          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/40 border border-slate-200/80 dark:border-zinc-800 transition shadow-xs">
+            {/* Card Header */}
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-[var(--color-imamu-accent)]" />
+                <span>المواد المسجلة في هذا الفصل ({courses.length} مواد · {totalHours} ساعة)</span>
               </span>
               <button
                 type="button"
-                onClick={() => setShowSubjectPicker(!showSubjectPicker)}
+                onClick={() => setIsEditingCourses(prev => !prev)}
                 className="text-[11px] font-bold text-[var(--color-imamu-accent)] hover:underline flex items-center gap-1 cursor-pointer"
               >
-                <Plus className="w-3 h-3" />
-                إضافة من دليل المواد
+                {isEditingCourses ? (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>إنهاء التعديل</span>
+                  </>
+                ) : (
+                  <>
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>تعديل المواد</span>
+                  </>
+                )}
               </button>
             </div>
 
-            {/* Subject Picker Dropdown */}
-            {showSubjectPicker && (
-              <div className="bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-2xl p-3 mb-2.5 animate-in fade-in duration-150">
-                <div className="relative mb-2">
-                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-                  <input
-                    type="text"
-                    value={searchSubject}
-                    onChange={e => setSearchSubject(e.target.value)}
-                    placeholder="ابحث باسم المادة أو رمزها..."
-                    className="w-full pr-8 pl-3 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 outline-none"
-                    autoFocus
-                  />
-                </div>
-                {filteredCatalog.length > 0 ? (
-                  <div className="flex flex-col gap-1 max-h-36 overflow-y-auto">
-                    {filteredCatalog.map(s => (
-                      <div
-                        key={s.id}
-                        onClick={() => addSubjectFromCatalog(s)}
-                        className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white dark:bg-zinc-900 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer border border-slate-100 dark:border-zinc-800"
-                      >
-                        <div className="flex items-center gap-2 truncate">
-                          <span className="text-[11px] font-bold text-[var(--color-imamu-accent)]">{s.code}</span>
-                          <span className="text-xs text-slate-700 dark:text-zinc-200 truncate">{s.name}</span>
-                        </div>
-                        <span className="text-[10px] text-slate-400 shrink-0">{s.creditHours || 3} س</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : searchSubject.trim() ? (
-                  <p className="text-center text-[11px] text-slate-400 py-2">لا توجد مواد مطابقة للبحث</p>
-                ) : null}
-              </div>
-            )}
-
-            {/* Courses List with Trash Button */}
+            {/* Timings-style List of Courses */}
             {courses.length === 0 ? (
-              <div className="text-center py-6 bg-slate-50 dark:bg-zinc-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-zinc-800">
-                <BookOpen className="w-6 h-6 text-slate-300 dark:text-zinc-600 mx-auto mb-1.5" />
+              <div className="text-center py-5 bg-white dark:bg-zinc-900/60 rounded-xl border border-dashed border-slate-200 dark:border-zinc-800">
+                <BookOpen className="w-5 h-5 text-slate-300 dark:text-zinc-600 mx-auto mb-1" />
                 <p className="text-xs text-slate-400">لا توجد مواد مسجلة بعد في هذا الفصل.</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">استخدم الـ CRN أو دليل المواد لإضافة موادك.</p>
+                {!isEditingCourses && (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingCourses(true)}
+                    className="text-[11px] font-bold text-[var(--color-imamu-accent)] mt-1.5 hover:underline cursor-pointer"
+                  >
+                    انقر هنا لإضافة مواد بالـ CRN أو من الدليل
+                  </button>
+                )}
               </div>
             ) : (
-              <div className="space-y-1.5 max-h-56 overflow-y-auto pr-0.5">
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-0.5 custom-scrollbar">
                 {courses.map(c => (
                   <div
                     key={c.courseCode}
-                    className="flex items-center justify-between px-3 py-2 bg-slate-50 dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl group hover:border-slate-300 dark:hover:border-zinc-700 transition"
+                    className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs shadow-2xs"
                   >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="text-[11px] font-bold text-[var(--color-imamu-accent)] bg-[var(--color-imamu-brown)]/10 px-1.5 py-0.5 rounded-md shrink-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="px-2 py-0.5 rounded-md bg-stone-100 dark:bg-stone-900/50 text-[var(--color-imamu-accent)] font-bold text-[10px] shrink-0">
                         {c.courseCode}
                       </span>
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-xs font-semibold text-slate-800 dark:text-zinc-100 truncate">
-                          {c.courseName}
-                        </span>
-                        <div className="flex items-center gap-2 text-[10px] text-slate-400">
-                          {c.sectionNumber && (
-                            <span className="text-slate-600 dark:text-zinc-300 font-medium">
-                              شعبة {c.sectionNumber}
-                            </span>
-                          )}
-                          {c.crn && <span>CRN: {c.crn}</span>}
-                          {c.creditHours && <span>{c.creditHours} ساعات</span>}
-                        </div>
-                      </div>
+                      <span className="text-slate-800 dark:text-zinc-200 font-bold truncate">
+                        {c.courseName}
+                      </span>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => removeCourse(c.courseCode)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition cursor-pointer shrink-0"
-                      title={`حذف مادة ${c.courseName}`}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-2 text-[10.5px] text-slate-500 dark:text-zinc-400 font-medium">
+                        {c.sectionNumber && (
+                          <span className="text-slate-600 dark:text-zinc-300 font-semibold">
+                            شعبة {c.sectionNumber}
+                          </span>
+                        )}
+                        {c.creditHours && <span>{c.creditHours} ساعات</span>}
+                        {c.crn && <span>CRN: {c.crn}</span>}
+                      </div>
+
+                      {isEditingCourses && (
+                        <button
+                          type="button"
+                          onClick={() => removeCourse(c.courseCode)}
+                          className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition cursor-pointer"
+                          title={`حذف مادة ${c.courseName}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
+
+          {/* Under it: CRN Adder & Subject Picker (only when editing) */}
+          {isEditingCourses && (
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/40 border border-slate-200/80 dark:border-zinc-800 space-y-3 animate-in fade-in duration-150">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-2">
+                  <span>الرقم المرجعي للشعبة (CRN)</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowSubjectPicker(!showSubjectPicker)}
+                  className="text-[11px] font-bold text-[var(--color-imamu-accent)] hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-3 h-3" />
+                  إضافة من دليل المواد
+                </button>
+              </div>
+
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    value={crnInput}
+                    onChange={e => {
+                      setCrnInput(e.target.value);
+                      if (crnFeedback) setCrnFeedback(null);
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleFetchCrn();
+                      }
+                    }}
+                    placeholder="أدخل الـ CRN (مثال: 10245)"
+                    className="w-full px-4 py-2.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none focus:border-[var(--color-imamu-accent)] focus:ring-1 focus:ring-[var(--color-imamu-accent)] shadow-xs transition text-center sm:text-right"
+                  />
+                </div>
+                <button
+                  type="button"
+                  disabled={isFetchingCrn || !crnInput.trim()}
+                  onClick={handleFetchCrn}
+                  className="px-4 py-2.5 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] disabled:opacity-40 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shrink-0 shadow-xs"
+                >
+                  {isFetchingCrn ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>جلب...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Search className="w-4 h-4" />
+                      <span>جلب البيانات</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {crnFeedback && (
+                <div className={clsx(
+                  "p-3 rounded-xl border text-xs flex items-center gap-2",
+                  crnFeedback.type === 'success'
+                    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                    : "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
+                )}>
+                  {crnFeedback.type === 'success' ? (
+                    <Check className="w-4 h-4 shrink-0 text-emerald-500" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 shrink-0 text-amber-500" />
+                  )}
+                  <span>{crnFeedback.msg}</span>
+                </div>
+              )}
+
+              {/* Subject Picker Dropdown */}
+              {showSubjectPicker && (
+                <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-2xl p-3 animate-in fade-in duration-150">
+                  <div className="relative mb-2">
+                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={searchSubject}
+                      onChange={e => setSearchSubject(e.target.value)}
+                      placeholder="ابحث باسم المادة أو رمزها..."
+                      className="w-full pr-8 pl-3 py-1.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 outline-none"
+                      autoFocus
+                    />
+                  </div>
+                  {filteredCatalog.length > 0 ? (
+                    <div className="flex flex-col gap-1 max-h-36 overflow-y-auto">
+                      {filteredCatalog.map(s => (
+                        <div
+                          key={s.id}
+                          onClick={() => addSubjectFromCatalog(s)}
+                          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700/60 transition cursor-pointer border border-slate-100 dark:border-zinc-800"
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            <span className="text-[11px] font-bold text-[var(--color-imamu-accent)]">{s.code}</span>
+                            <span className="text-xs text-slate-700 dark:text-zinc-200 truncate">{s.name}</span>
+                          </div>
+                          <span className="text-[10px] text-slate-400 shrink-0">{s.creditHours || 3} س</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : searchSubject.trim() ? (
+                    <p className="text-center text-[11px] text-slate-400 py-2">لا توجد مواد مطابقة للبحث</p>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Under it: Delete Term Button (not in the save changes bar) */}
+          {onDelete && (
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm(`هل أنت متأكد من حذف فصل "${semester.label || 'هذا الفصل'}"؟`)) {
+                    onDelete();
+                  }
+                }}
+                className="w-full py-2.5 px-4 rounded-xl border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>حذف هذا الفصل الدراسي</span>
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Footer actions */}
+        {/* Footer actions: "Close" when untouched, "Save / Cancel" when modified */}
         <div className="flex gap-2 pt-3.5 border-t border-slate-100 dark:border-zinc-800 shrink-0">
-          <button
-            type="button"
-            onClick={() => {
-              onSave(label.trim() || semester.label, courses, emoji);
-            }}
-            className="flex-1 py-2.5 rounded-xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
-          >
-            <Check className="w-4 h-4" />
-            حفظ التغييرات
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 text-xs font-bold hover:bg-slate-200 dark:hover:bg-zinc-700 transition cursor-pointer"
-          >
-            إلغاء
-          </button>
+          {hasChanges ? (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  onSave(label.trim() || semester.label, courses, emoji);
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+              >
+                <Check className="w-4 h-4" />
+                حفظ التغييرات
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-5 py-2.5 rounded-xl bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 text-xs font-bold hover:bg-slate-200 dark:hover:bg-zinc-700 transition cursor-pointer"
+              >
+                إلغاء
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 text-xs font-bold hover:bg-slate-200 dark:hover:bg-zinc-700 transition cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              إغلاق
+            </button>
+          )}
         </div>
       </motion.div>
     </div>
@@ -895,6 +934,7 @@ function SidebarInsights({
   onEditTask,
   onRename,
   onUpdateSemester,
+  onDeleteSemester,
   onOpenNewSemesterModal,
   subjects = [],
 }: {
@@ -907,6 +947,7 @@ function SidebarInsights({
   onEditTask?: (task: StudentTask) => void;
   onRename?: (newLabel: string) => void;
   onUpdateSemester?: (newLabel: string, newCourses: CourseEntry[], newEmoji?: string) => void;
+  onDeleteSemester?: (id: string) => void;
   onOpenNewSemesterModal?: () => void;
   subjects?: any[];
 }) {
@@ -1392,6 +1433,12 @@ function SidebarInsights({
             onSave={(newLabel, newCourses, newEmoji) => {
               onUpdateSemester?.(newLabel, newCourses, newEmoji);
               setShowEditModal(false);
+            }}
+            onDelete={() => {
+              if (activeSemester) {
+                onDeleteSemester?.(activeSemester.id);
+                setShowEditModal(false);
+              }
             }}
           />
         )}
@@ -1928,132 +1975,126 @@ function SidebarInsights({
                 return (
                   <div
                     key={t.id}
-                    className={`group relative flex items-start gap-2.5 py-2.5 transition-colors ${
+                    className={`group relative flex flex-col gap-2 py-3 transition-colors border-b border-slate-100 dark:border-zinc-800 last:border-0 ${
                       t.completed ? 'opacity-50' : ''
                     }`}
                   >
-                    {/* Circle checkbox with colored border */}
-                    <button
-                      type="button"
-                      onClick={() => toggleTask(t.id)}
-                      className="mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-transform active:scale-90 cursor-pointer shadow-2xs"
-                      style={{
-                        borderColor: taskColor,
-                        backgroundColor: t.completed ? taskColor : 'transparent'
-                      }}
-                    >
-                      {t.completed && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
-                    </button>
+                    {/* Top Row: Circle Checkbox + Title + Countdown Badge + Three Dots */}
+                    <div className="flex items-center gap-2.5 w-full">
+                      {/* Circle checkbox with colored border */}
+                      <button
+                        type="button"
+                        onClick={() => toggleTask(t.id)}
+                        className="w-5.5 h-5.5 rounded-full border-2 flex items-center justify-center shrink-0 transition-transform active:scale-90 cursor-pointer shadow-2xs"
+                        style={{
+                          borderColor: taskColor,
+                          backgroundColor: t.completed ? taskColor : 'transparent'
+                        }}
+                      >
+                        {t.completed && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
+                      </button>
 
-                    {/* Task info */}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        {/* Title */}
+                      {/* Title */}
+                      <span
+                        className={`text-sm font-bold leading-snug transition-colors truncate flex-1 min-w-0 ${
+                          t.completed
+                            ? 'line-through text-slate-400 dark:text-zinc-500'
+                            : 'text-slate-900 dark:text-white'
+                        }`}
+                      >
+                        {t.title}
+                      </span>
+
+                      {/* Countdown badge */}
+                      {countdown && (
                         <span
-                          className={`text-xs sm:text-sm font-bold leading-snug transition-colors truncate ${
-                            t.completed
-                              ? 'line-through text-slate-400 dark:text-zinc-500'
-                              : 'text-slate-900 dark:text-white'
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0 ${
+                            countdown.isOverdue
+                              ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+                              : countdown.isToday
+                              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                              : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400'
                           }`}
                         >
-                          {t.title}
+                          {countdown.text}
                         </span>
+                      )}
 
-                        {/* Date, Time & Countdown ("غداً") placed together */}
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {duePill && (
-                            <span className="text-[10.5px] font-medium text-slate-500 dark:text-zinc-400 flex items-center gap-1">
-                              <Clock className="w-3 h-3 text-slate-400 dark:text-zinc-500 shrink-0" />
-                              <span dir="rtl">{duePill}</span>
-                            </span>
-                          )}
-
-                          {countdown && (
-                            <span
-                              className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0 ${
-                                countdown.isOverdue
-                                  ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
-                                  : countdown.isToday
-                                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                                  : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400'
-                              }`}
-                            >
-                              {countdown.text}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Tags in pills: Course, Category, Priority */}
-                      <div className="flex flex-wrap items-center gap-1.5 mt-1.5 text-[11px]">
-                        {/* Course / Class Pill */}
-                        {t.courseName && (
-                          <span
-                            className="px-2.5 py-0.5 rounded-lg font-bold text-white shadow-2xs truncate max-w-[140px]"
-                            style={{ backgroundColor: taskColor }}
-                            title={t.courseName}
-                          >
-                            {t.courseName}
-                          </span>
-                        )}
-
-                        {/* Category Pill in Arabic */}
-                        {categoryLabel && (
-                          <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-medium">
-                            {categoryLabel}
-                          </span>
-                        )}
-
-                        {/* Priority Pill in Arabic */}
-                        {t.priority === 'high' && (
-                          <span className="px-1.5 py-0.5 rounded-md bg-rose-500/15 text-rose-600 dark:text-rose-400 font-bold border border-rose-500/20 text-[10px]">
-                            عالية !!!
-                          </span>
-                        )}
-                        {t.priority === 'medium' && (
-                          <span className="px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/20 text-[10px]">
-                            متوسطة !!
-                          </span>
-                        )}
-                        {t.priority === 'low' && (
-                          <span className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 font-medium text-[10px]">
-                            منخفضة !
-                          </span>
-                        )}
+                      {/* Three dots action button */}
+                      <div className="relative shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (activeTaskMenu?.task.id === t.id) {
+                              setActiveTaskMenu(null);
+                            } else {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              const menuHeight = 84;
+                              const menuWidth = 112;
+                              const spaceBelow = window.innerHeight - rect.bottom;
+                              const openUpwards = spaceBelow < (menuHeight + 10) && rect.top > menuHeight;
+                              const x = Math.max(8, Math.min(rect.left, window.innerWidth - menuWidth - 8));
+                              const y = openUpwards ? rect.top - 4 : rect.bottom + 4;
+                              setActiveTaskMenu({ task: t, x, y, openUpwards });
+                            }
+                          }}
+                          className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+                          title="خيارات المهمة"
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
 
-                    {/* Three dots action button */}
-                    <div className="relative shrink-0">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (activeTaskMenu?.task.id === t.id) {
-                            setActiveTaskMenu(null);
-                          } else {
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            const menuHeight = 84;
-                            const menuWidth = 112;
-                            const spaceBelow = window.innerHeight - rect.bottom;
-                            const openUpwards = spaceBelow < (menuHeight + 10) && rect.top > menuHeight;
-                            const x = Math.max(8, Math.min(rect.left, window.innerWidth - menuWidth - 8));
-                            const y = openUpwards ? rect.top - 4 : rect.bottom + 4;
-                            setActiveTaskMenu({ task: t, x, y, openUpwards });
-                          }
-                        }}
-                        className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
-                        title="خيارات المهمة"
-                      >
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
+                    {/* Bottom Row: Tags starting right under the circle */}
+                    <div className="flex items-center gap-1.5 flex-wrap text-[11px] w-full">
+                      {/* Date/time pill */}
+                      {duePill && (
+                        <span className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 font-medium" dir="rtl">
+                          <Clock className="w-3 h-3 shrink-0" />
+                          {duePill}
+                        </span>
+                      )}
+
+                      {t.courseName && (
+                        <span
+                          className="px-2.5 py-0.5 rounded-lg font-bold text-white shadow-2xs truncate max-w-[140px]"
+                          style={{ backgroundColor: taskColor }}
+                          title={t.courseName}
+                        >
+                          {t.courseName}
+                        </span>
+                      )}
+
+                      {categoryLabel && (
+                        <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-medium">
+                          {categoryLabel}
+                        </span>
+                      )}
+
+                      {t.priority === 'high' && (
+                        <span className="px-1.5 py-0.5 rounded-md bg-rose-500/15 text-rose-600 dark:text-rose-400 font-bold border border-rose-500/20 text-[10px]">
+                          عالية !!!
+                        </span>
+                      )}
+                      {t.priority === 'medium' && (
+                        <span className="px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/20 text-[10px]">
+                          متوسطة !!
+                        </span>
+                      )}
+                      {t.priority === 'low' && (
+                        <span className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 font-medium text-[10px]">
+                          منخفضة !
+                        </span>
+                      )}
                     </div>
                   </div>
                 );
               };
 
               return (
-                <div className="flex flex-col gap-3 max-h-[500px] overflow-y-auto pr-0.5 custom-scrollbar pt-2">
+                <div className="flex flex-col gap-3 pt-2">
                   {/* 1. LATE TASKS (Open by default, only shown if tasks exist under it) */}
                   {lateTasks.length > 0 && (
                     <div className="flex flex-col">
@@ -2063,11 +2104,11 @@ function SidebarInsights({
                         className="flex items-center justify-between py-1 text-xs font-bold text-rose-600 dark:text-rose-400 cursor-pointer select-none group"
                       >
                         <div className="flex items-center gap-1.5">
-                          <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isLateOpen ? '' : '-rotate-90'}`} />
                           <span>متأخرة</span>
                           <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400">
                             {lateTasks.length}
                           </span>
+                          <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isLateOpen ? '' : 'rotate-90'}`} />
                         </div>
                       </button>
                       {isLateOpen && (
@@ -2087,11 +2128,11 @@ function SidebarInsights({
                         className="flex items-center justify-between py-1 text-xs font-bold text-slate-700 dark:text-zinc-300 cursor-pointer select-none group"
                       >
                         <div className="flex items-center gap-1.5">
-                          <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isUpcomingOpen ? '' : '-rotate-90'}`} />
                           <span>القادمة</span>
                           <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300">
                             {upcomingTasks.length}
                           </span>
+                          <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isUpcomingOpen ? '' : 'rotate-90'}`} />
                         </div>
                       </button>
                       {isUpcomingOpen && (
@@ -2111,11 +2152,11 @@ function SidebarInsights({
                         className="flex items-center justify-between py-1 text-xs font-bold text-slate-500 dark:text-zinc-400 cursor-pointer select-none group"
                       >
                         <div className="flex items-center gap-1.5">
-                          <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isFinishedOpen ? '' : '-rotate-90'}`} />
                           <span>المكتملة</span>
                           <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400">
                             {finishedTasks.length}
                           </span>
+                          <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isFinishedOpen ? '' : 'rotate-90'}`} />
                         </div>
                       </button>
                       {isFinishedOpen && (
@@ -2312,10 +2353,9 @@ function SemesterWizard({ onClose, onSave, subjects }: WizardProps) {
   const term = selectedFolderTerm || (academicYear && semesterName ? `${academicYear}-${semesterName}` : label);
   const finalLabel = label.trim() || `${academicYear} ${semesterName}`.trim() || 'فصل جديد';
 
-  const filteredSubjects = subjects.filter(s => {
-    const q = searchSubject.toLowerCase();
-    return !q || s.code?.toLowerCase().includes(q) || s.name?.toLowerCase().includes(q);
-  }).slice(0, 50);
+  const filteredSubjects = subjects.filter(s => 
+    matchArabicSearch([s.code, s.name], searchSubject)
+  ).slice(0, 50);
 
   const isSelected = (s: any) => selectedCourses.some(c => c.courseCode === s.code);
 
@@ -2506,39 +2546,13 @@ function SemesterWizard({ onClose, onSave, subjects }: WizardProps) {
                       >
                         <span>{emoji || '🎓'}</span>
                       </button>
-                      <AnimatePresence>
-                        {showEmojiPicker && (
-                          <>
-                            <div className="fixed inset-0 z-40" onClick={() => setShowEmojiPicker(false)} />
-                            <motion.div
-                              initial={{ opacity: 0, scale: 0.95, y: -4 }}
-                              animate={{ opacity: 1, scale: 1, y: 0 }}
-                              exit={{ opacity: 0, scale: 0.95, y: -4 }}
-                              transition={{ duration: 0.15 }}
-                              className="absolute top-full mt-2 right-0 z-50 p-2.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xl w-64"
-                              dir="rtl"
-                              onClick={e => e.stopPropagation()}
-                            >
-                              <p className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 mb-2 px-1">اختر أيقونة الفصل الدراسي:</p>
-                              <div className="grid grid-cols-6 gap-1.5 p-1 max-h-48 overflow-y-auto custom-scrollbar">
-                                {SEMESTER_EMOJIS.map(em => (
-                                  <button
-                                    key={em}
-                                    type="button"
-                                    onClick={() => { setEmoji(em); setShowEmojiPicker(false); }}
-                                    className={clsx(
-                                      "w-8 h-8 rounded-xl flex items-center justify-center text-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer",
-                                      emoji === em && "bg-[var(--color-imamu-accent)]/15 ring-2 ring-inset ring-[var(--color-imamu-accent)]"
-                                    )}
-                                  >
-                                    {em}
-                                  </button>
-                                ))}
-                              </div>
-                            </motion.div>
-                          </>
-                        )}
-                      </AnimatePresence>
+                      <EmojiPickerPopover
+                        isOpen={showEmojiPicker}
+                        onClose={() => setShowEmojiPicker(false)}
+                        selectedEmoji={emoji}
+                        onSelectEmoji={setEmoji}
+                        title="أيقونة الفصل الدراسي"
+                      />
                     </div>
 
                     <input
@@ -3543,7 +3557,7 @@ export function AnaPage() {
             )}
           </div>
 
-          <div className="w-full md:w-80 lg:w-84 shrink-0 order-2">
+          <div className="w-full md:w-96 lg:w-[26rem] shrink-0 order-2">
             <SidebarInsights
               events={events}
               activeSemester={activeSemester}
@@ -3585,6 +3599,7 @@ export function AnaPage() {
               }}
               onRename={(newLabel) => activeSemester && renameSemester(activeSemester.id, newLabel)}
               onUpdateSemester={(newLabel, newCourses, newEmoji) => activeSemester && updateSemesterDetails(activeSemester.id, newLabel, newCourses, newEmoji)}
+              onDeleteSemester={deleteSemester}
               onOpenNewSemesterModal={() => setIsWizardOpen(true)}
               subjects={subjects}
             />

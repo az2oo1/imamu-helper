@@ -10,6 +10,7 @@ import {
   Search, HelpCircle, 
   Check, Copy, MessageSquare, Shirt
 } from 'lucide-react';
+import { matchArabicSearch } from '../lib/search-utils';
 
 
 interface FAQItem {
@@ -354,13 +355,7 @@ export function NewbiePage() {
       const matchCat = selectedCategory === 'all' || item.category === selectedCategory;
       if (!matchCat) return false;
 
-      if (!searchQuery.trim()) return true;
-      const q = searchQuery.toLowerCase().trim();
-      return (
-        item.question.toLowerCase().includes(q) ||
-        item.summary.toLowerCase().includes(q) ||
-        item.points.some(p => p.toLowerCase().includes(q))
-      );
+      return matchArabicSearch([item.question, item.summary, item.categoryLabel, ...item.points], searchQuery);
     });
   }, [selectedCategory, searchQuery]);
 

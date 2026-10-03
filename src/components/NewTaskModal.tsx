@@ -30,6 +30,7 @@ export function NewTaskModal({
   taskToEdit
 }: NewTaskModalProps) {
   const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<TaskPriority | undefined>(undefined);
   const [selectedCourseCode, setSelectedCourseCode] = useState<string>(initialCourseCode || '');
   const [category, setCategory] = useState<string>('');
@@ -42,6 +43,7 @@ export function NewTaskModal({
     if (isOpen) {
       if (taskToEdit) {
         setTitle(taskToEdit.title || '');
+        setDescription(taskToEdit.description || '');
         setPriority(taskToEdit.priority);
         setSelectedCourseCode(taskToEdit.courseCode || '');
         setCategory(taskToEdit.category || '');
@@ -50,6 +52,7 @@ export function NewTaskModal({
         setDueTime(taskToEdit.dueTime || '12:30');
       } else {
         setTitle('');
+        setDescription('');
         setPriority(undefined);
         setSelectedCourseCode(initialCourseCode || '');
         setCategory('');
@@ -86,6 +89,7 @@ export function NewTaskModal({
 
     onSaveTask({
       title: title.trim(),
+      description: description.trim() || undefined,
       priority: priority || undefined,
       category: category || undefined,
       categoryLabel: catObj ? catObj.label : (category || undefined),
@@ -327,6 +331,23 @@ export function NewTaskModal({
                 </motion.div>
               )}
             </AnimatePresence>
+          </div>
+
+          {/* 4. Notes / Additional Description */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-zinc-300">
+                ملاحظات أو وصف إضافي
+              </label>
+              <span className="text-[10px] text-slate-400 dark:text-zinc-500">اختياري</span>
+            </div>
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              rows={2}
+              placeholder="أضف أي تفاصيل، روابط، أو ملاحظات تهمك لهذه المهمة..."
+              className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none focus:ring-2 focus:ring-[var(--color-imamu-accent)]/30 focus:border-[var(--color-imamu-accent)] transition resize-none custom-scrollbar"
+            />
           </div>
 
           {/* Submit Action Button */}

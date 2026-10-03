@@ -5,8 +5,9 @@ import {
   LayoutDashboard, Users, Shield, BookOpen, GraduationCap,
   Folder, HelpCircle, Calendar, Command
 } from 'lucide-react';
+import { matchArabicSearch } from '../../lib/search-utils';
 
-export type Tab = 'dashboard' | 'users' | 'contributors' | 'news_sources' | 'majors' | 'events' | 'subjects' | 'sections' | 'teachers' | 'resources' | 'tutorials' | 'feedback' | 'settings';
+export type Tab = 'dashboard' | 'users' | 'contributors' | 'news_sources' | 'majors' | 'events' | 'subjects' | 'sections' | 'teachers' | 'resources' | 'tutorials' | 'feedback' | 'settings' | 'logs';
 
 export interface SearchResultItem {
   id: string;
@@ -87,7 +88,7 @@ export function CommandPalette({
   if (q) {
     // 1. Admin Tabs
     tabs.forEach((t) => {
-      if (t.label.toLowerCase().includes(q)) {
+      if (matchArabicSearch([t.label], query)) {
         results.push({
           id: `tab-${t.id}`,
           categoryLabel: 'أقسام لوحة التحكم',
@@ -108,12 +109,7 @@ export function CommandPalette({
       const email = u.email || '';
       const handle = u.handle || u.username || '';
       const uid = u.uid || u.id || '';
-      if (
-        name.toLowerCase().includes(q) ||
-        email.toLowerCase().includes(q) ||
-        handle.toLowerCase().includes(q) ||
-        String(uid).toLowerCase().includes(q)
-      ) {
+      if (matchArabicSearch([name, email, handle, String(uid)], query)) {
         results.push({
           id: `user-${uid || name}`,
           categoryLabel: 'المستخدمون والطلاب',
@@ -135,11 +131,7 @@ export function CommandPalette({
       const name = s.displayName || s.handle || '';
       const handle = s.handle || '';
       const bio = s.bio || '';
-      if (
-        name.toLowerCase().includes(q) ||
-        handle.toLowerCase().includes(q) ||
-        bio.toLowerCase().includes(q)
-      ) {
+      if (matchArabicSearch([name, handle, bio], query)) {
         results.push({
           id: `entity-${s.id || handle}`,
           categoryLabel: 'حسابات الجهات الرسمية (Entity Accounts)',
@@ -160,7 +152,7 @@ export function CommandPalette({
     subjects.forEach((subj) => {
       const code = subj.code || '';
       const name = subj.name || '';
-      if (code.toLowerCase().includes(q) || name.toLowerCase().includes(q)) {
+      if (matchArabicSearch([code, name], query)) {
         results.push({
           id: `subj-${subj.id || code}`,
           categoryLabel: 'المقررات والمواد الدراسية',
@@ -182,7 +174,7 @@ export function CommandPalette({
     // 5. Majors
     majors.forEach((m) => {
       const name = typeof m === 'string' ? m : m.name || '';
-      if (name.toLowerCase().includes(q)) {
+      if (matchArabicSearch([name], query)) {
         results.push({
           id: `major-${m.id || name}`,
           categoryLabel: 'التخصصات الأكاديمية',
@@ -203,11 +195,7 @@ export function CommandPalette({
       const title = r.title || '';
       const desc = r.description || r.courseName || '';
       const code = r.courseCode || '';
-      if (
-        title.toLowerCase().includes(q) ||
-        desc.toLowerCase().includes(q) ||
-        code.toLowerCase().includes(q)
-      ) {
+      if (matchArabicSearch([title, desc, code, r.major], query)) {
         results.push({
           id: `res-${r.id}`,
           categoryLabel: 'المصادر والمراجع',
@@ -228,7 +216,7 @@ export function CommandPalette({
     tutorials.forEach((tut) => {
       const title = tut.title || '';
       const desc = tut.description || '';
-      if (title.toLowerCase().includes(q) || desc.toLowerCase().includes(q)) {
+      if (matchArabicSearch([title, desc], query)) {
         results.push({
           id: `tut-${tut.id}`,
           categoryLabel: 'شروحات الدليلة',
@@ -248,7 +236,7 @@ export function CommandPalette({
     events.forEach((ev) => {
       const title = ev.title || '';
       const desc = ev.description || '';
-      if (title.toLowerCase().includes(q) || desc.toLowerCase().includes(q)) {
+      if (matchArabicSearch([title, desc, ev.date], query)) {
         results.push({
           id: `event-${ev.id}`,
           categoryLabel: 'التقويم والمواعيد',

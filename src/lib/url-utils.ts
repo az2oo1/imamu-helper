@@ -82,16 +82,32 @@ export function parseAllResourceLinks(input?: string): { title?: string; url: st
 
   const extractCodeAndDiscount = (rawCodeStr?: string): { code?: string; discount?: string } => {
     if (!rawCodeStr) return {};
-    let str = rawCodeStr.trim();
+    let str = rawCodeStr.trim().replace(/^[\-\:\s]+/, '');
+    if (!str) return {};
     
-    // Check if format is CODE (discount) or CODE - discount or CODE [discount]
-    const discountMatch = str.match(/([A-Z0-9_\-]+)\s*(?:[\(\[\-\s]+([^()\]\s]+(?:%|\s*ريال|\s*SAR)?)[\]\)\s]*)?/i);
-    if (discountMatch) {
-      const code = discountMatch[1].trim();
-      let discount: string | undefined = discountMatch[2]?.trim();
+    // 1. Format: CODE (discount) or CODE [discount] or CODE - discount
+    const codeDiscountMatch = str.match(/^([A-Z0-9_\-]+)\s*(?:[\(\[\-\s]+([^()\]\s]+(?:%|\s*ريال|\s*SAR)?)[\]\)\s]*)?$/i);
+    if (codeDiscountMatch) {
+      const code = codeDiscountMatch[1].trim();
+      let discount: string | undefined = codeDiscountMatch[2]?.trim();
       if (discount && (discount === code || /^[\-\:\s]+$/.test(discount))) discount = undefined;
       return { code, discount };
     }
+
+    // 2. Standalone discount: "(20%)", "20%", "خصم 15%", "50 ريال", "(50 ريال)"
+    const onlyDiscountMatch = str.match(/^\(?\s*(?:خصم\s*)?(\d+\s*%(?:\s*خصم)?|\d+\s*(?:ريال|SAR)?)\s*\)?$/i);
+    if (onlyDiscountMatch) {
+      return { discount: onlyDiscountMatch[1].trim() };
+    }
+
+    // 3. Fallback: contains (discount) in parenthesis
+    const parenDiscountMatch = str.match(/^(.*?)\s*[\(\[]\s*([^()\]]+(?:%|ريال|SAR|خصم)[^()\]]*)\s*[\)\]]$/i);
+    if (parenDiscountMatch) {
+      const code = parenDiscountMatch[1].replace(/[\-\:\s]+$/, '').trim();
+      const discount = parenDiscountMatch[2].trim();
+      return { code: code || undefined, discount };
+    }
+
     return { code: str };
   };
 

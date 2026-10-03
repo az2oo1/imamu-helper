@@ -3,6 +3,7 @@ import {
   Users, Search, Plus, Trash2, Edit3, Eye, Shield, Award, 
   Linkedin, Instagram, Twitter, Github, Mail, Globe, Check, X, Sparkles, HeartHandshake, Link2, Copy, UserCircle2, User, Upload
 } from 'lucide-react';
+import { matchArabicSearch } from '../../lib/search-utils';
 
 function ContributorAvatar({ src, alt, className = "w-12 h-12 rounded-2xl" }: { src?: string; alt: string; className?: string }) {
   const [imgError, setImgError] = useState(false);
@@ -256,7 +257,7 @@ export default function AdminContributorsTab() {
 
   const filtered = contributorsList.filter(c => {
     const matchCat = activeCategory === 'all' || c.category === activeCategory;
-    const matchSearch = !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.role.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = matchArabicSearch([c.name, c.role, c.bio], search);
     return matchCat && matchSearch;
   });
 

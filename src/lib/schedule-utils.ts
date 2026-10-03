@@ -327,6 +327,13 @@ export function parseTimeRange(
   let startMin = parseTimeToMinutes(rawStart) ?? 8 * 60;
   let endMin = parseTimeToMinutes(rawEnd) ?? (startMin + 50);
 
+  // If user entered them backwards (e.g. start is evening, end is morning, or start > end), swap them
+  if (endMin < startMin) {
+    const temp = startMin;
+    startMin = endMin;
+    endMin = temp;
+  }
+
   if (endMin <= startMin) {
     endMin = startMin + 50;
   }

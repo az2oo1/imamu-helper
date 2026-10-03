@@ -7,6 +7,7 @@ import {
   ArrowLeft, Phone, Search, ChevronLeft,
   Building, ShieldAlert, Send
 } from 'lucide-react';
+import { matchArabicSearch } from '../lib/search-utils';
 
 interface PhoneContact {
   department: string;
@@ -43,8 +44,7 @@ export function NumbersPage() {
 
   // Filter contacts
   const filteredContacts = phoneContacts.filter(contact => {
-    const matchesSearch = contact.department.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          contact.number.includes(searchQuery);
+    const matchesSearch = matchArabicSearch([contact.department, contact.number], searchQuery);
     const matchesCategory = activeCategory === 'all' || contact.category === activeCategory;
     return matchesSearch && matchesCategory;
   });

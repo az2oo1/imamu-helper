@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Trash2, Tag } from 'lucide-react';
+import { Plus, Trash2, Tag, Percent } from 'lucide-react';
 
 export interface Link {
   name: string;
   url: string;
   code?: string;
+  discount?: string;
 }
 
 interface Props {
@@ -16,32 +17,107 @@ interface Props {
   showDiscountCode?: boolean;
 }
 
+function extractCodeAndDiscount(rawCodeStr?: string): { code?: string; discount?: string } {
+  if (!rawCodeStr) return {};
+  let str = rawCodeStr.trim().replace(/^[\-\:\s]+/, '');
+  if (!str) return {};
+
+  // 1. Format: CODE (discount) or CODE [discount] or CODE - discount
+  const codeDiscountMatch = str.match(/^([A-Z0-9_\-]+)\s*(?:[\(\[\-\s]+([^()\]\s]+(?:%|\s*ريال|\s*SAR)?)[\]\)\s]*)?$/i);
+  if (codeDiscountMatch) {
+    const code = codeDiscountMatch[1].trim();
+    let discount: string | undefined = codeDiscountMatch[2]?.trim();
+    if (discount && (discount === code || /^[\-\:\s]+$/.test(discount))) discount = undefined;
+    return { code, discount };
+  }
+
+  // 2. Standalone discount: "(20%)", "20%", "خصم 15%", "50 ريال", "(50 ريال)"
+  const onlyDiscountMatch = str.match(/^\(?\s*(?:خصم\s*)?(\d+\s*%(?:\s*خصم)?|\d+\s*(?:ريال|SAR)?)\s*\)?$/i);
+  if (onlyDiscountMatch) {
+    return { discount: onlyDiscountMatch[1].trim() };
+  }
+
+  // 3. Fallback: contains (discount) in parenthesis
+  const parenDiscountMatch = str.match(/^(.*?)\s*[\(\[]\s*([^()\]]+(?:%|ريال|SAR|خصم)[^()\]]*)\s*[\)\]]$/i);
+  if (parenDiscountMatch) {
+    const code = parenDiscountMatch[1].replace(/[\-\:\s]+$/, '').trim();
+    const discount = parenDiscountMatch[2].trim();
+    return { code: code || undefined, discount };
+  }
+
+  return { code: str };
+}
+
 export function parseMarkdownLinks(text: string): Link[] {
   if (!text || !text.trim()) return [];
   const links: Link[] = [];
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
   for (const line of lines) {
-    const regex = /\[([^\]]*)\]\(([^)]+)\)(?:\s*(?:-|كود|code|خصم)?\s*[:\-\s]*([A-Z0-9_\-]+))?/i;
-    const match = line.match(regex);
-    if (match) {
-      let rawTitle = match[1].trim();
-      const rawUrl = match[2].trim();
-      let extractedCode = match[3]?.trim();
+    // 1. Standard markdown: [Title](URL) optionally followed by code/discount
+    const mdMatch = line.match(/^\[([^\]]*)\]\(([^)]*)\)(?:\s*(?:-|كود|code|خصم)?\s*[:\-\s]*([^\n]+))?/i);
+    if (mdMatch) {
+      let rawTitle = mdMatch[1].trim();
+      let rawUrl = mdMatch[2].trim();
+      const rawCodePart = mdMatch[3]?.trim();
 
-      if (!extractedCode) {
-        const codeInTitleMatch = rawTitle.match(/(?:كود|كود الخصم|code|خصم)\s*[:\-\s]*([A-Z0-9_\-]+)/i);
-        if (codeInTitleMatch) {
-          extractedCode = codeInTitleMatch[1];
-          rawTitle = rawTitle.replace(/(?:كود|كود الخصم|code|خصم)\s*[:\-\s]*[A-Z0-9_\-]+/gi, '').replace(/[\(\)\[\]\-\|]+$/, '').trim();
-        }
+      const { code, discount } = extractCodeAndDiscount(rawCodePart);
+
+      // Clean brackets or parens from URL if mistakenly present
+      rawUrl = rawUrl.replace(/^[\[\(]+/, '').replace(/[\]\)]+$/, '').trim();
+
+      // If user put URL into the title brackets and left parens empty, e.g. [https://google.com]()
+      if (!rawUrl && (rawTitle.startsWith('http://') || rawTitle.startsWith('https://') || rawTitle.startsWith('www.') || rawTitle.includes('.com') || rawTitle.includes('.edu') || rawTitle.includes('.sa'))) {
+        rawUrl = rawTitle;
+        rawTitle = '';
       }
 
-      links.push({ name: rawTitle, url: rawUrl, code: extractedCode || '' });
-    } else {
-      const parts = line.split(/\s+/).filter(Boolean);
-      if (parts[0]) {
-        links.push({ name: `رابط ${links.length + 1}`, url: parts[0] });
+      links.push({
+        name: rawTitle,
+        url: rawUrl,
+        code: code || '',
+        discount: discount || ''
+      });
+      continue;
+    }
+
+    // 2. Bracketed without parens: [https://...] or [Title]
+    const bracketMatch = line.match(/^\[([^\]]+)\]$/);
+    if (bracketMatch) {
+      const inner = bracketMatch[1].trim();
+      if (inner.startsWith('http://') || inner.startsWith('https://') || inner.startsWith('www.') || inner.includes('.com') || inner.includes('.net') || inner.includes('.org') || inner.includes('.edu') || inner.includes('.sa')) {
+        links.push({ name: '', url: inner, code: '', discount: '' });
+      } else {
+        links.push({ name: inner, url: '', code: '', discount: '' });
+      }
+      continue;
+    }
+
+    // 3. Raw URL line: "https://..." or "Title https://..."
+    const urlMatch = line.match(/(https?:\/\/[^\s]+|www\.[^\s]+)/i);
+    if (urlMatch) {
+      const url = urlMatch[1].replace(/^[\[\(]+/, '').replace(/[\]\)]+$/, '').trim();
+      const titlePart = line.substring(0, urlMatch.index).trim().replace(/^[\[\(]+/, '').replace(/[\]\)\-\:\s]+$/, '').trim();
+      const afterPart = line.substring(urlMatch.index! + urlMatch[0].length).trim().replace(/^[\]\)\-\:\s]+/, '').trim();
+
+      const { code, discount } = extractCodeAndDiscount(afterPart);
+
+      links.push({
+        name: titlePart,
+        url: url,
+        code: code || '',
+        discount: discount || ''
+      });
+      continue;
+    }
+
+    // 4. Fallback line
+    const cleaned = line.replace(/^[\[\(]+/, '').replace(/[\]\)]+$/, '').trim();
+    if (cleaned) {
+      if (cleaned.startsWith('http') || cleaned.startsWith('www') || cleaned.includes('.com') || cleaned.includes('/')) {
+        links.push({ name: '', url: cleaned, code: '', discount: '' });
+      } else {
+        links.push({ name: cleaned, url: '', code: '', discount: '' });
       }
     }
   }
@@ -53,10 +129,21 @@ function serializeMarkdownLinks(links: Link[]): string {
   return links
     .filter(l => l.url?.trim() || l.name?.trim())
     .map(l => {
-      const name = l.name ?? '';
-      const url = l.url ?? '';
-      const code = l.code?.trim() ? ` - ${l.code.trim()}` : '';
-      return `[${name}](${url})${code}`;
+      const name = (l.name ?? '').trim();
+      const url = (l.url ?? '').trim();
+      const code = (l.code ?? '').trim();
+      const discount = (l.discount ?? '').trim();
+
+      let suffix = '';
+      if (code && discount) {
+        suffix = ` - ${code} (${discount})`;
+      } else if (code) {
+        suffix = ` - ${code}`;
+      } else if (discount) {
+        suffix = ` - (${discount})`;
+      }
+
+      return `[${name}](${url})${suffix}`;
     })
     .join('\n');
 }
@@ -72,14 +159,26 @@ export default function ResourceLinksInput({ label, value, onChange, color, show
     }
   }, [value]);
 
-  const updateLink = (index: number, field: 'name' | 'url' | 'code', val: string) => {
-    const updated = links.map((item, i) => (i === index ? { ...item, [field]: val } : item));
+  const updateLink = (index: number, field: 'name' | 'url' | 'code' | 'discount', val: string) => {
+    const updated = links.map((item, i) => {
+      if (i !== index) return item;
+
+      // Smart auto-detection: If user pastes a URL in the name field while URL is empty, move it to url!
+      if (field === 'name' && !item.url.trim()) {
+        const trimmed = val.trim();
+        if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('www.')) {
+          return { ...item, name: '', url: trimmed };
+        }
+      }
+
+      return { ...item, [field]: val };
+    });
     setLinks(updated);
     onChange(serializeMarkdownLinks(updated));
   };
 
   const addLink = () => {
-    const updated = [...links, { name: '', url: '', code: '' }];
+    const updated = [...links, { name: '', url: '', code: '', discount: '' }];
     setLinks(updated);
     onChange(serializeMarkdownLinks(updated));
   };
@@ -142,16 +241,11 @@ export default function ResourceLinksInput({ label, value, onChange, color, show
                     onChange={e => updateLink(i, 'name', e.target.value)}
                     className={`w-full py-2.5 px-3 rounded-xl text-xs border outline-none transition ${
                       isNameEmpty 
-                        ? 'border-red-500 bg-red-50/60 dark:bg-red-950/30 text-red-900 dark:text-red-200 focus:ring-1 focus:ring-red-500' 
+                        ? 'border-amber-400/80 bg-amber-50/30 dark:bg-amber-950/20 text-slate-900 dark:text-white focus:ring-1 focus:ring-amber-500' 
                         : 'focus:border-[var(--color-imamu-brown)]'
                     }`}
                     style={!isNameEmpty ? { background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' } : {}}
                   />
-                  {isNameEmpty && (
-                    <span className="text-[10px] font-bold text-red-500 mt-1 block px-1">
-                      اسم المصدر مطلوب
-                    </span>
-                  )}
                 </div>
 
                 {/* Link URL Input */}
@@ -161,12 +255,13 @@ export default function ResourceLinksInput({ label, value, onChange, color, show
                     placeholder="الرابط https://..."
                     value={link.url}
                     onChange={e => updateLink(i, 'url', e.target.value)}
-                    className={`w-full py-2.5 px-3 rounded-xl text-xs border outline-none transition font-mono ${
+                    className={`w-full py-2.5 px-3 rounded-xl text-xs border outline-none transition ${
                       isUrlEmpty 
                         ? 'border-red-500 bg-red-50/60 dark:bg-red-950/30 text-red-900 dark:text-red-200 focus:ring-1 focus:ring-red-500' 
                         : 'focus:border-[var(--color-imamu-brown)]'
                     }`}
                     style={!isUrlEmpty ? { background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' } : {}}
+                    dir="ltr"
                   />
                   {isUrlEmpty && (
                     <span className="text-[10px] font-bold text-red-500 mt-1 block px-1">
@@ -177,14 +272,30 @@ export default function ResourceLinksInput({ label, value, onChange, color, show
 
                 {/* Discount Code Input (for paid links) */}
                 {isPaidColor && (
+                  <div className="w-full sm:w-28 shrink-0">
+                    <input
+                      type="text"
+                      placeholder="كود الخصم"
+                      value={link.code || ''}
+                      onChange={e => updateLink(i, 'code', e.target.value)}
+                      className="w-full py-2.5 px-3 rounded-xl text-xs border outline-none transition font-bold uppercase text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] bg-amber-50/50 dark:bg-amber-950/20 border-amber-200/80 dark:border-amber-900/60 focus:border-amber-400 placeholder-amber-400/60 dark:placeholder-amber-600/60"
+                      dir="ltr"
+                      title="كود الخصم (اختياري)"
+                    />
+                  </div>
+                )}
+
+                {/* Percentage or Price Discount Input (for paid links) */}
+                {isPaidColor && (
                   <div className="w-full sm:w-36 shrink-0">
                     <input
                       type="text"
-                      placeholder="كود الخصم (اختياري)"
-                      value={link.code || ''}
-                      onChange={e => updateLink(i, 'code', e.target.value)}
-                      className="w-full py-2.5 px-3 rounded-xl text-xs border outline-none transition font-mono font-bold uppercase text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] bg-amber-50/50 dark:bg-amber-950/20 border-amber-200/80 dark:border-amber-900/60 focus:border-amber-400 placeholder-amber-400/60 dark:placeholder-amber-600/60"
-                      dir="ltr"
+                      placeholder="الخصم (مثال: 15% أو 50 ريال)"
+                      value={link.discount || ''}
+                      onChange={e => updateLink(i, 'discount', e.target.value)}
+                      className="w-full py-2.5 px-3 rounded-xl text-xs border outline-none transition font-bold text-amber-700 dark:text-amber-300 bg-amber-50/50 dark:bg-amber-950/20 border-amber-200/80 dark:border-amber-900/60 focus:border-amber-400 placeholder-amber-400/60 dark:placeholder-amber-600/60"
+                      dir="rtl"
+                      title="نسبة الخصم مثل 20% أو قيمة الخصم مثل 50 ريال (اختياري)"
                     />
                   </div>
                 )}

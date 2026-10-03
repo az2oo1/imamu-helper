@@ -8,6 +8,7 @@ import {
   Building, BookOpen, Compass, ShieldAlert,
   Send, ExternalLink, HelpCircle
 } from 'lucide-react';
+import { matchArabicSearch } from '../lib/search-utils';
 
 interface College {
   id: string;
@@ -133,10 +134,8 @@ export function EmailsPage() {
 
   const selectedCollege = colleges.find(c => c.id === selectedCollegeId) || colleges[0];
 
-  // Filter emails based on search query
   const filteredEmails = selectedCollege.emails.filter(item => 
-    item.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.email.toLowerCase().includes(searchQuery.toLowerCase())
+    matchArabicSearch([item.role, item.email], searchQuery)
   );
 
   return (

@@ -37,10 +37,16 @@ export interface AcademicEventFlags {
  */
 export function parseDate(input: DateInput): Date | null {
   if (!input) return null;
-  if (input instanceof Date) return isNaN(input.getTime()) ? null : input;
+  const checkValid = (d: Date): Date | null => {
+    if (isNaN(d.getTime())) return null;
+    const year = d.getFullYear();
+    if (year < 1900 || year > 2100) return null;
+    return d;
+  };
+
+  if (input instanceof Date) return checkValid(input);
   if (typeof input === 'number') {
-    const d = new Date(input);
-    return isNaN(d.getTime()) ? null : d;
+    return checkValid(new Date(input));
   }
 
   const trimmed = String(input).trim();
@@ -49,8 +55,7 @@ export function parseDate(input: DateInput): Date | null {
   // Handle YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
     const [y, m, d] = trimmed.split('-').map(Number);
-    const dateObj = new Date(y, m - 1, d);
-    return isNaN(dateObj.getTime()) ? null : dateObj;
+    return checkValid(new Date(y, m - 1, d));
   }
 
   // Handle DD/MM/YYYY
@@ -59,13 +64,11 @@ export function parseDate(input: DateInput): Date | null {
     const day = Number(ddmmMatch[1]);
     const month = Number(ddmmMatch[2]) - 1;
     const year = Number(ddmmMatch[3]);
-    const dateObj = new Date(year, month, day);
-    return isNaN(dateObj.getTime()) ? null : dateObj;
+    return checkValid(new Date(year, month, day));
   }
 
   // Fallback to standard JS parsing
-  const parsed = new Date(trimmed);
-  return isNaN(parsed.getTime()) ? null : parsed;
+  return checkValid(new Date(trimmed));
 }
 
 /**

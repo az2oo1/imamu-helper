@@ -29,6 +29,7 @@ import ImageUploadInput from './ImageUploadInput';
 import ResourceLinksInput from './ResourceLinksInput';
 import { cleanCourseName, isWhatsappUrl, parseAllResourceLinks } from '../lib/url-utils';
 import { WhatsappIcon } from './WhatsappIcon';
+import { matchArabicSearch } from '../lib/search-utils';
 
 interface CreateResourceModalProps {
   isOpen: boolean;
@@ -229,9 +230,7 @@ export default function CreateResourceModal({
   const isEditing = !!resourceForm.id;
 
   const filteredSubjects = subjects.filter(s => 
-    !courseSearch || 
-    s.code?.toLowerCase().includes(courseSearch.toLowerCase()) || 
-    s.name?.toLowerCase().includes(courseSearch.toLowerCase())
+    matchArabicSearch([s.code, s.name, cleanCourseName(s.name)], courseSearch)
   );
 
   const canAdvance = resourceKind === 'course'
@@ -243,8 +242,7 @@ export default function CreateResourceModal({
     { id: 2, title: 'المجلدات والواتساب', icon: FolderGit2 },
     { id: 3, title: 'المصادر المجانية والمدفوعة', icon: Sparkles },
     { id: 4, title: 'الوسائط والوصف', icon: FileText },
-    { id: 5, title: 'إعدادات وخيارات', icon: Settings },
-    { id: 6, title: 'الشعب', icon: Users }
+    { id: 5, title: 'إعدادات وخيارات', icon: Settings }
   ];
 
   const manualSteps = [
@@ -355,7 +353,13 @@ export default function CreateResourceModal({
             {/* Horizontal Progress Stepper */}
             <div className="relative pt-1 px-4">
               {/* Background Track Line */}
-              <div className={`absolute top-4 ${resourceKind === 'manual' ? 'right-[10%] left-[10%]' : 'right-[8.33%] left-[8.33%]'} h-0.5 bg-slate-200 dark:bg-zinc-800 -z-0 overflow-hidden`}>
+              <div 
+                className="absolute top-4 h-0.5 bg-slate-200 dark:bg-zinc-800 -z-0 overflow-hidden"
+                style={{
+                  right: `${100 / (2 * totalSteps)}%`,
+                  left: `${100 / (2 * totalSteps)}%`
+                }}
+              >
                 {/* Animated Completed Track Line */}
                 <motion.div
                   className="h-full bg-emerald-500 rounded-full origin-right"
@@ -366,7 +370,12 @@ export default function CreateResourceModal({
               </div>
 
               {/* Step Circle Nodes Grid */}
-              <div className={`relative z-10 grid ${resourceKind === 'manual' ? 'grid-cols-5' : 'grid-cols-6'} w-full`}>
+              <div 
+                className="relative z-10 grid w-full"
+                style={{
+                  gridTemplateColumns: `repeat(${totalSteps}, minmax(0, 1fr))`
+                }}
+              >
                 {steps.map((step) => {
                   const isCompleted = activeStep > step.id;
                   const isActive = activeStep === step.id;
@@ -562,34 +571,6 @@ export default function CreateResourceModal({
                           </div>
                         )}
                       </div>
-
-                      <div className="bg-slate-50 dark:bg-zinc-800/50 rounded-2xl p-5 border border-slate-200/80 dark:border-zinc-800 space-y-4">
-                        <div className="space-y-2">
-                          <label className="block text-xs font-bold text-slate-700 dark:text-zinc-200">
-                            عنوان باقة المقرر (تلقائي من المقرر أو مخصص)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="مثال: باقة مصادر أساسيات الحوسبة..."
-                            value={resourceForm.title || ''}
-                            onChange={e => setResourceForm((s: any) => ({ ...s, title: e.target.value }))}
-                            className="w-full py-3 px-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-bold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-[var(--color-imamu-accent)]/40 focus:border-[var(--color-imamu-accent)] shadow-xs"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="block text-xs font-bold text-slate-700 dark:text-zinc-200">
-                            الوصف والتفاصيل (اختياري)
-                          </label>
-                          <textarea
-                            rows={3}
-                            placeholder="اكتب وصفاً ثرياً ومختصراً يوضح محتويات وأهداف هذه المادة الأكاديمية..."
-                            value={resourceForm.description || ''}
-                            onChange={e => setResourceForm((s: any) => ({ ...s, description: e.target.value }))}
-                            className="w-full py-3 px-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-[var(--color-imamu-accent)]/40 focus:border-[var(--color-imamu-accent)] shadow-xs resize-none"
-                          />
-                        </div>
-                      </div>
                     </>
                   ) : (
                     /* 👥 2. STANDALONE MANUAL RESOURCE FLOW (COMPLETELY ISOLATED FROM COURSES) */
@@ -687,7 +668,7 @@ export default function CreateResourceModal({
                       placeholder="https://chat.whatsapp.com/..."
                       value={resourceForm.whatsappLink || ''}
                       onChange={e => setResourceForm((s: any) => ({ ...s, whatsappLink: e.target.value }))}
-                      className="w-full py-3 px-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-mono font-bold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-xs"
+                      className="w-full py-3 px-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-bold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-xs"
                       dir="ltr"
                     />
                   </div>
@@ -809,23 +790,6 @@ export default function CreateResourceModal({
                     
                     {resourceKind === 'course' ? (
                       <>
-                        {/* Toggle Sections Feature */}
-                        <div className="flex items-center justify-between p-3.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl">
-                          <div>
-                            <h5 className="text-xs font-bold text-slate-900 dark:text-white">تفعيل قسم الشعب للمقرر ({sections.length} شعب)</h5>
-                            <p className="text-[11px] text-slate-500 dark:text-zinc-400">السماح للطلاب بعرض وإضافة الشعب وروابط الواتساب للمادة</p>
-                          </div>
-                          <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                            <input
-                              type="checkbox"
-                              checked={resourceForm.sectionsEnabled !== false}
-                              onChange={e => setResourceForm((s: any) => ({ ...s, sectionsEnabled: e.target.checked }))}
-                              className="sr-only peer"
-                            />
-                            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-                          </label>
-                        </div>
-
                         <div className="space-y-2">
                           <label className="block text-xs font-bold text-slate-700 dark:text-zinc-200">نوع الباقة الأساسي</label>
                           <select
@@ -873,225 +837,6 @@ export default function CreateResourceModal({
                 </motion.div>
               )}
 
-              {/* STEP 6: Course Sections (الشعب) */}
-              {activeStep === 6 && (
-                <motion.div
-                  key="step6"
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 10 }}
-                  transition={{ duration: 0.2 }}
-                  className="space-y-5"
-                >
-                  <div className="bg-slate-50 dark:bg-zinc-800/50 rounded-2xl p-5 border border-slate-200/80 dark:border-zinc-800 space-y-4">
-                    {/* Toggle Header for Step 6 */}
-                    <div className="flex items-center justify-between p-3.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl">
-                      <div>
-                        <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                          <Users className="w-4 h-4 text-[var(--color-imamu-accent)]" />
-                          <span>تفعيل وتخصيص شعب المادة ({sections.length})</span>
-                        </h4>
-                        <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">يمكنك تعطيل أو تفعيل تبويب الشعب لهذه الباقة في أي وقت</p>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                        <input
-                          type="checkbox"
-                          checked={resourceForm.sectionsEnabled !== false}
-                          onChange={e => setResourceForm((s: any) => ({ ...s, sectionsEnabled: e.target.checked }))}
-                          className="sr-only peer"
-                        />
-                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-                      </label>
-                    </div>
-
-                    {resourceForm.sectionsEnabled === false ? (
-                      <div className="p-5 bg-amber-50/70 dark:bg-amber-950/30 rounded-2xl border border-amber-200 dark:border-amber-900/50 text-center text-xs font-bold text-amber-700 dark:text-amber-400">
-                        تنبيه: قسم الشعب معطّل حالياً لهذه الباقة. قم بتفعيل المفتاح اعلاه لتمكين الطلاب من استعراض الشعب والروابط.
-                      </div>
-                    ) : (
-                      <>
-                        {/* Informative Header */}
-                        <div className="p-3.5 sm:p-4 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-2xl border border-emerald-200/60 dark:border-emerald-900/40 text-xs text-emerald-800 dark:text-emerald-300 leading-relaxed flex items-start gap-2.5">
-                          <Users className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                          <div>
-                            <p className="font-bold">الشعب الرسمية المعتمدة لهذا المقرر:</p>
-                            <p className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-0.5">
-                              هذه الشعب مستخرجة مباشرة من نظام الجامعة وتطابق قاعدة البيانات. يمكنك إضافة أو تعديل أو حذف روابط مجموعات الواتساب وأرقام التواصل المخصصة لكل شعبة.
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Section Cards List */}
-                        {sections.length === 0 ? (
-                          <p className="text-xs text-slate-400 dark:text-zinc-500 italic bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-100 dark:border-zinc-800 text-center">
-                            لا توجد شعب مسجلة رسمياً لهذا المقرر في قاعدة البيانات حالياً.
-                          </p>
-                        ) : (
-                          <div className="flex flex-col gap-2.5">
-                            {sections.map((sec, idx) => {
-                              const isEditing = editingSectionId === sec.id;
-                              const sectionTitle = sec.sectionNumber 
-                                ? `شعبة ${sec.sectionNumber}` 
-                                : (sec.sectionName || (sec.crn ? `شعبة ${sec.crn}` : 'شعبة دراسية'));
-                              const hasLinks = Boolean(sec.whatsappLink || sec.phone);
-
-                              return (
-                                <div
-                                  key={sec.id || idx}
-                                  className="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 transition-all space-y-3"
-                                >
-                                  {/* Header with section badges & actions */}
-                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <span className="px-2.5 py-1 bg-[var(--color-imamu-brown)] text-white text-xs font-bold rounded-xl shadow-xs">
-                                        {sectionTitle}
-                                      </span>
-                                      {sec.crn && (
-                                        <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border border-slate-200/60 dark:border-zinc-700/60" title="الرقم المرجعي للشعبة">
-                                          CRN: {sec.crn}
-                                        </span>
-                                      )}
-                                      {sec.campus && (
-                                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60">
-                                          {sec.campus}
-                                        </span>
-                                      )}
-                                    </div>
-
-                                    {/* Action Buttons */}
-                                    {!isEditing && (
-                                      <div className="flex items-center gap-2 shrink-0">
-                                        {sec.whatsappLink && (
-                                          <a
-                                            href={sec.whatsappLink}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition cursor-pointer shadow-xs"
-                                          >
-                                            <WhatsappIcon className="w-3.5 h-3.5 fill-current" />
-                                            <span>واتساب</span>
-                                          </a>
-                                        )}
-                                        {hasLinks ? (
-                                          <div className="flex items-center gap-1">
-                                            <button
-                                              type="button"
-                                              onClick={() => handleOpenEditSectionLink(sec)}
-                                              className="px-2.5 py-1.5 rounded-xl text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 text-xs font-bold transition cursor-pointer flex items-center gap-1 border border-slate-200 dark:border-zinc-700"
-                                              title="تعديل رابط الواتساب ورقم التواصل"
-                                            >
-                                              <Edit3 className="w-3.5 h-3.5" />
-                                              <span className="hidden sm:inline">تعديل</span>
-                                            </button>
-                                            <button
-                                              type="button"
-                                              onClick={() => handleDeleteSectionLink(sec.id)}
-                                              disabled={isUpdatingLink}
-                                              className="p-1.5 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition cursor-pointer"
-                                              title="حذف رابط الواتساب ورقم التواصل لهذه الشعبة"
-                                            >
-                                              <Trash2 className="w-4 h-4" />
-                                            </button>
-                                          </div>
-                                        ) : (
-                                          <button
-                                            type="button"
-                                            onClick={() => handleOpenEditSectionLink(sec)}
-                                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-stone-100 dark:bg-stone-900 text-[var(--color-imamu-accent)] hover:bg-stone-200 dark:hover:bg-stone-800 text-xs font-bold transition cursor-pointer border border-stone-200/80 dark:border-zinc-700"
-                                          >
-                                            <Plus className="w-3.5 h-3.5" />
-                                            <span>إضافة قروب واتساب</span>
-                                          </button>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  {/* Details: Instructor & Schedule */}
-                                  {(sec.primaryInstructor || sec.scheduleSummary || sec.phone) && (
-                                    <div className="text-xs text-slate-600 dark:text-zinc-400 space-y-1 pt-1 border-t border-slate-100 dark:border-zinc-800/80">
-                                      {sec.primaryInstructor && (
-                                        <p className="flex items-center gap-1.5 font-medium">
-                                          <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                          <span>أستاذ المادة: <strong className="text-slate-800 dark:text-zinc-200">{sec.primaryInstructor}</strong></span>
-                                        </p>
-                                      )}
-                                      {sec.scheduleSummary && (
-                                        <p className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-zinc-400">
-                                          <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                          <span>{sec.scheduleSummary}</span>
-                                        </p>
-                                      )}
-                                      {sec.phone && (
-                                        <p className="flex items-center gap-1.5 text-[11px] text-slate-600 dark:text-zinc-300">
-                                          <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                          <span>رقم التواصل: <span className="font-mono font-bold" dir="ltr">{sec.phone}</span></span>
-                                        </p>
-                                      )}
-                                    </div>
-                                  )}
-
-                                  {/* Inline Edit Form for this section */}
-                                  {isEditing && (
-                                    <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200 dark:border-zinc-700/80 space-y-3 pt-3">
-                                      <h6 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                                        <WhatsappIcon className="w-3.5 h-3.5 fill-emerald-600" />
-                                        <span>إضافة / تعديل رابط الواتساب لـ ({sectionTitle})</span>
-                                      </h6>
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        <div>
-                                          <label className="block text-[11px] font-bold text-slate-600 dark:text-zinc-400 mb-1">رابط مجموعة الواتساب</label>
-                                          <input
-                                            type="text"
-                                            placeholder="https://chat.whatsapp.com/..."
-                                            value={editWaLink}
-                                            onChange={e => setEditWaLink(e.target.value)}
-                                            className="w-full py-2 px-3 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-mono font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
-                                            dir="ltr"
-                                          />
-                                        </div>
-                                        <div>
-                                          <label className="block text-[11px] font-bold text-slate-600 dark:text-zinc-400 mb-1">رقم الهاتف / منسق الشعبة (اختياري)</label>
-                                          <input
-                                            type="text"
-                                            placeholder="050xxxxxxx"
-                                            value={editPhone}
-                                            onChange={e => setEditPhone(e.target.value)}
-                                            className="w-full py-2 px-3 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-mono font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
-                                            dir="ltr"
-                                          />
-                                        </div>
-                                      </div>
-                                      <div className="flex items-center justify-end gap-2">
-                                        <button
-                                          type="button"
-                                          onClick={() => setEditingSectionId(null)}
-                                          className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-zinc-700 text-xs font-bold text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
-                                        >
-                                          إلغاء
-                                        </button>
-                                        <button
-                                          type="button"
-                                          disabled={isUpdatingLink}
-                                          onClick={() => handleSaveSectionLink(sec.id)}
-                                          className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-xs"
-                                        >
-                                          {isUpdatingLink ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                                          <span>حفظ الرابط</span>
-                                        </button>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </motion.div>
-              )}
             </AnimatePresence>
           </motion.div>
 

@@ -32,19 +32,7 @@ interface Tutorial {
 
 function matchSubjectIds(id1: any, id2: any): boolean {
   if (id1 == null || id2 == null || id1 === '' || id2 === '') return false;
-  const s1 = String(id1).trim();
-  const s2 = String(id2).trim();
-  if (s1 === s2) return true;
-  try {
-    if (/^\d+$/.test(s1) && /^\d+$/.test(s2)) {
-      const b1 = BigInt(s1);
-      const b2 = BigInt(s2);
-      if (b1 === b2) return true;
-      const diff = b1 > b2 ? b1 - b2 : b2 - b1;
-      return diff < 200n;
-    }
-  } catch (_e) {}
-  return false;
+  return String(id1).trim() === String(id2).trim();
 }
 
 interface Block {

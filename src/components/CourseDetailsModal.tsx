@@ -563,7 +563,7 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0 mr-2">
-                          {item.code && (
+                          {item.code ? (
                             <button
                               type="button"
                               onClick={(e) => {
@@ -592,7 +592,14 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
                                 <Copy className="w-3.5 h-3.5 text-[var(--color-imamu-accent)] opacity-70 group-hover/btn:opacity-100 transition-colors" />
                               )}
                             </button>
-                          )}
+                          ) : item.discount ? (
+                            <span
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold border border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10 shadow-2xs"
+                            >
+                              <Tag className="w-3 h-3" />
+                              <span>{item.discount.includes('%') || item.discount.includes('خصم') || item.discount.includes('ريال') ? item.discount : `خصم ${item.discount}`}</span>
+                            </span>
+                          ) : null}
                           <ExternalLink className="w-4 h-4 text-slate-400 dark:text-zinc-500 group-hover:text-[var(--color-imamu-accent)] transition-colors shrink-0" />
                         </div>
                       </a>

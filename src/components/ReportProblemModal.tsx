@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Send, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 
@@ -26,13 +27,18 @@ export default function ReportProblemModal({
   const { user: contextUser, dbUser } = useAuth();
   const activeUser = propUser || contextUser;
 
+  const [mounted, setMounted] = useState(false);
   const [feedbackType, setFeedbackType] = useState<string>('bug_report');
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!isOpen || !mounted) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,9 +105,9 @@ export default function ReportProblemModal({
     }
   };
 
-  return (
+  return createPortal(
     <div 
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200" 
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200" 
       dir="rtl"
       onClick={(e) => {
         e.stopPropagation();
@@ -201,6 +207,7 @@ export default function ReportProblemModal({
           </form>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -11,23 +11,12 @@ import CreateResourceModal from '../components/CreateResourceModal';
 import ReportDropdownMenu from '../components/ReportDropdownMenu';
 import { cleanCourseName, cleanUrlProtocol, parseResourceUrl, parseAllResourceLinks, isWhatsappUrl, decodeHtmlEntities } from '../lib/url-utils';
 import { useSWR } from '../lib/swr';
+import { matchArabicSearch, normalizeArabic } from '../lib/search-utils';
 
 
 function matchSubjectIds(id1: any, id2: any): boolean {
   if (id1 == null || id2 == null || id1 === '' || id2 === '') return false;
-  const s1 = String(id1).trim();
-  const s2 = String(id2).trim();
-  if (s1 === s2) return true;
-  try {
-    if (/^\d+$/.test(s1) && /^\d+$/.test(s2)) {
-      const b1 = BigInt(s1);
-      const b2 = BigInt(s2);
-      if (b1 === b2) return true;
-      const diff = b1 > b2 ? b1 - b2 : b2 - b1;
-      return diff < 200n;
-    }
-  } catch (_e) {}
-  return false;
+  return String(id1).trim() === String(id2).trim();
 }
 
 interface Resource {
@@ -404,60 +393,77 @@ export function Resources() {
     const rawMajor = (r.major || '').toLowerCase();
     const subMajors = Array.isArray((cardSubject as any)?.majors) ? (cardSubject as any).majors.map((m: string) => String(m).toLowerCase()) : [];
 
-    const matchesSearch = 
-      r.title.toLowerCase().includes(search.toLowerCase()) ||
-      r.courseCode.toLowerCase().includes(search.toLowerCase()) ||
-      r.courseName.toLowerCase().includes(search.toLowerCase()) ||
-      code.toLowerCase().includes(search.toLowerCase()) ||
-      name.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = matchArabicSearch([
+      r.title,
+      r.courseCode,
+      r.courseName,
+      code,
+      name,
+      cardSubject?.name,
+      cardSubject?.code,
+      cleanCourseName(cardSubject?.name || ''),
+      cleanCourseName(r.courseName || ''),
+      cleanCourseName(r.title || ''),
+      r.description,
+      r.major,
+      ...(Array.isArray(subMajors) ? subMajors : [])
+    ], search);
     
     const matchesMajor = (() => {
       if (selectedMajor === 'all') return true;
 
+      const normCode = normalizeArabic(code);
+      const normName = normalizeArabic(name);
+      const normRawMajor = normalizeArabic(rawMajor);
+      const normSubMajors = subMajors.map(m => normalizeArabic(m));
+
       const matchesPrefix = (prefixRegex: RegExp) => prefixRegex.test(code);
-      const matchesStr = (str: string) => 
-        rawMajor.includes(str) || 
-        name.includes(str) || 
-        code.toLowerCase().includes(str) ||
-        subMajors.some((m: string) => m.includes(str));
+      const matchesStr = (str: string) => {
+        const normStr = normalizeArabic(str);
+        return normRawMajor.includes(normStr) || 
+          normName.includes(normStr) || 
+          normCode.includes(normStr) ||
+          normSubMajors.some((m: string) => m.includes(normStr));
+      };
 
       if (selectedMajor === 'CS') {
-        return matchesPrefix(/^CS/i) || matchesStr('حاسب') || matchesStr('computer') || matchesStr('برمجة') || matchesStr('خوارزميات');
+        return matchesPrefix(/^CS/i) || matchesStr('حاسب') || matchesStr('computer') || matchesStr('برمجة') || matchesStr('خوارزميات') || matchesStr('عال');
       }
       if (selectedMajor === 'IS') {
-        return matchesPrefix(/^IS(?!LM)/i) || matchesStr('نظم') || matchesStr('information systems');
+        return matchesPrefix(/^IS(?!LM)/i) || matchesStr('نظم') || matchesStr('information systems') || matchesStr('نال');
       }
       if (selectedMajor === 'IT') {
-        return matchesPrefix(/^IT/i) || matchesStr('تقنية') || matchesStr('information technology');
+        return matchesPrefix(/^IT/i) || matchesStr('تقنية') || matchesStr('information technology') || matchesStr('تال');
       }
       if (selectedMajor === 'SE') {
-        return matchesPrefix(/^SE/i) || matchesStr('هندسة برمجيات') || matchesStr('software');
+        return matchesPrefix(/^SE/i) || matchesStr('هندسة برمجيات') || matchesStr('software') || matchesStr('هاب');
       }
       if (selectedMajor === 'MAT') {
-        return matchesPrefix(/^(MAT|MATH)/i) || matchesStr('رياضيات') || matchesStr('math') || matchesStr('تفاضل') || matchesStr('جبر');
+        return matchesPrefix(/^(MAT|MATH)/i) || matchesStr('رياضيات') || matchesStr('math') || matchesStr('تفاضل') || matchesStr('جبر') || matchesStr('ريض');
       }
       if (selectedMajor === 'PHYS') {
-        return matchesPrefix(/^(PHYS|PHY)/i) || matchesStr('فيزياء') || matchesStr('physics');
+        return matchesPrefix(/^(PHYS|PHY)/i) || matchesStr('فيزياء') || matchesStr('physics') || matchesStr('فيز');
       }
       if (selectedMajor === 'STAT') {
-        return matchesPrefix(/^STAT/i) || matchesStr('إحصاء') || matchesStr('statistics');
+        return matchesPrefix(/^STAT/i) || matchesStr('إحصاء') || matchesStr('statistics') || matchesStr('احص');
       }
       if (selectedMajor === 'ISLM') {
-        return matchesPrefix(/^(ISLM|IC|SALM)/i) || matchesStr('إسلام') || matchesStr('islam');
+        return matchesPrefix(/^(ISLM|IC|SALM)/i) || matchesStr('إسلام') || matchesStr('islam') || matchesStr('سلم');
       }
       if (selectedMajor === 'ARAB') {
         return matchesPrefix(/^ARAB/i) || matchesStr('عرب') || matchesStr('arabic');
       }
       if (selectedMajor === 'ENG') {
-        return matchesPrefix(/^ENG/i) || matchesStr('إنجليز') || matchesStr('english');
+        return matchesPrefix(/^ENG/i) || matchesStr('إنجليز') || matchesStr('english') || matchesStr('نجم');
       }
       if (selectedMajor === 'BUS') {
-        return matchesPrefix(/^(BUS|MGMT|FIN|ACCT|ECON)/i) || matchesStr('إدارة') || matchesStr('مالية') || matchesStr('business');
+        return matchesPrefix(/^(BUS|MGMT|FIN|ACCT|ECON)/i) || matchesStr('إدارة') || matchesStr('مالية') || matchesStr('business') || matchesStr('ادر');
       }
 
-      return rawMajor.includes(selectedMajor.toLowerCase()) || 
+      const normSelected = normalizeArabic(selectedMajor);
+      return normRawMajor.includes(normSelected) || 
         r.major === selectedMajor ||
-        subMajors.some((m: string) => m.includes(selectedMajor.toLowerCase()));
+        normSubMajors.some((m: string) => m.includes(normSelected));
     })();
 
     return matchesSearch && matchesMajor;

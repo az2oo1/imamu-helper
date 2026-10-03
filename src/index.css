@@ -116,7 +116,7 @@
   --font-sans: "ThmanyahSans", sans-serif;
   --font-display: "ThmanyahSerifDisplay", serif;
   --font-serif: "ThmanyahSerifText", serif;
-  --font-mono: "JetBrains Mono", monospace;
+  --font-mono: "ThmanyahSans", sans-serif;
 
   --color-imamu-brown: #8C6239;
   --color-imamu-brown-light: #9E7348;
@@ -225,38 +225,58 @@ input[type="number"] {
 }
 
 /* Form controls refinement for light and dark modes */
-html.light input[type="text"],
-html.light input[type="number"],
-html.light input[type="email"],
-html.light input[type="password"],
-html.light input[type="tel"],
-html.light input[type="search"],
-html.light textarea,
-html.light select {
+html.light input[type="text"]:not([class*="bg-transparent"]):not([class*="border-none"]):not([class*="border-0"]),
+html.light input[type="number"]:not([class*="bg-transparent"]):not([class*="border-none"]):not([class*="border-0"]),
+html.light input[type="email"]:not([class*="bg-transparent"]):not([class*="border-none"]):not([class*="border-0"]),
+html.light input[type="password"]:not([class*="bg-transparent"]):not([class*="border-none"]):not([class*="border-0"]),
+html.light input[type="tel"]:not([class*="bg-transparent"]):not([class*="border-none"]):not([class*="border-0"]),
+html.light input[type="search"]:not([class*="bg-transparent"]):not([class*="border-none"]):not([class*="border-0"]),
+html.light textarea:not([class*="bg-transparent"]):not([class*="border-none"]):not([class*="border-0"]),
+html.light select:not([class*="bg-transparent"]):not([class*="border-none"]):not([class*="border-0"]) {
   background-color: #FAF8F4;
   color: #1A1410;
   border: 1px solid #DDD7CC;
   border-radius: 0.75rem;
 }
 
-html.dark input[type="text"],
-html.dark input[type="number"],
-html.dark input[type="email"],
-html.dark input[type="password"],
-html.dark input[type="tel"],
-html.dark input[type="search"],
-html.dark textarea,
-html.dark select {
+html.dark input[type="text"]:not([class*="bg-transparent"]):not([class*="border-none"]):not([class*="border-0"]),
+html.dark input[type="number"]:not([class*="bg-transparent"]):not([class*="border-none"]):not([class*="border-0"]),
+html.dark input[type="email"]:not([class*="bg-transparent"]):not([class*="border-none"]):not([class*="border-0"]),
+html.dark input[type="password"]:not([class*="bg-transparent"]):not([class*="border-none"]):not([class*="border-0"]),
+html.dark input[type="tel"]:not([class*="bg-transparent"]):not([class*="border-none"]):not([class*="border-0"]),
+html.dark input[type="search"]:not([class*="bg-transparent"]):not([class*="border-none"]):not([class*="border-0"]),
+html.dark textarea:not([class*="bg-transparent"]):not([class*="border-none"]):not([class*="border-0"]),
+html.dark select:not([class*="bg-transparent"]):not([class*="border-none"]):not([class*="border-0"]) {
   background-color: #121218;
   color: #f4f4f5;
   border: 1px solid #27272a;
   border-radius: 0.75rem;
 }
 
-input:focus, textarea:focus, select:focus {
+input:not([class*="bg-transparent"]):not([class*="border-none"]):not([class*="border-0"]):focus,
+textarea:not([class*="bg-transparent"]):not([class*="border-none"]):not([class*="border-0"]):focus,
+select:not([class*="bg-transparent"]):not([class*="border-none"]):not([class*="border-0"]):focus {
   border-color: var(--color-imamu-accent, #3b82f6);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-imamu-accent, #3b82f6) 30%, transparent);
   outline: none;
+}
+
+/* Explicitly reset any input marked as transparent or borderless */
+input[class*="bg-transparent"],
+input[class*="border-none"],
+input[class*="border-0"] {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+input[class*="bg-transparent"]:focus,
+input[class*="border-none"]:focus,
+input[class*="border-0"]:focus {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
 }
 
 /* Custom Selection — Dynamically aligns with active theme accent color */

@@ -9,10 +9,13 @@ import {
 } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { parseDate, formatDate, formatHijriDate, formatHijriMonthDay, getCountdown, getEventCategoryMeta } from '../lib/date-utils';
+import { AnimatePresence } from 'motion/react';
 import ReportDropdownMenu from '../components/ReportDropdownMenu';
 import CalendarSelector from '../components/CalendarSelector';
+import { NewTaskModal } from '../components/NewTaskModal';
 import { useSWR } from '../lib/swr';
 import { StudentTask, TASK_CATEGORIES, getCourseColor } from '../lib/task-utils';
+import { matchArabicSearch } from '../lib/search-utils';
 
 
 export function CalendarPage() {
@@ -92,34 +95,22 @@ export function CalendarPage() {
     }
   };
 
-  // Add Event Popover State (Google Calendar style quick-add)
-  const [isAddPopoverOpen, setIsAddPopoverOpen] = useState(false);
-  const [newEventTitle, setNewEventTitle] = useState('');
-  const [newEventDate, setNewEventDate] = useState(new Date().toISOString().split('T')[0]);
-  const [newEventTime, setNewEventTime] = useState('09:00');
-  const [newEventDesc, setNewEventDesc] = useState('');
-  const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
-  const [addEventError, setAddEventError] = useState('');
-  const popoverRef = useRef<HTMLDivElement>(null);
-  const addButtonRef = useRef<HTMLButtonElement>(null);
+  // New Task Modal State (Task Maker)
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
 
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        popoverRef.current && 
-        !popoverRef.current.contains(e.target as Node) &&
-        !addButtonRef.current?.contains(e.target as Node)
-      ) {
-        setIsAddPopoverOpen(false);
-      }
-    };
-    if (isAddPopoverOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+  const registeredCourses = React.useMemo(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem('imamu_my_semesters');
+      if (!raw) return [];
+      const sems = JSON.parse(raw);
+      const activeSemId = localStorage.getItem('imamu_active_semester_id');
+      const active = sems.find((s: any) => s.id === activeSemId) || sems[0];
+      return active?.courses || [];
+    } catch {
+      return [];
     }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isAddPopoverOpen]);
+  }, [isTaskModalOpen]);
 
   useEffect(() => {
     loadTaskEvents();
@@ -146,37 +137,18 @@ export function CalendarPage() {
     setEvents(combined.sort((a, b) => (parseDate(a.date)?.getTime() || 0) - (parseDate(b.date)?.getTime() || 0)));
   }, [eventsData, taskEvents]);
 
-  const handleAddPersonalEvent = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newEventTitle.trim() || !newEventDate) {
-      setAddEventError('يرجى كتابة عنوان الموعد وتاريخه');
-      return;
-    }
-
-    setIsSubmittingEvent(true);
-    setAddEventError('');
-
+  const handleSaveNewTask = (taskData: Omit<StudentTask, 'id' | 'completed' | 'createdAt'>) => {
     try {
-      const newTask: StudentTask = {
-        id: Date.now().toString(),
-        title: newEventTitle.trim(),
-        completed: false,
-        dueDate: newEventDate,
-        dueTime: newEventTime || undefined,
-        description: newEventDesc.trim() || undefined,
-        category: 'Event',
-        categoryLabel: 'موعد شخصي',
-        color: '#0284c7',
-        createdAt: new Date().toISOString()
-      };
-
       const raw = localStorage.getItem('imamu_student_tasks');
       const prev: StudentTask[] = raw ? JSON.parse(raw) : [];
+      const newTask: StudentTask = {
+        id: Date.now().toString(),
+        ...taskData,
+        completed: false,
+        createdAt: new Date().toISOString()
+      };
       const updated = [newTask, ...prev];
       localStorage.setItem('imamu_student_tasks', JSON.stringify(updated));
-
-      window.dispatchEvent(new Event('imamu_tasks_updated'));
-      window.dispatchEvent(new Event('storage'));
 
       const token = localStorage.getItem('token') || localStorage.getItem('imamu_token') || '';
       if (token) {
@@ -190,15 +162,10 @@ export function CalendarPage() {
         }).catch(() => {});
       }
 
-      setNewEventTitle('');
-      setNewEventDesc('');
-      setIsAddPopoverOpen(false);
+      window.dispatchEvent(new Event('imamu_tasks_updated'));
+      window.dispatchEvent(new Event('storage'));
       loadTaskEvents();
-    } catch (err: any) {
-      setAddEventError(err.message || 'حدث خطأ أثناء حفظ الموعد');
-    } finally {
-      setIsSubmittingEvent(false);
-    }
+    } catch {}
   };
 
   const nextPeriod = () => {
@@ -210,7 +177,8 @@ export function CalendarPage() {
   const goToday = () => setCurrentDate(new Date());
 
   const formatGoogleCalendarDate = (dateString: string) => {
-    const d = parseISO(dateString);
+    const d = parseDate(dateString);
+    if (!d || isNaN(d.getTime())) return '';
     const formatDatePart = (dateObj: Date) => {
       const year = dateObj.getFullYear();
       const month = String(dateObj.getMonth() + 1).padStart(2, '0');
@@ -320,10 +288,7 @@ export function CalendarPage() {
     .map(e => ({ ...e, parsedDate: parseDate(e.date) }))
     .filter(e => {
       if (!e.parsedDate) return false;
-      const matchesSearch = !searchQuery.trim() || 
-        e.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        (e.description && e.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (e.entityName && e.entityName.toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchesSearch = matchArabicSearch([e.title, e.description, e.entityName], searchQuery);
       
       if (searchQuery.trim()) return matchesSearch;
       return isAfter(e.parsedDate, startOfDay(new Date())) || isSameDay(e.parsedDate, new Date());
@@ -431,7 +396,7 @@ export function CalendarPage() {
           visibleCalendars={visibleCalendars}
           onToggleCalendar={handleToggleCalendar}
           onShowOnlyCalendar={handleShowOnlyCalendar}
-          onOpenAddEvent={() => setIsAddPopoverOpen(true)}
+          onOpenAddEvent={() => setIsTaskModalOpen(true)}
           onEventCreated={() => {
             mutate();
             loadTaskEvents();
@@ -475,10 +440,11 @@ export function CalendarPage() {
             className="flex-1 min-h-0 max-h-full overflow-y-auto overscroll-contain space-y-2.5 px-0.5 scrollbar-none"
           >
             {displayedUpcomingEvents.map((ev, i) => {
-              const d = parseISO(ev.date);
-              const dayStr = format(d, 'd');
-              const monthStr = format(d, 'MMM', { locale: ar });
-              const timeStr = format(d, 'h:mm a', { locale: ar });
+              const d = ev.parsedDate || parseDate(ev.date);
+              const isValidDate = !!(d && !isNaN(d.getTime()));
+              const dayStr = isValidDate ? format(d, 'd') : '-';
+              const monthStr = isValidDate ? format(d, 'MMM', { locale: ar }) : '';
+              const timeStr = isValidDate ? format(d, 'h:mm a', { locale: ar }) : (ev.time || '');
               const meta = getEventCategoryMeta(ev);
               const eventKey = ev.id || `${ev.title}-${ev.date}`;
               const isExpanded = expandedSidebarEventId === eventKey;
@@ -490,7 +456,9 @@ export function CalendarPage() {
                     const willExpand = !isExpanded;
                     setExpandedSidebarEventId(willExpand ? eventKey : null);
                     setHighlightedEventId(willExpand ? eventKey : null);
-                    setCurrentDate(d);
+                    if (isValidDate) {
+                      setCurrentDate(d);
+                    }
                   }}
                   className={`w-full rounded-2xl border transition-all duration-300 ease-out cursor-pointer text-right p-3.5 shadow-none animate-in fade-in slide-in-from-bottom-2 ${
                     isExpanded
@@ -660,21 +628,16 @@ export function CalendarPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 relative">
-            {/* New Add Event Button (Moved here per user request) */}
+          <div className="flex items-center gap-2">
+            {/* New Add Task Button (Replaced quick-add date popover with task maker) */}
             <button
-              ref={addButtonRef}
               type="button"
-              onClick={() => setIsAddPopoverOpen(!isAddPopoverOpen)}
-              className={`btn-rise inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer shadow-2xs active:scale-95 border shrink-0 ${
-                isAddPopoverOpen
-                  ? 'bg-[var(--color-imamu-brown)] text-white border-[var(--color-imamu-brown)] shadow-xs'
-                  : 'bg-slate-100 dark:bg-zinc-950 text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-800 hover:text-[var(--color-imamu-accent)] hover:border-[var(--color-imamu-accent)]/50'
-              }`}
-              title="إضافة موعد شخصي جديد"
+              onClick={() => setIsTaskModalOpen(true)}
+              className="btn-rise inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer shadow-2xs active:scale-95 border shrink-0 bg-slate-100 dark:bg-zinc-950 text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-800 hover:text-[var(--color-imamu-accent)] hover:border-[var(--color-imamu-accent)]/50"
+              title="إضافة مهمة جديدة"
             >
-              <Plus className={`w-3.5 h-3.5 transition-transform duration-200 ${isAddPopoverOpen ? 'rotate-45 text-white' : 'text-[var(--color-imamu-accent)]'}`} />
-              <span>موعد جديد</span>
+              <Plus className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
+              <span>مهمة جديدة</span>
             </button>
 
             {/* View Switcher: شهر | أسبوع */}
@@ -702,119 +665,6 @@ export function CalendarPage() {
                 <List className="w-3.5 h-3.5" /> أسبوع
               </button>
             </div>
-
-            {/* Quick Add Event Floating Popover ("look like the white box") */}
-            {isAddPopoverOpen && (
-              <div 
-                ref={popoverRef}
-                className="absolute top-full left-0 mt-2.5 z-50 w-80 sm:w-96 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-5 shadow-2xl text-right animate-in fade-in zoom-in-95 duration-150"
-                dir="rtl"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-3 mb-3.5">
-                  <h3 className="font-serif font-extrabold text-sm sm:text-base text-slate-900 dark:text-white inline-flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-[#0284c7]" />
-                    <span>إضافة موعد إلى تقويمي الخاص</span>
-                  </h3>
-                  <button 
-                    type="button"
-                    onClick={() => setIsAddPopoverOpen(false)}
-                    className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-              {addEventError && (
-                <div className="mb-3.5 p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 text-xs">
-                  {addEventError}
-                </div>
-              )}
-
-              <form onSubmit={handleAddPersonalEvent} className="space-y-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1">
-                    عنوان الموعد أو المهمة *
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="مثال: تسليم مشروع التخرج، موعد اختبار..."
-                    value={newEventTitle}
-                    onChange={(e) => setNewEventTitle(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:border-[#0284c7] transition"
-                    autoFocus
-                    required
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1">
-                      التاريخ *
-                    </label>
-                    <input
-                      type="date"
-                      value={newEventDate}
-                      onChange={(e) => setNewEventDate(e.target.value)}
-                      className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:border-[#0284c7] transition"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1">
-                      الوقت
-                    </label>
-                    <input
-                      type="time"
-                      value={newEventTime}
-                      onChange={(e) => setNewEventTime(e.target.value)}
-                      className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:border-[#0284c7] transition"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1">
-                    ملاحظات أو وصف إضافي (اختياري)
-                  </label>
-                  <textarea
-                    rows={2}
-                    placeholder="تفاصيل الموعد أو التذكير..."
-                    value={newEventDesc}
-                    onChange={(e) => setNewEventDesc(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:border-[#0284c7] transition resize-none"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2 pt-2 border-t border-slate-200 dark:border-zinc-800">
-                  <button
-                    type="submit"
-                    disabled={isSubmittingEvent}
-                    className="btn-rise flex-1 py-2 px-4 rounded-xl text-xs font-bold bg-[#0284c7] hover:bg-[#0369a1] text-white transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50 active:scale-95"
-                  >
-                    {isSubmittingEvent ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>جاري الحفظ...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>حفظ الموعد</span>
-                      </>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsAddPopoverOpen(false)}
-                    className="py-2 px-3 rounded-xl text-xs font-bold text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
-                  >
-                    إلغاء
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
           </div>
         </div>
 
@@ -929,7 +779,10 @@ export function CalendarPage() {
                         <div className="flex items-center gap-1.5 mt-0.5 text-[9.5px] truncate opacity-90">
                           <span className="inline-flex items-center gap-0.5 shrink-0">
                             <Clock className="w-2.5 h-2.5 inline" />
-                            {format(parseISO(ev.date), 'h:mm a', { locale: ar })}
+                            {(() => {
+                              const evD = parseDate(ev.date);
+                              return evD && !isNaN(evD.getTime()) ? format(evD, 'h:mm a', { locale: ar }) : (ev.time || '');
+                            })()}
                           </span>
                           {meta ? (
                             <>
@@ -1091,6 +944,18 @@ export function CalendarPage() {
           </div>
         </div>
       )}
+
+      {/* New Task Modal (Task Maker) */}
+      <AnimatePresence>
+        {isTaskModalOpen && (
+          <NewTaskModal
+            isOpen={isTaskModalOpen}
+            onClose={() => setIsTaskModalOpen(false)}
+            onSaveTask={handleSaveNewTask}
+            courses={registeredCourses}
+          />
+        )}
+      </AnimatePresence>
 
     </div>
   );

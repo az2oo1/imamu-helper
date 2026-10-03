@@ -1,10 +1,9 @@
-import { AdminLogsPage } from '../../../src/views/AdminLogsPage';
+import { redirect } from 'next/navigation';
 
 export const metadata = {
-  title: 'سجلات أحداث النظام - مساعد الإمام',
-  description: 'مركز الرقابة والتدقيق الأمني وسجلات أحداث منصة مساعد الإمام',
+  title: 'سجلات أحداث النظام - لوحة التحكم والإدارة',
 };
 
 export default function AdminLogsRoute() {
-  return <AdminLogsPage />;
+  redirect('/admin?tab=logs');
 }

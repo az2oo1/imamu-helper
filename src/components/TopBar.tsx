@@ -8,7 +8,7 @@ import { useTheme } from '../lib/ThemeContext';
 import { 
   LogIn, LogOut, Menu, X, UserCircle2, 
   Home, Calculator, BookOpen, Calendar, Newspaper, HelpCircle, 
-  Sun, Moon, Activity, Shield, Building2, ShieldCheck, User2
+  Sun, Moon, Shield, Building2, ShieldCheck, User2
 } from 'lucide-react';
 import clsx from 'clsx';
 import { motion, AnimatePresence, LayoutGroup } from 'motion/react';
@@ -145,22 +145,7 @@ export function TopBar() {
 
           {/* Left Action Controls (Desktop Theme Switcher + User/Login Button) */}
           <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-            {/* Mobile quick link to Ana */}
-            {isLoggedIn && (
-              <Link
-                href="/ana"
-                className={clsx(
-                  "md:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition active:scale-95 shrink-0",
-                  pathname === '/ana'
-                    ? "bg-[var(--color-imamu-brown)] text-white shadow-xs"
-                    : "bg-[var(--color-imamu-brown)]/10 dark:bg-[var(--color-imamu-brown)]/20 text-[var(--color-imamu-accent)] border border-[var(--color-imamu-brown)]/20 hover:bg-[var(--color-imamu-brown)]/20"
-                )}
-                title="لوحتي الأكاديمية"
-              >
-                <User2 className="w-3.5 h-3.5 shrink-0" />
-                <span>أنا</span>
-              </Link>
-            )}
+
 
             {/* Theme Toggle Button (Desktop only) */}
             <button
@@ -211,15 +196,6 @@ export function TopBar() {
                           <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{dbUser?.userName || user?.displayName || 'طالب'}</p>
                         </div>
                         <Link 
-                          href="/ana" 
-                          onClick={() => setProfileMenuOpen(false)}
-                          className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-[var(--color-imamu-accent)] hover:bg-[var(--color-imamu-brown)]/5 dark:hover:bg-[var(--color-imamu-brown)]/10 transition text-right"
-                          dir="rtl"
-                        >
-                          <User2 className="w-4 h-4 text-[var(--color-imamu-accent)] shrink-0" />
-                          لوحتي الأكاديمية (أنا)
-                        </Link>
-                        <Link 
                           href="/profile" 
                           onClick={() => setProfileMenuOpen(false)}
                           className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 transition text-right"
@@ -238,26 +214,15 @@ export function TopBar() {
                           لوحة تحكم الجهة
                         </Link>
                         {isAdmin && (
-                          <>
-                            <Link 
-                              href="/admin" 
-                              onClick={() => setProfileMenuOpen(false)}
-                              className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:bg-slate-50 dark:hover:bg-zinc-800 transition text-right"
-                              dir="rtl"
-                            >
-                              <ShieldCheck className="w-4 h-4 text-indigo-500 shrink-0" />
-                              لوحة تحكم المسؤول
-                            </Link>
-                            <Link 
-                              href="/admin/logs" 
-                              onClick={() => setProfileMenuOpen(false)}
-                              className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:bg-slate-50 dark:hover:bg-zinc-800 transition text-right"
-                              dir="rtl"
-                            >
-                              <Activity className="w-4 h-4 text-emerald-500" />
-                              سجلات أحداث النظام
-                            </Link>
-                          </>
+                          <Link 
+                            href="/admin" 
+                            onClick={() => setProfileMenuOpen(false)}
+                            className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:bg-slate-50 dark:hover:bg-zinc-800 transition text-right"
+                            dir="rtl"
+                          >
+                            <ShieldCheck className="w-4 h-4 text-indigo-500 shrink-0" />
+                            لوحة التحكم والإدارة
+                          </Link>
                         )}
                         <hr className="my-1 border-slate-100 dark:border-zinc-800" />
                         <button
@@ -399,14 +364,6 @@ export function TopBar() {
                       </div>
                     </div>
                     <Link
-                      href="/ana"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-[var(--color-imamu-brown)]/10 dark:bg-[var(--color-imamu-brown)]/20 text-[var(--color-imamu-accent)] border border-[var(--color-imamu-brown)]/30 font-bold text-xs hover:bg-[var(--color-imamu-brown)]/20 transition cursor-pointer"
-                    >
-                      <User2 className="w-4 h-4 text-[var(--color-imamu-accent)] shrink-0" />
-                      <span>لوحتي الأكاديمية (أنا)</span>
-                    </Link>
-                    <Link
                       href={managedAccounts.length > 0 ? `/@/${encodeURIComponent(managedAccounts[0].handle.replace(/^@/, ''))}/dashboard` : '/profile'}
                       onClick={() => setMobileMenuOpen(false)}
                       className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40 font-bold text-xs hover:bg-emerald-100 dark:hover:bg-emerald-950/50 transition cursor-pointer"
@@ -421,7 +378,7 @@ export function TopBar() {
                         className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/40 font-bold text-xs hover:bg-indigo-100 dark:hover:bg-indigo-950/50 transition cursor-pointer"
                       >
                         <ShieldCheck className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                        <span>لوحة تحكم المسؤول</span>
+                        <span>لوحة التحكم والإدارة</span>
                       </Link>
                     )}
                     <button

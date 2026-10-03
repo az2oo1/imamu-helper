@@ -7,9 +7,10 @@ import {
   Trash2, Link as LinkIcon, Download, Upload, Plus, X,
   Users, Settings, HelpCircle, ExternalLink, Server, Command,
   CheckCircle2, AlertTriangle, Info, XCircle, RefreshCw, Zap, Loader2,
-  LayoutDashboard, Newspaper, GraduationCap, Link2, Folder, Edit3, Send, Mail, HeartHandshake, MessageSquare, Layers, UserCheck
+  LayoutDashboard, Newspaper, GraduationCap, Link2, Folder, Edit3, Send, Mail, HeartHandshake, MessageSquare, Layers, UserCheck, Activity
 } from 'lucide-react';
 import { TutorialsTab } from '../components/TutorialsTab';
+import { AdminLogsPage } from './AdminLogsPage';
 import CreateCourseModal from '../components/CreateCourseModal';
 import CreateResourceModal from '../components/CreateResourceModal';
 import CreateEventModal from '../components/CreateEventModal';
@@ -23,9 +24,10 @@ import AdminFeedbackTab from './admin/AdminFeedbackTab';
 import AdminSettingsTab from './admin/AdminSettingsTab';
 import AdminSectionsTab from './admin/AdminSectionsTab';
 import CommandPalette from './admin/CommandPalette';
+import { matchArabicSearch } from '../lib/search-utils';
 import { parseDate, formatDate } from '../lib/date-utils';
 
-type Tab = 'dashboard' | 'users' | 'contributors' | 'news_sources' | 'majors' | 'events' | 'subjects' | 'sections' | 'teachers' | 'resources' | 'tutorials' | 'feedback' | 'settings';
+type Tab = 'dashboard' | 'users' | 'contributors' | 'news_sources' | 'majors' | 'events' | 'subjects' | 'sections' | 'teachers' | 'resources' | 'tutorials' | 'feedback' | 'settings' | 'logs';
 
 interface Toast {
   id: string;
@@ -222,7 +224,7 @@ export function AdminPage() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get('tab') as Tab;
-      if (tabParam && ['dashboard', 'users', 'contributors', 'news_sources', 'majors', 'events', 'subjects', 'sections', 'teachers', 'resources', 'tutorials', 'feedback', 'settings'].includes(tabParam)) {
+      if (tabParam && ['dashboard', 'users', 'contributors', 'news_sources', 'majors', 'events', 'subjects', 'sections', 'teachers', 'resources', 'tutorials', 'feedback', 'settings', 'logs'].includes(tabParam)) {
         setActiveTab(tabParam);
       }
     }
@@ -252,6 +254,7 @@ export function AdminPage() {
     { id: 'tutorials', label: 'إدارة شروحات الدليلة', icon: <HelpCircle className="w-5 h-5" /> },
     { id: 'feedback', label: 'البلاغات والتقييمات', icon: <MessageSquare className="w-5 h-5" /> },
     { id: 'settings', label: 'الإعدادات العامة', icon: <Settings className="w-5 h-5" /> },
+    { id: 'logs', label: 'سجلات أحداث النظام', icon: <Activity className="w-5 h-5" /> },
   ];
 
   // Granular admin permissions filter
@@ -276,7 +279,7 @@ export function AdminPage() {
     if (tabId === 'events') return userPerms.includes('dates');
     if (tabId === 'news_sources') return userPerms.includes('news');
     if (tabId === 'tutorials' || tabId === 'feedback') return userPerms.includes('tutorials') || userPerms.includes('feedback');
-    if (tabId === 'settings') return userPerms.includes('logs');
+    if (tabId === 'settings' || tabId === 'logs') return userPerms.includes('logs');
     return true;
   };
 
@@ -1210,7 +1213,7 @@ export function AdminPage() {
         </div>
 
         <div className="divide-y divide-slate-100 dark:divide-zinc-800/60">
-          {subjects.filter(s => s.code?.toLowerCase().includes(subjectSearch.toLowerCase()) || s.name?.toLowerCase().includes(subjectSearch.toLowerCase())).slice(0, subjectLimit).map(s => (
+          {subjects.filter(s => matchArabicSearch([s.code, s.name, s.tags], subjectSearch)).slice(0, subjectLimit).map(s => (
             <div key={s.id} className="py-3.5 px-5 flex items-center justify-between group hover:bg-slate-100/60 dark:hover:bg-zinc-800/60 transition">
               <div className="flex items-center gap-3 min-w-0 flex-1">
                 <div className="font-mono text-xs px-2.5 py-1 rounded-lg border font-bold shrink-0 bg-[var(--color-imamu-brown)/10] text-[var(--color-imamu-accent)] border-slate-200/80 dark:border-zinc-700/80">{s.code}</div>
@@ -1514,6 +1517,7 @@ export function AdminPage() {
           health={health}
         />
       );
+      case 'logs': return <AdminLogsPage />;
       default: return null;
     }
   };

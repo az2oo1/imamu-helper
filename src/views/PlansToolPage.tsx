@@ -5,6 +5,7 @@ import { useAuth } from '../lib/AuthContext';
 import { FileText, ArrowLeft, GraduationCap, ExternalLink, Search, ArrowUpRight, Plus, Trash2, Download, Eye, Layers, X, BookOpen, Clock, Sparkles, ChevronDown, Check, Upload } from 'lucide-react';
 import Link from 'next/link';
 import ReportDropdownMenu from '../components/ReportDropdownMenu';
+import { matchArabicSearch } from '../lib/search-utils';
 
 interface PdfFileItem {
   id: string;
@@ -265,7 +266,7 @@ export function PlansToolPage() {
     setOpenPdfIndex(null);
   };
 
-  const filteredMajors = majors.filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredMajors = majors.filter(m => matchArabicSearch([m.name], searchQuery));
 
   const renderPdfPlanViewer = () => {
     if (!selectedMajor) return null;

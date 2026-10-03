@@ -272,7 +272,7 @@ export default function CalendarSelector({
                         className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-[var(--color-imamu-accent)] hover:bg-[var(--color-imamu-accent)]/10 transition cursor-pointer text-right border-t border-slate-100 dark:border-zinc-800 mt-1"
                       >
                         <Plus className="w-3.5 h-3.5" />
-                        <span>إضافة موعد شخصي</span>
+                        <span>إضافة مهمة جديدة</span>
                       </button>
                     )}
 

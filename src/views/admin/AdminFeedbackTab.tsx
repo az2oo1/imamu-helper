@@ -7,6 +7,7 @@ import {
   Newspaper, Folder, Cpu, Calendar, ExternalLink, RefreshCw
 } from 'lucide-react';
 import { CustomSelect } from '../../components/ui/CustomSelect';
+import { matchArabicSearch } from '../../lib/search-utils';
 
 interface FeedbackItem {
   id: string;
@@ -122,11 +123,7 @@ export default function AdminFeedbackTab({ getToken }: { getToken: () => Promise
   };
 
   const filteredFeedback = feedback.filter(item => {
-    const matchSearch = !search ||
-      item.targetTitle?.toLowerCase().includes(search.toLowerCase()) ||
-      item.comment?.toLowerCase().includes(search.toLowerCase()) ||
-      item.userName?.toLowerCase().includes(search.toLowerCase()) ||
-      item.userEmail?.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = matchArabicSearch([item.targetTitle, item.comment, item.userName, item.userEmail], search);
 
     const matchCategory = categoryFilter === 'ALL' || item.targetType === categoryFilter;
     const matchStatus = statusFilter === 'ALL' || item.status === statusFilter;

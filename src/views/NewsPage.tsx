@@ -17,6 +17,7 @@ import { NewsMediaPreview } from '../components/NewsMediaPreview';
 import { formatDate } from '../lib/date-utils';
 import { getArabicCategoryLabel } from '../lib/textHelpers';
 import { useSWR } from '../lib/swr';
+import { matchArabicSearch } from '../lib/search-utils';
 
 interface Comment {
   id: number;
@@ -339,11 +340,8 @@ export function NewsPage() {
   // Search filtering logic
   const filteredAccounts = useMemo(() => {
     if (!searchQuery.trim()) return accounts;
-    const q = searchQuery.toLowerCase().replace(/^#/, '').trim();
     return accounts.filter(acc => 
-      (acc.displayName && acc.displayName.toLowerCase().includes(q)) ||
-      (acc.handle && acc.handle.toLowerCase().includes(q)) ||
-      (acc.bio && acc.bio.toLowerCase().includes(q))
+      matchArabicSearch([acc.displayName, acc.handle, acc.bio], searchQuery)
     );
   }, [accounts, searchQuery]);
 
@@ -351,16 +349,8 @@ export function NewsPage() {
     let result = news.filter(n => matchesCategory(n, activeCategory));
 
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      const cleanQ = q.replace(/^#/, '');
       result = result.filter(n => 
-        (n.title && n.title.toLowerCase().includes(q)) ||
-        (n.content && n.content.toLowerCase().includes(q)) ||
-        (n.title && n.title.toLowerCase().includes(cleanQ)) ||
-        (n.content && n.content.toLowerCase().includes(cleanQ)) ||
-        (n.author && n.author.toLowerCase().includes(cleanQ)) ||
-        (n.authorHandle && n.authorHandle.toLowerCase().includes(cleanQ)) ||
-        (n.category && n.category.toLowerCase().includes(cleanQ))
+        matchArabicSearch([n.title, n.content, n.author, n.authorHandle, n.category], searchQuery)
       );
     }
 

@@ -112,6 +112,7 @@ export function AddCourseModal({
 
   // Timing Editor State for CRN view
   const [isEditingTimings, setIsEditingTimings] = useState(false);
+  const [activeScheduleIdx, setActiveScheduleIdx] = useState<number | null>(null);
   const [customSchedules, setCustomSchedules] = useState<ScheduleItem[]>([]);
 
   // WhatsApp Link Management for CRN view
@@ -191,6 +192,83 @@ export function AddCourseModal({
     setCourseInstructors(next);
     setHasUserEdited(true);
   };
+
+  const renderTeacherSearchBar = () => (
+    <div className="relative text-right w-full">
+      <div className="flex items-center gap-2 bg-slate-50 dark:bg-zinc-800/90 border border-slate-200 dark:border-zinc-700 rounded-xl px-3 py-1.5 focus-within:border-[var(--color-imamu-accent)] transition shadow-xs">
+        <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+        <input
+          type="text"
+          value={teacherSearchQuery}
+          onChange={e => setTeacherSearchQuery(e.target.value)}
+          placeholder="ابحث باسم الدكتور أو بريده..."
+          className="w-full !bg-transparent !border-0 !border-none !shadow-none !ring-0 focus:!ring-0 focus:!border-none focus:!shadow-none text-xs text-slate-900 dark:text-white outline-none placeholder-slate-400 py-1"
+          autoFocus
+        />
+        {loadingDbTeachers && (
+          <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--color-imamu-accent)] shrink-0" />
+        )}
+        <button
+          type="button"
+          onClick={() => { setIsSearchingTeachers(false); setTeacherSearchQuery(''); }}
+          className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-zinc-300 transition cursor-pointer"
+          title="إغلاق البحث"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* Floating Dropdown */}
+      <div className="absolute top-full right-0 left-0 mt-1 z-50 bg-white dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-700 shadow-xl max-h-52 overflow-y-auto divide-y divide-slate-100 dark:divide-zinc-800/80 custom-scrollbar animate-in fade-in zoom-in-95 duration-100 text-right">
+        {loadingDbTeachers && dbTeachers.length === 0 ? (
+          <div className="py-4 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--color-imamu-accent)] shrink-0" />
+            <span>جاري التحميل...</span>
+          </div>
+        ) : filteredDbTeachers.length === 0 ? (
+          <div className="py-3 text-center text-xs text-slate-400">
+            {teacherSearchQuery.trim() ? 'لا توجد نتائج مطابقة' : 'لا يوجد دكاترة في قاعدة البيانات'}
+          </div>
+        ) : (
+          filteredDbTeachers.map(t => {
+            const isAlreadyAdded = courseInstructors.some(ci => ci.name.toLowerCase() === t.name.toLowerCase());
+            return (
+              <div
+                key={t.id || t.name}
+                onClick={() => !isAlreadyAdded && handleAddTeacher(t)}
+                className={clsx(
+                  "px-3 py-2 flex items-center justify-between gap-2 transition cursor-pointer text-right",
+                  isAlreadyAdded
+                    ? "opacity-40 cursor-not-allowed bg-slate-50/50 dark:bg-zinc-800/30"
+                    : "hover:bg-slate-50 dark:hover:bg-zinc-800/80"
+                )}
+              >
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                    {t.name}
+                  </div>
+                  {t.email && (
+                    <div className="text-[10px] text-slate-400 font-mono truncate" dir="ltr">
+                      {t.email}
+                    </div>
+                  )}
+                </div>
+                <span
+                  className="text-[10.5px] font-bold px-2 py-0.5 rounded-md shrink-0"
+                  style={{
+                    backgroundColor: isAlreadyAdded ? undefined : 'color-mix(in srgb, var(--color-imamu-accent) 15%, transparent)',
+                    color: isAlreadyAdded ? '#888' : 'var(--color-imamu-accent)'
+                  }}
+                >
+                  {isAlreadyAdded ? 'مضاف' : '+ إضافة'}
+                </span>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
 
   // Manual Mode State (after selecting a course from catalog)
   const [searchQuery, setSearchQuery] = useState('');
@@ -436,6 +514,22 @@ export function AddCourseModal({
           name: initialCourse.courseName,
           creditHours: initialCourse.creditHours || 3
         });
+        const teacherFromSched = initialCourse.customSchedule?.find(fs => fs.teacher)?.teacher;
+        const initialPrimary = initialCourse.primaryInstructor || teacherFromSched;
+        let initialInstructors = initialCourse.instructors;
+        if (typeof initialInstructors === 'string') {
+          try {
+            initialInstructors = JSON.parse(initialInstructors);
+          } catch (_) {}
+        }
+        if (!Array.isArray(initialInstructors) || initialInstructors.length === 0) {
+          if (initialPrimary && initialPrimary !== 'غير محدد') {
+            initialInstructors = [{ name: initialPrimary, isPrimary: true }];
+          } else {
+            initialInstructors = [];
+          }
+        }
+        setCourseInstructors(initialInstructors);
         if (initialCourse.customSchedule && initialCourse.customSchedule.length > 0) {
           setManualSchedules(initialCourse.customSchedule);
         }
@@ -481,6 +575,7 @@ export function AddCourseModal({
     setCrnInput('');
     setCrnError(null);
     setIsEditingTimings(false);
+    setActiveScheduleIdx(null);
     setIsEditingWaLink(false);
     setActiveTab('overview');
     setSelectedColor('');
@@ -773,7 +868,7 @@ export function AddCourseModal({
       if (newNames.length > 0 && currentNamesSorted !== newNamesSorted) {
         diffItems.push({
           key: 'instructors',
-          title: 'أستاذ المقرر / هيئة التدريس',
+          title: 'دكتور المقرر / هيئة التدريس',
           iconType: 'user',
           currentDisplay: currentNames.join('، ') || 'غير محدد',
           newDisplay: newNames.join('، ') || 'غير محدد',
@@ -843,7 +938,7 @@ export function AddCourseModal({
         if (newTeachersPerSched && currTeachersPerSched !== newTeachersPerSched) {
           diffItems.push({
             key: 'schedules_teachers',
-            title: 'أساتذة مواعيد المحاضرات',
+            title: 'دكاترة مواعيد المحاضرات',
             iconType: 'users',
             currentDisplay: currTeachersPerSched || 'غير محدد',
             newDisplay: newTeachersPerSched || 'غير محدد',
@@ -986,6 +1081,12 @@ export function AddCourseModal({
     const name = (selectedSubject?.name || code).trim();
     if (!code || !selectedSemId) return;
 
+    const primary = courseInstructors.find(i => i.isPrimary)?.name || courseInstructors[0]?.name || manualSchedules.find(s => s.teacher)?.teacher || initialCourse?.primaryInstructor;
+    const finalSchedules = manualSchedules.map(s => ({
+      ...s,
+      teacher: s.teacher || primary || ''
+    }));
+
     const course: CourseEntry = {
       subjectId: selectedSubject?.id || initialCourse?.subjectId,
       courseCode: code,
@@ -994,10 +1095,10 @@ export function AddCourseModal({
       creditHours: selectedSubject?.creditHours || initialCourse?.creditHours || 3,
       examDate: initialCourse?.examDate,
       examTime: initialCourse?.examTime,
-      customSchedule: manualSchedules,
+      customSchedule: finalSchedules,
       whatsappLink: manualWaLink || initialCourse?.whatsappLink || undefined,
       color: selectedColor || initialCourse?.color || undefined,
-      primaryInstructor: courseInstructors.find(i => i.isPrimary)?.name || courseInstructors[0]?.name || manualSchedules.find(s => s.teacher)?.teacher || initialCourse?.primaryInstructor,
+      primaryInstructor: primary,
       instructors: courseInstructors.length > 0 ? courseInstructors : undefined
     };
     onAddCourseToSemester(selectedSemId, course, initialCourse?.courseCode);
@@ -1508,39 +1609,270 @@ export function AddCourseModal({
                   </button>
                 </div>
 
-                {/* Section WhatsApp Link */}
-                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/40 border border-slate-200 dark:border-zinc-800 space-y-2">
-                  <label className="text-xs font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-2">
-                    <WhatsappIcon className="w-4 h-4 fill-emerald-500" />
-                    <span>رابط قروب الواتساب للشعبة (اختياري)</span>
-                  </label>
-                  <input
-                    type="url"
-                    value={manualWaLink}
-                    onChange={e => {
-                      setManualWaLink(e.target.value);
-                      setHasUserEdited(true);
-                    }}
-                    placeholder="https://chat.whatsapp.com/..."
-                    className="w-full px-3.5 py-2.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:border-emerald-500"
-                    dir="ltr"
-                  />
+                {/* Section WhatsApp Link (ONLY if section has CRN) */}
+                {Boolean(initialCourse?.crn || fetchedSection?.crn) && (
+                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/40 border border-slate-200 dark:border-zinc-800 space-y-2">
+                    <label className="text-xs font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-2">
+                      <WhatsappIcon className="w-4 h-4 fill-emerald-500" />
+                      <span>رابط قروب الواتساب للشعبة (اختياري)</span>
+                    </label>
+                    <input
+                      type="url"
+                      value={manualWaLink}
+                      onChange={e => {
+                        setManualWaLink(e.target.value);
+                        setHasUserEdited(true);
+                      }}
+                      placeholder="https://chat.whatsapp.com/..."
+                      className="w-full px-3.5 py-2.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:border-emerald-500"
+                      dir="ltr"
+                    />
+                  </div>
+                )}
+
+                {/* Lecturer / Instructors Section */}
+                <div className="space-y-2.5">
+                  <div className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 px-1 flex items-center justify-between">
+                    <span>هيئة التدريس ({courseInstructors.length})</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextVal = !(isEditingInstructors || isEditingTimings);
+                        setIsEditingInstructors(nextVal);
+                        setIsEditingTimings(nextVal);
+                        if (!nextVal) {
+                          setIsSearchingTeachers(false);
+                          setActiveScheduleIdx(null);
+                        } else {
+                          setActiveScheduleIdx(null);
+                        }
+                      }}
+                      className={clsx(
+                        "flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-xl border transition cursor-pointer active:scale-95",
+                        (isEditingInstructors || isEditingTimings)
+                          ? "bg-[var(--color-imamu-accent)] text-white border-[var(--color-imamu-accent)] shadow-2xs"
+                          : "text-slate-600 hover:text-slate-900 dark:text-zinc-300 dark:hover:text-white border-slate-200/80 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700 bg-slate-100/60 dark:bg-zinc-800/40"
+                      )}
+                    >
+                      {(isEditingInstructors || isEditingTimings) ? (
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          <span>تم</span>
+                        </>
+                      ) : (
+                        <>
+                          <Pencil className="w-3.5 h-3.5" />
+                          <span>تعديل</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {courseInstructors.length === 0 ? (
+                    <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/40 border border-dashed border-slate-200 dark:border-zinc-700 text-center space-y-2">
+                      <User className="w-5 h-5 mx-auto text-slate-400 opacity-60" />
+                      <p className="text-xs text-slate-500 dark:text-zinc-400">لا يوجد دكتور مضاف لهذا المقرر.</p>
+                      {isSearchingTeachers ? (
+                        <div className="pt-2">
+                          {renderTeacherSearchBar()}
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => { setIsEditingInstructors(true); setIsSearchingTeachers(true); }}
+                          className="px-3 py-1.5 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs inline-flex items-center gap-1"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>إضافة دكتور</span>
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      {courseInstructors.map((inst, idx) => {
+                        const emailToCopy = inst.email || `${(selectedSubject?.code || 'course').toLowerCase()}@imamu.edu.sa`;
+                        return (
+                          <div
+                            key={idx}
+                            className="p-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-800/50 border border-slate-200/80 dark:border-zinc-800 flex items-center justify-between gap-3"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-10 h-10 rounded-2xl bg-stone-100 dark:bg-stone-900/50 border border-[var(--color-imamu-accent)]/20 text-[var(--color-imamu-accent)] flex items-center justify-center shrink-0">
+                                <User className="w-5 h-5" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                                    {inst.name}
+                                  </h4>
+                                  <span
+                                    className={clsx(
+                                      "text-[10px] px-2 py-0.5 rounded-md font-bold shrink-0",
+                                      inst.isPrimary
+                                        ? "bg-stone-100 dark:bg-stone-900/50 text-[var(--color-imamu-accent)]"
+                                        : "bg-slate-200/60 dark:bg-zinc-700 text-slate-600 dark:text-zinc-300"
+                                    )}
+                                  >
+                                    {inst.isPrimary ? 'دكتور رئيسي' : 'دكتور مشارك'}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5 truncate" dir="ltr">
+                                  {emailToCopy}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {isEditingInstructors ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveTeacher(idx)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 text-xs font-bold transition hover:bg-rose-100 dark:hover:bg-rose-900/50 cursor-pointer shadow-2xs"
+                                  title="حذف الدكتور من هذا المقرر"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span className="text-[11px]">حذف</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyEmail(emailToCopy)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-700 text-xs font-bold text-slate-700 dark:text-zinc-300 transition cursor-pointer"
+                                >
+                                  {copiedEmail === emailToCopy ? (
+                                    <>
+                                      <Check className="w-3.5 h-3.5 text-emerald-500" />
+                                      <span className="text-emerald-500 text-[11px]">تم النسخ!</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Copy className="w-3.5 h-3.5 text-slate-400" />
+                                      <span className="text-[11px]">نسخ البريد</span>
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* Add Doctor option shown in place of button while editing */}
+                      {isEditingInstructors && (
+                        isSearchingTeachers ? (
+                          renderTeacherSearchBar()
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setIsSearchingTeachers(true)}
+                            className="w-full py-2 px-3 border border-dashed border-slate-300 dark:border-zinc-700 hover:border-[var(--color-imamu-accent)] rounded-xl text-xs font-bold text-slate-500 dark:text-zinc-400 hover:text-[var(--color-imamu-accent)] transition flex items-center justify-center gap-1.5 bg-slate-50/50 dark:bg-zinc-800/30 cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>إضافة دكتور للمقرر</span>
+                          </button>
+                        )
+                      )}
+                    </>
+                  )}
                 </div>
 
-                {/* TimingEditor (Image 2 style) */}
-                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/40 border border-slate-200 dark:border-zinc-800 space-y-3">
-                  <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-[var(--color-imamu-accent)]" />
-                    <span>تحديد المواعيد والقاعة وأستاذ المادة</span>
-                  </h4>
-                  <TimingEditor
-                    schedules={manualSchedules}
-                    availableTeachers={courseInstructors.map(t => t.name)}
-                    onChange={(newSched) => {
-                      setManualSchedules(newSched);
-                      setHasUserEdited(true);
-                    }}
-                  />
+                {/* Timings Preview Card & Inline TimingEditor */}
+                <div className="space-y-3">
+                  {!isEditingTimings ? (
+                    <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/40 border border-slate-200/80 dark:border-zinc-800 shadow-xs">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-[var(--color-imamu-accent)]" />
+                          <span>أوقات ومواعيد المحاضرات</span>
+                        </span>
+                      </div>
+
+                      {manualSchedules.length === 0 ? (
+                        <div
+                          onClick={() => {
+                            setActiveScheduleIdx(0);
+                            setIsEditingTimings(true);
+                            setIsEditingInstructors(true);
+                          }}
+                          className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-zinc-700 text-center cursor-pointer hover:border-[var(--color-imamu-accent)]/60 transition"
+                        >
+                          <p className="text-xs text-slate-400">انقر هنا لتحديد أيام ومواعيد وقاعة المحاضرة</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {manualSchedules.map((sch, i) => (
+                            <div
+                              key={sch.id || i}
+                              onClick={() => {
+                                setActiveScheduleIdx(i);
+                                setIsEditingTimings(true);
+                                setIsEditingInstructors(true);
+                              }}
+                              className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 hover:border-[var(--color-imamu-accent)]/60 transition cursor-pointer text-xs group"
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="flex gap-1">
+                                  {sch.days.map(d => (
+                                    <span
+                                      key={d}
+                                      className="px-2 py-0.5 rounded-md bg-stone-100 dark:bg-stone-900/50 text-[var(--color-imamu-accent)] font-bold text-[10px]"
+                                    >
+                                      {d}
+                                    </span>
+                                  ))}
+                                </div>
+                                <span className="text-slate-700 dark:text-zinc-300 font-semibold" dir="ltr">
+                                  {sch.startTime} → {sch.endTime}
+                                </span>
+                              </div>
+                              {sch.classroom && (
+                                <span className="text-slate-500 dark:text-zinc-400 flex items-center gap-1 text-[11px]">
+                                  <MapPin className="w-3 h-3 text-[var(--color-imamu-accent)]" />
+                                  القاعة: {sch.classroom}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/40 border border-[var(--color-imamu-accent)]/40 space-y-3">
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-zinc-800">
+                        <span className="text-xs font-bold text-[var(--color-imamu-accent)] flex items-center gap-1.5">
+                          <Clock className="w-4 h-4" />
+                          <span>محرر المواعيد والقاعة</span>
+                        </span>
+                      </div>
+                      <TimingEditor
+                        schedules={manualSchedules}
+                        availableTeachers={courseInstructors.map(t => t.name)}
+                        activeIdx={activeScheduleIdx}
+                        onActiveIdxChange={setActiveScheduleIdx}
+                        onChange={(newSched) => {
+                          setManualSchedules(newSched);
+                          setHasUserEdited(true);
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Delete Course Button placed under محرر المواعيد والقاعة - visible only in edit mode */}
+                  {(isEditingInstructors || isEditingTimings) && initialCourse && onDeleteCourseFromSemester && (
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onDeleteCourseFromSemester(selectedSemId, initialCourse.courseCode, initialCourse.crn);
+                          handleModalClose();
+                        }}
+                        className="w-full py-2.5 px-4 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 border border-rose-500/20 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span>حذف المقرر من هذا الفصل</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1735,122 +2067,55 @@ export function AddCourseModal({
                           <button
                             type="button"
                             onClick={() => {
-                              setIsEditingInstructors(prev => !prev);
-                              if (isEditingInstructors) {
+                              const nextVal = !(isEditingInstructors || isEditingTimings);
+                              setIsEditingInstructors(nextVal);
+                              setIsEditingTimings(nextVal);
+                              if (!nextVal) {
                                 setIsSearchingTeachers(false);
+                                setActiveScheduleIdx(null);
+                              } else {
+                                setActiveScheduleIdx(null);
                               }
                             }}
                             className={clsx(
-                              "flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg border transition cursor-pointer",
-                              isEditingInstructors
+                              "flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-xl border transition cursor-pointer active:scale-95",
+                              (isEditingInstructors || isEditingTimings)
                                 ? "bg-[var(--color-imamu-accent)] text-white border-[var(--color-imamu-accent)] shadow-2xs"
-                                : "text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 border-slate-200/80 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700"
+                                : "text-slate-600 hover:text-slate-900 dark:text-zinc-300 dark:hover:text-white border-slate-200/80 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700 bg-slate-100/60 dark:bg-zinc-800/40"
                             )}
                           >
-                            {isEditingInstructors ? (
+                            {(isEditingInstructors || isEditingTimings) ? (
                               <>
-                                <Check className="w-3 h-3" />
+                                <Check className="w-3.5 h-3.5" />
                                 <span>تم</span>
                               </>
                             ) : (
                               <>
-                                <Pencil className="w-3 h-3" />
+                                <Pencil className="w-3.5 h-3.5" />
                                 <span>تعديل</span>
                               </>
                             )}
                           </button>
                         </div>
 
-                        {/* Compact Searchable Add Teacher with Floating Dropdown */}
-                        {isSearchingTeachers && (
-                          <div className="relative">
-                            <div className="flex items-center gap-2 bg-slate-50 dark:bg-zinc-800/90 border border-slate-200 dark:border-zinc-700 rounded-xl px-3 py-1.5 focus-within:border-[var(--color-imamu-accent)] transition shadow-xs">
-                              <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                              <input
-                                type="text"
-                                value={teacherSearchQuery}
-                                onChange={e => setTeacherSearchQuery(e.target.value)}
-                                placeholder="ابحث باسم الأستاذ أو بريده..."
-                                className="w-full bg-transparent text-xs text-slate-900 dark:text-white outline-none placeholder-slate-400"
-                                autoFocus
-                              />
-                              {loadingDbTeachers && (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--color-imamu-accent)] shrink-0" />
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => { setIsSearchingTeachers(false); setTeacherSearchQuery(''); }}
-                                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-zinc-300 transition cursor-pointer"
-                                title="إغلاق البحث"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-
-                            {/* Floating Dropdown */}
-                            <div className="absolute top-full right-0 left-0 mt-1 z-50 bg-white dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-700 shadow-xl max-h-52 overflow-y-auto divide-y divide-slate-100 dark:divide-zinc-800/80 custom-scrollbar animate-in fade-in zoom-in-95 duration-100">
-                              {loadingDbTeachers && dbTeachers.length === 0 ? (
-                                <div className="py-4 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--color-imamu-accent)] shrink-0" />
-                                  <span>جاري التحميل...</span>
-                                </div>
-                              ) : filteredDbTeachers.length === 0 ? (
-                                <div className="py-3 text-center text-xs text-slate-400">
-                                  {teacherSearchQuery.trim() ? 'لا توجد نتائج مطابقة' : 'لا يوجد أساتذة في قاعدة البيانات'}
-                                </div>
-                              ) : (
-                                filteredDbTeachers.map(t => {
-                                  const isAlreadyAdded = courseInstructors.some(ci => ci.name.toLowerCase() === t.name.toLowerCase());
-                                  return (
-                                    <div
-                                      key={t.id || t.name}
-                                      onClick={() => !isAlreadyAdded && handleAddTeacher(t)}
-                                      className={clsx(
-                                        "px-3 py-2 flex items-center justify-between gap-2 transition cursor-pointer text-right",
-                                        isAlreadyAdded
-                                          ? "opacity-40 cursor-not-allowed bg-slate-50/50 dark:bg-zinc-800/30"
-                                          : "hover:bg-slate-50 dark:hover:bg-zinc-800/80"
-                                      )}
-                                    >
-                                      <div className="min-w-0">
-                                        <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                                          {t.name}
-                                        </div>
-                                        {t.email && (
-                                          <div className="text-[10px] text-slate-400 font-mono truncate" dir="ltr">
-                                            {t.email}
-                                          </div>
-                                        )}
-                                      </div>
-                                      <span
-                                        className="text-[10.5px] font-bold px-2 py-0.5 rounded-md shrink-0"
-                                        style={{
-                                          backgroundColor: isAlreadyAdded ? undefined : 'color-mix(in srgb, var(--color-imamu-accent) 15%, transparent)',
-                                          color: isAlreadyAdded ? '#888' : 'var(--color-imamu-accent)'
-                                        }}
-                                      >
-                                        {isAlreadyAdded ? 'مضاف' : '+ إضافة'}
-                                      </span>
-                                    </div>
-                                  );
-                                })
-                              )}
-                            </div>
-                          </div>
-                        )}
-
                         {courseInstructors.length === 0 ? (
                           <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/40 border border-dashed border-slate-200 dark:border-zinc-700 text-center space-y-2">
                             <User className="w-5 h-5 mx-auto text-slate-400 opacity-60" />
-                            <p className="text-xs text-slate-500 dark:text-zinc-400">لا يوجد أساتذة مسجلين لهذا المقرر حالياً.</p>
-                            <button
-                              type="button"
-                              onClick={() => { setIsEditingInstructors(true); setIsSearchingTeachers(true); }}
-                              className="px-3 py-1.5 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs inline-flex items-center gap-1"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                              <span>إضافة أستاذ</span>
-                            </button>
+                            <p className="text-xs text-slate-500 dark:text-zinc-400">لا يوجد دكاترة مسجلين لهذا المقرر حالياً.</p>
+                            {isSearchingTeachers ? (
+                              <div className="pt-2 text-right">
+                                {renderTeacherSearchBar()}
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => { setIsEditingInstructors(true); setIsSearchingTeachers(true); }}
+                                className="px-3 py-1.5 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs inline-flex items-center gap-1"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>إضافة دكتور</span>
+                              </button>
+                            )}
                           </div>
                         ) : (
                           <>
@@ -1878,7 +2143,7 @@ export function AddCourseModal({
                                               : "bg-slate-200/60 dark:bg-zinc-700 text-slate-600 dark:text-zinc-300"
                                           )}
                                         >
-                                          {inst.isPrimary ? 'أستاذ رئيسي' : 'أستاذ مشارك'}
+                                          {inst.isPrimary ? 'دكتور رئيسي' : 'دكتور مشارك'}
                                         </span>
                                       </div>
                                       <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5 truncate" dir="ltr">
@@ -1894,7 +2159,7 @@ export function AddCourseModal({
                                         type="button"
                                         onClick={() => handleRemoveTeacher(idx)}
                                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 text-xs font-bold transition hover:bg-rose-100 dark:hover:bg-rose-900/50 cursor-pointer shadow-2xs"
-                                        title="حذف الأستاذ من هذا المقرر"
+                                        title="حذف الدكتور من هذا المقرر"
                                       >
                                         <Trash2 className="w-3.5 h-3.5" />
                                         <span className="text-[11px]">حذف</span>
@@ -1924,16 +2189,20 @@ export function AddCourseModal({
                               );
                             })}
 
-                            {/* Add Teacher option shown while editing */}
-                            {isEditingInstructors && !isSearchingTeachers && (
-                              <button
-                                type="button"
-                                onClick={() => setIsSearchingTeachers(true)}
-                                className="w-full py-2 px-3 border border-dashed border-slate-300 dark:border-zinc-700 hover:border-[var(--color-imamu-accent)] rounded-xl text-xs font-bold text-slate-500 dark:text-zinc-400 hover:text-[var(--color-imamu-accent)] transition flex items-center justify-center gap-1.5 bg-slate-50/50 dark:bg-zinc-800/30 cursor-pointer"
-                              >
-                                <Plus className="w-3.5 h-3.5" />
-                                <span>إضافة أستاذ للمقرر</span>
-                              </button>
+                            {/* Add Doctor option shown in place of button while editing */}
+                            {isEditingInstructors && (
+                              isSearchingTeachers ? (
+                                renderTeacherSearchBar()
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => setIsSearchingTeachers(true)}
+                                  className="w-full py-2 px-3 border border-dashed border-slate-300 dark:border-zinc-700 hover:border-[var(--color-imamu-accent)] rounded-xl text-xs font-bold text-slate-500 dark:text-zinc-400 hover:text-[var(--color-imamu-accent)] transition flex items-center justify-center gap-1.5 bg-slate-50/50 dark:bg-zinc-800/30 cursor-pointer"
+                                >
+                                  <Plus className="w-3.5 h-3.5" />
+                                  <span>إضافة دكتور للمقرر</span>
+                                </button>
+                              )
                             )}
                           </>
                         )}
@@ -1943,18 +2212,11 @@ export function AddCourseModal({
                       <div className="space-y-3">
                         {!isEditingTimings ? (
                           /* Timings Preview Card */
-                          <div
-                            onClick={() => setIsEditingTimings(true)}
-                            className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/40 border border-slate-200/80 dark:border-zinc-800 hover:border-[var(--color-imamu-accent)]/50 transition cursor-pointer group shadow-xs"
-                          >
+                          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/40 border border-slate-200/80 dark:border-zinc-800 shadow-xs">
                             <div className="flex items-center justify-between mb-3">
                               <span className="text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-2">
                                 <Clock className="w-4 h-4 text-[var(--color-imamu-accent)]" />
-                                أوقات ومواعيد المحاضرات
-                              </span>
-                              <span className="text-[11px] font-bold text-[var(--color-imamu-accent)] group-hover:underline flex items-center gap-1">
-                                <Edit3 className="w-3.5 h-3.5" />
-                                تعديل المواعيد والقاعة
+                                <span>أوقات ومواعيد المحاضرات</span>
                               </span>
                             </div>
 
@@ -1963,7 +2225,12 @@ export function AddCourseModal({
                               {customSchedules.map((sch, i) => (
                                 <div
                                   key={sch.id || i}
-                                  className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs"
+                                  onClick={() => {
+                                    setActiveScheduleIdx(i);
+                                    setIsEditingTimings(true);
+                                    setIsEditingInstructors(true);
+                                  }}
+                                  className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 hover:border-[var(--color-imamu-accent)]/60 transition cursor-pointer text-xs group"
                                 >
                                   <div className="flex items-center gap-2">
                                     <div className="flex gap-1">
@@ -1996,24 +2263,36 @@ export function AddCourseModal({
                             <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-zinc-800">
                               <span className="text-xs font-bold text-[var(--color-imamu-accent)] flex items-center gap-1.5">
                                 <Clock className="w-4 h-4" />
-                                محرر المواعيد والقاعة
+                                <span>محرر المواعيد والقاعة</span>
                               </span>
-                              <button
-                                type="button"
-                                onClick={() => setIsEditingTimings(false)}
-                                className="px-3.5 py-1.5 rounded-xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-xs font-bold transition cursor-pointer shadow-sm"
-                              >
-                                حفظ والرجوع للنظرة العامة ✓
-                              </button>
                             </div>
                             <TimingEditor
                               schedules={customSchedules}
                               availableTeachers={courseInstructors.map(t => t.name)}
+                              activeIdx={activeScheduleIdx}
+                              onActiveIdxChange={setActiveScheduleIdx}
                               onChange={(newSched) => {
                                 setCustomSchedules(newSched);
                                 setHasUserEdited(true);
                               }}
                             />
+                          </div>
+                        )}
+
+                        {/* Delete Course Button placed under محرر المواعيد والقاعة - visible only in edit mode */}
+                        {(isEditingInstructors || isEditingTimings) && initialCourse && onDeleteCourseFromSemester && (
+                          <div className="pt-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onDeleteCourseFromSemester(selectedSemId, initialCourse.courseCode, initialCourse.crn);
+                                handleModalClose();
+                              }}
+                              className="w-full py-2.5 px-4 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 border border-rose-500/20 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              <span>حذف المقرر من هذا الفصل</span>
+                            </button>
                           </div>
                         )}
                       </div>
@@ -2169,22 +2448,7 @@ export function AddCourseModal({
         {/* ─── Bottom Action Bar ─── */}
         <div className="px-5 py-3.5 border-t border-slate-200/80 dark:border-zinc-800 bg-slate-50/60 dark:bg-zinc-900/60 backdrop-blur-md flex items-center justify-between gap-2.5 shrink-0">
           <div className="flex items-center gap-2">
-            {initialCourse && onDeleteCourseFromSemester && (
-              <button
-                type="button"
-                onClick={() => {
-                  onDeleteCourseFromSemester(selectedSemId, initialCourse.courseCode, initialCourse.crn);
-                  handleModalClose();
-                }}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-slate-500 hover:text-rose-600 dark:text-zinc-400 dark:hover:text-rose-400 hover:bg-rose-500/10 text-xs font-bold transition cursor-pointer active:scale-95"
-                title="حذف المقرر من الفصل"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>حذف المقرر</span>
-              </button>
-            )}
-
-            {initialCourse && (
+            {initialCourse && Boolean(initialCourse.crn) && (
               <button
                 type="button"
                 onClick={handleCheckCourseUpdates}
@@ -2347,61 +2611,78 @@ export function AddCourseModal({
                       </div>
 
                       {/* Schedule Item Diff */}
-                      {item.key === 'schedules_times' && item.currentSchedules && item.newSchedules ? (
-                        <div className="space-y-3 pt-1">
-                          {/* Current */}
-                          <div className="space-y-1.5">
-                            <span className="text-[11px] font-semibold text-slate-400 dark:text-zinc-500 block">
-                              الحالي في جدولك:
-                            </span>
-                            <div className="flex flex-wrap gap-2 opacity-60">
-                              {item.currentSchedules.map((s, idx) => (
-                                <div key={idx} className="flex items-center gap-2 p-2 rounded-xl bg-slate-100 dark:bg-zinc-800 text-xs">
-                                  <div className="flex gap-1">
-                                    {s.days.map(d => (
-                                      <span key={d} className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-zinc-700 text-slate-600 dark:text-zinc-300 font-bold text-[10px]">
-                                        {d}
-                                      </span>
-                                    ))}
-                                  </div>
-                                  <span dir="ltr" className="line-through text-slate-500 dark:text-zinc-400 font-medium">
-                                    {s.startTime} → {s.endTime}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
+                      {/* Schedule Item Diff */}
+                      {item.key === 'schedules_times' && item.currentSchedules && item.newSchedules ? (() => {
+                        const normalizeDays = (days: string[] = []) =>
+                          days.map(d => DAY_MAP_AR[d.trim()] || d.trim()).sort().join(',');
+                        const normalizeTime = (t: string = '') => t.trim().toLowerCase().replace(/\s+/g, ' ');
+                        const isTimingMatch = (a: ScheduleItem, b: ScheduleItem) =>
+                          normalizeDays(a.days) === normalizeDays(b.days) &&
+                          normalizeTime(a.startTime) === normalizeTime(b.startTime) &&
+                          normalizeTime(a.endTime) === normalizeTime(b.endTime);
 
-                          {/* New */}
-                          <div className="space-y-1.5">
-                            <span className="text-[11px] font-bold text-[var(--color-imamu-accent)] block">
-                              الجديد في النظام:
-                            </span>
-                            <div className="flex flex-wrap gap-2">
-                              {item.newSchedules.map((s, idx) => (
-                                <div key={idx} className="flex items-center gap-2 p-2 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-xs shadow-2xs">
-                                  <div className="flex gap-1">
-                                    {s.days.map(d => (
-                                      <span key={d} className="px-1.5 py-0.5 rounded bg-stone-100 dark:bg-stone-900/50 text-[var(--color-imamu-accent)] font-bold text-[10px]">
-                                        {d}
-                                      </span>
-                                    ))}
-                                  </div>
-                                  <span dir="ltr" className="font-bold text-slate-800 dark:text-white">
-                                    {s.startTime} → {s.endTime}
-                                  </span>
-                                  {s.classroom && (
-                                    <span className="text-slate-500 dark:text-zinc-400 flex items-center gap-1 text-[11px] mr-1">
-                                      <MapPin className="w-3 h-3 text-[var(--color-imamu-accent)]" />
-                                      {s.classroom}
+                        const changedCurrent = item.currentSchedules.filter(c => !item.newSchedules!.some(n => isTimingMatch(c, n)));
+                        const changedNew = item.newSchedules.filter(n => !item.currentSchedules!.some(c => isTimingMatch(c, n)));
+
+                        const displayCurrent = changedCurrent.length > 0 ? changedCurrent : item.currentSchedules;
+                        const displayNew = changedNew.length > 0 ? changedNew : item.newSchedules;
+
+                        return (
+                          <div className="space-y-3 pt-1">
+                            {/* Current */}
+                            <div className="space-y-1.5">
+                              <span className="text-[11px] font-semibold text-slate-400 dark:text-zinc-500 block">
+                                الحالي في جدولك:
+                              </span>
+                              <div className="flex flex-wrap gap-2 opacity-60">
+                                {displayCurrent.map((s, idx) => (
+                                  <div key={idx} className="flex items-center gap-2 p-2 rounded-xl bg-slate-100 dark:bg-zinc-800 text-xs">
+                                    <div className="flex gap-1">
+                                      {s.days.map(d => (
+                                        <span key={d} className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-zinc-700 text-slate-600 dark:text-zinc-300 font-bold text-[10px]">
+                                          {d}
+                                        </span>
+                                      ))}
+                                    </div>
+                                    <span dir="ltr" className="line-through text-slate-500 dark:text-zinc-400 font-medium">
+                                      {s.startTime} → {s.endTime}
                                     </span>
-                                  )}
-                                </div>
-                              ))}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* New */}
+                            <div className="space-y-1.5">
+                              <span className="text-[11px] font-bold text-[var(--color-imamu-accent)] block">
+                                الجديد في النظام:
+                              </span>
+                              <div className="flex flex-wrap gap-2">
+                                {displayNew.map((s, idx) => (
+                                  <div key={idx} className="flex items-center gap-2 p-2 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-xs shadow-2xs">
+                                    <div className="flex gap-1">
+                                      {s.days.map(d => (
+                                        <span key={d} className="px-1.5 py-0.5 rounded bg-stone-100 dark:bg-stone-900/50 text-[var(--color-imamu-accent)] font-bold text-[10px]">
+                                          {d}
+                                        </span>
+                                      ))}
+                                    </div>
+                                    <span dir="ltr" className="font-bold text-slate-800 dark:text-white">
+                                      {s.startTime} → {s.endTime}
+                                    </span>
+                                    {s.classroom && (
+                                      <span className="text-slate-500 dark:text-zinc-400 flex items-center gap-1 text-[11px] mr-1">
+                                        <MapPin className="w-3 h-3 text-[var(--color-imamu-accent)]" />
+                                        {s.classroom}
+                                      </span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ) : (
+                        );
+                      })() : (
                         /* Non-schedule diffs (Instructors, classroom, exam) */
                         <div className="space-y-2 pt-1 text-xs">
                           <div className="flex items-start gap-2">

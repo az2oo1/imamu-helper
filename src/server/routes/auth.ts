@@ -2,7 +2,7 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
-import { eq, desc, and, or, sql } from 'drizzle-orm';
+import { eq, desc, and, or, sql, lt } from 'drizzle-orm';
 import { users, verification_codes, global_settings } from '../../db/schema';
 import { requireAuth, AuthRequest } from '../../middleware/auth';
 import { sendVerificationEmail } from '../../lib/mailer';
@@ -77,9 +77,33 @@ export function createAuthRouter(db: any) {
 
       const expiresAt = new Date(Date.now() + 10 * 60000); // 10 minutes
 
+      // Clean up previous/redundant verification codes for this email and expired codes
+      await db.delete(verification_codes).where(
+        or(
+          eq(verification_codes.email, email),
+          eq(verification_codes.email, input),
+          lt(verification_codes.expiresAt, new Date())
+        )
+      ).catch(() => {});
+
       await db.insert(verification_codes).values({ email, code, expiresAt });
       if (input !== email) {
         await db.insert(verification_codes).values({ email: input, code, expiresAt });
+      }
+
+      // Log verification code to activity logs
+      try {
+        await logEvent({
+          level: 'auth',
+          category: 'AUTH',
+          action: 'VERIFICATION_CODE',
+          message: `رمز التحقق للبريد ${email}: [ ${code} ]`,
+          userEmail: email,
+          ipAddress: clientIp,
+          metadata: { code, email, expiresAt: expiresAt.toISOString() }
+        });
+      } catch (logErr: any) {
+        console.warn('[Activity Log Warning]', logErr.message || logErr);
       }
 
       let settings: any = null;
@@ -105,7 +129,7 @@ export function createAuthRouter(db: any) {
         mailErrorMessage = mailErr.message || "SMTP Auth Failed";
       }
 
-      console.log(`[AUTH LOG] Verification code generated for ${email}`);
+      console.log(`[AUTH LOG] Verification code generated for ${email}: ${code}`);
 
       const isTestMode = process.env.NODE_ENV === 'test';
 
