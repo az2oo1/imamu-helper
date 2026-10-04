@@ -420,7 +420,6 @@ export function createAuthenticatedAccountsRouter(db: any) {
         authorAvatar,
         authorId: req.user.uid,
         entityId: String(account.id),
-        imageUrl: coverImage,
         images: JSON.stringify(imageList),
         readTime,
         isFeatured: !!isFeatured,

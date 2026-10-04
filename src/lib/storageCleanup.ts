@@ -125,8 +125,13 @@ export async function cleanupUnregisteredStorageFiles(db: any): Promise<CleanupR
   // 1. Clean Garage S3 Object Storage Buckets
   const s3Client = getS3Client();
   if (s3Client) {
+    const plansBucket = process.env.S3_BUCKET_PLANS || process.env.S3_BUCKET_PDFS || 'imamu-plans';
     const buckets = getAllBucketNames();
     for (const bucketName of buckets) {
+      // Study plan PDFs are organized directly in the plans bucket by major ID, not indexed as database column URLs
+      if (bucketName === plansBucket) {
+        continue;
+      }
       try {
         let isTruncated = true;
         let continuationToken: string | undefined = undefined;

@@ -9,6 +9,7 @@ import { requestLogger, logger } from "./src/middleware/logger";
 import { getFileFromStorage, ensureAllBucketsExist } from "./src/lib/storage";
 
 import { extractTelegramChannelPosts } from './src/server/services/telegram';
+import { cleanupUnregisteredStorageFiles } from './src/lib/storageCleanup';
 import { news_sources } from './src/db/schema';
 import { sql } from 'drizzle-orm';
 import { generalApiLimiter, authApiLimiter } from './src/middleware/rateLimiter';
@@ -236,6 +237,51 @@ async function startServer() {
   };
 
   startPeriodicTelegramFetcher();
+
+  // Start periodic storage cleanup worker (runs daily to purge unreferenced S3 & disk files)
+  const startPeriodicStorageCleanup = () => {
+    if (process.env.DISABLE_BACKGROUND_WORKERS === 'true') {
+      return;
+    }
+
+    const STORAGE_CLEANUP_LOCK_ID = 84729105;
+
+    const runStorageCleanup = async () => {
+      let lockAcquired = true;
+      try {
+        const lockResult: any = await db.execute(sql`SELECT pg_try_advisory_lock(${STORAGE_CLEANUP_LOCK_ID}) as locked`);
+        lockAcquired = lockResult?.rows?.[0]?.locked ?? true;
+      } catch (_e) {
+        lockAcquired = true;
+      }
+
+      if (!lockAcquired) {
+        return;
+      }
+
+      try {
+        logger.info('[Storage Cleanup] Starting scheduled purge of unreferenced storage files...');
+        const result = await cleanupUnregisteredStorageFiles(db);
+        if (result.totalDeletedCount > 0) {
+          logger.info(`[Storage Cleanup] Purged ${result.totalDeletedCount} unreferenced files (${(result.totalFreedBytes / 1024 / 1024).toFixed(2)} MB freed).`);
+        } else {
+          logger.info('[Storage Cleanup] Storage is clean. Zero unreferenced files found.');
+        }
+      } catch (err: any) {
+        logger.warn('[Storage Cleanup Error]', err.message || err);
+      } finally {
+        try {
+          await db.execute(sql`SELECT pg_advisory_unlock(${STORAGE_CLEANUP_LOCK_ID})`);
+        } catch (_e) {}
+      }
+    };
+
+    // Run first cleanup 1 minute after server boot, then every 24 hours
+    setTimeout(runStorageCleanup, 60 * 1000);
+    setInterval(runStorageCleanup, 24 * 60 * 60 * 1000);
+  };
+
+  startPeriodicStorageCleanup();
 
   // JSON 404 fallback for unmatched /api routes (prevents Next.js HTML 404 rendering)
   app.all("/api/*", (req, res) => {

@@ -285,6 +285,8 @@ export async function extractTelegramChannelPosts(
       }
     }
 
+    const postImages = finalPhotoUrl ? JSON.stringify([finalPhotoUrl]) : null;
+
     await db.insert(news).values({
       content: postContent,
       source: channelHandle,
@@ -292,7 +294,7 @@ export async function extractTelegramChannelPosts(
       authorHandle: targetAuthorHandle,
       authorAvatar: targetAuthorAvatar,
       entityId: targetEntityId,
-      imageUrl: finalPhotoUrl,
+      images: postImages,
       videoUrl: post.videoUrl || null,
       date: post.date,
       tweetId: post.tweetId,
