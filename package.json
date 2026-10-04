@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "mkdir -p dist public && next build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "build": "node -e \"fs.mkdirSync('dist',{recursive:true});fs.mkdirSync('public',{recursive:true})\" && next build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "NODE_ENV=production node dist/server.cjs",
     "clean": "rm -rf dist .next",
     "lint": "tsc --noEmit",
@@ -15,10 +15,7 @@
     "test:tier2": "tsx --test tests/auth_tier2.test.ts",
     "test:tier3": "tsx --test tests/auth_tier3.test.ts",
     "test:tier4": "tsx --test tests/auth_tier4.test.ts",
-    "test:full": "tsx --test tests/full_app_crud.test.ts",
-    "wizard": "tsx scripts/setup-wizard.ts",
-    "create-user": "tsx scripts/setup-wizard.ts",
-    "extract:courses": "node --experimental-websocket scripts/extract-courses.cjs"
+    "test:full": "tsx --test tests/full_app_crud.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1131.0",

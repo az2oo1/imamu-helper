@@ -40,14 +40,19 @@ COPY package*.json ./
 # Install only production dependencies
 RUN npm ci --omit=dev
 
-# Copy built artifacts and scripts from builder
+# Copy built artifacts from builder
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/drizzle ./drizzle
-COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/server.ts ./server.ts
+
+# Ensure runtime directories exist with appropriate ownership
+RUN mkdir -p /app/uploads /app/.data && chown -R node:node /app
+
+# Run as non-root user for security best practices
+USER node
 
 # Expose port
 EXPOSE 3000

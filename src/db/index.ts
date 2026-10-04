@@ -543,10 +543,18 @@ async function initializeDatabase() {
 
     let connectedPool: Pool | null = null;
 
+    const maxPool = Number(process.env.DB_POOL_MAX) || 10;
+    const minPool = Number(process.env.DB_POOL_MIN) || 2;
+    const idleTimeoutMillis = Number(process.env.DB_POOL_IDLE_TIMEOUT_MS) || 10000;
+    const connectionTimeoutMillis = Number(process.env.DB_CONNECTION_TIMEOUT_MS) || 5000;
+
     if (dbUrl) {
       const poolConfig: PoolConfig = {
         connectionString: dbUrl,
-        connectionTimeoutMillis: 3000,
+        connectionTimeoutMillis,
+        max: maxPool,
+        min: minPool,
+        idleTimeoutMillis,
       };
       if ((process.env.SQL_SSL === 'true' || dbUrl.includes('sslmode=require')) && !dbUrl.includes('sslmode=disable')) {
         poolConfig.ssl = {
@@ -582,7 +590,10 @@ async function initializeDatabase() {
           password: process.env.SQL_PASSWORD || '',
           database: process.env.SQL_DB_NAME || 'imamu',
           port,
-          connectionTimeoutMillis: 3000,
+          connectionTimeoutMillis,
+          max: maxPool,
+          min: minPool,
+          idleTimeoutMillis,
         };
 
         if (process.env.SQL_SSL === 'true') {
@@ -658,3 +669,37 @@ initializeDatabase().catch(err => {
   console.error('[DB] Critical database initialization error:', err);
   resolveDbReady();
 });
+
+export async function checkDatabaseHealth(): Promise<{ status: 'healthy' | 'degraded' | 'unhealthy'; isPrimary: boolean; details?: string }> {
+  try {
+    if (usingPrimary && primaryPool) {
+      await primaryPool.query('SELECT 1');
+      return { status: 'healthy', isPrimary: true };
+    }
+    if (activeDb) {
+      if (process.env.DISABLE_PGLITE_FALLBACK === 'true') {
+        return { status: 'unhealthy', isPrimary: false, details: 'Primary database connection unavailable and PGlite fallback is disabled' };
+      }
+      return { status: 'degraded', isPrimary: false, details: 'Operating on embedded fallback database' };
+    }
+    return { status: 'unhealthy', isPrimary: false, details: 'No active database instance available' };
+  } catch (err: any) {
+    return { status: 'unhealthy', isPrimary: false, details: err.message || String(err) };
+  }
+}
+
+export async function closeDatabaseConnections(): Promise<void> {
+  if (healthCheckTimer) {
+    clearInterval(healthCheckTimer);
+    healthCheckTimer = null;
+  }
+  if (primaryPool) {
+    try {
+      await primaryPool.end();
+      console.log('[DB] Primary database pool closed.');
+    } catch (e) {
+      console.warn('[DB] Error closing database pool:', e);
+    }
+  }
+}
+

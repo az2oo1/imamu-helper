@@ -4,20 +4,6 @@ A comprehensive academic companion application designed for Imam Mohammad Ibn Sa
 
 ---
 
-## 🚀 CLI Setup & Management Wizard
-
-Use the interactive terminal wizard to manage users, bypass email verification, audit security, or remove SMTP configuration from `.env` files:
-
-```bash
-# Interactive setup menu
-npm run wizard
-
-# Direct user creation wizard
-npm run create-user
-```
-
----
-
 ## 🛠️ Getting Started
 
 ### 1. Installation
@@ -88,3 +74,22 @@ docker compose exec app bash
 
 Full setup, backup configuration and the CockroachDB → PostgreSQL data
 migration steps are in [`deploy/STACK.md`](deploy/STACK.md).
+
+---
+
+## ☸️ Kubernetes & Scalability
+
+The application is fully containerized and architected for high availability and horizontal scaling across multiple pods:
+
+- **Horizontal Pod Autoscaler (HPA)**: Auto-scales from 2 to 10 replicas based on CPU/memory demand.
+- **Stateless Architecture**: Authenticates via stateless JWT tokens with centralized S3 object storage.
+- **Resilience & Probes**: Kubernetes liveness (`/healthz`) and readiness (`/readyz`) probes with zero-downtime rolling updates.
+- **Connection Pooling**: Configurable PostgreSQL connection pools per pod replica to avoid pool exhaustion.
+
+Full Kubernetes manifests, kustomize configuration, and operations documentation are in [`deploy/KUBERNETES.md`](deploy/KUBERNETES.md).
+
+```bash
+# Deploy to Kubernetes cluster via Kustomize
+kubectl apply -k deploy/k8s
+```
+

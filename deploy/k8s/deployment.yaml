@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: imamu-helper
+  namespace: imamu
+  labels:
+    app.kubernetes.io/name: imamu-helper
+    app.kubernetes.io/component: web
+    app.kubernetes.io/part-of: imamu-helper
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: imamu-helper
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: imamu-helper
+        app.kubernetes.io/component: web
+        app.kubernetes.io/part-of: imamu-helper
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: app
+          image: ghcr.io/az2oo1/imamu-helper:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: imamu-config
+            - secretRef:
+                name: imamu-secret
+          resources:
+            requests:
+              cpu: 150m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1024Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 4
+            failureThreshold: 2
+          lifecycle:
+            preStop:
+              exec:
+                # Sleep briefly so ingress and kube-proxy drain endpoints before container receives SIGTERM
+                command: ["/bin/sh", "-c", "sleep 5"]
+          volumeMounts:
+            - name: app-temp
+              mountPath: /tmp
+      volumes:
+        - name: app-temp
+          emptyDir: {}

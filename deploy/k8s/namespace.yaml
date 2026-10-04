@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: imamu
+  labels:
+    app.kubernetes.io/name: imamu-helper
+    app.kubernetes.io/part-of: imamu-helper

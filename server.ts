@@ -4,7 +4,7 @@ import compression from "compression";
 import path from "path";
 import fs from "fs";
 import next from "next";
-import { getDb } from "./src/db/index";
+import { getDb, checkDatabaseHealth, closeDatabaseConnections } from "./src/db/index";
 import { requestLogger, logger } from "./src/middleware/logger";
 import { getFileFromStorage, ensureAllBucketsExist } from "./src/lib/storage";
 
@@ -27,7 +27,13 @@ async function startServer() {
   const db = await getDb();
 
   const app = express();
-  app.set('trust proxy', 1);
+  const trustProxyEnv = process.env.TRUST_PROXY;
+  if (trustProxyEnv !== undefined) {
+    const parsedNum = Number(trustProxyEnv);
+    app.set('trust proxy', isNaN(parsedNum) ? (trustProxyEnv === 'true' ? true : trustProxyEnv === 'false' ? false : trustProxyEnv) : parsedNum);
+  } else {
+    app.set('trust proxy', 1);
+  }
   app.use(requestLogger);
   app.use(compression());
   const PORT = Number(process.env.PORT) || 3000;
@@ -121,10 +127,44 @@ async function startServer() {
   // Ensure all dedicated S3 buckets exist in Garage Object Storage in the background
   ensureAllBucketsExist().catch(err => console.warn('[Storage] Bucket init notice:', err.message || err));
 
-  // Health check API
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok" });
-  });
+  let isShuttingDown = false;
+
+  // Kubernetes Liveness Probes: /healthz & /api/health
+  const handleLiveness = (_req: express.Request, res: express.Response) => {
+    res.json({
+      status: "ok",
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString()
+    });
+  };
+  app.get("/healthz", handleLiveness);
+  app.get("/api/health", handleLiveness);
+
+  // Kubernetes Readiness Probes: /readyz & /api/ready
+  const handleReadiness = async (_req: express.Request, res: express.Response) => {
+    if (isShuttingDown) {
+      return res.status(503).json({
+        status: "shutting_down",
+        message: "Server is in graceful shutdown process"
+      });
+    }
+    const dbHealth = await checkDatabaseHealth();
+    if (dbHealth.status === 'unhealthy') {
+      return res.status(503).json({
+        status: "unhealthy",
+        database: dbHealth,
+        timestamp: new Date().toISOString()
+      });
+    }
+    return res.status(200).json({
+      status: "ready",
+      database: dbHealth,
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString()
+    });
+  };
+  app.get("/readyz", handleReadiness);
+  app.get("/api/ready", handleReadiness);
 
   // Apply rate limiting before routes
   app.use("/api/auth", authApiLimiter);
@@ -234,9 +274,44 @@ async function startServer() {
     }
   });
 
-  app.listen(PORT, "0.0.0.0", () => {
+  const server = app.listen(PORT, "0.0.0.0", () => {
     logger.info(`Server running on http://localhost:${PORT}`);
   });
+
+  // Graceful shutdown handling for Kubernetes
+  const gracefulShutdown = (signal: string) => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+    logger.info(`Received ${signal}. Initiating graceful shutdown...`);
+
+    const shutdownTimeoutMs = Number(process.env.SHUTDOWN_TIMEOUT_MS) || 15000;
+    const forceExitTimer = setTimeout(() => {
+      logger.error(`Graceful shutdown timed out (${shutdownTimeoutMs}ms). Forcing exit.`);
+      process.exit(1);
+    }, shutdownTimeoutMs);
+    if (forceExitTimer.unref) forceExitTimer.unref();
+
+    server.close(async (err) => {
+      if (err) {
+        console.error('[Shutdown Error] Error closing HTTP server:', err);
+        logger.error('SYSTEM', 'SHUTDOWN_ERROR', err?.message || String(err));
+        process.exit(1);
+      }
+      logger.info('SYSTEM', 'SHUTDOWN', 'HTTP server closed. Draining database connection pools...');
+      try {
+        await closeDatabaseConnections();
+        logger.info('SYSTEM', 'SHUTDOWN', 'Database connections closed cleanly. Exiting.');
+        process.exit(0);
+      } catch (dbErr: any) {
+        console.error('[Shutdown Error] Error closing database connections:', dbErr);
+        logger.error('SYSTEM', 'DB_SHUTDOWN_ERROR', dbErr?.message || String(dbErr));
+        process.exit(1);
+      }
+    });
+  };
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 
 startServer();

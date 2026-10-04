@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: imamu-config
+  namespace: imamu
+  labels:
+    app.kubernetes.io/name: imamu-helper
+    app.kubernetes.io/part-of: imamu-helper
+data:
+  PORT: "3000"
+  NODE_ENV: "production"
+
+  # PostgreSQL Settings
+  SQL_HOST: "imamu-postgres"
+  SQL_PORT: "5432"
+  SQL_USER: "imamu"
+  SQL_DB_NAME: "imamu"
+  SQL_SSL: "false"
+
+  # Horizontal Scalability & Cluster Resilience
+  DISABLE_BACKGROUND_WORKERS: "false"
+  DISABLE_PGLITE_FALLBACK: "true"
+  DB_POOL_MAX: "10"
+  DB_POOL_MIN: "2"
+  DB_POOL_IDLE_TIMEOUT_MS: "10000"
+  DB_CONNECTION_TIMEOUT_MS: "5000"
+  TRUST_PROXY: "1"
+  SHUTDOWN_TIMEOUT_MS: "15000"
+
+  # Garage / S3-Compatible Object Storage Settings
+  S3_ENDPOINT: "http://imamu-garage:3900"
+  S3_REGION: "garage"
+  S3_FORCE_PATH_STYLE: "true"
+  S3_PUBLIC_URL: "/uploads"
+  S3_BUCKET_NAME: "imamu-uploads"
+  S3_BUCKET_PLANS: "imamu-plans"
+  S3_BUCKET_PFPS: "imamu-pfps"
+  S3_BUCKET_DALILAH: "imamu-dalilah"
+  S3_BUCKET_RESOURCES: "imamu-resources"
+  S3_BUCKET_NEWS: "imamu-news"
+  S3_BUCKET_TUTORIALS: "imamu-tutorials"
+
+  # Application Public URL
+  APP_URL: "https://imamu-helper.example.com"
