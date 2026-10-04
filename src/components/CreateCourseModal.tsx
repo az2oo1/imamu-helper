@@ -11,13 +11,11 @@ interface CreateCourseModalProps {
     creditHours: string;
     level: string;
     whatsappLink: string;
-    driveLink: string;
     description: string;
     syllabus: string;
     freeResourcesUrl: string;
     paidResourcesUrl: string;
     avatarUrl: string;
-    bannerUrl: string;
     tags: string;
   };
   setSubjectForm: React.Dispatch<React.SetStateAction<any>>;

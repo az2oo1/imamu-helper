@@ -60,10 +60,6 @@ const SCHEMA_VERIFICATION_STATEMENTS = [
   )`,
   `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS description text`,
   `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS syllabus text`,
-  `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS free_resources_url text`,
-  `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS paid_resources_url text`,
-  `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS avatar_url text`,
-  `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS banner_url text`,
   `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS tags text`,
   `ALTER TABLE major_courses ADD COLUMN IF NOT EXISTS prereq text`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS student_email text`,
@@ -73,7 +69,6 @@ const SCHEMA_VERIFICATION_STATEMENTS = [
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS active_sem_id text`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS student_tasks text`,
   `CREATE INDEX IF NOT EXISTS idx_users_user_name ON users(user_name)`,
-  `ALTER TABLE course_resources ADD COLUMN IF NOT EXISTS drive_link text`,
   `ALTER TABLE course_resources ADD COLUMN IF NOT EXISTS box_link text`,
   `ALTER TABLE course_resources ADD COLUMN IF NOT EXISTS whatsapp_link text`,
   `ALTER TABLE course_resources ADD COLUMN IF NOT EXISTS free_resources_url text`,
@@ -86,13 +81,11 @@ const SCHEMA_VERIFICATION_STATEMENTS = [
     title text NOT NULL,
     type text NOT NULL DEFAULT 'drive',
     url text NOT NULL,
-    drive_link text,
     box_link text,
     whatsapp_link text,
     free_resources_url text,
     paid_resources_url text,
     avatar_url text,
-    banner_url text,
     description text,
     sections_enabled boolean DEFAULT true,
     created_at timestamp DEFAULT now()
@@ -115,12 +108,18 @@ const SCHEMA_VERIFICATION_STATEMENTS = [
     instructors text,
     schedules text,
     schedule_summary text,
+    created_at timestamp DEFAULT now()
+  )`,
+  `CREATE TABLE IF NOT EXISTS community_section_info (
+    id serial PRIMARY KEY,
+    section_id integer NOT NULL REFERENCES course_sections(id) ON DELETE CASCADE,
     section_name text,
     whatsapp_link text,
     phone text,
     published_by_user_id text,
     published_by_user_name text,
-    created_at timestamp DEFAULT now()
+    created_at timestamp DEFAULT now(),
+    CONSTRAINT community_section_info_section_id_unique UNIQUE (section_id)
   )`,
   `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS course_number text`,
   `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS subject_code text`,
@@ -151,9 +150,6 @@ const SCHEMA_VERIFICATION_STATEMENTS = [
   `ALTER TABLE course_sections ADD COLUMN IF NOT EXISTS instructors text`,
   `ALTER TABLE course_sections ADD COLUMN IF NOT EXISTS schedules text`,
   `ALTER TABLE course_sections ADD COLUMN IF NOT EXISTS schedule_summary text`,
-  `ALTER TABLE course_sections ALTER COLUMN section_name DROP NOT NULL`,
-  `ALTER TABLE course_sections ALTER COLUMN whatsapp_link DROP NOT NULL`,
-  `ALTER TABLE course_sections ALTER COLUMN published_by_user_id DROP NOT NULL`,
   `DROP INDEX IF EXISTS idx_sections_crn_unq`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_sections_crn_term_unq ON course_sections(crn, term)`,
   `CREATE INDEX IF NOT EXISTS idx_sections_course_code ON course_sections(course_code)`,
@@ -171,15 +167,6 @@ const SCHEMA_VERIFICATION_STATEMENTS = [
     ip_address text,
     user_agent text,
     metadata text,
-    created_at timestamp DEFAULT now()
-  )`,
-  `CREATE TABLE IF NOT EXISTS tools (
-    id serial PRIMARY KEY,
-    title text NOT NULL,
-    description text NOT NULL,
-    link text NOT NULL,
-    icon text,
-    category text,
     created_at timestamp DEFAULT now()
   )`,
   `CREATE TABLE IF NOT EXISTS contributors (
@@ -209,7 +196,6 @@ const SCHEMA_VERIFICATION_STATEMENTS = [
   `ALTER TABLE events ADD COLUMN IF NOT EXISTS user_id text`,
   `ALTER TABLE events ADD COLUMN IF NOT EXISTS location text`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS admin_permissions text`,
-  `ALTER TABLE news_likes ALTER COLUMN news_id TYPE bigint`,
   `ALTER TABLE news_comments ALTER COLUMN news_id TYPE bigint`,
   `ALTER TABLE news ADD COLUMN IF NOT EXISTS title text`,
   `ALTER TABLE news ADD COLUMN IF NOT EXISTS excerpt text`,
@@ -224,10 +210,10 @@ const SCHEMA_VERIFICATION_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS news_bookmarks (
     id serial PRIMARY KEY,
     user_id text NOT NULL,
-    news_id bigint NOT NULL,
+    news_id integer NOT NULL REFERENCES news(id) ON DELETE CASCADE,
+    created_at timestamp DEFAULT now(),
+    CONSTRAINT news_bookmarks_user_news_unique UNIQUE (user_id, news_id)
   )`,
-  `ALTER TABLE tutorials ALTER COLUMN section_id TYPE bigint`,
-  `ALTER TABLE tutorial_comments ALTER COLUMN tutorial_id TYPE bigint`,
   `ALTER TABLE news_sources ADD COLUMN IF NOT EXISTS display_name text`,
   `ALTER TABLE news_sources ADD COLUMN IF NOT EXISTS bio text`,
   `ALTER TABLE news_sources ADD COLUMN IF NOT EXISTS banner_url text`,
@@ -252,6 +238,15 @@ const SCHEMA_VERIFICATION_STATEMENTS = [
     feedback_type text DEFAULT 'bug_report' NOT NULL,
     comment text,
     status text DEFAULT 'pending' NOT NULL,
+    created_at timestamp DEFAULT now()
+  )`,
+  `CREATE TABLE IF NOT EXISTS tools (
+    id serial PRIMARY KEY,
+    title text NOT NULL,
+    description text,
+    link text NOT NULL,
+    icon text,
+    category text,
     created_at timestamp DEFAULT now()
   )`
 ];
@@ -298,6 +293,15 @@ async function applySchemaVerifications(runner: (sql: string) => Promise<any>) {
   }
 }
 
+function triggerFallback(err: any): void {
+  if (process.env.DISABLE_PGLITE_FALLBACK === 'true') {
+    throw err;
+  }
+  console.warn('[DB Resilience] Primary DB connection lost, falling back to PGlite:', err.message || err);
+  usingPrimary = false;
+  activeDb = fallbackDb;
+}
+
 function createResilientProxy() {
   return new Proxy({}, {
     get(_target, prop: string | symbol) {
@@ -317,9 +321,7 @@ function createResilientProxy() {
                       return await primaryDb.query[tableProp][methodProp](...args);
                     } catch (err: any) {
                       if (isConnectionError(err)) {
-                        console.warn(`[DB Resilience] Primary DB connection lost, falling back to PGlite:`, err.message || err);
-                        usingPrimary = false;
-                        activeDb = fallbackDb;
+                        triggerFallback(err);
                       } else {
                         throw err;
                       }
@@ -340,9 +342,7 @@ function createResilientProxy() {
               return await primaryDb.execute(...args);
             } catch (err: any) {
               if (isConnectionError(err)) {
-                console.warn('[DB Resilience] Primary DB connection lost, falling back to PGlite:', err.message || err);
-                usingPrimary = false;
-                activeDb = fallbackDb;
+                triggerFallback(err);
               } else {
                 throw err;
               }
@@ -359,9 +359,7 @@ function createResilientProxy() {
               return await primaryDb.transaction(...args);
             } catch (err: any) {
               if (isConnectionError(err)) {
-                console.warn('[DB Resilience] Primary DB connection lost, falling back to PGlite:', err.message || err);
-                usingPrimary = false;
-                activeDb = fallbackDb;
+                triggerFallback(err);
               } else {
                 throw err;
               }
@@ -401,9 +399,7 @@ function createChainBuilder(initialMethod: string, initialArgs: any[]) {
                 return await current;
               } catch (err: any) {
                 if (isConnectionError(err)) {
-                  console.warn('[DB Resilience] Primary DB connection lost, falling back to PGlite:', err.message || err);
-                  usingPrimary = false;
-                  activeDb = fallbackDb;
+                  triggerFallback(err);
                 } else {
                   throw err;
                 }

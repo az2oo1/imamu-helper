@@ -17,19 +17,16 @@ const DEFAULT_FALLBACK_MAJORS = [
   {
     id: 1,
     name: 'علوم الحاسب',
-    pdfUrl: '',
     courses: []
   },
   {
     id: 2,
     name: 'تقنية المعلومات',
-    pdfUrl: '',
     courses: []
   },
   {
     id: 3,
     name: 'نظم المعلومات',
-    pdfUrl: '',
     courses: []
   }
 ];

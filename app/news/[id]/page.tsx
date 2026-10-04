@@ -33,7 +33,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     const title = item.title || 'خبر جامعي';
     const cleanContent = item.content ? item.content.replace(/<[^>]*>/g, '').trim() : '';
     const description = item.excerpt || cleanContent.slice(0, 160) || 'تفاصيل الخبر الأكاديمي والطلابي على منصة مساعد الإمام';
-    const image = item.imageUrl || '/logo_light.png';
+    let image = '/logo_light.png';
+    try {
+      const parsed = item.images ? (typeof item.images === 'string' ? JSON.parse(item.images) : item.images) : [];
+      if (parsed.length > 0) image = parsed[0];
+    } catch {}
 
     return {
       title: `${title} | أخبار الإمام`,

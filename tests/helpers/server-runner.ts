@@ -5,7 +5,11 @@ const DEFAULT_PORT = Number(process.env.TEST_PORT) || 3001;
 
 function clearPort(port: number) {
   try {
-    execSync(`fuser -k -9 ${port}/tcp`, { stdio: 'ignore' });
+    if (process.platform === 'win32') {
+      execSync(`powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort ${port} -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"`, { stdio: 'ignore' });
+    } else {
+      execSync(`fuser -k -9 ${port}/tcp`, { stdio: 'ignore' });
+    }
   } catch (_e) {}
 }
 
@@ -22,45 +26,48 @@ export async function ensureServerRunning(port: number = DEFAULT_PORT): Promise<
   clearPort(port);
   await new Promise((r) => setTimeout(r, 200));
 
-  serverProcess = spawn('npx', ['tsx', 'server.ts'], {
+  const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+  let startupError = '';
+  serverProcess = spawn(npxCmd, ['tsx', 'server.ts'], {
+    shell: process.platform === 'win32',
     env: {
       ...process.env,
       PORT: port.toString(),
       NODE_ENV: 'test',
     },
-    stdio: process.env.DEBUG_TEST_SERVER ? ['ignore', 'pipe', 'pipe'] : 'ignore',
+    stdio: ['ignore', 'pipe', 'pipe'],
   });
 
-  serverProcess.unref();
-
-  if (process.env.DEBUG_TEST_SERVER) {
-    serverProcess.stdout?.on('data', (chunk) => {
-      console.log(`[Server stdout] ${chunk.toString().trim()}`);
-    });
-    serverProcess.stderr?.on('data', (chunk) => {
-      console.error(`[Server stderr] ${chunk.toString().trim()}`);
-    });
-    (serverProcess.stdout as any)?.unref?.();
-    (serverProcess.stderr as any)?.unref?.();
-  }
+  serverProcess.stderr?.on('data', (chunk) => {
+    startupError += chunk.toString();
+  });
 
   const startTime = Date.now();
-  while (Date.now() - startTime < 10000) {
+  while (Date.now() - startTime < 25000) {
     try {
       const res = await fetch(`${baseUrl}/api/health`);
       if (res.ok) {
         return baseUrl;
       }
     } catch (_err) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 150));
     }
   }
 
-  throw new Error(`Test server failed to start on port ${port} within timeout`);
+  throw new Error(`Test server failed to start on port ${port} within timeout: ${startupError}`);
 }
 
 export function stopServer(): void {
-  // Retain server process across test files so mid-suite tests do not get ECONNRESET
+  if (serverProcess) {
+    try {
+      if (process.platform === 'win32' && serverProcess.pid) {
+        execSync(`taskkill /pid ${serverProcess.pid} /T /F`, { stdio: 'ignore' });
+      } else {
+        serverProcess.kill('SIGKILL');
+      }
+    } catch (_e) {}
+    serverProcess = null;
+  }
 }
 
 process.on('exit', () => {

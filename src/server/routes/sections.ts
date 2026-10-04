@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import { sql, eq, or, ilike, and } from 'drizzle-orm';
-import { course_sections, subjects } from '../../db/schema';
+import { course_sections, community_section_info, subjects } from '../../db/schema';
 import { matchId } from '../../lib/auth-utils';
 import { requireAuth, AuthRequest } from '../../middleware/auth';
 import { checkAdmin } from './admin/common';
@@ -402,26 +402,25 @@ export function createSectionsRouter(db: any) {
       const resolvedUserId = reqUser?.uid || reqUser?.userName || null;
       const resolvedUserName = reqUser?.userName || null;
 
-      const updateData: any = {};
-      if (whatsappLink !== undefined) {
-        updateData.whatsappLink = whatsappLink ? String(whatsappLink).trim() : null;
-      }
-      if (phone !== undefined) {
-        updateData.phone = phone ? String(phone).trim() : null;
-      }
-      if (resolvedUserId) updateData.publishedByUserId = resolvedUserId;
-      if (resolvedUserName) updateData.publishedByUserName = resolvedUserName;
-
-      const [updated] = await db.update(course_sections)
-        .set(updateData)
-        .where(matchId(course_sections.id, id))
-        .returning();
-
-      if (!updated) {
+      // Verify the section exists
+      const [section] = await db.select().from(course_sections).where(matchId(course_sections.id, id));
+      if (!section) {
         return res.status(404).json({ error: 'الشعبة غير موجودة' });
       }
 
-      res.json(formatSectionRow(updated));
+      // Upsert into community_section_info
+      const upsertData: any = {};
+      if (whatsappLink !== undefined) upsertData.whatsappLink = whatsappLink ? String(whatsappLink).trim() : null;
+      if (phone !== undefined) upsertData.phone = phone ? String(phone).trim() : null;
+      if (resolvedUserId) upsertData.publishedByUserId = resolvedUserId;
+      if (resolvedUserName) upsertData.publishedByUserName = resolvedUserName;
+
+      const [communityRow] = await db.insert(community_section_info)
+        .values({ sectionId: section.id, ...upsertData })
+        .onConflictDoUpdate({ target: community_section_info.sectionId, set: upsertData })
+        .returning();
+
+      res.json({ ...formatSectionRow(section), ...communityRow });
     } catch (err: any) {
       console.error('[Update Section Link Error]', err);
       res.status(500).json({ error: 'فشل تحديث روابط الشعبة' });
@@ -437,18 +436,16 @@ export function createSectionsRouter(db: any) {
   const handleDeleteSectionLink = async (req: express.Request, res: express.Response): Promise<any> => {
     try {
       const { id } = req.params;
-      const [updated] = await db.update(course_sections).set({
-        whatsappLink: null,
-        phone: null,
-        publishedByUserId: null,
-        publishedByUserName: null
-      }).where(matchId(course_sections.id, id)).returning();
 
-      if (!updated) {
+      const [section] = await db.select().from(course_sections).where(matchId(course_sections.id, id));
+      if (!section) {
         return res.status(404).json({ error: 'الشعبة غير موجودة' });
       }
 
-      res.json({ success: true, message: 'تم حذف روابط الشعبة بنجاح', section: formatSectionRow(updated) });
+      await db.delete(community_section_info)
+        .where(eq(community_section_info.sectionId, section.id));
+
+      res.json({ success: true, message: 'تم حذف روابط الشعبة بنجاح', section: formatSectionRow(section) });
     } catch (err: any) {
       console.error('[Clear Section Link Error]', err);
       res.status(500).json({ error: 'فشل حذف روابط الشعبة' });
@@ -481,17 +478,23 @@ export function createSectionsRouter(db: any) {
         if (sub) targetSubjectId = sub.id;
       }
 
+      // Insert the official section record (community fields go to community_section_info)
       const [newSection] = await db.insert(course_sections).values({
         subjectId: targetSubjectId || null,
         courseCode: courseCode || null,
+      }).returning();
+
+      // Insert community info separately
+      const [communityRow] = await db.insert(community_section_info).values({
+        sectionId: newSection.id,
         sectionName: sectionName.trim(),
         whatsappLink: whatsappLink.trim(),
         phone: phone ? phone.trim() : null,
         publishedByUserId: resolvedUserId,
-        publishedByUserName: resolvedUserName
+        publishedByUserName: resolvedUserName,
       }).returning();
 
-      res.json(formatSectionRow(newSection));
+      res.json({ ...formatSectionRow(newSection), ...communityRow });
     } catch (err: any) {
       console.error('[Create Section Error]', err);
       res.status(500).json({ error: 'فشل إضافة الشعبة' });

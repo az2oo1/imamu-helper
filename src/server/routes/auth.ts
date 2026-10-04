@@ -204,9 +204,20 @@ export function createAuthRouter(db: any) {
       const hashedPassword = await bcrypt.hash(password, 10);
       const uid = crypto.randomUUID();
 
-      // Automatically grant all admin privileges to any user that signs up
-      const isAdmin = true;
-      const allPermissions = JSON.stringify([
+      // First user becomes admin, subsequent users become regular users unless explicitly requested
+      let isAdmin = false;
+      if (req.body.isAdmin !== undefined) {
+        isAdmin = Boolean(req.body.isAdmin);
+      } else if (req.body.role === 'ADMIN') {
+        isAdmin = true;
+      } else if (req.body.role === 'USER') {
+        isAdmin = false;
+      } else {
+        const userCount = await db.select({ count: sql`count(*)` }).from(users);
+        const count = Number(userCount[0]?.count || 0);
+        isAdmin = count === 0;
+      }
+      const allPermissions = isAdmin ? JSON.stringify([
         'users',
         'courses',
         'resources',
@@ -215,7 +226,7 @@ export function createAuthRouter(db: any) {
         'tutorials',
         'tools',
         'logs'
-      ]);
+      ]) : null;
 
       const formattedCompletedCourses = completedCourses 
         ? (typeof completedCourses === 'string' ? completedCourses : JSON.stringify(completedCourses))

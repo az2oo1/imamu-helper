@@ -50,9 +50,9 @@ export function createAdminAcademicRouter(db: any) {
   router.post("/admin/subjects", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
     try {
-      const { code, name, creditHours, level, description, driveLink, whatsappLink } = req.body;
+      const { code, name, creditHours, level, description } = req.body;
       const [subj] = await db.insert(subjects).values({
-        code, name, creditHours: Number(creditHours) || 3, level: level ? Number(level) : null, description, driveLink, whatsappLink
+        code, name, creditHours: Number(creditHours) || 3, level: level ? Number(level) : null, description
       }).returning();
       res.json(subj);
     } catch (e) {
@@ -80,8 +80,8 @@ export function createAdminAcademicRouter(db: any) {
   router.post("/admin/majors", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
     try {
-      const { name, pdfUrl } = req.body;
-      const [mjr] = await db.insert(majors).values({ name, pdfUrl }).returning();
+      const { name } = req.body;
+      const [mjr] = await db.insert(majors).values({ name }).returning();
       res.json(mjr);
     } catch (e) {
       console.error(e);
@@ -94,10 +94,9 @@ export function createAdminAcademicRouter(db: any) {
     if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
     try {
       const idRaw = req.params.id;
-      const { name, pdfUrl } = req.body;
+      const { name } = req.body;
       const updates: any = {};
       if (name !== undefined) updates.name = name;
-      if (pdfUrl !== undefined) updates.pdfUrl = pdfUrl;
       const [mjr] = await db.update(majors).set(updates).where(matchId(majors.id, idRaw)).returning();
       if (!mjr) return res.status(404).json({ error: "Major not found" });
       res.json(mjr);
@@ -140,7 +139,7 @@ export function createAdminAcademicRouter(db: any) {
 
       const allMajors = await db.select().from(majors);
       const major = allMajors.find((m: any) => String(m.id) === String(idRaw));
-      const plans = await listMajorPlansFromS3(idRaw, major?.name, major?.pdfUrl);
+      const plans = await listMajorPlansFromS3(idRaw, major?.name);
 
       res.json({ success: true, uploaded: uploadedPlans, plans });
     } catch (e: any) {
@@ -163,7 +162,7 @@ export function createAdminAcademicRouter(db: any) {
 
       const allMajors = await db.select().from(majors);
       const major = allMajors.find((m: any) => String(m.id) === String(idRaw));
-      const plans = await listMajorPlansFromS3(idRaw, major?.name, major?.pdfUrl);
+      const plans = await listMajorPlansFromS3(idRaw, major?.name);
 
       res.json({ success: true, plans });
     } catch (e: any) {

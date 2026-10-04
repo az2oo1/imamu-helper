@@ -201,10 +201,10 @@ export function getCountdown(targetDateInput: DateInput, nowInput: DateInput = n
  * (25th of month, Friday -> 24th, Saturday -> 26th)
  */
 export function calculateMokafaaDate(year: number, monthZeroBased: number): Date {
-  const dateObj = new Date(year, monthZeroBased, 25);
+  const dateObj = new Date(year, monthZeroBased, 27);
   const dayOfWeek = dateObj.getDay();
-  if (dayOfWeek === 5) dateObj.setDate(24);      // Friday -> Thursday 24th
-  else if (dayOfWeek === 6) dateObj.setDate(26); // Saturday -> Sunday 26th
+  if (dayOfWeek === 5) dateObj.setDate(26);      // Friday -> Thursday 26th
+  else if (dayOfWeek === 6) dateObj.setDate(28); // Saturday -> Sunday 28th
   return dateObj;
 }
 

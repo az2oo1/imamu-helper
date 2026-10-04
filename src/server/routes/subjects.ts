@@ -307,13 +307,13 @@ export function createSubjectsRouter(db: any) {
       }
 
       const firstWaResource = allResources.find((r: any) => r.whatsappLink || r.whatsappUrl || (r.url && r.url.includes('whatsapp')));
-      const resolvedWhatsappLink = subject.whatsappLink || firstWaResource?.whatsappLink || firstWaResource?.whatsappUrl || firstWaResource?.url || null;
-      const firstAvatar = subject.avatarUrl || allResources.find((r: any) => r.avatarUrl)?.avatarUrl || null;
-      const firstBanner = subject.bannerUrl || allResources.find((r: any) => r.bannerUrl)?.bannerUrl || null;
+      const resolvedWhatsappLink = firstWaResource?.whatsappLink || firstWaResource?.whatsappUrl || firstWaResource?.url || null;
+      const firstAvatar = allResources.find((r: any) => r.avatarUrl)?.avatarUrl || null;
+      const firstBanner = allResources.find((r: any) => r.bannerUrl)?.bannerUrl || null;
       const firstResWithDesc = allResources.find((r: any) => r.description && r.description.trim() && !r.description.trim().startsWith('المتطلبات السابقة:') && !r.description.trim().startsWith('المتطلب السابق:'));
       const subjDescIsPrereqOnly = subject.description?.trim().startsWith('المتطلبات السابقة:') || subject.description?.trim().startsWith('المتطلب السابق:');
-      const resolvedDescription = (subjDescIsPrereqOnly && firstResWithDesc?.description) 
-        ? firstResWithDesc.description.trim() 
+      const resolvedDescription = (subjDescIsPrereqOnly && firstResWithDesc?.description)
+        ? firstResWithDesc.description.trim()
         : (subject.description?.trim() || firstResWithDesc?.description?.trim() || null);
 
       let sectionsList: any[] = [];
@@ -330,12 +330,10 @@ export function createSubjectsRouter(db: any) {
           name: decodeHtmlEntities(subject.name),
           description: decodeHtmlEntities(resolvedDescription),
           avatarUrl: firstAvatar,
-          bannerUrl: firstBanner,
           whatsappLink: resolvedWhatsappLink,
-          freeResourcesUrl: subject.freeResourcesUrl || allResources.find((r: any) => r.freeResourcesUrl)?.freeResourcesUrl || null,
-          paidResourcesUrl: subject.paidResourcesUrl || allResources.find((r: any) => r.paidResourcesUrl)?.paidResourcesUrl || null,
-          boxLink: subject.boxLink || allResources.find((r: any) => r.boxLink)?.boxLink || null,
-          driveLink: subject.driveLink || allResources.find((r: any) => r.driveLink)?.driveLink || null,
+          freeResourcesUrl: allResources.find((r: any) => r.freeResourcesUrl)?.freeResourcesUrl || null,
+          paidResourcesUrl: allResources.find((r: any) => r.paidResourcesUrl)?.paidResourcesUrl || null,
+          boxLink: allResources.find((r: any) => r.boxLink)?.boxLink || null,
           isAcademicSubject: true,
           resources: allResources,
           sections: sectionsList,
@@ -427,7 +425,7 @@ export function createSubjectsRouter(db: any) {
         const courses = allMajorCourses.filter((mc: any) => String(mc.majorId) === String(m.id)).map((mc: any) => ({
           subjectId: String(mc.subjectId), optionalGroup: mc.optionalGroup, optionalGroupReqCount: mc.optionalGroupReqCount, prereq: mc.prereq
         }));
-        const plans = await listMajorPlansFromS3(m.id, m.name, m.pdfUrl);
+        const plans = await listMajorPlansFromS3(m.id, m.name);
         return {
           ...m,
           plans,
@@ -439,9 +437,9 @@ export function createSubjectsRouter(db: any) {
     } catch (error) {
       console.error(error);
       res.json([
-        { id: 1, name: 'علوم الحاسب', pdfUrl: null, plans: [], courseIds: [], courses: [] },
-        { id: 2, name: 'تقنية المعلومات', pdfUrl: null, plans: [], courseIds: [], courses: [] },
-        { id: 3, name: 'نظم المعلومات', pdfUrl: null, plans: [], courseIds: [], courses: [] }
+        { id: 1, name: 'علوم الحاسب', plans: [], courseIds: [], courses: [] },
+        { id: 2, name: 'تقنية المعلومات', plans: [], courseIds: [], courses: [] },
+        { id: 3, name: 'نظم المعلومات', plans: [], courseIds: [], courses: [] }
       ]);
     }
   });
@@ -451,7 +449,7 @@ export function createSubjectsRouter(db: any) {
       const { id } = req.params;
       const allMajors = await db.select().from(majors);
       const major = allMajors.find((m: any) => String(m.id) === String(id));
-      const plans = await listMajorPlansFromS3(id, major?.name, major?.pdfUrl);
+      const plans = await listMajorPlansFromS3(id, major?.name);
       res.json(plans);
     } catch (error) {
       console.error("Error fetching major plans:", error);
@@ -531,14 +529,12 @@ export function createSubjectsRouter(db: any) {
           majors: majorNames,
           type: cr.type || (resolvedWa ? 'group' : 'drive'),
           fileUrl: cr.url,
-          driveUrl: (cr.type === 'drive' || cr.type === 'summary') ? cr.url : (cr.driveLink || undefined),
           boxLink: cr.boxLink || undefined,
           whatsappUrl: resolvedWa,
           whatsappLink: resolvedWa,
           freeResourcesUrl: cr.freeResourcesUrl || undefined,
           paidResourcesUrl: cr.paidResourcesUrl || undefined,
           avatarUrl: cr.avatarUrl || undefined,
-          bannerUrl: cr.bannerUrl || undefined,
           telegramUrl: cr.type === 'telegram' ? cr.url : undefined,
           description: cr.description,
           sectionsEnabled: isCourseResource ? (cr.sectionsEnabled !== false) : false,
@@ -546,28 +542,6 @@ export function createSubjectsRouter(db: any) {
         });
       }
 
-      for (const s of allSubjects) {
-        if (!subjectsWithResources.has(s.id) && (s.driveLink || s.whatsappLink)) {
-          const majorNames = subjectMajorsMap.get(s.id) || [];
-          const majorStr = majorNames.length > 0 ? majorNames.join(' / ') : 'جميع التخصصات';
-          const cleanName = cleanCourseName(s.name);
-          resourcesList.push({
-            id: `syn_${s.id}`,
-            subjectId: s.id,
-            title: cleanName,
-            courseCode: s.code,
-            courseName: cleanName,
-            major: majorStr,
-            majors: majorNames,
-            type: s.driveLink ? 'summary' : s.whatsappLink ? 'group' : 'exam',
-            fileUrl: s.driveLink || '',
-            driveUrl: s.driveLink || undefined,
-            whatsappUrl: s.whatsappLink || undefined,
-            description: s.description || undefined,
-            createdAt: new Date().toISOString()
-          });
-        }
-      }
 
       res.json(resourcesList);
     } catch (error) {

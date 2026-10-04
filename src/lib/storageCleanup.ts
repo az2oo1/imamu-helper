@@ -9,7 +9,6 @@ import {
   news, 
   news_sources, 
   tutorials, 
-  tools, 
   contributors,
   app_feedback
 } from '../db/schema';
@@ -101,13 +100,11 @@ export async function getRegisteredStorageKeys(db: any): Promise<Set<string>> {
 
   await Promise.all([
     harvest(users, ['profilePicUrl']),
-    harvest(majors, ['pdfUrl']),
-    harvest(subjects, ['avatarUrl', 'bannerUrl', 'driveLink', 'freeResourcesUrl', 'paidResourcesUrl', 'syllabus', 'description']),
-    harvest(course_resources, ['url', 'driveLink', 'boxLink', 'freeResourcesUrl', 'paidResourcesUrl', 'avatarUrl', 'bannerUrl', 'description']),
-    harvest(news, ['imageUrl', 'images', 'authorAvatar', 'videoUrl', 'content', 'excerpt']),
+    harvest(subjects, ['syllabus', 'description']),
+    harvest(course_resources, ['url', 'boxLink', 'freeResourcesUrl', 'paidResourcesUrl', 'avatarUrl', 'description']),
+    harvest(news, ['images', 'authorAvatar', 'videoUrl', 'content', 'excerpt']),
     harvest(news_sources, ['profilePicUrl', 'bannerUrl', 'links', 'bio']),
-    harvest(tutorials, ['imageUrl', 'videoUrl', 'linkUrl', 'steps', 'text']),
-    harvest(tools, ['link', 'icon', 'description']),
+    harvest(tutorials, ['videoUrl', 'linkUrl', 'steps', 'text']),
     harvest(contributors, ['photoUrl', 'socialLinks', 'bio']),
     harvest(app_feedback, ['comment', 'targetUrl'])
   ]);

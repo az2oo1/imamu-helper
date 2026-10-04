@@ -145,10 +145,10 @@ export function AdminPage() {
   const [isCreateAccountModalOpen, setIsCreateAccountModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<any | null>(null);
   const [majorForm, setMajorForm] = useState<{
-    id?: number; name: string; pdfUrl: string;
+    id?: number; name: string;
     courses: { subjectId: number; optionalGroup: string; optionalGroupReqCount: string }[];
     batches: { name: string; reqCount: string }[]
-  }>({ name: '', pdfUrl: '', courses: [], batches: [] });
+  }>({ name: '', courses: [], batches: [] });
   const [draggedSubjectId, setDraggedSubjectId] = useState<number | null>(null);
   const [subjectForm, setSubjectForm] = useState<{ 
     id?: number; 
@@ -157,13 +157,11 @@ export function AdminPage() {
     creditHours: string; 
     level: string; 
     whatsappLink: string;
-    driveLink: string;
     description: string; 
     syllabus: string; 
     freeResourcesUrl: string; 
     paidResourcesUrl: string; 
     avatarUrl: string; 
-    bannerUrl: string; 
     tags: string; 
   }>({ 
     code: '', 
@@ -171,13 +169,11 @@ export function AdminPage() {
     creditHours: '3', 
     level: '', 
     whatsappLink: '',
-    driveLink: '',
     description: '', 
     syllabus: '', 
     freeResourcesUrl: '', 
     paidResourcesUrl: '', 
     avatarUrl: '', 
-    bannerUrl: '', 
     tags: '' 
   });
 
@@ -205,16 +201,14 @@ export function AdminPage() {
     title: string;
     type: string;
     url: string;
-    driveLink?: string;
     boxLink?: string;
     whatsappLink?: string;
     freeResourcesUrl?: string;
     paidResourcesUrl?: string;
     avatarUrl?: string;
-    bannerUrl?: string;
     description?: string;
     sectionsEnabled?: boolean;
-  }>({ title: '', type: 'course_hub', url: '', description: '', driveLink: '', boxLink: '', whatsappLink: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', bannerUrl: '', sectionsEnabled: true });
+  }>({ title: '', type: 'course_hub', url: '', description: '', boxLink: '', whatsappLink: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', sectionsEnabled: true });
 
   // Modals
   const [deleteModal, setDeleteModal] = useState<{ url: string; message: string } | null>(null);
@@ -789,22 +783,18 @@ export function AdminPage() {
                 <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Major Name</label>
                 <input type="text" placeholder="e.g. Computer Science" value={majorForm.name} onChange={e => setMajorForm(s => ({ ...s, name: e.target.value }))} className="py-2.5 px-3 rounded-xl text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>PDF Plan URL</label>
-                <input type="text" placeholder="PDF Plan URL" value={majorForm.pdfUrl} onChange={e => setMajorForm(s => ({ ...s, pdfUrl: e.target.value }))} className="py-2.5 px-3 rounded-xl text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-              </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => {
                     const url = majorForm.id ? `/api/admin/majors/${majorForm.id}` : '/api/admin/majors';
                     const method = majorForm.id ? 'PUT' : 'POST';
-                    handlePostWithMethod(url, method, majorForm, () => setMajorForm({ id: undefined, name: '', pdfUrl: '', courses: [], batches: [] }));
+                    handlePostWithMethod(url, method, majorForm, () => setMajorForm({ id: undefined, name: '', courses: [], batches: [] }));
                   }}
                   className="flex-1 bg-[var(--color-imamu-brown)] text-white py-2 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-brown-light)] transition"
                 >
                   {majorForm.id ? 'Update Major' : 'Add Major'}
                 </button>
-                {majorForm.id && <button onClick={() => setMajorForm({ id: undefined, name: '', pdfUrl: '', courses: [], batches: [] })} className="px-3 py-2 border rounded-xl text-sm font-medium transition hover:bg-[var(--bg-subtle)]" style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}>Cancel</button>}
+                {majorForm.id && <button onClick={() => setMajorForm({ id: undefined, name: '', courses: [], batches: [] })} className="px-3 py-2 border rounded-xl text-sm font-medium transition hover:bg-[var(--bg-subtle)]" style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}>Cancel</button>}
               </div>
             </div>
           </div>
@@ -819,7 +809,6 @@ export function AdminPage() {
                 <div key={m.id} className="py-3 flex items-center justify-between group">
                   <div className="min-w-0 flex-1">
                     <div className="font-medium text-sm truncate" style={{ color: 'var(--text-main)' }}>{m.name}</div>
-                    {m.pdfUrl && <a href={m.pdfUrl} target="_blank" rel="noreferrer" className="text-[10px] text-[var(--color-imamu-brown)] font-medium hover:underline flex items-center gap-1 mt-1"><LinkIcon className="w-2.5 h-2.5" /> PDF Plan</a>}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <button
@@ -1182,7 +1171,7 @@ export function AdminPage() {
           <button
             onClick={() => {
               setSubjectForm({ 
-                id: undefined, code: '', name: '', creditHours: '3', level: '', whatsappLink: '', driveLink: '', description: '', syllabus: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', bannerUrl: '', tags: '' 
+                id: undefined, code: '', name: '', creditHours: '3', level: '', whatsappLink: '', description: '', syllabus: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', tags: '' 
               });
               setIsCourseModalOpen(true);
             }}
@@ -1237,13 +1226,11 @@ export function AdminPage() {
                       creditHours: s.creditHours?.toString() || '3', 
                       level: s.level?.toString() || '',
                       whatsappLink: s.whatsappLink || '',
-                      driveLink: s.driveLink || '',
                       description: s.description || '',
                       syllabus: s.syllabus || '',
-                      freeResourcesUrl: s.freeResourcesUrl || s.driveLink || '',
+                      freeResourcesUrl: s.freeResourcesUrl || '',
                       paidResourcesUrl: s.paidResourcesUrl || '',
                       avatarUrl: s.avatarUrl || '',
-                      bannerUrl: s.bannerUrl || '',
                       tags: s.tags || ''
                     });
                     setIsCourseModalOpen(true);
@@ -1298,7 +1285,7 @@ export function AdminPage() {
         <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
           <button
             onClick={() => {
-              setResourceForm({ title: '', type: 'course_hub', url: '', description: '', driveLink: '', boxLink: '', whatsappLink: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', bannerUrl: '', sectionsEnabled: true });
+              setResourceForm({ title: '', type: 'course_hub', url: '', description: '', boxLink: '', whatsappLink: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', sectionsEnabled: true });
               setIsResourceModalOpen(true);
             }}
             className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-semibold text-xs sm:text-sm rounded-xl transition shadow-sm border border-emerald-500/30 shrink-0"
@@ -1412,13 +1399,11 @@ export function AdminPage() {
                         title: r.title || '',
                         type: r.type || 'course_hub',
                         url: r.fileUrl || r.driveUrl || r.url || '',
-                        driveLink: r.driveLink || '',
                         boxLink: r.boxLink || '',
                         whatsappLink: r.whatsappLink || '',
                         freeResourcesUrl: r.freeResourcesUrl || '',
                         paidResourcesUrl: r.paidResourcesUrl || '',
                         avatarUrl: r.avatarUrl || '',
-                        bannerUrl: r.bannerUrl || '',
                         description: r.description || '',
                         sectionsEnabled: r.sectionsEnabled !== false
                       });
@@ -1473,7 +1458,7 @@ export function AdminPage() {
             const headers = await authHeaders();
             const res = await fetch(url, { method, headers, body: JSON.stringify(payload) });
             if (res.ok) {
-              setResourceForm({ title: '', type: 'course_hub', url: '', description: '', driveLink: '', boxLink: '', whatsappLink: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', bannerUrl: '' });
+              setResourceForm({ title: '', type: 'course_hub', url: '', description: '', boxLink: '', whatsappLink: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', sectionsEnabled: true });
               fetchData();
               toast('success', 'Resource saved successfully');
               setIsResourceModalOpen(false);

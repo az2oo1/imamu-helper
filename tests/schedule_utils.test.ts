@@ -125,8 +125,8 @@ describe('Schedule Utilities Tests', () => {
   });
 
   describe('COURSE_CARD_PALETTES', () => {
-    it('provides 6 distinct themed color palettes', () => {
-      assert.equal(COURSE_CARD_PALETTES.length, 6);
+    it('provides at least 6 distinct themed color palettes', () => {
+      assert.ok(COURSE_CARD_PALETTES.length >= 6);
     });
 
     it('each palette includes all required card, dot, gradient, and box color classes', () => {

@@ -10,6 +10,8 @@ import { getFileFromStorage, ensureAllBucketsExist } from "./src/lib/storage";
 
 import { extractTelegramChannelPosts } from './src/server/services/telegram';
 import { news_sources } from './src/db/schema';
+import { sql } from 'drizzle-orm';
+import { generalApiLimiter, authApiLimiter } from './src/middleware/rateLimiter';
 import { createAuthRouter } from './src/server/routes/auth';
 import { createSubjectsRouter } from './src/server/routes/subjects';
 import { createSectionsRouter } from './src/server/routes/sections';
@@ -25,6 +27,7 @@ async function startServer() {
   const db = await getDb();
 
   const app = express();
+  app.set('trust proxy', 1);
   app.use(requestLogger);
   app.use(compression());
   const PORT = Number(process.env.PORT) || 3000;
@@ -62,7 +65,7 @@ async function startServer() {
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', 'inline');
       res.setHeader('X-Content-Type-Options', 'nosniff');
-      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
       return res.send(buffer);
     } catch (err: any) {
       console.error('[PDF Proxy Error]', err);
@@ -86,6 +89,14 @@ async function startServer() {
         if (mimeType) res.setHeader('Content-Type', mimeType);
         res.setHeader('Content-Disposition', 'inline; filename="' + encodeURIComponent(path.basename(filename)) + '"');
         res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+
+        const etag = `W/"${file.buffer.length.toString(16)}-${file.buffer.slice(0, 16).toString('hex')}"`;
+        res.setHeader('ETag', etag);
+        if (req.headers['if-none-match'] === etag) {
+          return res.status(304).end();
+        }
+
         return res.send(file.buffer);
       }
     } catch (e) {}
@@ -93,6 +104,7 @@ async function startServer() {
   });
 
   const setInlineHeaders = (res: express.Response, filePath: string) => {
+    res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
     if (filePath.toLowerCase().endsWith('.pdf')) {
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', 'inline');
@@ -100,18 +112,23 @@ async function startServer() {
     }
   };
 
-  app.use('/uploads', express.static(persistentUploadsDir, { setHeaders: setInlineHeaders }));
-  app.use('/uploads', express.static(legacyUploadsDir, { setHeaders: setInlineHeaders }));
+  const staticUploadsConfig = { maxAge: '1d', setHeaders: setInlineHeaders };
+  app.use('/uploads', express.static(persistentUploadsDir, staticUploadsConfig));
+  app.use('/uploads', express.static(legacyUploadsDir, staticUploadsConfig));
 
   app.use(express.json({ limit: '50mb' }));
 
-  // Ensure all dedicated S3 buckets exist in Garage Object Storage
-  await ensureAllBucketsExist().catch(err => console.warn('[Storage] Bucket init notice:', err.message || err));
+  // Ensure all dedicated S3 buckets exist in Garage Object Storage in the background
+  ensureAllBucketsExist().catch(err => console.warn('[Storage] Bucket init notice:', err.message || err));
 
   // Health check API
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
   });
+
+  // Apply rate limiting before routes
+  app.use("/api/auth", authApiLimiter);
+  app.use("/api", generalApiLimiter);
 
   // Mount Modular Express Routers under /api
   app.use("/api", createAuthRouter(db));
@@ -126,13 +143,32 @@ async function startServer() {
   // Dynamic SEO Router (/sitemap.xml & /robots.txt)
   app.use("/", createSeoRouter(db));
 
-  // Start periodic Telegram channel news fetcher worker (runs every 30 minutes if enabled in settings)
+  // Start periodic Telegram channel news fetcher worker with distributed locking
   const startPeriodicTelegramFetcher = () => {
+    if (process.env.DISABLE_BACKGROUND_WORKERS === 'true') {
+      logger.info('[Background Worker] Disabled via DISABLE_BACKGROUND_WORKERS');
+      return;
+    }
+
+    const TELEGRAM_CRON_LOCK_ID = 84729104;
+
     const fetchAllSources = async () => {
+      let lockAcquired = true;
+      try {
+        const lockResult: any = await db.execute(sql`SELECT pg_try_advisory_lock(${TELEGRAM_CRON_LOCK_ID}) as locked`);
+        lockAcquired = lockResult?.rows?.[0]?.locked ?? true;
+      } catch (_e) {
+        lockAcquired = true;
+      }
+
+      if (!lockAcquired) {
+        // Another instance is already executing the worker
+        return;
+      }
+
       try {
         const settings = await db.query.global_settings.findFirst().catch(() => null);
         if (!settings?.autoFetchTelegram) {
-          // Off by default unless explicitly turned ON in Global Settings
           return;
         }
 
@@ -148,6 +184,10 @@ async function startServer() {
         }
       } catch (e) {
         console.error('[Periodic Fetcher Error]', e);
+      } finally {
+        try {
+          await db.execute(sql`SELECT pg_advisory_unlock(${TELEGRAM_CRON_LOCK_ID})`);
+        } catch (_e) {}
       }
     };
 

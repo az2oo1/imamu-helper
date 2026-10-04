@@ -170,9 +170,7 @@ export async function ensureBucketExists(bucketName?: string): Promise<void> {
 
 export async function ensureAllBucketsExist(): Promise<void> {
   const buckets = getAllBucketNames();
-  for (const bucket of buckets) {
-    await ensureBucketExists(bucket);
-  }
+  await Promise.allSettled(buckets.map((bucket) => ensureBucketExists(bucket)));
 }
 
 export function getPersistentUploadsDir(): string {
@@ -420,8 +418,7 @@ export interface StorageFileItem {
  */
 export async function listMajorPlansFromS3(
   majorId: string | number,
-  majorName?: string,
-  fallbackPdfUrl?: string | null
+  majorName?: string
 ): Promise<StorageFileItem[]> {
   const client = getS3Client();
   const bucketName = process.env.S3_BUCKET_PLANS || process.env.S3_BUCKET_PDFS || 'imamu-plans';
@@ -536,23 +533,6 @@ export async function listMajorPlansFromS3(
       }
     } catch (err: any) {
       console.warn(`[Storage] Failed to list plans from S3 bucket "${bucketName}":`, err.message || err);
-    }
-  }
-
-  // 3. Fallback / DB pdfUrl check (only add if file actually exists in storage/disk)
-  if (fallbackPdfUrl && fallbackPdfUrl.trim()) {
-    const cleanUrl = fallbackPdfUrl.trim();
-    const key = cleanUrl.replace(/^\/uploads\//, '');
-    if (!seenKeys.has(key) && !seenKeys.has(cleanUrl)) {
-      const existingFile = await getFileFromStorage(key, 'plan');
-      if (existingFile) {
-        items.unshift({
-          id: 'official-db-pdf',
-          title: majorName ? `خطة ${majorName}` : 'الخطة الدراسية',
-          url: cleanUrl,
-          key: key
-        });
-      }
     }
   }
 

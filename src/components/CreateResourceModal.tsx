@@ -42,13 +42,11 @@ interface CreateResourceModalProps {
     type: string;
     major?: string;
     url?: string;
-    driveLink?: string;
     boxLink?: string;
     whatsappLink?: string;
     freeResourcesUrl?: string;
     paidResourcesUrl?: string;
     avatarUrl?: string;
-    bannerUrl?: string;
     description?: string;
     sectionsEnabled?: boolean;
   };
@@ -748,13 +746,6 @@ export default function CreateResourceModal({
                     value={resourceForm.avatarUrl || ''} 
                     onChange={val => setResourceForm((s: any) => ({ ...s, avatarUrl: val }))} 
                     type="avatar" 
-                  />
-
-                  <ImageUploadInput 
-                    label="صورة الغلاف والبانر (Resource Banner Image)" 
-                    value={resourceForm.bannerUrl || ''} 
-                    onChange={val => setResourceForm((s: any) => ({ ...s, bannerUrl: val }))} 
-                    type="banner" 
                   />
 
                   <div className="bg-slate-50 dark:bg-zinc-800/50 rounded-2xl p-5 border border-slate-200/80 dark:border-zinc-800 space-y-2">

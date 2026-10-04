@@ -36,7 +36,7 @@ export async function syncExternalImagesToStorage(db: any) {
       }
     }
 
-    // 3. course_resources avatarUrl and bannerUrl
+    // 3. course_resources avatarUrl
     const resources = await db.select().from(course_resources);
     for (const r of resources) {
       const updates: any = {};
@@ -44,27 +44,19 @@ export async function syncExternalImagesToStorage(db: any) {
         const stored = await downloadAndUploadToStorage(r.avatarUrl, `resources/${r.id}/avatar`, 'resources');
         if (stored && stored !== r.avatarUrl) updates.avatarUrl = stored;
       }
-      if (r.bannerUrl && (r.bannerUrl.startsWith('http://') || r.bannerUrl.startsWith('https://') || r.bannerUrl.startsWith('data:image/'))) {
-        const stored = await downloadAndUploadToStorage(r.bannerUrl, `resources/${r.id}/banner`, 'resources');
-        if (stored && stored !== r.bannerUrl) updates.bannerUrl = stored;
-      }
       if (Object.keys(updates).length > 0) {
         await db.update(course_resources).set(updates).where(eq(course_resources.id, r.id));
         console.log(`[Storage Sync] Saved course_resource #${r.id} avatar to Garage S3`, updates);
       }
     }
 
-    // 4. subjects avatarUrl and bannerUrl
+    // 4. subjects avatarUrl
     const subjs = await db.select().from(subjects);
     for (const sub of subjs) {
       const updates: any = {};
       if (sub.avatarUrl && (sub.avatarUrl.startsWith('http://') || sub.avatarUrl.startsWith('https://') || sub.avatarUrl.startsWith('data:image/'))) {
         const stored = await downloadAndUploadToStorage(sub.avatarUrl, `subjects/${sub.id}/avatar`, 'resources');
         if (stored && stored !== sub.avatarUrl) updates.avatarUrl = stored;
-      }
-      if (sub.bannerUrl && (sub.bannerUrl.startsWith('http://') || sub.bannerUrl.startsWith('https://') || sub.bannerUrl.startsWith('data:image/'))) {
-        const stored = await downloadAndUploadToStorage(sub.bannerUrl, `subjects/${sub.id}/banner`, 'resources');
-        if (stored && stored !== sub.bannerUrl) updates.bannerUrl = stored;
       }
       if (Object.keys(updates).length > 0) {
         await db.update(subjects).set(updates).where(eq(subjects.id, sub.id));

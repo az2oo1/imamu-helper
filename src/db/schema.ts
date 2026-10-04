@@ -1,17 +1,5 @@
-import { integer, bigint, pgTable, serial, text, timestamp, boolean, varchar, unique, index, uniqueIndex, customType } from 'drizzle-orm/pg-core';
+import { integer, pgTable, serial, text, timestamp, boolean, varchar, unique, index, uniqueIndex } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
-
-export const stringBigint = customType<{ data: string; driverData: string }>({
-  dataType() {
-    return 'bigint';
-  },
-  fromDriver(value: unknown): string {
-    return String(value ?? '');
-  },
-  toDriver(value: string | number): string {
-    return String(value ?? '');
-  },
-});
 
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
@@ -25,10 +13,10 @@ export const users = pgTable('users', {
   major: text('major'),
   currentGpa: varchar('current_gpa', { length: 10 }),
   finishedHours: integer('finished_hours'),
-  completedCourses: text('completed_courses'), // JSON array of course codes
-  semesters: text('semesters'), // JSON array of user semesters
-  activeSemId: text('active_sem_id'), // currently selected semester id
-  studentTasks: text('student_tasks'), // JSON array of student tasks (independent from semesters)
+  completedCourses: text('completed_courses'), // JSON array of course codes — TODO: migrate to join table
+  semesters: text('semesters'),               // JSON array of user semesters — TODO: migrate to own table
+  activeSemId: text('active_sem_id'),          // currently selected semester id (inside semesters JSON)
+  studentTasks: text('student_tasks'),         // JSON array of student tasks — TODO: migrate to own table
   isAdmin: boolean('is_admin').default(true),
   isBanned: boolean('is_banned').default(false),
   adminPermissions: text('admin_permissions'), // JSON array string of granted permission keys
@@ -44,10 +32,10 @@ export const users = pgTable('users', {
 export const majors = pgTable('majors', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
-  pdfUrl: text('pdf_url'), // Link to plan PDF
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+// Resource links (whatsapp, box, etc.) live in course_resources — NOT here.
 export const subjects = pgTable('subjects', {
   id: serial('id').primaryKey(),
   code: text('code').notNull().unique(),
@@ -65,12 +53,6 @@ export const subjects = pgTable('subjects', {
   level: integer('level'),
   description: text('description'),
   syllabus: text('syllabus'),
-  driveLink: text('drive_link'),
-  whatsappLink: text('whatsapp_link'),
-  freeResourcesUrl: text('free_resources_url'),
-  paidResourcesUrl: text('paid_resources_url'),
-  avatarUrl: text('avatar_url'),
-  bannerUrl: text('banner_url'),
   tags: text('tags'),
   createdAt: timestamp('created_at').defaultNow(),
 }, (table) => ({
@@ -85,13 +67,11 @@ export const course_resources = pgTable('course_resources', {
   title: text('title').notNull(),
   type: text('type').notNull().default('drive'),
   url: text('url').notNull(),
-  driveLink: text('drive_link'),
   boxLink: text('box_link'),
   whatsappLink: text('whatsapp_link'),
   freeResourcesUrl: text('free_resources_url'),
   paidResourcesUrl: text('paid_resources_url'),
   avatarUrl: text('avatar_url'),
-  bannerUrl: text('banner_url'),
   description: text('description'),
   sectionsEnabled: boolean('sections_enabled').default(true),
   createdAt: timestamp('created_at').defaultNow(),
@@ -125,22 +105,20 @@ export const events = pgTable('events', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
-
-
+// image_url removed — use images (JSON array) as the single source of truth for images.
 export const news = pgTable('news', {
   id: serial('id').primaryKey(),
   title: text('title'),
   content: text('content').notNull(),
   excerpt: text('excerpt'),
   category: text('category'), // e.g. Campus, Academic, Sports, Events
-  source: text('source'), // e.g. @IMAMU_News
+  source: text('source'),     // e.g. @IMAMU_News
   authorName: text('author_name'),
   authorHandle: text('author_handle'),
   authorAvatar: text('author_avatar'),
   authorId: text('author_id'),
   entityId: text('entity_id'),
-  imageUrl: text('image_url'),
-  images: text('images'), // JSON string array of image URLs
+  images: text('images'),     // JSON string array of image URLs (first element = cover image)
   videoUrl: text('video_url'),
   readTime: text('read_time'),
   isFeatured: boolean('is_featured').default(false),
@@ -154,13 +132,13 @@ export const news = pgTable('news', {
 export const news_bookmarks = pgTable('news_bookmarks', {
   id: serial('id').primaryKey(),
   userId: text('user_id').notNull(),
-  newsId: bigint('news_id', { mode: 'number' }).references(() => news.id, { onDelete: 'cascade' }).notNull(),
+  newsId: integer('news_id').references(() => news.id, { onDelete: 'cascade' }).notNull(),
   createdAt: timestamp('created_at').defaultNow(),
 }, (t) => ({
   unq: unique().on(t.userId, t.newsId)
 }));
 
-
+// Enforced as single-row via CHECK(id=1) constraint on the DB.
 export const global_settings = pgTable('global_settings', {
   id: serial('id').primaryKey(),
   fetchRangeDays: integer('fetch_range_days').default(30),
@@ -181,7 +159,7 @@ export const global_settings = pgTable('global_settings', {
 export const newsLikes = pgTable('news_likes', {
   id: serial('id').primaryKey(),
   userId: text('user_id').notNull(),
-  newsId: bigint('news_id', { mode: 'number' }).references(() => news.id, { onDelete: 'cascade' }).notNull(),
+  newsId: integer('news_id').references(() => news.id, { onDelete: 'cascade' }).notNull(),
   createdAt: timestamp('created_at').defaultNow(),
 }, (t) => ({
   unq: unique().on(t.userId, t.newsId)
@@ -190,7 +168,7 @@ export const newsLikes = pgTable('news_likes', {
 export const newsComments = pgTable('news_comments', {
   id: serial('id').primaryKey(),
   userId: text('user_id').notNull(),
-  newsId: bigint('news_id', { mode: 'number' }).references(() => news.id, { onDelete: 'cascade' }).notNull(),
+  newsId: integer('news_id').references(() => news.id, { onDelete: 'cascade' }).notNull(),
   content: text('content').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
 });
@@ -201,8 +179,8 @@ export const news_sources = pgTable('news_sources', {
   displayName: text('display_name'),
   bio: text('bio'),
   bannerUrl: text('banner_url'),
-  links: text('links'), // JSON string array of { title, url }
-  assignedUsers: text('assigned_users'), // JSON string array of manager User UIDs
+  links: text('links'),             // JSON string array of { title, url }
+  assignedUsers: text('assigned_users'),     // JSON string array of manager User UIDs
   telegramChannels: text('telegram_channels'), // JSON string array of Telegram channels to fetch from
   isActive: boolean('is_active').default(true),
   profilePicUrl: text('profile_pic_url'),
@@ -218,7 +196,6 @@ export const account_follows = pgTable('account_follows', {
 }, (t) => ({
   unq: unique().on(t.userId, t.sourceId)
 }));
-
 
 export const verification_codes = pgTable('verification_codes', {
   id: serial('id').primaryKey(),
@@ -238,7 +215,7 @@ export const tutorial_sections = pgTable('tutorial_sections', {
 
 export const tutorials = pgTable('tutorials', {
   id: serial('id').primaryKey(),
-  sectionId: stringBigint('section_id').references(() => tutorial_sections.id, { onDelete: 'cascade' }).notNull(),
+  sectionId: integer('section_id').references(() => tutorial_sections.id, { onDelete: 'cascade' }).notNull(),
   title: text('title').notNull(),
   description: text('description').notNull(),
   text: text('text').notNull(),
@@ -252,25 +229,18 @@ export const tutorials = pgTable('tutorials', {
 
 export const tutorial_feedback = pgTable('tutorial_feedback', {
   id: serial('id').primaryKey(),
-  tutorialId: bigint('tutorial_id', { mode: 'number' }).references(() => tutorials.id, { onDelete: 'cascade' }).notNull(),
+  tutorialId: integer('tutorial_id').references(() => tutorials.id, { onDelete: 'cascade' }).notNull(),
   userId: text('user_id').notNull(),
   isHelpful: boolean('is_helpful').notNull(),
   comment: text('comment'),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
-export const feedback_comments = pgTable('feedback_comments', {
-  id: serial('id').primaryKey(),
-  feedbackId: bigint('feedback_id', { mode: 'number' }).references(() => tutorial_feedback.id, { onDelete: 'cascade' }).notNull(),
-  userId: text('user_id').notNull(),
-  userName: text('user_name'),
-  content: text('content').notNull(),
-  createdAt: timestamp('created_at').defaultNow(),
-});
+// feedback_comments table was dropped — it was never used in the codebase.
 
 export const tutorial_comments = pgTable('tutorial_comments', {
   id: serial('id').primaryKey(),
-  tutorialId: bigint('tutorial_id', { mode: 'number' }).references(() => tutorials.id, { onDelete: 'cascade' }).notNull(),
+  tutorialId: integer('tutorial_id').references(() => tutorials.id, { onDelete: 'cascade' }).notNull(),
   userId: text('user_id').notNull(),
   userName: text('user_name'),
   content: text('content').notNull(),
@@ -290,6 +260,7 @@ export const activity_logs = pgTable('activity_logs', {
   metadata: text('metadata'),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
 
 export const tools = pgTable('tools', {
   id: serial('id').primaryKey(),
@@ -320,7 +291,7 @@ export const contributors = pgTable('contributors', {
 export const app_feedback = pgTable('app_feedback', {
   id: serial('id').primaryKey(),
   targetType: text('target_type').notNull(), // 'tutorial' | 'news' | 'resource' | 'tool' | 'event' | 'general'
-  targetId: text('target_id'), // ID or reference key of target item
+  targetId: text('target_id'),    // ID or reference key of target item
   targetTitle: text('target_title'), // Title snapshot for display
   userId: text('user_id'),
   userName: text('user_name'),
@@ -331,6 +302,7 @@ export const app_feedback = pgTable('app_feedback', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+// Official section data only. Community-contributed info lives in community_section_info.
 export const course_sections = pgTable('course_sections', {
   id: serial('id').primaryKey(),
   crn: text('crn'),
@@ -351,15 +323,9 @@ export const course_sections = pgTable('course_sections', {
   seatsAvailable: integer('seats_available'),
   finalExam: text('final_exam'),
   primaryInstructor: text('primary_instructor'),
-  instructors: text('instructors'), // JSON string array of { name, email, isPrimary }
-  schedules: text('schedules'), // JSON string array of meeting schedules
+  instructors: text('instructors'),       // JSON string array of { name, email, isPrimary }
+  schedules: text('schedules'),           // JSON string array of meeting schedules
   scheduleSummary: text('schedule_summary'),
-  // Legacy / community fields
-  sectionName: text('section_name'),
-  whatsappLink: text('whatsapp_link'),
-  phone: text('phone'),
-  publishedByUserId: text('published_by_user_id'),
-  publishedByUserName: text('published_by_user_name'),
   createdAt: timestamp('created_at').defaultNow(),
 }, (table) => ({
   idxSectionsCrnTerm: uniqueIndex('idx_sections_crn_term_unq').on(table.crn, table.term),
@@ -370,4 +336,16 @@ export const course_sections = pgTable('course_sections', {
   idxSectionsTerm: index('idx_sections_term').on(table.term),
 }));
 
-
+// Community-contributed info for official sections (WhatsApp groups, section names, etc.)
+export const community_section_info = pgTable('community_section_info', {
+  id: serial('id').primaryKey(),
+  sectionId: integer('section_id').references(() => course_sections.id, { onDelete: 'cascade' }).notNull().unique(),
+  sectionName: text('section_name'),
+  whatsappLink: text('whatsapp_link'),
+  phone: text('phone'),
+  publishedByUserId: text('published_by_user_id'),
+  publishedByUserName: text('published_by_user_name'),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  idxCommunitySectionId: index('idx_community_section_section_id').on(table.sectionId),
+}));

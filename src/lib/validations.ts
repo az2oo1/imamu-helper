@@ -45,26 +45,6 @@ export const updateProfileSchema = z.object({
 });
 
 // ==========================================
-// Tools Schemas
-// ==========================================
-
-export const createToolSchema = z.object({
-  title: z.string().min(1, 'Title and link are required'),
-  link: z.string().min(1, 'Title and link are required'),
-  description: z.string().default(''),
-  icon: z.string().optional(),
-  category: z.string().optional(),
-});
-
-export const updateToolSchema = z.object({
-  title: z.string().min(1).optional(),
-  link: z.string().min(1).optional(),
-  description: z.string().optional(),
-  icon: z.string().optional(),
-  category: z.string().optional(),
-});
-
-// ==========================================
 // Resources Schemas
 // ==========================================
 

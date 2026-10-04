@@ -212,9 +212,6 @@ export function createNewsRouter(db: any) {
         parsedImages = typeof record.images === 'string' ? JSON.parse(record.images) : record.images;
       } catch (e) {}
     }
-    if (parsedImages.length === 0 && record.imageUrl) {
-      parsedImages = [record.imageUrl];
-    }
 
     const calculatedReadTime = record.readTime || (Math.max(1, Math.ceil((record.content || '').split(/\s+/).length / 200)) + ' min read');
 
@@ -235,7 +232,7 @@ export function createNewsRouter(db: any) {
       authorName: effectiveAuthorName,
       authorHandle: effectiveAuthorHandle,
       authorAvatar: effectiveAvatar,
-      imageUrl: record.imageUrl || (parsedImages[0] || null),
+      imageUrl: parsedImages[0] || null,
       images: parsedImages,
       readTime: calculatedReadTime,
       featured: !!record.isFeatured,
@@ -269,7 +266,7 @@ export function createNewsRouter(db: any) {
           excerpt: news.excerpt,
           category: news.category,
           source: news.source,
-          imageUrl: news.imageUrl,
+
           images: news.images,
           videoUrl: news.videoUrl,
           readTime: news.readTime,
@@ -360,7 +357,7 @@ export function createNewsRouter(db: any) {
           excerpt: news.excerpt,
           category: news.category,
           source: news.source,
-          imageUrl: news.imageUrl,
+
           images: news.images,
           videoUrl: news.videoUrl,
           readTime: news.readTime,
@@ -561,8 +558,7 @@ export function createNewsRouter(db: any) {
         authorAvatar,
         authorId: req.user.uid,
         entityId: entityId || null,
-        imageUrl: coverImage,
-        images: JSON.stringify(imageList),
+        images: JSON.stringify(coverImage ? [coverImage, ...imageList.filter((u: string) => u !== coverImage)] : imageList),
         readTime: calculatedReadTime,
         isFeatured: !!isFeatured,
         formId: formId || null,
@@ -598,7 +594,9 @@ export function createNewsRouter(db: any) {
       }
 
       const imageList = parseImageList(images, photoUrl);
-      const coverImage = photoUrl || (imageList.length > 0 ? imageList[0] : existing[0].imageUrl);
+      // Cover = first element of images; fall back to existing first image if nothing new supplied
+      const existingImages: string[] = (() => { try { return JSON.parse(existing[0].images || '[]'); } catch { return []; } })();
+      const coverImage = photoUrl || (imageList.length > 0 ? imageList[0] : existingImages[0]);
       const categoryName = tag || category || existing[0].category || 'Campus';
 
       const updateData: any = {};
@@ -609,8 +607,13 @@ export function createNewsRouter(db: any) {
         updateData.readTime = calculateReadTime(content);
       }
       if (categoryName !== undefined) updateData.category = categoryName;
-      if (coverImage !== undefined) updateData.imageUrl = coverImage;
-      if (imageList !== undefined) updateData.images = JSON.stringify(imageList);
+      if (images !== undefined || photoUrl !== undefined) {
+        // Ensure cover is first
+        const newImageList = coverImage
+          ? [coverImage, ...imageList.filter((u: string) => u !== coverImage)]
+          : imageList;
+        updateData.images = JSON.stringify(newImageList);
+      }
       if (formId !== undefined) updateData.formId = formId;
       if (entityId !== undefined) updateData.entityId = entityId;
       if (isArchived !== undefined) updateData.isArchived = isArchived;

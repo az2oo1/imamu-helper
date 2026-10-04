@@ -33,7 +33,7 @@ export function createAdminResourcesRouter(db: any) {
     try {
       const { 
         subjectId, courseCode, title, type, url, description, 
-        driveLink, boxLink, whatsappLink, freeResourcesUrl, paidResourcesUrl, avatarUrl, bannerUrl, sectionsEnabled,
+        boxLink, whatsappLink, freeResourcesUrl, paidResourcesUrl, avatarUrl, sectionsEnabled,
         resourceKind
       } = req.body;
       let targetSubjectId: any = null;
@@ -51,14 +51,12 @@ export function createAdminResourcesRouter(db: any) {
         subjectId: targetSubjectId || null,
         title: title || 'مصدر أكاديمي',
         type: type || 'drive',
-        url: url || driveLink || whatsappLink || '',
-        driveLink: driveLink || null,
+        url: url || whatsappLink || '',
         boxLink: boxLink || null,
         whatsappLink: whatsappLink || null,
         freeResourcesUrl: freeResourcesUrl || null,
         paidResourcesUrl: paidResourcesUrl || null,
         avatarUrl: avatarUrl || null,
-        bannerUrl: bannerUrl || null,
         description: description || null,
         sectionsEnabled: sectionsEnabled !== undefined ? Boolean(sectionsEnabled) : true
       }).returning();
@@ -76,7 +74,7 @@ export function createAdminResourcesRouter(db: any) {
       const idRaw = req.params.id;
       const { 
         title, type, url, description, subjectId, courseCode,
-        driveLink, boxLink, whatsappLink, freeResourcesUrl, paidResourcesUrl, avatarUrl, bannerUrl, sectionsEnabled,
+        boxLink, whatsappLink, freeResourcesUrl, paidResourcesUrl, avatarUrl, sectionsEnabled,
         resourceKind
       } = req.body;
 
@@ -96,13 +94,11 @@ export function createAdminResourcesRouter(db: any) {
       if (type !== undefined) updateData.type = type;
       if (url !== undefined) updateData.url = url;
       if (description !== undefined) updateData.description = description;
-      if (driveLink !== undefined) updateData.driveLink = driveLink;
       if (boxLink !== undefined) updateData.boxLink = boxLink;
       if (whatsappLink !== undefined) updateData.whatsappLink = whatsappLink;
       if (freeResourcesUrl !== undefined) updateData.freeResourcesUrl = freeResourcesUrl;
       if (paidResourcesUrl !== undefined) updateData.paidResourcesUrl = paidResourcesUrl;
       if (avatarUrl !== undefined) updateData.avatarUrl = avatarUrl;
-      if (bannerUrl !== undefined) updateData.bannerUrl = bannerUrl;
       if (targetSubjectId !== undefined) updateData.subjectId = targetSubjectId;
       if (sectionsEnabled !== undefined) updateData.sectionsEnabled = Boolean(sectionsEnabled);
 
@@ -149,7 +145,6 @@ export function createAdminResourcesRouter(db: any) {
       if (subjectIdToClear) {
         const [targetSubj] = await db.select().from(subjects).where(matchId(subjects.id, subjectIdToClear));
         if (targetSubj) {
-          await db.update(subjects).set({ driveLink: null, whatsappLink: null }).where(matchId(subjects.id, subjectIdToClear));
           await db.delete(course_resources).where(matchId(course_resources.subjectId, subjectIdToClear));
           return res.json({ success: true, syntheticDeleted: true });
         }

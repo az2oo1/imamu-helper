@@ -31,6 +31,7 @@
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "express": "^4.22.2",
+    "express-rate-limit": "^8.7.0",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.577.0",
     "motion": "^12.43.0",

@@ -34,7 +34,6 @@ interface Resource {
   freeResourcesUrl?: string;
   paidResourcesUrl?: string;
   avatarUrl?: string;
-  bannerUrl?: string;
   description?: string;
   sectionsEnabled?: boolean;
   createdAt: string;
@@ -166,7 +165,6 @@ export function Resources() {
     freeResourcesUrl: '',
     paidResourcesUrl: '',
     avatarUrl: '',
-    bannerUrl: '',
     description: '',
     sectionsEnabled: true
   });
@@ -314,7 +312,6 @@ export function Resources() {
           freeResourcesUrl: '', 
           paidResourcesUrl: '', 
           avatarUrl: '', 
-          bannerUrl: '', 
           sectionsEnabled: true 
         });
         return true;
@@ -342,7 +339,6 @@ export function Resources() {
       freeResourcesUrl: '',
       paidResourcesUrl: '',
       avatarUrl: '',
-      bannerUrl: '',
       sectionsEnabled: kind === 'course'
     });
     setIsAddResourceOpen(true);
@@ -364,7 +360,6 @@ export function Resources() {
       freeResourcesUrl: r.freeResourcesUrl || '',
       paidResourcesUrl: r.paidResourcesUrl || '',
       avatarUrl: r.avatarUrl || '',
-      bannerUrl: r.bannerUrl || '',
       description: r.description || '',
       sectionsEnabled: isManual ? false : (r.sectionsEnabled !== false)
     });
