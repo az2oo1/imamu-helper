@@ -6,7 +6,7 @@ import { useAuth } from '../lib/AuthContext';
 import { 
   Newspaper, Heart, MessageSquare, Share2, Eye, Clock, 
   ChevronLeft, ThumbsUp, Send, User, Check, Sparkles, Image, Video, X, Trash2, Maximize2,
-  Search, TrendingUp, Flame, Hash, Filter, CheckCircle2, UserCheck, UserPlus, ExternalLink,
+  Search, TrendingUp, Filter, CheckCircle2, UserCheck, UserPlus, ExternalLink,
   Users
 } from 'lucide-react';
 import { InView, SpotlightCard } from '../components/ui';
@@ -279,45 +279,6 @@ export function NewsPage() {
     }
   };
 
-  // Dynamically extract trending hashtags from news content
-  const trendingHashtags = useMemo(() => {
-    const counts: Record<string, number> = {};
-    const hashtagRegex = /#([\u0600-\u06FF\w_]+)/g;
-
-    news.forEach(item => {
-      const text = `${item.title || ''} ${item.content || ''}`;
-      const matches = text.match(hashtagRegex);
-      if (matches) {
-        const uniqueInItem = new Set(matches.map(m => m.trim()));
-        uniqueInItem.forEach(tag => {
-          counts[tag] = (counts[tag] || 0) + 1;
-        });
-      }
-    });
-
-    const extracted = Object.entries(counts)
-      .map(([tag, count]) => ({ tag, count }))
-      .sort((a, b) => b.count - a.count);
-
-    const defaultHashtags = [
-      { tag: '#جامعة_الإمام', count: Math.max(news.length, 14) },
-      { tag: '#قبول_1446', count: 9 },
-      { tag: '#التقويم_الأكاديمي', count: 7 },
-      { tag: '#فعاليات_الإمام', count: 6 },
-      { tag: '#الخدمات_الطلابية', count: 5 },
-      { tag: '#المكتبة_المركزية', count: 4 },
-    ];
-
-    const mergedMap = new Map<string, number>();
-    defaultHashtags.forEach(h => mergedMap.set(h.tag, h.count));
-    extracted.forEach(h => mergedMap.set(h.tag, (mergedMap.get(h.tag) || 0) + h.count));
-
-    return Array.from(mergedMap.entries())
-      .map(([tag, count]) => ({ tag, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 8);
-  }, [news]);
-
   // Compute top 10 authenticated accounts
   const top10Accounts = useMemo(() => {
     return [...accounts]
@@ -583,17 +544,33 @@ export function NewsPage() {
                       </div>
 
                       <div className="flex items-center justify-between w-full border-t border-slate-100 dark:border-zinc-800 pt-3.5 mt-2">
-                        <div className="flex items-center gap-2">
-                          <button 
-                            onClick={(e) => handleAuthorClick(featuredItem.sourceHandle || featuredItem.authorHandle || featuredItem.source || '@IMAMU', e)}
-                            className="font-mono text-xs font-bold text-[var(--color-imamu-accent)] hover:underline bg-[var(--color-imamu-accent)]/10 px-2.5 py-1 rounded-full transition cursor-pointer"
-                            title="الانتقال إلى مصدر الخبر"
-                          >
-                            @{((featuredItem.sourceHandle || featuredItem.authorHandle || featuredItem.source || 'IMAMU')).replace(/^@/, '')}
-                          </button>
-                          <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono">
-                            • {formatDate(featuredItem.createdAt, 'ar-display')}
-                          </span>
+                        <div 
+                          onClick={(e) => handleAuthorClick(featuredItem.sourceHandle || featuredItem.authorHandle || featuredItem.source || '@IMAMU', e)}
+                          className="flex items-center gap-3 cursor-pointer group/author"
+                          title="الانتقال إلى مصدر الخبر"
+                        >
+                          <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 flex items-center justify-center font-bold text-xs text-slate-700 dark:text-zinc-300 overflow-hidden shrink-0 group-hover/author:border-[var(--color-imamu-accent)] transition">
+                            {featuredItem.authorAvatar ? (
+                              <img 
+                                src={featuredItem.authorAvatar} 
+                                alt={featuredItem.author || 'إدارة الأخبار'} 
+                                className="w-full h-full rounded-full object-cover"
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                              />
+                            ) : (
+                              (featuredItem.author || (featuredItem as any).authorName || 'إدارة الأخبار').charAt(0)
+                            )}
+                          </div>
+                          <div className="flex flex-col text-right">
+                            <span className="text-xs font-bold text-slate-900 dark:text-white group-hover/author:text-[var(--color-imamu-accent)] transition">
+                              {featuredItem.author || (featuredItem as any).authorName || 'إدارة الأخبار'}
+                            </span>
+                            <span className="text-[10px] text-slate-400 dark:text-zinc-500 flex items-center gap-1 font-mono">
+                              <span>@{((featuredItem.sourceHandle || featuredItem.authorHandle || featuredItem.source || 'IMAMU')).replace(/^@/, '')}</span>
+                              <span>•</span>
+                              <span>{formatDate(featuredItem.createdAt, 'ar-display')}</span>
+                            </span>
+                          </div>
                         </div>
 
                         <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-zinc-400">
@@ -692,22 +669,38 @@ export function NewsPage() {
                       >
                         <div>
                           <div className="flex items-start justify-between gap-2 mb-4">
-                            <button
+                            <div 
                               onClick={(e) => handleAuthorClick(item.sourceHandle || item.authorHandle || item.source || '@IMAMU', e)}
-                              className="font-mono text-xs font-bold text-[var(--color-imamu-accent)] hover:underline bg-[var(--color-imamu-accent)]/10 px-2.5 py-1 rounded-full transition flex items-center gap-1 shrink-0 cursor-pointer"
+                              className="flex items-center gap-2.5 min-w-0 cursor-pointer group/author"
                               title="الانتقال إلى مصدر الخبر"
                             >
-                              @{((item.sourceHandle || item.authorHandle || item.source || 'IMAMU')).replace(/^@/, '')}
-                            </button>
-
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono">
-                                {formatDate(item.createdAt, 'ar-display')}
-                              </span>
-                              <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800/90 border border-slate-200/80 dark:border-zinc-700/80 text-[var(--color-imamu-accent)] text-[10px] font-bold shadow-2xs shrink-0">
-                                {getArabicCategoryLabel(item.category, (item as any).tag || item.summary, item.content, item.title)}
-                              </span>
+                              <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 flex items-center justify-center font-bold text-xs text-slate-700 dark:text-zinc-300 overflow-hidden shrink-0 group-hover/author:border-[var(--color-imamu-accent)] transition">
+                                {item.authorAvatar ? (
+                                  <img 
+                                    src={item.authorAvatar} 
+                                    alt={item.author || 'إدارة الأخبار'} 
+                                    className="w-full h-full rounded-full object-cover"
+                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                  />
+                                ) : (
+                                  (item.author || (item as any).authorName || 'إدارة الأخبار').charAt(0)
+                                )}
+                              </div>
+                              <div className="flex flex-col text-right min-w-0">
+                                <span className="text-xs font-bold text-slate-900 dark:text-white line-clamp-1 group-hover/author:text-[var(--color-imamu-accent)] transition">
+                                  {item.author || (item as any).authorName || 'إدارة الأخبار'}
+                                </span>
+                                <span className="text-[10px] text-slate-400 dark:text-zinc-500 flex items-center gap-1 min-w-0 truncate font-mono">
+                                  <span className="truncate">@{((item.sourceHandle || item.authorHandle || item.source || 'IMAMU')).replace(/^@/, '')}</span>
+                                  <span className="shrink-0">•</span>
+                                  <span className="shrink-0">{formatDate(item.createdAt, 'ar-display')}</span>
+                                </span>
+                              </div>
                             </div>
+
+                            <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800/90 border border-slate-200/80 dark:border-zinc-700/80 text-[var(--color-imamu-accent)] text-[10px] font-bold shadow-2xs shrink-0">
+                              {getArabicCategoryLabel(item.category, (item as any).tag || item.summary, item.content, item.title)}
+                            </span>
                           </div>
 
                           {item.title && item.title !== item.author && (
@@ -780,22 +773,38 @@ export function NewsPage() {
                       >
                         <div>
                           <div className="flex items-start justify-between gap-2 mb-4">
-                            <button
+                            <div 
                               onClick={(e) => handleAuthorClick(item.sourceHandle || item.authorHandle || item.source || '@IMAMU', e)}
-                              className="font-mono text-xs font-bold text-[var(--color-imamu-accent)] hover:underline bg-[var(--color-imamu-accent)]/10 px-2.5 py-1 rounded-full transition flex items-center gap-1 shrink-0 cursor-pointer"
+                              className="flex items-center gap-2.5 min-w-0 cursor-pointer group/author"
                               title="الانتقال إلى مصدر الخبر"
                             >
-                              @{((item.sourceHandle || item.authorHandle || item.source || 'IMAMU')).replace(/^@/, '')}
-                            </button>
-
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono">
-                                {formatDate(item.createdAt, 'ar-display')}
-                              </span>
-                              <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800/90 border border-slate-200/80 dark:border-zinc-700/80 text-[var(--color-imamu-accent)] text-[10px] font-bold shadow-2xs shrink-0">
-                                {getArabicCategoryLabel(item.category, (item as any).tag || item.summary, item.content, item.title)}
-                              </span>
+                              <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 flex items-center justify-center font-bold text-xs text-slate-700 dark:text-zinc-300 overflow-hidden shrink-0 group-hover/author:border-[var(--color-imamu-accent)] transition">
+                                {item.authorAvatar ? (
+                                  <img 
+                                    src={item.authorAvatar} 
+                                    alt={item.author || 'إدارة الأخبار'} 
+                                    className="w-full h-full rounded-full object-cover"
+                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                  />
+                                ) : (
+                                  (item.author || (item as any).authorName || 'إدارة الأخبار').charAt(0)
+                                )}
+                              </div>
+                              <div className="flex flex-col text-right min-w-0">
+                                <span className="text-xs font-bold text-slate-900 dark:text-white line-clamp-1 group-hover/author:text-[var(--color-imamu-accent)] transition">
+                                  {item.author || (item as any).authorName || 'إدارة الأخبار'}
+                                </span>
+                                <span className="text-[10px] text-slate-400 dark:text-zinc-500 flex items-center gap-1 min-w-0 truncate font-mono">
+                                  <span className="truncate">@{((item.sourceHandle || item.authorHandle || item.source || 'IMAMU')).replace(/^@/, '')}</span>
+                                  <span className="shrink-0">•</span>
+                                  <span className="shrink-0">{formatDate(item.createdAt, 'ar-display')}</span>
+                                </span>
+                              </div>
                             </div>
+
+                            <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800/90 border border-slate-200/80 dark:border-zinc-700/80 text-[var(--color-imamu-accent)] text-[10px] font-bold shadow-2xs shrink-0">
+                              {getArabicCategoryLabel(item.category, (item as any).tag || item.summary, item.content, item.title)}
+                            </span>
                           </div>
 
                           {item.title && item.title !== item.author && (
@@ -864,49 +873,10 @@ export function NewsPage() {
 
           </div>
 
-          {/* Right Sidebar Column (Widgets: Top 10 Accounts & Trending Hashtags) - Direct on Background */}
+          {/* Right Sidebar Column (Widget: Top 10 Accounts) - Direct on Background */}
           <div className="lg:col-span-4 space-y-8 w-full sticky top-24">
-            
-            {/* Widget 1: Trending Hashtags - Direct on Background */}
+            {/* Widget: Top 10 Authenticated Accounts - Direct on Background */}
             <InView preset="fade-up" delay={0.15}>
-              <div className="py-2">
-                <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-200/80 dark:border-zinc-800">
-                  <Flame className="w-4 h-4 text-amber-500 fill-amber-500/20" />
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                    الأكثر تداولاً
-                  </h3>
-                </div>
-
-                <div className="space-y-1">
-                  {trendingHashtags.map((item, idx) => (
-                    <div
-                      key={item.tag}
-                      onClick={() => {
-                        setSearchQuery(item.tag);
-                        setSearchFilter('articles');
-                      }}
-                      className="flex items-center justify-between py-2 px-2.5 rounded-xl hover:bg-slate-100/70 dark:hover:bg-zinc-800/60 transition cursor-pointer group"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="text-xs font-bold text-slate-400 dark:text-zinc-500 w-4 text-center">
-                          {idx + 1}
-                        </span>
-                        <span className="text-xs font-bold text-slate-800 dark:text-zinc-200 group-hover:text-[var(--color-imamu-accent)] transition truncate">
-                          {item.tag}
-                        </span>
-                      </div>
-                      
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0">
-                        {item.count} خبر
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </InView>
-
-            {/* Widget 2: Top 10 Authenticated Accounts - Direct on Background */}
-            <InView preset="fade-up" delay={0.25}>
               <div className="py-2 pt-2">
                 <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-200/80 dark:border-zinc-800">
                   <div className="flex items-center gap-2">
