@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, 
@@ -70,6 +71,13 @@ export default function CreateResourceModal({
   const [isFetchingWaAvatar, setIsFetchingWaAvatar] = useState(false);
   const [waAvatarMessage, setWaAvatarMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const portalRef = useRef<HTMLDivElement>(null);
+  const [dropdownCoords, setDropdownCoords] = useState<{
+    top?: number;
+    bottom?: number;
+    left: number;
+    width: number;
+  } | null>(null);
 
   const [resourceKind, setResourceKind] = useState<'course' | 'manual'>(
     resourceForm.resourceKind || (resourceForm.subjectId ? 'course' : (resourceForm.id ? 'manual' : 'course'))
@@ -212,10 +220,48 @@ export default function CreateResourceModal({
     }
   };
 
+  const updateDropdownCoords = () => {
+    if (!dropdownRef.current) return;
+    const rect = dropdownRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const openUpwards = spaceBelow < 250 && spaceAbove > 200;
+
+    setDropdownCoords({
+      top: openUpwards ? undefined : rect.bottom + 6,
+      bottom: openUpwards ? window.innerHeight - rect.top + 6 : undefined,
+      left: rect.left,
+      width: rect.width
+    });
+  };
+
+  useEffect(() => {
+    if (!isCourseDropdownOpen) return;
+    updateDropdownCoords();
+
+    const handleScrollOrResize = () => {
+      updateDropdownCoords();
+    };
+
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
+
+    return () => {
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, [isCourseDropdownOpen]);
+
   // Close dropdown on click outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        dropdownRef.current && 
+        !dropdownRef.current.contains(target) &&
+        portalRef.current &&
+        !portalRef.current.contains(target)
+      ) {
         setIsCourseDropdownOpen(false);
       }
     }
@@ -422,7 +468,7 @@ export default function CreateResourceModal({
           </div>
 
           {/* Form Body with Smooth Dynamic Height Layout Animation */}
-          <motion.div layout className={`p-6 max-h-[65vh] custom-scrollbar ${isCourseDropdownOpen ? 'overflow-visible' : 'overflow-y-auto'}`}>
+          <motion.div layout className="p-6 max-h-[65vh] custom-scrollbar overflow-y-auto">
             <AnimatePresence mode="wait">
               {/* STEP 1: Two Distinct Choices - Course Resource VS Standalone Manual Thing */}
               {activeStep === 1 && (
@@ -519,18 +565,34 @@ export default function CreateResourceModal({
                                 type="text"
                                 placeholder="ابحث برمز المادة أو اسمها (مثال: CS1111 / أساسيات الحوسبة)..."
                                 value={courseSearch}
-                                onFocus={() => setIsCourseDropdownOpen(true)}
+                                onFocus={() => {
+                                  setIsCourseDropdownOpen(true);
+                                  updateDropdownCoords();
+                                }}
                                 onChange={e => {
                                   setCourseSearch(e.target.value);
                                   setIsCourseDropdownOpen(true);
+                                  updateDropdownCoords();
                                 }}
                                 className="w-full py-3 pr-10 pl-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl text-xs font-bold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-[var(--color-imamu-accent)]/40 focus:border-[var(--color-imamu-accent)] shadow-xs"
                               />
                               <Search className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5" />
                             </div>
 
-                            {isCourseDropdownOpen && (
-                              <div className="absolute right-0 left-0 top-full mt-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-2xl z-[200] overflow-hidden">
+                            {isCourseDropdownOpen && dropdownCoords && typeof document !== 'undefined' && createPortal(
+                              <div
+                                ref={portalRef}
+                                style={{
+                                  position: 'fixed',
+                                  top: dropdownCoords.top !== undefined ? `${dropdownCoords.top}px` : undefined,
+                                  bottom: dropdownCoords.bottom !== undefined ? `${dropdownCoords.bottom}px` : undefined,
+                                  left: `${dropdownCoords.left}px`,
+                                  width: `${dropdownCoords.width}px`,
+                                  zIndex: 99999,
+                                }}
+                                className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+                                dir="rtl"
+                              >
                                 <div className="max-h-56 overflow-y-auto custom-scrollbar p-1 divide-y divide-slate-100 dark:divide-zinc-800">
                                   {filteredSubjects.length > 0 ? (
                                     filteredSubjects.map(subj => (
@@ -564,7 +626,8 @@ export default function CreateResourceModal({
                                     </div>
                                   )}
                                 </div>
-                              </div>
+                              </div>,
+                              document.body
                             )}
                           </div>
                         )}

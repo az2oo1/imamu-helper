@@ -156,6 +156,9 @@ export function AdminPage() {
     name: string; 
     creditHours: string; 
     level: string; 
+    college?: string;
+    department?: string;
+    prereq?: string;
     whatsappLink: string;
     description: string; 
     syllabus: string; 
@@ -168,6 +171,9 @@ export function AdminPage() {
     name: '', 
     creditHours: '3', 
     level: '', 
+    college: '',
+    department: '',
+    prereq: '',
     whatsappLink: '',
     description: '', 
     syllabus: '', 
@@ -1035,6 +1041,19 @@ export function AdminPage() {
               </a>
             </div>
 
+            <div className="rounded-2xl p-5 border space-y-3 shadow-2xs" style={{ background: 'rgba(59,130,246,0.05)', borderColor: 'rgba(59,130,246,0.2)' }}>
+              <h4 className="font-bold text-xs text-blue-500 flex items-center gap-1.5">
+                <RefreshCw className="w-3.5 h-3.5" /> مزامنة التقويم الأكاديمي الرسمي
+              </h4>
+              <p className="text-[11px] text-blue-400/80 leading-relaxed">يسحب ويحدث تلقائياً جميع الفعاليات ومواعيد التسجيل والاختبارات وبداية الفصول من بوابة الجامعة الرسمية (Banner).</p>
+              <button
+                onClick={() => handlePost('/api/admin/events/sync-imamu', {}, () => { toast('success', 'تمت مزامنة مواعيد التقويم بنجاح من بوابة الجامعة الرسمية!'); fetchData(); })}
+                className="flex items-center justify-center gap-2 bg-blue-600 text-white font-bold py-2 rounded-xl text-xs w-full hover:bg-blue-700 transition cursor-pointer shadow-xs"
+              >
+                <RefreshCw className="w-4 h-4" /> مزامنة من بوابة الجامعة
+              </button>
+            </div>
+
             <div className="rounded-2xl p-5 border space-y-3 shadow-2xs" style={{ background: 'rgba(16,185,129,0.05)', borderColor: 'rgba(16,185,129,0.2)' }}>
               <h4 className="font-bold text-xs text-emerald-500">جدولة مواعيد المكافأة الجامعية</h4>
               <p className="text-[11px] text-emerald-400/80 leading-relaxed">يولد مواعيد إيداع المكافأة تلقائياً يوم 25 من كل شهر ميلادي لـ 12 شهراً.</p>
@@ -1171,7 +1190,7 @@ export function AdminPage() {
           <button
             onClick={() => {
               setSubjectForm({ 
-                id: undefined, code: '', name: '', creditHours: '3', level: '', whatsappLink: '', description: '', syllabus: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', tags: '' 
+                id: undefined, code: '', name: '', creditHours: '3', level: '', college: '', department: '', prereq: '', whatsappLink: '', description: '', syllabus: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', tags: '' 
               });
               setIsCourseModalOpen(true);
             }}
@@ -1202,15 +1221,31 @@ export function AdminPage() {
         </div>
 
         <div className="divide-y divide-slate-100 dark:divide-zinc-800/60">
-          {subjects.filter(s => matchArabicSearch([s.code, s.name, s.tags], subjectSearch)).slice(0, subjectLimit).map(s => (
-            <div key={s.id} className="py-3.5 px-5 flex items-center justify-between group hover:bg-slate-100/60 dark:hover:bg-zinc-800/60 transition">
+          {subjects.filter(s => matchArabicSearch([s.code, s.name, s.tags, s.college, s.department, s.prereq], subjectSearch)).slice(0, subjectLimit).map(s => (
+            <div key={s.id} className="py-3.5 px-5 flex items-center justify-between group hover:bg-slate-100/60 dark:hover:bg-zinc-800/60 transition gap-4">
               <div className="flex items-center gap-3 min-w-0 flex-1">
                 <div className="font-mono text-xs px-2.5 py-1 rounded-lg border font-bold shrink-0 bg-[var(--color-imamu-brown)/10] text-[var(--color-imamu-accent)] border-slate-200/80 dark:border-zinc-700/80">{s.code}</div>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 space-y-1">
                   <div className="font-bold text-sm truncate" style={{ color: 'var(--text-main)' }}>{s.name}</div>
-                  <div className="flex items-center gap-2 mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                  <div className="flex items-center gap-2 flex-wrap text-xs" style={{ color: 'var(--text-muted)' }}>
                     <span>{s.creditHours || 3} Hours</span>
                     {s.level && <span>• Level {s.level}</span>}
+                    {s.college && (
+                      <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                        {s.college}
+                      </span>
+                    )}
+                    {s.department && (
+                      <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                        {s.department}
+                      </span>
+                    )}
+                    {s.prereq && (
+                      <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1" title={s.prereq}>
+                        <BookOpen className="w-3 h-3" />
+                        <span className="truncate max-w-xs">متطلب: {s.prereq}</span>
+                      </span>
+                    )}
                     {s.tags && <span className="text-slate-400">• Tags: {s.tags}</span>}
                   </div>
                 </div>
@@ -1225,6 +1260,9 @@ export function AdminPage() {
                       name: s.name || '', 
                       creditHours: s.creditHours?.toString() || '3', 
                       level: s.level?.toString() || '',
+                      college: s.college || '',
+                      department: s.department || '',
+                      prereq: s.prereq || '',
                       whatsappLink: s.whatsappLink || '',
                       description: s.description || '',
                       syllabus: s.syllabus || '',

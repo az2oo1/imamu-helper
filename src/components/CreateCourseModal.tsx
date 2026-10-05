@@ -10,6 +10,9 @@ interface CreateCourseModalProps {
     name: string;
     creditHours: string;
     level: string;
+    college?: string;
+    department?: string;
+    prereq?: string;
     whatsappLink: string;
     description: string;
     syllabus: string;
@@ -88,6 +91,45 @@ export default function CreateCourseModal({
                 style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} 
               />
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>College (الكلية)</label>
+              <input 
+                type="text" 
+                placeholder="e.g. كلية علوم الحاسب والمعلومات" 
+                value={subjectForm.college || ''} 
+                onChange={e => setSubjectForm((s: any) => ({ ...s, college: e.target.value }))} 
+                className="py-2 px-3 rounded-xl text-sm border outline-none" 
+                style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} 
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Department (القسم)</label>
+              <input 
+                type="text" 
+                placeholder="e.g. علوم الحاسب" 
+                value={subjectForm.department || ''} 
+                onChange={e => setSubjectForm((s: any) => ({ ...s, department: e.target.value }))} 
+                className="py-2 px-3 rounded-xl text-sm border outline-none" 
+                style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} 
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+              Prerequisites (المتطلبات السابقة من بانر أو الكلية)
+            </label>
+            <input 
+              type="text" 
+              placeholder="e.g. CS140 or عال140 (البرمجة كينونية التوجه)" 
+              value={subjectForm.prereq || ''} 
+              onChange={e => setSubjectForm((s: any) => ({ ...s, prereq: e.target.value }))} 
+              className="py-2 px-3 rounded-xl text-sm border outline-none" 
+              style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} 
+            />
           </div>
 
           <div className="grid grid-cols-3 gap-4">

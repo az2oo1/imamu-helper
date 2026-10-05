@@ -6,11 +6,13 @@ import {
   AlertTriangle, Trash2, Clock, MapPin, User, Users,
   BookOpen, ChevronRight, ChevronLeft, Eye, X, FileText, Loader2,
   Check, Layers, Sparkles, Folder, FolderOpen, FolderPlus, ArrowRight,
-  Copy, Mail, UserCheck, ChevronDown, ChevronUp
+  Copy, Mail, UserCheck, ChevronDown, ChevronUp, Plus, RotateCcw,
+  Activity, Play, Pause, Radio, Globe, Sliders
 } from 'lucide-react';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatScheduleDaysDisplay } from '../../lib/schedule-utils';
+import { formatDate } from '../../lib/date-utils';
 
 interface ScheduleMeeting {
   type?: string;
@@ -54,12 +56,26 @@ interface SectionItem {
   createdAt?: string;
 }
 
-interface ImportResult {
-  success: boolean;
-  coursesCount: number;
-  sectionsCount: number;
-  elapsedMs: number;
-  message: string;
+export interface BannerTermItem {
+  termCode: string;
+  termName: string;
+  academicYear: string;
+  semester: string;
+  monitorChanges: boolean;
+  autoUpdate: boolean;
+  updateIntervalDays: number;
+  lastSyncAt?: string | null;
+  lastCheckAt?: string | null;
+  totalSections: number;
+  status: 'idle' | 'syncing' | 'error';
+  lastError?: string | null;
+}
+
+export interface DetectedTermItem {
+  termCode: string;
+  termName: string;
+  academicYear: string;
+  semester: string;
 }
 
 export interface FolderItem {
@@ -68,7 +84,9 @@ export interface FolderItem {
   academicYear?: string;
   semester?: string;
   term?: string;
+  termCode?: string;
   count: number;
+  bannerConfig?: BannerTermItem;
 }
 
 const FOLDERS_STORAGE_KEY = 'imamu_section_folders';
@@ -132,43 +150,87 @@ export default function AdminSectionsTab({
   // Selected Section for Details Modal
   const [selectedSection, setSelectedSection] = useState<SectionItem | null>(null);
 
-  // Import Modal State
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
-  const [importFile, setImportFile] = useState<File | null>(null);
-  const [importResult, setImportResult] = useState<ImportResult | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Banner Terms State
+  const [bannerTerms, setBannerTerms] = useState<BannerTermItem[]>([]);
+  const [bannerTermsLoading, setBannerTermsLoading] = useState(false);
 
+  // Add Term Modal State
+  const [isAddTermModalOpen, setIsAddTermModalOpen] = useState(false);
+  const [detectedTerms, setDetectedTerms] = useState<DetectedTermItem[]>([]);
+  const [detectedLoading, setDetectedLoading] = useState(false);
+  const [selectedTermMode, setSelectedTermMode] = useState<'detected' | 'custom'>('detected');
+  const [selectedTermCode, setSelectedTermCode] = useState<string>('');
+  const [customTermCode, setCustomTermCode] = useState('');
+  const [customTermName, setCustomTermName] = useState('');
+  const [customYear, setCustomYear] = useState('1448');
+  const [customSemester, setCustomSemester] = useState('الفصل الأول');
+  const [newTermMonitorChanges, setNewTermMonitorChanges] = useState(true);
+  const [newTermAutoUpdate, setNewTermAutoUpdate] = useState(true);
+  const [newTermIntervalDays, setNewTermIntervalDays] = useState(2);
+  const [newTermSyncImmediately, setNewTermSyncImmediately] = useState(true);
+  const [addingTerm, setAddingTerm] = useState(false);
+
+  // Add CRNs Modal State
+  const [addCrnsTerm, setAddCrnsTerm] = useState<BannerTermItem | null>(null);
+  const [crnsInputText, setCrnsInputText] = useState('');
+  const [addingCrns, setAddingCrns] = useState(false);
+  const [addCrnsResult, setAddCrnsResult] = useState<{ addedCount: number; message: string } | null>(null);
+
+  // Action status indicators
+  const [syncingTermCode, setSyncingTermCode] = useState<string | null>(null);
+  const [emptyingTermCode, setEmptyingTermCode] = useState<string | null>(null);
+
+  const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
   const copyEmail = (email: string) => {
     navigator.clipboard.writeText(email);
     setCopiedEmail(email);
     setTimeout(() => setCopiedEmail(null), 2000);
   };
 
-  // Import Modal Folder State: 'existing' | 'new'
-  const [uploadFolderMode, setUploadFolderMode] = useState<'existing' | 'new'>('existing');
-  const [selectedExistingFolderId, setSelectedExistingFolderId] = useState<string>('');
-  const [newFolderYear, setNewFolderYear] = useState('1448');
-  const [newFolderSemester, setNewFolderSemester] = useState('الفصل الأول');
+  // Derive folder list from bannerTerms and availableTerms
+  const folders: FolderItem[] = useMemo(() => {
+    const list: FolderItem[] = [];
+    const bannerCodeSet = new Set<string>();
 
-  // Derive folder list from availableTerms
-  const folders: FolderItem[] = availableTerms.map((t, idx) => {
-    const name = t.term || (t.academicYear && t.semester ? `${t.academicYear} - ${t.semester}` : t.academicYear || t.semester || 'غير مصنف');
-    const id = t.term || `${t.academicYear || ''}-${t.semester || ''}` || `term-${idx}`;
-    return {
-      id,
-      name,
-      academicYear: t.academicYear,
-      semester: t.semester,
-      term: t.term,
-      count: t.count || 0
-    };
-  });
+    for (const bt of bannerTerms) {
+      bannerCodeSet.add(bt.termCode);
+      list.push({
+        id: bt.termCode,
+        name: bt.termName,
+        academicYear: bt.academicYear,
+        semester: bt.semester,
+        term: bt.termCode,
+        termCode: bt.termCode,
+        count: bt.totalSections || 0,
+        bannerConfig: bt
+      });
+    }
 
-  const grandTotalSections = availableTerms.reduce((sum, t) => sum + (Number(t.count) || 0), 0);
+    // Also include any terms from availableTerms that aren't already represented
+    for (const t of availableTerms) {
+      const codeOrTerm = t.term || '';
+      if (codeOrTerm && bannerCodeSet.has(codeOrTerm)) continue;
+      const name = t.term || (t.academicYear && t.semester ? `${t.academicYear} - ${t.semester}` : t.academicYear || t.semester || 'غير مصنف');
+      const id = t.term || `${t.academicYear || ''}-${t.semester || ''}`;
+      if (!list.some(f => f.name === name || f.id === id)) {
+        list.push({
+          id,
+          name,
+          academicYear: t.academicYear,
+          semester: t.semester,
+          term: t.term,
+          termCode: t.term,
+          count: t.count || 0
+        });
+      }
+    }
 
-  // Fetch distinct terms metadata
+    return list;
+  }, [bannerTerms, availableTerms]);
+
+  const grandTotalSections = folders.reduce((sum, t) => sum + (Number(t.count) || 0), 0);
+
+  // Fetch distinct terms metadata from DB
   const fetchTerms = useCallback(async () => {
     try {
       const token = await getToken();
@@ -195,16 +257,358 @@ export default function AdminSectionsTab({
     }
   }, [getToken]);
 
+  // Fetch registered banner terms
+  const fetchBannerTerms = useCallback(async () => {
+    setBannerTermsLoading(true);
+    try {
+      const token = await getToken();
+      const res = await fetch('/api/admin/banner/terms', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBannerTerms(data.terms || []);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setBannerTermsLoading(false);
+    }
+  }, [getToken]);
+
   useEffect(() => {
     fetchTerms();
-  }, [fetchTerms]);
+    fetchBannerTerms();
+  }, [fetchTerms, fetchBannerTerms]);
 
-  // Keep selectedExistingFolderId valid
-  useEffect(() => {
-    if (folders.length > 0 && !selectedExistingFolderId) {
-      setSelectedExistingFolderId(selectedFolder && selectedFolder !== 'all' ? selectedFolder.id : folders[0].id);
+  // Open Add Term Modal and query detected terms
+  const openAddTermModal = async () => {
+    setIsAddTermModalOpen(true);
+    setDetectedLoading(true);
+    try {
+      const token = await getToken();
+      const res = await fetch('/api/admin/banner/detected-terms', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const terms = data.terms || [];
+        setDetectedTerms(terms);
+        if (terms.length > 0) {
+          setSelectedTermCode(terms[0].termCode);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      toast('error', 'تعذر جلب الفصول المكتشفة من بانر');
+    } finally {
+      setDetectedLoading(false);
     }
-  }, [folders, selectedFolder, selectedExistingFolderId]);
+  };
+
+  // Submit adding term
+  const handleAddTermSubmit = async () => {
+    let termCode = '';
+    let termName = '';
+    let academicYear = '';
+    let semester = '';
+
+    if (selectedTermMode === 'detected') {
+      const found = detectedTerms.find(t => t.termCode === selectedTermCode);
+      if (!found) {
+        toast('warning', 'يرجى اختيار فصل دراسي محدد');
+        return;
+      }
+      termCode = found.termCode;
+      termName = found.termName;
+      academicYear = found.academicYear;
+      semester = found.semester;
+    } else {
+      if (!customTermCode.trim() || !customTermName.trim()) {
+        toast('warning', 'يرجى إدخال رمز الفصل واسمه');
+        return;
+      }
+      termCode = customTermCode.trim();
+      termName = customTermName.trim();
+      academicYear = customYear.trim();
+      semester = customSemester.trim();
+    }
+
+    setAddingTerm(true);
+    try {
+      const token = await getToken();
+      const res = await fetch('/api/admin/banner/terms', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          termCode,
+          termName,
+          academicYear,
+          semester,
+          syncImmediately: newTermSyncImmediately
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'فشل إضافة الفصل');
+      }
+
+      // Update options toggles
+      await fetch(`/api/admin/banner/terms/${encodeURIComponent(termCode)}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          monitorChanges: newTermMonitorChanges,
+          autoUpdate: newTermAutoUpdate,
+          updateIntervalDays: newTermIntervalDays
+        })
+      });
+
+      toast('success', `تمت إضافة الفصل «${termName}» بنجاح!`);
+      setIsAddTermModalOpen(false);
+      fetchBannerTerms();
+      fetchTerms();
+    } catch (e: any) {
+      toast('error', e.message || 'حدث خطأ أثناء إضافة الفصل');
+    } finally {
+      setAddingTerm(false);
+    }
+  };
+
+  // Toggle Live Monitoring for Term
+  const handleToggleMonitor = async (termCode: string, currentValue: boolean) => {
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/admin/banner/terms/${encodeURIComponent(termCode)}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ monitorChanges: !currentValue })
+      });
+      if (res.ok) {
+        toast('success', !currentValue ? 'تم تفعيل مراقبة التغييرات الفورية' : 'تم إيقاف مراقبة التغييرات');
+        fetchBannerTerms();
+      } else {
+        toast('error', 'فشل تحديث إعدادات المراقبة');
+      }
+    } catch {
+      toast('error', 'خطأ في الاتصال بالخادم');
+    }
+  };
+
+  // Toggle Auto Regular Update for Term
+  const handleToggleAutoUpdate = async (termCode: string, currentValue: boolean) => {
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/admin/banner/terms/${encodeURIComponent(termCode)}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ autoUpdate: !currentValue })
+      });
+      if (res.ok) {
+        toast('success', !currentValue ? 'تم تفعيل التحديث الدوري التلقائي' : 'تم إيقاف التحديث الدوري');
+        fetchBannerTerms();
+      } else {
+        toast('error', 'فشل تحديث إعدادات التحديث الدوري');
+      }
+    } catch {
+      toast('error', 'خطأ في الاتصال بالخادم');
+    }
+  };
+
+  // Change Update Interval for Term
+  const handleChangeInterval = async (termCode: string, newDays: number) => {
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/admin/banner/terms/${encodeURIComponent(termCode)}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ updateIntervalDays: newDays })
+      });
+      if (res.ok) {
+        toast('success', `تم ضبط التحديث الدوري ليكون كل ${newDays} ${newDays === 1 ? 'يوم' : newDays === 2 ? 'يومين' : 'أيام'}`);
+        fetchBannerTerms();
+      }
+    } catch {
+      toast('error', 'خطأ في الاتصال بالخادم');
+    }
+  };
+
+  // Immediate Full Sync for Term
+  const handleSyncNow = async (termCode: string) => {
+    setSyncingTermCode(termCode);
+    try {
+      const token = await getToken();
+      toast('info', 'بدأت مزامنة بيانات الشعب ومقاعدها من بانر الآن...');
+      const res = await fetch(`/api/admin/banner/terms/${encodeURIComponent(termCode)}/sync`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        toast('success', `اكتملت المزامنة بنجاح! تم استيراد ${data.sectionsCount?.toLocaleString() || 0} شعبة و ${data.coursesCount?.toLocaleString() || 0} مقرر.`);
+        fetchBannerTerms();
+        fetchTerms();
+        if (selectedFolder) fetchSections();
+      } else {
+        toast('error', data.error || 'فشلت المزامنة من بانر');
+      }
+    } catch (e: any) {
+      toast('error', e.message || 'خطأ أثناء المزامنة');
+    } finally {
+      setSyncingTermCode(null);
+    }
+  };
+
+  // Empty Term Sections
+  const handleEmptyTerm = async (termCode: string, termName: string) => {
+    if (!confirm(`⚠️ هل أنت متأكد من تفريغ كافة شُعب الفصل «${termName}» من قاعدة البيانات؟\n\nستبقى إعدادات الفصل محفوظة للمزامنة اللاحقة.`)) {
+      return;
+    }
+    setEmptyingTermCode(termCode);
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/admin/banner/terms/${encodeURIComponent(termCode)}/empty`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        toast('success', data.message || 'تم تفريغ شعب الفصل بنجاح');
+        fetchBannerTerms();
+        fetchTerms();
+        if (selectedFolder) fetchSections();
+      } else {
+        toast('error', data.error || 'فشل تفريغ شعب الفصل');
+      }
+    } catch {
+      toast('error', 'حدث خطأ في الاتصال');
+    } finally {
+      setEmptyingTermCode(null);
+    }
+  };
+
+  // Delete Term from Tracking
+  const handleDeleteTerm = async (termCode: string, termName: string) => {
+    if (!confirm(`⚠️ هل أنت متأكد من حذف الفصل «${termName}» وإلغاء متابعته نهائياً؟\n\nسيتم مسح شعب هذا الفصل أيضاً.`)) {
+      return;
+    }
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/admin/banner/terms/${encodeURIComponent(termCode)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        toast('success', 'تم حذف الفصل الدراسي بنجاح');
+        if (selectedFolder && selectedFolder !== 'all' && (selectedFolder.termCode === termCode || selectedFolder.id === termCode)) {
+          setSelectedFolder(null);
+        }
+        fetchBannerTerms();
+        fetchTerms();
+      } else {
+        toast('error', 'فشل حذف الفصل');
+      }
+    } catch {
+      toast('error', 'حدث خطأ في الاتصال');
+    }
+  };
+
+  // Detected CRNs count for modal
+  const detectedCrnsCount = useMemo(() => {
+    const raw = crnsInputText.trim();
+    if (!raw) return 0;
+    try {
+      if (raw.startsWith('[') || raw.startsWith('{')) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(Boolean).length;
+        }
+        if (parsed && Array.isArray(parsed.crns)) {
+          return parsed.crns.filter(Boolean).length;
+        }
+      }
+    } catch {}
+    return raw.split(/[\s,،\n\r]+/).filter(c => /^\d+$/.test(c.trim())).length;
+  }, [crnsInputText]);
+
+  // Submit adding CRNs
+  const handleAddCrnsSubmit = async () => {
+    if (!addCrnsTerm) return;
+    const raw = crnsInputText.trim();
+    if (!raw) {
+      toast('warning', 'يرجى إدخال أرقام الـ CRN أولاً');
+      return;
+    }
+
+    let crns: string[] = [];
+    try {
+      if (raw.startsWith('[') || raw.startsWith('{')) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          crns = parsed.map(item => typeof item === 'object' && item !== null ? String(item.crn || item.CRN || '') : String(item)).filter(Boolean);
+        } else if (parsed && Array.isArray(parsed.crns)) {
+          crns = parsed.crns.map(String).filter(Boolean);
+        }
+      }
+    } catch {}
+
+    if (crns.length === 0) {
+      crns = raw.split(/[\s,،\n\r]+/).map(c => c.trim()).filter(c => /^\d+$/.test(c));
+    }
+
+    if (crns.length === 0) {
+      toast('warning', 'لم يتم العثور على أرقام CRN صالحة. تأكد من الصيغة.');
+      return;
+    }
+
+    setAddingCrns(true);
+    setAddCrnsResult(null);
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/admin/banner/terms/${encodeURIComponent(addCrnsTerm.termCode)}/add-crns`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ crns })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        setAddCrnsResult({
+          addedCount: data.addedCount || 0,
+          message: data.message || `تمت إضافة ${data.addedCount} شعبة بنجاح`
+        });
+        toast('success', data.message || 'تمت إضافة الشعب بنجاح!');
+        fetchBannerTerms();
+        fetchTerms();
+        if (selectedFolder) fetchSections();
+      } else {
+        toast('error', data.error || 'فشلت إضافة الشعب من بانر');
+      }
+    } catch (e: any) {
+      toast('error', e.message || 'خطأ أثناء إضافة الشعب');
+    } finally {
+      setAddingCrns(false);
+    }
+  };
+
 
   // Fetch teachers list from backend API
   const fetchTeachers = useCallback(async () => {
@@ -418,78 +822,6 @@ export default function AdminSectionsTab({
     }
   };
 
-  // Handle File Upload and Import
-  const handleUploadAndImport = async () => {
-    if (!importFile) {
-      toast('warning', 'يرجى اختيار ملف JSON أولاً');
-      return;
-    }
-
-    let finalYear = '';
-    let finalSemester = '';
-    let finalTerm = '';
-
-    if (uploadFolderMode === 'existing') {
-      const existing = folders.find(f => f.id === selectedExistingFolderId) || folders[0];
-      if (existing) {
-        finalYear = existing.academicYear || '';
-        finalSemester = existing.semester || '';
-        finalTerm = existing.term || existing.name;
-      } else {
-        toast('warning', 'يرجى اختيار مجلد موجود أو إنشاء مجلد جديد');
-        return;
-      }
-    } else {
-      finalYear = newFolderYear.trim();
-      finalSemester = newFolderSemester.trim();
-      finalTerm = finalYear && finalSemester ? `${finalYear} - ${finalSemester}` : (finalYear || finalSemester || 'فصل جديد');
-    }
-
-    setImporting(true);
-    setImportResult(null);
-
-    try {
-      const token = await getToken();
-      const formData = new FormData();
-      formData.append('file', importFile);
-      if (finalYear) formData.append('academicYear', finalYear);
-      if (finalSemester) formData.append('semester', finalSemester);
-      if (finalTerm) formData.append('term', finalTerm);
-
-      const res = await fetch('/api/admin/import-data', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setImportResult(data);
-        toast('success', `اكتمل الاستيراد بنجاح في مجلد (${finalTerm})! تم تحديث ${data.coursesCount} مقرر و ${data.sectionsCount} شعبة.`);
-        const newFolderObj: FolderItem = {
-          id: finalTerm,
-          name: finalTerm,
-          academicYear: finalYear,
-          semester: finalSemester,
-          term: finalTerm,
-          count: data.sectionsCount || 0
-        };
-        const currentSaved = loadSharedFolders();
-        saveSharedFolders([newFolderObj, ...currentSaved.filter(f => f.term !== finalTerm && f.name !== finalTerm)]);
-        fetchSections();
-        fetchTerms();
-        fetchTeachers();
-      } else {
-        toast('error', data.error || 'فشل استيراد البيانات');
-      }
-    } catch (err: any) {
-      console.error(err);
-      toast('error', 'حدث خطأ أثناء رفع ومعالجة الملف');
-    } finally {
-      setImporting(false);
-    }
-  };
-
   return (
     <div className="space-y-6 animate-fadeIn" dir="rtl">
       {/* Top View Toggle: Sections vs Teachers */}
@@ -512,7 +844,7 @@ export default function AdminSectionsTab({
               </div>
               <div>
                 <h1 className="text-base font-black" style={{ color: 'var(--text-main)' }}>الشعب والمواعيد</h1>
-                <p className="text-[11px] text-slate-500 dark:text-zinc-400 font-medium">إدارة مجلدات الشعب الدراسية واستيراد البيانات</p>
+                <p className="text-[11px] text-slate-500 dark:text-zinc-400 font-medium">إدارة الفصول الدراسية والمزامنة التلقائية مع بانر</p>
               </div>
             </>
           )}
@@ -520,28 +852,23 @@ export default function AdminSectionsTab({
 
         <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => {
-              setUploadFolderMode('existing');
-              setImportFile(null);
-              setImportResult(null);
-              setIsImportModalOpen(true);
-            }}
+            onClick={openAddTermModal}
             className="flex items-center gap-2 px-4 py-2 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl transition shadow-md border border-amber-700/30 cursor-pointer"
           >
-            <Upload className="w-4 h-4" />
-            <span>استيراد شعب (JSON)</span>
+            <Plus className="w-4 h-4" />
+            <span>إضافة فصل دراسي</span>
           </button>
           <button
             onClick={() => {
               if (activeSubTab === 'teachers') fetchTeachers();
-              else { fetchSections(); fetchTerms(); }
+              else { fetchSections(); fetchTerms(); fetchBannerTerms(); }
             }}
-            disabled={loading || teachersLoading}
+            disabled={loading || teachersLoading || bannerTermsLoading}
             className="p-2 rounded-xl border transition hover:bg-slate-100 dark:hover:bg-zinc-800"
             style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
             title="تحديث البيانات"
           >
-            <RefreshCw className={`w-4 h-4 ${(loading || teachersLoading) ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${(loading || teachersLoading || bannerTermsLoading) ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
@@ -609,10 +936,10 @@ export default function AdminSectionsTab({
               </p>
               {teachers.length === 0 && (
                 <button
-                  onClick={() => setIsImportModalOpen(true)}
+                  onClick={openAddTermModal}
                   className="mt-3 px-4 py-2 bg-[var(--color-imamu-brown)] text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
                 >
-                  استيراد ملف الشُعب الآن
+                  إضافة فصل دراسي من بانر
                 </button>
               )}
             </div>
@@ -748,20 +1075,15 @@ export default function AdminSectionsTab({
               )}
 
               <button
-                onClick={() => {
-                  setUploadFolderMode('new');
-                  setImportFile(null);
-                  setImportResult(null);
-                  setIsImportModalOpen(true);
-                }}
-                className="flex items-center gap-2 px-4 py-2.5 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl transition shadow-md border border-amber-700/30"
+                onClick={openAddTermModal}
+                className="flex items-center gap-2 px-4 py-2.5 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl transition shadow-md border border-amber-700/30 cursor-pointer"
               >
-                <FolderPlus className="w-4 h-4" />
-                <span>إنشاء مجلد واستيراد شعب</span>
+                <Plus className="w-4 h-4" />
+                <span>إضافة فصل دراسي</span>
               </button>
 
               <button
-                onClick={() => fetchTerms()}
+                onClick={() => { fetchTerms(); fetchBannerTerms(); }}
                 className="p-2.5 rounded-xl border transition hover:bg-slate-100 dark:hover:bg-zinc-800"
                 style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
                 title="تحديث قائمة الفصول"
@@ -783,22 +1105,17 @@ export default function AdminSectionsTab({
                     مجلدات الفصول الأكاديمية
                   </h3>
                   <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                    اضغط على أي مجلد لتحميل وعرض الشعب الخاصة به
+                    اضغط على أي مجلد لتحميل وعرض الشعب الخاصة به أو إدارة مزامنته مع بانر
                   </p>
                 </div>
               </div>
 
               <button
-                onClick={() => {
-                  setUploadFolderMode('new');
-                  setImportFile(null);
-                  setImportResult(null);
-                  setIsImportModalOpen(true);
-                }}
+                onClick={openAddTermModal}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-[var(--color-imamu-accent)] border border-amber-500/30 text-xs font-bold transition active:scale-95 cursor-pointer"
               >
-                <FolderPlus className="w-4 h-4" />
-                <span>مجلد جديد</span>
+                <Plus className="w-4 h-4" />
+                <span>إضافة فصل دراسي</span>
               </button>
             </div>
 
@@ -808,93 +1125,207 @@ export default function AdminSectionsTab({
                   <Folder className="w-7 h-7" />
                 </div>
                 <div className="font-bold text-sm" style={{ color: 'var(--text-main)' }}>
-                  لا توجد مجلدات شعب دراسية مسجلة حالياً
+                  لا توجد فصول دراسية مضافة حالياً
                 </div>
                 <p className="text-xs max-w-sm mx-auto" style={{ color: 'var(--text-muted)' }}>
-                  قم بإنشاء مجلد فصلي واستيراد ملف الشعب الدراسية (JSON) للبدء في إدارة الشعب والمواعيد.
+                  اضغط على زر «إضافة فصل دراسي» لاختيار فصل من بانر والبدء في سحب ومراقبة وتحديث الشعب تلقائياً.
                 </p>
                 <button
                   type="button"
-                  onClick={() => {
-                    setUploadFolderMode('new');
-                    setImportFile(null);
-                    setImportResult(null);
-                    setIsImportModalOpen(true);
-                  }}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--color-imamu-brown)] text-white text-xs font-bold shadow-md hover:bg-[var(--color-imamu-brown-dark)] transition"
+                  onClick={openAddTermModal}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--color-imamu-brown)] text-white text-xs font-bold shadow-md hover:bg-[var(--color-imamu-brown-dark)] transition cursor-pointer"
                 >
-                  <FolderPlus className="w-4 h-4" />
-                  <span>إنشاء أول مجلد واستيراد الشعب</span>
+                  <Plus className="w-4 h-4" />
+                  <span>إضافة أول فصل دراسي من بانر</span>
                 </button>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5 pt-1">
                 {/* Individual Folder Cards */}
-                {folders.map((folder) => (
-                  <div
-                    key={folder.id}
-                    onClick={() => handleSelectFolder(folder)}
-                    className="group p-4 rounded-2xl border text-right transition-all duration-150 hover:shadow-md hover:border-amber-500/50 hover:bg-amber-500/[0.02] cursor-pointer flex flex-col justify-between gap-3 relative border-slate-200 dark:border-zinc-800/80"
-                    style={{ background: 'var(--bg-subtle)' }}
-                  >
-                    <div className="flex items-start justify-between gap-2.5">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-[var(--color-imamu-accent)] group-hover:bg-[var(--color-imamu-brown)] group-hover:text-white transition flex items-center justify-center shrink-0 shadow-xs">
-                          <Folder className="w-5 h-5" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-xs font-bold truncate text-slate-900 dark:text-white group-hover:text-[var(--color-imamu-accent)] transition" title={folder.name}>
-                            {folder.name}
+                {folders.map((folder) => {
+                  const isSyncing = syncingTermCode === (folder.termCode || folder.id) || folder.bannerConfig?.status === 'syncing';
+                  const isEmptying = emptyingTermCode === (folder.termCode || folder.id);
+
+                  return (
+                    <div
+                      key={folder.id}
+                      onClick={() => handleSelectFolder(folder)}
+                      className="group p-4 rounded-2xl border text-right transition-all duration-150 hover:shadow-md hover:border-amber-500/50 hover:bg-amber-500/[0.02] cursor-pointer flex flex-col justify-between gap-3 relative border-slate-200 dark:border-zinc-800/80"
+                      style={{ background: 'var(--bg-subtle)' }}
+                    >
+                      {/* Header */}
+                      <div className="flex items-start justify-between gap-2.5">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-[var(--color-imamu-accent)] group-hover:bg-[var(--color-imamu-brown)] group-hover:text-white transition flex items-center justify-center shrink-0 shadow-xs">
+                            <Folder className="w-5 h-5" />
                           </div>
-                          <div className="text-[10px] text-slate-400 mt-0.5">
-                            {folder.academicYear ? `عام ${folder.academicYear}` : 'سنة دراسية'} {folder.semester ? `• ${folder.semester}` : ''}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-xs font-bold truncate text-slate-900 dark:text-white group-hover:text-[var(--color-imamu-accent)] transition" title={folder.name}>
+                                {folder.name}
+                              </span>
+                              {folder.termCode && (
+                                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-md bg-amber-500/10 text-[var(--color-imamu-accent)] border border-amber-500/20">
+                                  {folder.termCode}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-slate-400 mt-0.5">
+                              {folder.academicYear ? `عام ${folder.academicYear}` : 'سنة دراسية'} {folder.semester ? `• ${folder.semester}` : ''}
+                            </div>
                           </div>
                         </div>
+
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-[var(--color-imamu-accent)] shrink-0">
+                          {folder.count.toLocaleString()} شعبة
+                        </span>
                       </div>
 
-                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-[var(--color-imamu-accent)] shrink-0">
-                        {folder.count.toLocaleString()}
-                      </span>
-                    </div>
+                      {/* Syncing Progress Banner if active */}
+                      {isSyncing && (
+                        <div className="p-2 rounded-xl bg-amber-500/15 text-[var(--color-imamu-accent)] text-xs font-bold flex items-center gap-2 animate-pulse">
+                          <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                          <span>جاري المزامنة والتحديث من بانر...</span>
+                        </div>
+                      )}
 
-                    {/* Quick actions strip */}
-                    <div className="flex items-center justify-between border-t pt-2.5 border-slate-200/60 dark:border-zinc-800/80 text-[11px]" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        onClick={() => handleSelectFolder(folder)}
-                        className="text-[var(--color-imamu-accent)] font-bold flex items-center gap-1 group-hover:translate-x-[-2px] transition-transform cursor-pointer"
-                      >
-                        <span>فتح المجلد</span>
-                        <ChevronLeft className="w-3.5 h-3.5" />
-                      </button>
+                      {/* Options & Controls (1: Monitoring, 2: Auto Update) */}
+                      {folder.bannerConfig && (
+                        <div
+                          className="p-2.5 rounded-xl border border-slate-200/80 dark:border-zinc-800/80 space-y-2 bg-white/50 dark:bg-zinc-900/50"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {/* Option 1: Monitoring for changes */}
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-1.5">
+                              <Activity className={clsx("w-3.5 h-3.5", folder.bannerConfig.monitorChanges ? "text-emerald-500" : "text-slate-400")} />
+                              <span className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300">مراقبة التغييرات:</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleMonitor(folder.termCode!, folder.bannerConfig!.monitorChanges)}
+                              className={clsx(
+                                "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                                folder.bannerConfig.monitorChanges ? "bg-emerald-500" : "bg-slate-300 dark:bg-zinc-700"
+                              )}
+                              title={folder.bannerConfig.monitorChanges ? "المراقبة مفعلة (فحص دوري للمقاعد والشعب)" : "المراقبة متوقفة"}
+                            >
+                              <span className={clsx(
+                                "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                                folder.bannerConfig.monitorChanges ? "translate-x-0" : "-translate-x-4"
+                              )} />
+                            </button>
+                          </div>
 
-                      <div className="flex items-center gap-1">
+                          {/* Option 2: Regularly updating + Frequency */}
+                          <div className="flex items-center justify-between text-xs gap-2 pt-1 border-t border-slate-200/40 dark:border-zinc-800/60">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <RefreshCw className={clsx("w-3.5 h-3.5", folder.bannerConfig.autoUpdate ? "text-amber-500" : "text-slate-400")} />
+                              <span className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300 shrink-0">تحديث دوري:</span>
+                              {folder.bannerConfig.autoUpdate && (
+                                <select
+                                  value={folder.bannerConfig.updateIntervalDays || 2}
+                                  onChange={(e) => handleChangeInterval(folder.termCode!, Number(e.target.value))}
+                                  className="text-[10px] font-bold py-0.5 px-1.5 rounded-lg border bg-white dark:bg-zinc-800 border-slate-200 dark:border-zinc-700 text-[var(--color-imamu-accent)] cursor-pointer"
+                                >
+                                  <option value={1}>كل 1 يوم</option>
+                                  <option value={2}>كل يومين</option>
+                                  <option value={3}>كل 3 أيام</option>
+                                  <option value={7}>كل أسبوع</option>
+                                </select>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleAutoUpdate(folder.termCode!, folder.bannerConfig!.autoUpdate)}
+                              className={clsx(
+                                "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                                folder.bannerConfig.autoUpdate ? "bg-amber-500" : "bg-slate-300 dark:bg-zinc-700"
+                              )}
+                              title={folder.bannerConfig.autoUpdate ? "التحديث الدوري مفعل" : "التحديث الدوري متوقف"}
+                            >
+                              <span className={clsx(
+                                "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                                folder.bannerConfig.autoUpdate ? "translate-x-0" : "-translate-x-4"
+                              )} />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Quick Actions Strip */}
+                      <div className="flex items-center justify-between border-t pt-2.5 border-slate-200/60 dark:border-zinc-800/80 text-[11px]" onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
-                          onClick={() => {
-                            setSelectedExistingFolderId(folder.id);
-                            setUploadFolderMode('existing');
-                            setImportFile(null);
-                            setImportResult(null);
-                            setIsImportModalOpen(true);
-                          }}
-                          className="p-1.5 rounded-lg hover:bg-amber-500/15 text-slate-400 hover:text-[var(--color-imamu-accent)] transition cursor-pointer"
-                          title="استيراد شعب إضافية لهذا المجلد"
+                          onClick={() => handleSelectFolder(folder)}
+                          className="text-[var(--color-imamu-accent)] font-bold flex items-center gap-1 group-hover:translate-x-[-2px] transition-transform cursor-pointer"
                         >
-                          <Upload className="w-3.5 h-3.5" />
+                          <span>فتح المجلد</span>
+                          <ChevronLeft className="w-3.5 h-3.5" />
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteFolder(folder)}
-                          className="p-1.5 rounded-lg hover:bg-red-500/15 text-slate-400 hover:text-red-500 transition cursor-pointer"
-                          title="حذف شعب هذا المجلد بالكامل"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+
+                        <div className="flex items-center gap-1">
+                          {/* Sync Now Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleSyncNow(folder.termCode || folder.id)}
+                            disabled={isSyncing}
+                            className="p-1.5 rounded-lg hover:bg-amber-500/15 text-slate-400 hover:text-[var(--color-imamu-accent)] transition cursor-pointer disabled:opacity-40"
+                            title="مزامنة فورية وتحديث كامل من بانر الآن"
+                          >
+                            <RefreshCw className={clsx("w-3.5 h-3.5", isSyncing && "animate-spin")} />
+                          </button>
+
+                          {/* Option 4: Add CRNs by JSON */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const bt = folder.bannerConfig || {
+                                termCode: folder.termCode || folder.id,
+                                termName: folder.name,
+                                academicYear: folder.academicYear || '',
+                                semester: folder.semester || '',
+                                monitorChanges: false,
+                                autoUpdate: false,
+                                updateIntervalDays: 2,
+                                totalSections: folder.count,
+                                status: 'idle'
+                              };
+                              setAddCrnsTerm(bt);
+                              setCrnsInputText('');
+                              setAddCrnsResult(null);
+                            }}
+                            className="p-1.5 rounded-lg hover:bg-amber-500/15 text-slate-400 hover:text-[var(--color-imamu-accent)] transition cursor-pointer"
+                            title="إضافة شعب بالرقم المرجعي (CRN) أو JSON"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Option 3: Empty Term */}
+                          <button
+                            type="button"
+                            onClick={() => handleEmptyTerm(folder.termCode || folder.id, folder.name)}
+                            disabled={isEmptying}
+                            className="p-1.5 rounded-lg hover:bg-amber-500/15 text-slate-400 hover:text-amber-600 transition cursor-pointer disabled:opacity-40"
+                            title="تفريغ كافة شعب هذا الفصل"
+                          >
+                            <RotateCcw className={clsx("w-3.5 h-3.5", isEmptying && "animate-spin")} />
+                          </button>
+
+                          {/* Delete Term */}
+                          <button
+                            type="button"
+                            onClick={() => folder.bannerConfig ? handleDeleteTerm(folder.termCode!, folder.name) : handleDeleteFolder(folder)}
+                            className="p-1.5 rounded-lg hover:bg-red-500/15 text-slate-400 hover:text-red-500 transition cursor-pointer"
+                            title="حذف الفصل الدراسي بالكامل"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {/* "All Sections" Card */}
                 <div
@@ -979,26 +1410,96 @@ export default function AdminSectionsTab({
             <div className="flex items-center gap-2 flex-wrap shrink-0">
               {selectedFolder !== 'all' && (
                 <>
+                  {/* Quick Toggles if Banner Config is available */}
+                  {selectedFolder.bannerConfig && (
+                    <div className="flex items-center gap-2 p-1 bg-white/70 dark:bg-zinc-800/70 border border-slate-200 dark:border-zinc-700 rounded-xl px-2.5 text-xs">
+                      {/* Monitor toggle */}
+                      <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-semibold text-slate-700 dark:text-zinc-200" title="مراقبة التغييرات وتحديث المقاعد والشعب">
+                        <Activity className={clsx("w-3.5 h-3.5", selectedFolder.bannerConfig.monitorChanges ? "text-emerald-500" : "text-slate-400")} />
+                        <span>مراقبة</span>
+                        <input
+                          type="checkbox"
+                          checked={selectedFolder.bannerConfig.monitorChanges}
+                          onChange={() => handleToggleMonitor(selectedFolder.termCode || selectedFolder.id, selectedFolder.bannerConfig!.monitorChanges)}
+                          className="w-3.5 h-3.5 accent-emerald-500 rounded cursor-pointer"
+                        />
+                      </label>
+
+                      <div className="w-px h-3.5 bg-slate-200 dark:bg-zinc-700" />
+
+                      {/* Auto update toggle */}
+                      <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-semibold text-slate-700 dark:text-zinc-200" title="تحديث دوري تلقائي">
+                        <RefreshCw className={clsx("w-3.5 h-3.5", selectedFolder.bannerConfig.autoUpdate ? "text-amber-500" : "text-slate-400")} />
+                        <span>تحديث دوري</span>
+                        <input
+                          type="checkbox"
+                          checked={selectedFolder.bannerConfig.autoUpdate}
+                          onChange={() => handleToggleAutoUpdate(selectedFolder.termCode || selectedFolder.id, selectedFolder.bannerConfig!.autoUpdate)}
+                          className="w-3.5 h-3.5 accent-amber-500 rounded cursor-pointer"
+                        />
+                      </label>
+                    </div>
+                  )}
+
+                  {/* Immediate Sync Button */}
                   <button
+                    type="button"
+                    onClick={() => handleSyncNow(selectedFolder.termCode || selectedFolder.id)}
+                    disabled={syncingTermCode === (selectedFolder.termCode || selectedFolder.id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition cursor-pointer shadow-xs disabled:opacity-50"
+                    title="مزامنة وتحديث الشعب فوراً من بانر"
+                  >
+                    <RefreshCw className={clsx("w-3.5 h-3.5", syncingTermCode === (selectedFolder.termCode || selectedFolder.id) && "animate-spin")} />
+                    <span>مزامنة فورية من بانر</span>
+                  </button>
+
+                  {/* Add CRNs Button */}
+                  <button
+                    type="button"
                     onClick={() => {
-                      setSelectedExistingFolderId(selectedFolder.id);
-                      setUploadFolderMode('existing');
-                      setImportFile(null);
-                      setImportResult(null);
-                      setIsImportModalOpen(true);
+                      const bt = selectedFolder.bannerConfig || {
+                        termCode: selectedFolder.termCode || selectedFolder.id,
+                        termName: selectedFolder.name,
+                        academicYear: selectedFolder.academicYear || '',
+                        semester: selectedFolder.semester || '',
+                        monitorChanges: false,
+                        autoUpdate: false,
+                        updateIntervalDays: 2,
+                        totalSections: selectedFolder.count,
+                        status: 'idle'
+                      };
+                      setAddCrnsTerm(bt);
+                      setCrnsInputText('');
+                      setAddCrnsResult(null);
                     }}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-bold text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 transition cursor-pointer shadow-xs"
+                    title="إضافة وتحديث أرقام CRN محددة عبر JSON"
                   >
-                    <Upload className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
-                    <span>إضافة شعب لهذا المجلد</span>
+                    <FileText className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
+                    <span>إضافة شعب (JSON)</span>
                   </button>
+
+                  {/* Empty Term Sections Button */}
                   <button
-                    onClick={() => handleDeleteFolder(selectedFolder)}
+                    type="button"
+                    onClick={() => handleEmptyTerm(selectedFolder.termCode || selectedFolder.id, selectedFolder.name)}
+                    disabled={emptyingTermCode === (selectedFolder.termCode || selectedFolder.id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-xs font-bold text-amber-700 dark:text-amber-300 transition cursor-pointer disabled:opacity-50"
+                    title="تفريغ جميع شعب هذا الفصل"
+                  >
+                    <RotateCcw className={clsx("w-3.5 h-3.5", emptyingTermCode === (selectedFolder.termCode || selectedFolder.id) && "animate-spin")} />
+                    <span>تفريغ الشعب</span>
+                  </button>
+
+                  {/* Delete Term Button */}
+                  <button
+                    type="button"
+                    onClick={() => selectedFolder.bannerConfig ? handleDeleteTerm(selectedFolder.termCode!, selectedFolder.name) : handleDeleteFolder(selectedFolder)}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-xs font-bold text-red-600 dark:text-red-400 transition cursor-pointer"
-                    title="حذف شعب هذا المجلد فقط"
+                    title="حذف الفصل الدراسي بالكامل"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    <span>حذف المجلد</span>
+                    <span>حذف الفصل</span>
                   </button>
                 </>
               )}
@@ -1428,232 +1929,358 @@ export default function AdminSectionsTab({
       )}
 
       {/* ==================================================================== */}
-      {/* MODAL 2: High-Speed JSON Import (استيراد المقررات والشعب) */}
+      {/* MODAL 2: Add Term from Banner (إضافة فصل دراسي من بانر)              */}
       {/* ==================================================================== */}
-      {isImportModalOpen && (
+      {isAddTermModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn" dir="rtl">
           <div className="w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden p-6 space-y-5" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
             <div className="flex items-start justify-between border-b pb-4" style={{ borderColor: 'var(--border-color)' }}>
-              <div>
-                <h3 className="text-base font-black flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
-                  <Sparkles className="w-4 h-4 text-[var(--color-imamu-accent)]" />
-                  <span>استيراد وتحديث المقررات والشعب (JSON)</span>
-                </h3>
-                <p className="text-xs text-slate-400 mt-1">
-                  ارفع ملف المقررات أو الشعب مع تحديد السنة والفصل لمنع اختلاط الشعب بين الفصول.
-                </p>
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center text-[var(--color-imamu-accent)]">
+                  <Plus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black" style={{ color: 'var(--text-main)' }}>
+                    إضافة فصل دراسي من بانر
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    اختر فصلاً دراسياً مكتشفاً من نظام بانر أو أدخل رمزه لبدء المتابعة والمزامنة.
+                  </p>
+                </div>
               </div>
               <button
-                disabled={importing}
-                onClick={() => setIsImportModalOpen(false)}
-                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800 transition disabled:opacity-40"
+                disabled={addingTerm}
+                onClick={() => setIsAddTermModalOpen(false)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800 transition disabled:opacity-40 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Folder Mode Switcher: Existing vs New */}
-            <div className="p-4 rounded-xl border space-y-3.5" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}>
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
-                  <Folder className="w-4 h-4 text-[var(--color-imamu-accent)]" />
-                  <span>تحديد مجلد الشعب الدراسية:</span>
+            {/* Mode Selector: Detected vs Custom */}
+            <div className="flex items-center gap-1 p-1 bg-slate-200/70 dark:bg-zinc-800/80 rounded-xl border border-slate-300/60 dark:border-zinc-700/60">
+              <button
+                type="button"
+                onClick={() => setSelectedTermMode('detected')}
+                className={clsx(
+                  "flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer",
+                  selectedTermMode === 'detected'
+                    ? "bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-xs"
+                    : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
+                )}
+              >
+                <Globe className="w-3.5 h-3.5 text-amber-500" />
+                <span>الفصول المكتشفة في بانر</span>
+                {detectedTerms.length > 0 && (
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-500/15 text-[var(--color-imamu-accent)] font-mono">
+                    {detectedTerms.length}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedTermMode('custom')}
+                className={clsx(
+                  "flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer",
+                  selectedTermMode === 'custom'
+                    ? "bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-xs"
+                    : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
+                )}
+              >
+                <Sliders className="w-3.5 h-3.5 text-emerald-500" />
+                <span>إدخال كود مخصص يدوي</span>
+              </button>
+            </div>
+
+            {/* Mode 1: Detected Terms */}
+            {selectedTermMode === 'detected' ? (
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300">
+                  اختر الفصل الدراسي المكتشف:
                 </label>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-amber-500/10 text-[var(--color-imamu-accent)] border border-amber-500/20">
-                  {uploadFolderMode === 'existing'
-                    ? (folders.find(f => f.id === selectedExistingFolderId)?.name || 'اختر مجلد')
-                    : (`${newFolderYear} - ${newFolderSemester}` || 'مجلد جديد')}
+                {detectedLoading ? (
+                  <div className="p-8 text-center space-y-2 rounded-xl border border-slate-200 dark:border-zinc-800">
+                    <Loader2 className="w-5 h-5 animate-spin mx-auto text-amber-600" />
+                    <p className="text-xs text-slate-400">جاري الاتصال ببانر واستكشاف الفصول...</p>
+                  </div>
+                ) : detectedTerms.length === 0 ? (
+                  <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-800 dark:text-amber-300">
+                    لم يتم العثور على فصول دراسية مباشرة. يمكنك استخدام خيار «إدخال كود مخصص يدوي» لإضافة الفصل.
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {detectedTerms.map((t) => (
+                      <div
+                        key={t.termCode}
+                        onClick={() => setSelectedTermCode(t.termCode)}
+                        className={clsx(
+                          "p-3 rounded-xl border transition cursor-pointer flex items-center justify-between text-xs",
+                          selectedTermCode === t.termCode
+                            ? "border-[var(--color-imamu-brown)] bg-amber-500/10 font-bold"
+                            : "border-slate-200 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800/60"
+                        )}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Radio className={clsx("w-4 h-4", selectedTermCode === t.termCode ? "text-[var(--color-imamu-accent)] fill-amber-500/30" : "text-slate-400")} />
+                          <div>
+                            <div className="text-slate-900 dark:text-white font-bold">{t.termName}</div>
+                            <div className="text-[10px] text-slate-400 mt-0.5">
+                              {t.academicYear} • {t.semester}
+                            </div>
+                          </div>
+                        </div>
+                        <span className="font-mono text-xs px-2 py-0.5 rounded-md bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-[var(--color-imamu-accent)]">
+                          {t.termCode}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Mode 2: Custom Term */
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold mb-1 text-slate-700 dark:text-zinc-300">
+                      كود الفصل في بانر <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="مثال: 144720"
+                      value={customTermCode}
+                      onChange={(e) => setCustomTermCode(e.target.value)}
+                      className="w-full py-2 px-3 rounded-xl text-xs font-mono border focus:outline-none focus:border-amber-600 font-semibold"
+                      style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold mb-1 text-slate-700 dark:text-zinc-300">
+                      اسم الفصل المعروض <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="مثال: الفصل الدراسي الثاني 1447هـ"
+                      value={customTermName}
+                      onChange={(e) => setCustomTermName(e.target.value)}
+                      className="w-full py-2 px-3 rounded-xl text-xs border focus:outline-none focus:border-amber-600 font-semibold"
+                      style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold mb-1 text-slate-700 dark:text-zinc-300">
+                      السنة الأكاديمية
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="1448"
+                      value={customYear}
+                      onChange={(e) => setCustomYear(e.target.value)}
+                      className="w-full py-2 px-3 rounded-xl text-xs border focus:outline-none focus:border-amber-600"
+                      style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold mb-1 text-slate-700 dark:text-zinc-300">
+                      الفصل
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="الفصل الأول"
+                      value={customSemester}
+                      onChange={(e) => setCustomSemester(e.target.value)}
+                      className="w-full py-2 px-3 rounded-xl text-xs border focus:outline-none focus:border-amber-600"
+                      style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Automation Options (Monitoring, Regular Update, Immediate Sync) */}
+            <div className="p-4 rounded-xl border space-y-3" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}>
+              <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <Sliders className="w-4 h-4 text-[var(--color-imamu-accent)]" />
+                <span>خيارات المراقبة والتحديث التلقائي:</span>
+              </div>
+
+              {/* Option 1: Monitor Changes */}
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={newTermMonitorChanges}
+                  onChange={(e) => setNewTermMonitorChanges(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-amber-600 rounded cursor-pointer"
+                />
+                <div className="text-xs">
+                  <div className="font-bold text-slate-800 dark:text-slate-100">1. مراقبة التغييرات والتحديث الفوري</div>
+                  <div className="text-[11px] text-slate-400">فحص دوري للشعب وتحديث المقاعد المتاحة فور وجود أي تغيير في بانر.</div>
+                </div>
+              </label>
+
+              {/* Option 2: Regularly Updating */}
+              <div className="space-y-1.5">
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newTermAutoUpdate}
+                    onChange={(e) => setNewTermAutoUpdate(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 accent-amber-600 rounded cursor-pointer"
+                  />
+                  <div className="text-xs flex-1">
+                    <div className="font-bold text-slate-800 dark:text-slate-100">2. التحديث الدوري التلقائي</div>
+                    <div className="text-[11px] text-slate-400">مزامنة كاملة للشعب وإضافة أي شعب جديدة كل فترة دورية محددة.</div>
+                  </div>
+                </label>
+
+                {newTermAutoUpdate && (
+                  <div className="mr-6 flex items-center gap-2 pt-1">
+                    <span className="text-[11px] font-semibold text-slate-600 dark:text-zinc-400">تكرار التحديث:</span>
+                    <select
+                      value={newTermIntervalDays}
+                      onChange={(e) => setNewTermIntervalDays(Number(e.target.value))}
+                      className="py-1 px-2.5 rounded-lg border text-xs font-bold bg-white dark:bg-zinc-800 border-slate-200 dark:border-zinc-700 text-[var(--color-imamu-accent)] cursor-pointer"
+                    >
+                      <option value={1}>كل 1 يوم</option>
+                      <option value={2}>كل يومين (موصى به)</option>
+                      <option value={3}>كل 3 أيام</option>
+                      <option value={7}>كل أسبوع</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Immediate Sync Checkbox */}
+              <label className="flex items-start gap-2.5 cursor-pointer pt-1 border-t border-slate-200/50 dark:border-zinc-800/60">
+                <input
+                  type="checkbox"
+                  checked={newTermSyncImmediately}
+                  onChange={(e) => setNewTermSyncImmediately(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-emerald-600 rounded cursor-pointer"
+                />
+                <div className="text-xs">
+                  <div className="font-bold text-emerald-700 dark:text-emerald-400">بدء المزامنة الفورية من بانر عند الإضافة</div>
+                  <div className="text-[11px] text-slate-400">سحب وجلب الشعب والمقررات فور حفظ الفصل الدراسي.</div>
+                </div>
+              </label>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t" style={{ borderColor: 'var(--border-color)' }}>
+              <button
+                disabled={addingTerm}
+                onClick={() => setIsAddTermModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition disabled:opacity-40 cursor-pointer"
+              >
+                إلغاء
+              </button>
+              <button
+                disabled={addingTerm || (selectedTermMode === 'detected' && !selectedTermCode)}
+                onClick={handleAddTermSubmit}
+                className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold text-white bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] transition shadow-md disabled:opacity-50 cursor-pointer"
+              >
+                {addingTerm ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>جاري إضافة الفصل وبدء المتابعة...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>إضافة الفصل وبدء المتابعة</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================================== */}
+      {/* MODAL 3: Add CRNs from JSON (إضافة شعب عبر CRN / JSON)               */}
+      {/* ==================================================================== */}
+      {addCrnsTerm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn" dir="rtl">
+          <div className="w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden p-6 space-y-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <div className="flex items-start justify-between border-b pb-4" style={{ borderColor: 'var(--border-color)' }}>
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center text-[var(--color-imamu-accent)]">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black" style={{ color: 'var(--text-main)' }}>
+                    إضافة شُعب عبر أرقام CRN أو JSON
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    الفصل: <span className="font-bold text-[var(--color-imamu-accent)]">{addCrnsTerm.termName} ({addCrnsTerm.termCode})</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                disabled={addingCrns}
+                onClick={() => { setAddCrnsTerm(null); setAddCrnsResult(null); }}
+                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800 transition disabled:opacity-40 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700 dark:text-zinc-300">
+                  ألصق مصفوفة JSON أو أرقام الـ CRN مفصولة بفواصل أو مسافات:
+                </label>
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-[var(--color-imamu-accent)]">
+                  {detectedCrnsCount} رقم CRN مكتشف
                 </span>
               </div>
-
-              {/* Mode Toggle Buttons */}
-              <div className="flex items-center gap-1 p-1 bg-slate-200/70 dark:bg-zinc-800/80 rounded-xl border border-slate-300/60 dark:border-zinc-700/60">
-                <button
-                  type="button"
-                  onClick={() => setUploadFolderMode('existing')}
-                  className={clsx(
-                    "flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer",
-                    uploadFolderMode === 'existing'
-                      ? "bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-xs"
-                      : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
-                  )}
-                >
-                  <Folder className="w-3.5 h-3.5 text-amber-500" />
-                  <span>اختيار مجلد موجود</span>
-                  {folders.length > 0 && (
-                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 font-mono">
-                      {folders.length}
-                    </span>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setUploadFolderMode('new')}
-                  className={clsx(
-                    "flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer",
-                    uploadFolderMode === 'new'
-                      ? "bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-xs"
-                      : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
-                  )}
-                >
-                  <FolderPlus className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>إنشاء مجلد جديد</span>
-                </button>
-              </div>
-
-              {/* Mode 1: Choose Existing Folder */}
-              {uploadFolderMode === 'existing' ? (
-                <div className="space-y-1.5">
-                  <label className="block text-[11px] font-semibold text-slate-500 dark:text-zinc-400">
-                    اختر المجلد الذي ترغب بحفظ أو تحديث الشعب بداخله:
-                  </label>
-                  {folders.length === 0 ? (
-                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-800 dark:text-amber-300">
-                      لا توجد مجلدات مسجلة بعد. استخدم خيار «إنشاء مجلد جديد» لإنشاء أول مجلد.
-                    </div>
-                  ) : (
-                    <div className="relative">
-                      <select
-                        value={selectedExistingFolderId}
-                        onChange={(e) => setSelectedExistingFolderId(e.target.value)}
-                        className="w-full py-2.5 px-3 rounded-xl text-xs font-semibold border focus:outline-none focus:border-amber-600 cursor-pointer"
-                        style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
-                      >
-                        {folders.map(f => (
-                          <option key={f.id} value={f.id}>
-                            📁 {f.name} ({f.count.toLocaleString()} شعبة)
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                /* Mode 2: Create New Folder (only Year and Semester) */
-                <div className="space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-semibold mb-1 text-slate-500 dark:text-zinc-400">
-                        السنة الأكاديمية <span className="text-red-400">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="مثال: 1448"
-                        value={newFolderYear}
-                        onChange={(e) => setNewFolderYear(e.target.value)}
-                        className="w-full py-2 px-3 rounded-xl text-xs border focus:outline-none focus:border-amber-600 font-semibold"
-                        style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-semibold mb-1 text-slate-500 dark:text-zinc-400">
-                        الفصل الدراسي <span className="text-red-400">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="مثال: الفصل الأول"
-                        value={newFolderSemester}
-                        onChange={(e) => setNewFolderSemester(e.target.value)}
-                        className="w-full py-2 px-3 rounded-xl text-xs border focus:outline-none focus:border-amber-600 font-semibold"
-                        style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-xs">
-                    <span className="text-slate-600 dark:text-zinc-300 font-medium">اسم المجلد المنشأ تلقائياً:</span>
-                    <span className="font-bold text-[var(--color-imamu-accent)] font-mono">
-                      📁 {newFolderYear.trim()} - {newFolderSemester.trim()}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              <p className="text-[11px] text-slate-400 dark:text-zinc-500">
-                💡 سيتم إيداع كافة الشعب المرفوعة داخل هذا المجلد تلقائياً ولن تختلط بشعب الفصول الأخرى.
+              <textarea
+                rows={6}
+                value={crnsInputText}
+                onChange={(e) => setCrnsInputText(e.target.value)}
+                placeholder={`أمثلة للصيغ المدعومة:\n["10234", "10235", "10236"]\nأو:\n10234, 10235, 10236`}
+                className="w-full p-3 rounded-xl text-xs font-mono border focus:outline-none focus:border-amber-600 leading-relaxed resize-none"
+                style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
+              />
+              <p className="text-[11px] text-slate-400">
+                💡 سيقوم النظام بالاتصال الفوري بنظام بانر وجلب بيانات ومواعيد ومقاعد ومدرسي هذه الشعب فقط وتضمينها للفصل.
               </p>
             </div>
 
-            {/* Drop Zone */}
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition hover:border-[var(--color-imamu-brown)] hover:bg-amber-500/5"
-              style={{ borderColor: importFile ? 'var(--color-imamu-brown)' : 'var(--border-color)' }}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".json"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    setImportFile(file);
-                    setImportResult(null);
-                  }
-                }}
-              />
-
-              {importFile ? (
-                <div className="space-y-2">
-                  <FileText className="w-10 h-10 mx-auto text-emerald-500" />
-                  <div className="font-bold text-sm text-slate-800 dark:text-slate-100">{importFile.name}</div>
-                  <div className="text-xs text-slate-400">{(importFile.size / (1024 * 1024)).toFixed(2)} MB</div>
-                  <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600">
-                    جاهز للاستيراد (ملف JSON)
-                  </span>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Upload className="w-10 h-10 mx-auto text-slate-400" />
-                  <div className="font-bold text-sm text-slate-700 dark:text-slate-200">
-                    اضغط لاختيار ملف JSON أو اسحبه هنا
-                  </div>
-                  <p className="text-xs text-slate-400">
-                    يدعم ملفات JSON الناتجة من أداة بانر (مثل imamu_helper_catalog.json)
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Result Report Card */}
-            {importResult && (
-              <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 space-y-2 text-xs text-emerald-700 dark:text-emerald-300">
-                <div className="font-bold flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>{importResult.message}</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2 pt-1 font-mono">
-                  <div>المقررات: <b>{importResult.coursesCount.toLocaleString()}</b></div>
-                  <div>الشعب: <b>{importResult.sectionsCount.toLocaleString()}</b></div>
-                  <div>الوقت: <b>{(importResult.elapsedMs / 1000).toFixed(2)}s</b></div>
-                </div>
+            {/* Result message */}
+            {addCrnsResult && (
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                <span className="font-bold">{addCrnsResult.message}</span>
               </div>
             )}
 
             {/* Action Buttons */}
             <div className="flex items-center justify-end gap-2 pt-2 border-t" style={{ borderColor: 'var(--border-color)' }}>
               <button
-                disabled={importing}
-                onClick={() => setIsImportModalOpen(false)}
+                disabled={addingCrns}
+                onClick={() => { setAddCrnsTerm(null); setAddCrnsResult(null); }}
                 className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition disabled:opacity-40 cursor-pointer"
               >
-                إلغاء
+                إغلاق
               </button>
               <button
-                disabled={!importFile || importing}
-                onClick={handleUploadAndImport}
+                disabled={addingCrns || detectedCrnsCount === 0}
+                onClick={handleAddCrnsSubmit}
                 className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold text-white bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] transition shadow-md disabled:opacity-50 cursor-pointer"
               >
-                {importing ? (
+                {addingCrns ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>جاري الاستيراد والتحديث الفائق...</span>
+                    <span>جاري جلب الشعب من بانر...</span>
                   </>
                 ) : (
                   <>
                     <Check className="w-4 h-4" />
-                    <span>بدء الاستيراد الفوري (JSON)</span>
+                    <span>بدء الجلب والإضافة من بانر ({detectedCrnsCount})</span>
                   </>
                 )}
               </button>

@@ -6,6 +6,7 @@ import { matchId } from '../../../lib/auth-utils';
 import { calculateMokafaaDate, formatDate, parseDate } from '../../../lib/date-utils';
 import { uploadMajorPlanToStorage, listMajorPlansFromS3, deleteFileFromStorage } from '../../../lib/storage';
 import { importMsariData } from '../../services/msari';
+import { syncImamuCalendar } from '../../services/imamuCalendar';
 import { checkAdmin, uploadStorage } from './common';
 
 export function createAdminAcademicRouter(db: any) {
@@ -48,12 +49,48 @@ export function createAdminAcademicRouter(db: any) {
 
   // Admin Create Subject
   router.post("/admin/subjects", requireAuth, async (req: AuthRequest, res): Promise<any> => {
-    if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Admin only" });
     try {
-      const { code, name, creditHours, level, description } = req.body;
+      const { code, name, creditHours, level, description, college, department, prereq, tags, syllabus } = req.body;
       const [subj] = await db.insert(subjects).values({
-        code, name, creditHours: Number(creditHours) || 3, level: level ? Number(level) : null, description
+        code,
+        name,
+        creditHours: Number(creditHours) || 3,
+        level: level ? Number(level) : null,
+        description,
+        college,
+        department,
+        prereq,
+        tags,
+        syllabus
       }).returning();
+      res.json(subj);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Admin Update Subject
+  router.put("/admin/subjects/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Admin only" });
+    try {
+      const idRaw = req.params.id;
+      const { code, name, creditHours, level, description, college, department, prereq, tags, syllabus } = req.body;
+      const updates: any = {};
+      if (code !== undefined) updates.code = code;
+      if (name !== undefined) updates.name = name;
+      if (creditHours !== undefined) updates.creditHours = Number(creditHours) || 3;
+      if (level !== undefined) updates.level = level ? Number(level) : null;
+      if (description !== undefined) updates.description = description;
+      if (college !== undefined) updates.college = college;
+      if (department !== undefined) updates.department = department;
+      if (prereq !== undefined) updates.prereq = prereq;
+      if (tags !== undefined) updates.tags = tags;
+      if (syllabus !== undefined) updates.syllabus = syllabus;
+
+      const [subj] = await db.update(subjects).set(updates).where(matchId(subjects.id, idRaw)).returning();
+      if (!subj) return res.status(404).json({ error: "Subject not found" });
       res.json(subj);
     } catch (e) {
       console.error(e);
@@ -269,6 +306,21 @@ export function createAdminAcademicRouter(db: any) {
     }
   });
 
+  // Admin Sync Calendar from Official IMAMU Banner Extensibility API
+  router.post("/admin/events/sync-imamu", requireAuth, async (req: AuthRequest, res): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Admin only" });
+    try {
+      const result = await syncImamuCalendar(db);
+      if (!result.success) {
+        return res.status(502).json({ error: result.error || "Failed to sync with university calendar" });
+      }
+      res.json(result);
+    } catch (e: any) {
+      console.error("[Sync IMAMU Calendar Error]", e);
+      res.status(500).json({ error: e.message || "Server error while syncing calendar" });
+    }
+  });
+
   // Calendar .ics live subscription & export
   router.get("/calendar.ics", async (req, res): Promise<any> => {
     try {
@@ -431,6 +483,14 @@ export function createAdminAcademicRouter(db: any) {
         } else {
           const dtstart = formatDate(d, 'iso-date').replace(/-/g, '');
           ics += `DTSTART;VALUE=DATE:${dtstart}\r\n`;
+          if (ev.endDate) {
+            const endD = parseDate(ev.endDate);
+            if (endD) {
+              const nextDay = new Date(endD.getTime() + 24 * 60 * 60 * 1000);
+              const dtend = formatDate(nextDay, 'iso-date').replace(/-/g, '');
+              ics += `DTEND;VALUE=DATE:${dtend}\r\n`;
+            }
+          }
         }
 
         ics += `SUMMARY:${escapeIcs(ev.title)}\r\n`;

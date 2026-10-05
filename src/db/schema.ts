@@ -52,6 +52,7 @@ export const subjects = pgTable('subjects', {
   labHours: integer('lab_hours'),
   level: integer('level'),
   description: text('description'),
+  prereq: text('prereq'),
   syllabus: text('syllabus'),
   tags: text('tags'),
   createdAt: timestamp('created_at').defaultNow(),
@@ -90,6 +91,7 @@ export const events = pgTable('events', {
   id: serial('id').primaryKey(),
   title: text('title').notNull(),
   date: text('date').notNull(), // Date string YYYY-MM-DD or ISO
+  endDate: text('end_date'),    // Optional End date string YYYY-MM-DD
   description: text('description'),
   calendarType: text('calendar_type').default('academic'), // 'academic' | 'entity' | 'user'
   entityId: text('entity_id'),
@@ -346,3 +348,21 @@ export const community_section_info = pgTable('community_section_info', {
 }, (table) => ({
   idxCommunitySectionId: index('idx_community_section_section_id').on(table.sectionId),
 }));
+
+export const banner_terms = pgTable('banner_terms', {
+  id: serial('id').primaryKey(),
+  termCode: text('term_code').notNull().unique(),
+  termName: text('term_name').notNull(),
+  academicYear: text('academic_year'),
+  semester: text('semester'),
+  monitorChanges: boolean('monitor_changes').default(false),
+  autoUpdate: boolean('auto_update').default(false),
+  updateIntervalDays: integer('update_interval_days').default(2),
+  lastSyncAt: timestamp('last_sync_at'),
+  lastCheckAt: timestamp('last_check_at'),
+  totalSections: integer('total_sections').default(0),
+  status: text('status').default('idle'), // 'idle' | 'syncing' | 'error'
+  lastError: text('last_error'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+

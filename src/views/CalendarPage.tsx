@@ -28,6 +28,11 @@ export function CalendarPage() {
   const [highlightedEventId, setHighlightedEventId] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(10);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hoveredDot, setHoveredDot] = useState<{
+    event: any;
+    rect: DOMRect;
+    day: Date;
+  } | null>(null);
 
   const [visibleCalendars, setVisibleCalendars] = useState<Record<'academic' | 'entity' | 'user', boolean>>(() => {
     if (typeof window !== 'undefined') {
@@ -275,10 +280,50 @@ export function CalendarPage() {
     return true;
   });
 
+  const getDotColor = (ev: any) => {
+    if (ev.calendarType === 'entity') return 'bg-emerald-500 ring-2 ring-emerald-400/30';
+    if (ev.isHoliday || ev.isHolidayEnd || ev.isNationalDay) return 'bg-emerald-500 ring-2 ring-emerald-400/30';
+    if (ev.isEid) return 'bg-purple-500 ring-2 ring-purple-400/30';
+    if (ev.isSemesterStart || ev.isSemesterEnd) return 'bg-indigo-500 ring-2 ring-indigo-400/30';
+    if (ev.title?.includes('تسجيل') || ev.title?.includes('التحويل') || ev.title?.includes('القبول') || ev.title?.includes('إعادة القيد') || ev.title?.includes('الاعتذار') || ev.title?.includes('التأجيل')) {
+      return 'bg-sky-500 ring-2 ring-sky-400/30';
+    }
+    if (ev.title?.includes('اختبار') || ev.title?.includes('امتحان')) return 'bg-rose-500 ring-2 ring-rose-400/30';
+    if (ev.title?.includes('مكافأة')) return 'bg-blue-500 ring-2 ring-blue-400/30';
+    return 'bg-amber-500 ring-2 ring-amber-400/30';
+  };
+
   const getEventsForDay = (day: Date) => {
+    const dayStart = startOfDay(day);
     return filteredEvents.filter(e => {
-      const d = parseDate(e.date);
-      return d ? isSameDay(d, day) : false;
+      const startD = parseDate(e.date);
+      if (!startD) return false;
+      const isStart = isSameDay(startD, dayStart);
+      if (isStart) return true;
+
+      // If the event has an endDate, show it on the final deadline day as well
+      if (e.endDate) {
+        const endD = parseDate(e.endDate);
+        if (endD && isSameDay(endD, dayStart)) {
+          return true;
+        }
+      }
+      return false;
+    });
+  };
+
+  const getOngoingEventsForDay = (day: Date) => {
+    const dayStart = startOfDay(day);
+    return filteredEvents.filter(e => {
+      if (!e.endDate) return false;
+      const startD = parseDate(e.date);
+      const endD = parseDate(e.endDate);
+      if (!startD || !endD) return false;
+
+      const s = startOfDay(startD);
+      const ed = startOfDay(endD);
+      // Strictly intermediate days between start and end date
+      return dayStart > s && dayStart < ed;
     });
   };
 
@@ -690,6 +735,7 @@ export function CalendarPage() {
             const isCurrMonth = isSameMonth(day, currentDate);
             const isDayToday = isToday(day);
             const dayEvents = getEventsForDay(day);
+            const ongoingEvents = getOngoingEventsForDay(day);
 
             return (
               <div 
@@ -700,7 +746,7 @@ export function CalendarPage() {
                     : 'bg-white dark:bg-zinc-900/40 hover:bg-stone-50/40 dark:hover:bg-zinc-900/80'
                 }`}
               >
-                <div className="flex justify-between items-start mb-2">
+                <div className="flex justify-between items-center mb-1.5 min-h-[28px]">
                   <span 
                     className={`inline-flex items-center justify-center w-7 h-7 rounded-xl text-xs font-bold ${
                       isDayToday 
@@ -712,6 +758,36 @@ export function CalendarPage() {
                   >
                     {format(day, 'd')}
                   </span>
+
+                  {ongoingEvents.length > 0 && (
+                    <div className="flex items-center gap-1 flex-wrap justify-end pl-0.5">
+                      {ongoingEvents.slice(0, 3).map((ev: any, idx: number) => {
+                        const dotColor = getDotColor(ev);
+                        return (
+                          <button
+                            key={ev.id || `${ev.title}-${idx}`}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedEvent(ev);
+                            }}
+                            onMouseEnter={(e) => {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setHoveredDot({ event: ev, rect, day });
+                            }}
+                            onMouseLeave={() => setHoveredDot(null)}
+                            className={`w-2.5 h-2.5 rounded-full transition-transform hover:scale-135 cursor-pointer shadow-xs ${dotColor}`}
+                            aria-label={ev.title}
+                          />
+                        );
+                      })}
+                      {ongoingEvents.length > 3 && (
+                        <span className="text-[9px] font-bold text-slate-400 dark:text-zinc-500">
+                          +{ongoingEvents.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex-1 overflow-x-hidden overflow-y-auto space-y-1.5 pr-0.5 min-h-0 scrollbar-none">
@@ -773,9 +849,12 @@ export function CalendarPage() {
                             ? activeHighlightClass
                             : `${lineAccentClass} bg-slate-100/70 dark:bg-zinc-900/60 hover:bg-slate-200/80 dark:hover:bg-zinc-800/80 text-slate-800 dark:text-zinc-200`
                         }`}
-                        title="انقر لعرض تفاصيل الفعالية"
                       >
-                        <div className="font-bold truncate text-[11px] leading-snug">{ev.title}</div>
+                        <div className="font-bold truncate text-[11px] leading-snug">
+                          {ev.endDate && isSameDay(parseDate(ev.endDate) || new Date(0), day) && !isSameDay(parseDate(ev.date) || new Date(0), day)
+                            ? `⚠️ آخر موعد: ${ev.title}`
+                            : ev.title}
+                        </div>
                         <div className="flex items-center gap-1.5 mt-0.5 text-[9.5px] truncate opacity-90">
                           <span className="inline-flex items-center gap-0.5 shrink-0">
                             <Clock className="w-2.5 h-2.5 inline" />
@@ -956,6 +1035,49 @@ export function CalendarPage() {
           />
         )}
       </AnimatePresence>
+
+      {/* Floating Tooltip for Hovered Ongoing Event Dot */}
+      {hoveredDot && typeof window !== 'undefined' && (
+        <div 
+          className="fixed z-9999 pointer-events-none p-3 rounded-2xl shadow-2xl border bg-slate-900/95 dark:bg-zinc-900/95 text-white border-slate-700/80 dark:border-zinc-700/80 backdrop-blur-md text-right text-xs max-w-[280px] transition-all animate-in fade-in zoom-in-95 duration-150"
+          style={{
+            top: Math.max(12, hoveredDot.rect.top - 120),
+            left: Math.min(window.innerWidth - 290, Math.max(12, hoveredDot.rect.left + hoveredDot.rect.width / 2 - 140)),
+          }}
+        >
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <span className={`w-2 h-2 rounded-full shrink-0 ${getDotColor(hoveredDot.event)}`} />
+            <span className="font-bold text-[10px] text-amber-400 px-1.5 py-0.5 rounded-md bg-amber-400/10 border border-amber-400/20">
+              فترة مستمرة
+            </span>
+          </div>
+          <p className="font-bold text-xs text-white leading-snug line-clamp-2">
+            {hoveredDot.event.title}
+          </p>
+          <div className="mt-2 space-y-1 text-[11px] text-slate-300 dark:text-zinc-400 border-t border-slate-800 dark:border-zinc-800 pt-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-slate-400">آخر موعد:</span>
+              <span className="font-semibold text-rose-300">{hoveredDot.event.endDate}</span>
+            </div>
+            {(() => {
+              const endD = parseDate(hoveredDot.event.endDate);
+              if (!endD) return null;
+              const diffDays = Math.ceil((endD.getTime() - hoveredDot.day.getTime()) / (1000 * 60 * 60 * 24));
+              return (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-slate-400">المتبقي:</span>
+                  <span className="font-semibold text-emerald-400">
+                    {diffDays <= 0 ? 'اليوم الأخير' : `${diffDays} أيام متبقية`}
+                  </span>
+                </div>
+              );
+            })()}
+          </div>
+          <div className="mt-2 text-[9.5px] text-slate-400 text-center">
+            (انقر على النقطة لعرض التفاصيل)
+          </div>
+        </div>
+      )}
 
     </div>
   );

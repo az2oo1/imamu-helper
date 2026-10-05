@@ -61,6 +61,23 @@ const SCHEMA_VERIFICATION_STATEMENTS = [
   `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS description text`,
   `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS syllabus text`,
   `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS tags text`,
+  `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS prereq text`,
+  `CREATE TABLE IF NOT EXISTS banner_terms (
+    id serial PRIMARY KEY,
+    term_code text NOT NULL UNIQUE,
+    term_name text NOT NULL,
+    academic_year text,
+    semester text,
+    monitor_changes boolean DEFAULT false,
+    auto_update boolean DEFAULT false,
+    update_interval_days integer DEFAULT 2,
+    last_sync_at timestamp,
+    last_check_at timestamp,
+    total_sections integer DEFAULT 0,
+    status text DEFAULT 'idle',
+    last_error text,
+    created_at timestamp DEFAULT now()
+  )`,
   `ALTER TABLE major_courses ADD COLUMN IF NOT EXISTS prereq text`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS student_email text`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS google_email text`,
@@ -691,6 +708,7 @@ export async function checkDatabaseHealth(): Promise<{ status: 'healthy' | 'degr
 }
 
 export async function closeDatabaseConnections(): Promise<void> {
+  await dbReadyPromise;
   if (healthCheckTimer) {
     clearInterval(healthCheckTimer);
     healthCheckTimer = null;

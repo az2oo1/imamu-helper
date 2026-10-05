@@ -669,22 +669,36 @@ function EditSemesterModal({
 
         {/* Body (scrollable) */}
         <div className="flex-1 overflow-y-auto py-3 space-y-3.5 min-h-0 pr-1 pl-1">
-          {/* Card: Enrolled Courses (Styled to match lecture timings card in AddCourseModal) */}
-          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/40 border border-slate-200/80 dark:border-zinc-800 transition shadow-xs">
+          {/* Card: Enrolled Courses */}
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50/80 dark:bg-zinc-800/40 border border-slate-200/80 dark:border-zinc-800/80 transition shadow-xs space-y-3">
             {/* Card Header */}
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-[var(--color-imamu-accent)]" />
-                <span>المواد المسجلة في هذا الفصل ({courses.length} مواد · {totalHours} ساعة)</span>
-              </span>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-7 h-7 rounded-lg bg-[var(--color-imamu-accent)]/10 text-[var(--color-imamu-accent)] flex items-center justify-center shrink-0">
+                  <BookOpen className="w-4 h-4" />
+                </div>
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                  <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-zinc-100">
+                    المواد المسجلة في هذا الفصل
+                  </span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-white dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700/80 shadow-2xs">
+                    {courses.length} مواد · {totalHours} ساعة
+                  </span>
+                </div>
+              </div>
+
               <button
                 type="button"
                 onClick={() => setIsEditingCourses(prev => !prev)}
-                className="text-[11px] font-bold text-[var(--color-imamu-accent)] hover:underline flex items-center gap-1 cursor-pointer"
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer shrink-0 ${
+                  isEditingCourses
+                    ? 'bg-[var(--color-imamu-accent)] text-white shadow-2xs hover:opacity-90'
+                    : 'bg-white dark:bg-zinc-800 text-[var(--color-imamu-accent)] hover:bg-slate-50 dark:hover:bg-zinc-700/70 border border-slate-200 dark:border-zinc-700 shadow-2xs'
+                }`}
               >
                 {isEditingCourses ? (
                   <>
-                    <Check className="w-3.5 h-3.5" />
+                    <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                     <span>إنهاء التعديل</span>
                   </>
                 ) : (
@@ -696,57 +710,78 @@ function EditSemesterModal({
               </button>
             </div>
 
-            {/* Timings-style List of Courses */}
+            {/* List of Courses */}
             {courses.length === 0 ? (
-              <div className="text-center py-5 bg-white dark:bg-zinc-900/60 rounded-xl border border-dashed border-slate-200 dark:border-zinc-800">
-                <BookOpen className="w-5 h-5 text-slate-300 dark:text-zinc-600 mx-auto mb-1" />
-                <p className="text-xs text-slate-400">لا توجد مواد مسجلة بعد في هذا الفصل.</p>
+              <div className="text-center py-6 px-4 bg-white dark:bg-zinc-900/60 rounded-xl border border-dashed border-slate-200 dark:border-zinc-800">
+                <div className="w-9 h-9 rounded-full bg-slate-100 dark:bg-zinc-800 flex items-center justify-center mx-auto mb-2 text-slate-400 dark:text-zinc-500">
+                  <BookOpen className="w-4 h-4" />
+                </div>
+                <p className="text-xs font-medium text-slate-400 dark:text-zinc-500">لا توجد مواد مسجلة بعد في هذا الفصل.</p>
                 {!isEditingCourses && (
                   <button
                     type="button"
                     onClick={() => setIsEditingCourses(true)}
-                    className="text-[11px] font-bold text-[var(--color-imamu-accent)] mt-1.5 hover:underline cursor-pointer"
+                    className="text-[11px] font-bold text-[var(--color-imamu-accent)] mt-2 hover:underline cursor-pointer inline-flex items-center gap-1"
                   >
-                    انقر هنا لإضافة مواد بالـ CRN أو من الدليل
+                    <span>انقر هنا لإضافة مواد بالـ CRN أو من الدليل</span>
                   </button>
                 )}
               </div>
             ) : (
-              <div className="space-y-2 max-h-56 overflow-y-auto pr-0.5 custom-scrollbar">
-                {courses.map(c => (
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1 pl-0.5 custom-scrollbar">
+                {courses.map((c, idx) => (
                   <div
-                    key={c.courseCode}
-                    className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs shadow-2xs"
+                    key={c.courseCode || idx}
+                    className="group p-2.5 sm:p-3 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200/90 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700 transition shadow-2xs flex flex-col gap-2"
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="px-2 py-0.5 rounded-md bg-stone-100 dark:bg-stone-900/50 text-[var(--color-imamu-accent)] font-bold text-[10px] shrink-0">
-                        {c.courseCode}
-                      </span>
-                      <span className="text-slate-800 dark:text-zinc-200 font-bold truncate">
-                        {c.courseName}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <div className="flex items-center gap-2 text-[10.5px] text-slate-500 dark:text-zinc-400 font-medium">
-                        {c.sectionNumber && (
-                          <span className="text-slate-600 dark:text-zinc-300 font-semibold">
-                            شعبة {c.sectionNumber}
-                          </span>
-                        )}
-                        {c.creditHours && <span>{c.creditHours} ساعات</span>}
-                        {c.crn && <span>CRN: {c.crn}</span>}
+                    {/* Top Row: Course Code badge + Name + Delete button */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded-md bg-[var(--color-imamu-accent)]/10 text-[var(--color-imamu-accent)] border border-[var(--color-imamu-accent)]/20 shrink-0">
+                          {c.courseCode}
+                        </span>
+                        <span className="text-xs font-bold text-slate-800 dark:text-zinc-100 truncate" title={c.courseName}>
+                          {c.courseName}
+                        </span>
                       </div>
 
                       {isEditingCourses && (
                         <button
                           type="button"
                           onClick={() => removeCourse(c.courseCode)}
-                          className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition cursor-pointer"
+                          className="p-1 -my-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition cursor-pointer shrink-0"
                           title={`حذف مادة ${c.courseName}`}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
+                      )}
+                    </div>
+
+                    {/* Bottom Row: Metadata chips */}
+                    <div className="flex items-center flex-wrap gap-1.5 text-[10.5px]">
+                      {c.sectionNumber && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 font-medium">
+                          <span className="text-slate-400 dark:text-zinc-500 text-[10px]">شعبة</span>
+                          <span className="font-bold text-slate-800 dark:text-zinc-200">{c.sectionNumber}</span>
+                        </span>
+                      )}
+                      {c.creditHours && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 font-medium">
+                          <span className="font-bold text-slate-800 dark:text-zinc-200">{c.creditHours}</span>
+                          <span className="text-slate-400 dark:text-zinc-500 text-[10px]">ساعات</span>
+                        </span>
+                      )}
+                      {c.crn && (
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 font-mono text-[10px]">
+                          <span className="text-slate-400 dark:text-zinc-500 font-sans font-medium text-[10px]">CRN</span>
+                          <span className="font-bold text-slate-700 dark:text-zinc-200">{c.crn}</span>
+                        </span>
+                      )}
+                      {c.primaryInstructor && c.primaryInstructor !== 'غير محدد' && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 font-medium truncate max-w-[150px]">
+                          <span className="text-slate-400 dark:text-zinc-500 text-[10px]">أستاذ:</span>
+                          <span className="truncate">{c.primaryInstructor}</span>
+                        </span>
                       )}
                     </div>
                   </div>

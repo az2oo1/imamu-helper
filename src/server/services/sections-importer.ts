@@ -263,7 +263,8 @@ export async function processAndUpsertCatalog(
         departmentCode: c.departmentCode ? String(c.departmentCode) : null,
         creditHours: Number(c.creditHours) || 3,
         lectureHours: c.lectureHours ? Number(c.lectureHours) : null,
-        labHours: c.labHours ? Number(c.labHours) : null
+        labHours: c.labHours ? Number(c.labHours) : null,
+        prereq: c.prereq || c.prerequisites || null
       });
     }
   }
@@ -349,7 +350,8 @@ export async function processAndUpsertCatalog(
           departmentCode: sql`coalesce(excluded.department_code, subjects.department_code)`,
           creditHours: sql`coalesce(excluded.credit_hours, subjects.credit_hours)`,
           lectureHours: sql`coalesce(excluded.lecture_hours, subjects.lecture_hours)`,
-          labHours: sql`coalesce(excluded.lab_hours, subjects.lab_hours)`
+          labHours: sql`coalesce(excluded.lab_hours, subjects.lab_hours)`,
+          prereq: sql`coalesce(excluded.prereq, subjects.prereq)`
         }
       });
     insertedCoursesCount += chunk.length;

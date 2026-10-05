@@ -50,6 +50,13 @@
       "when": 1787771000000,
       "tag": "0006_create_activity_logs",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787772000000,
+      "tag": "0007_add_event_end_date",
+      "breakpoints": true
     }
   ]
 }

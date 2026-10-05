@@ -408,15 +408,7 @@ export function createSubjectsRouter(db: any) {
 
   router.get("/majors", async (req: express.Request, res: express.Response) => {
     try {
-      let records = await db.select().from(majors);
-      if (!records || records.length === 0) {
-        await db.insert(majors).values([
-          { name: 'علوم الحاسب' },
-          { name: 'تقنية المعلومات' },
-          { name: 'نظم المعلومات' }
-        ]).catch(() => {});
-        records = await db.select().from(majors);
-      }
+      const records = await db.select().from(majors);
       const rawMajorCourses: any = await db.execute(sql`SELECT CAST(id AS text) as id, CAST(major_id AS text) as "majorId", CAST(subject_id AS text) as "subjectId", optional_group as "optionalGroup", optional_group_req_count as "optionalGroupReqCount", prereq FROM major_courses`).catch(() => []);
       const allMajorCourses = rawMajorCourses.rows || rawMajorCourses || [];
 

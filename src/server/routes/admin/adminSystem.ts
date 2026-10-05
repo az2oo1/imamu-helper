@@ -35,16 +35,7 @@ export function createAdminSystemRouter(db: any) {
       ]);
 
       const usersCount = Number(uRes?.count || 0);
-      let majorsCount = Number(mRes?.count || 0);
-      if (majorsCount === 0) {
-        await db.insert(majors).values([
-          { name: 'علوم الحاسب' },
-          { name: 'تقنية المعلومات' },
-          { name: 'نظم المعلومات' }
-        ]).catch(() => {});
-        const [freshM] = await db.select({ count: sql`count(*)` }).from(majors);
-        majorsCount = Number(freshM?.count || 3);
-      }
+      const majorsCount = Number(mRes?.count || 0);
       const subjectsCount = Number(sRes?.count || 0);
       const resourcesCount = Number(rRes?.count || 0);
       const newsCount = Number(nRes?.count || 0);

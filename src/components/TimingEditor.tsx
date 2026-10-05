@@ -1,14 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { X, MapPin, User, Pencil, Check, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, MapPin, User, Pencil, Check, Trash2, Clock, ChevronDown } from 'lucide-react';
 import {
   formatTo12Hour,
   parseTimeToMinutes,
   formatMinutesToTime,
   DAY_MAP_AR
 } from '../lib/schedule-utils';
-import { CustomSelect, CustomSelectOption } from './ui/CustomSelect';
 
 export interface ScheduleItem {
   id?: string;
@@ -27,23 +26,191 @@ const ALL_DAYS = [
   { key: 'Thu', en: 'Thu', ar: 'الخميس', shortAr: 'خميس' },
 ];
 
-function generate5MinuteOptions(): string[] {
-  const options: string[] = [];
-  // 07:00 am (420 mins) to 10:00 pm (1320 mins) in 5-minute intervals
-  for (let mins = 7 * 60; mins <= 22 * 60; mins += 5) {
-    const hours24 = Math.floor(mins / 60);
-    const m = mins % 60;
-    const period = hours24 >= 12 ? 'pm' : 'am';
-    let hours12 = hours24 % 12;
-    if (hours12 === 0) hours12 = 12;
-    const formattedHour = String(hours12).padStart(2, '0');
-    const formattedMin = String(m).padStart(2, '0');
-    options.push(`${formattedHour}:${formattedMin} ${period}`);
-  }
-  return options;
+
+interface Time12State {
+  hour: number;
+  minute: number;
+  period: 'am' | 'pm';
 }
 
-const BASE_TIME_OPTIONS = generate5MinuteOptions();
+function parseTo12State(timeStr?: string | null): Time12State {
+  if (!timeStr) return { hour: 8, minute: 0, period: 'am' };
+  const raw = timeStr.trim().toLowerCase();
+  const match = raw.match(/^(\d{1,2}):(\d{2})\s*(am|pm|ص|م)?$/i);
+  if (!match) return { hour: 8, minute: 0, period: 'am' };
+  let h = parseInt(match[1], 10);
+  let m = parseInt(match[2], 10);
+  let p: 'am' | 'pm' = 'am';
+  if (match[3]) {
+    const periodStr = match[3].toLowerCase();
+    if (periodStr === 'pm' || periodStr === 'م') {
+      p = 'pm';
+    }
+  } else {
+    if (h >= 12) {
+      p = 'pm';
+      if (h > 12) h -= 12;
+    } else if (h === 0) {
+      h = 12;
+    }
+  }
+  if (h <= 0) h = 12;
+  if (h > 12) h = 12;
+  if (m < 0) m = 0;
+  if (m > 59) m = 59;
+  return { hour: h, minute: m, period: p };
+}
+
+function format12State(state: Time12State): string {
+  const hStr = String(state.hour).padStart(2, '0');
+  const mStr = String(state.minute).padStart(2, '0');
+  return `${hStr}:${mStr} ${state.period}`;
+}
+
+export function ClockStepper({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+}) {
+  const state = parseTo12State(value);
+  const [activeUnit, setActiveUnit] = useState<'hour' | 'minute'>('hour');
+
+  const update = (partial: Partial<Time12State>) => {
+    const next = { ...state, ...partial };
+    onChange(format12State(next));
+  };
+
+  const incrementHour = () => {
+    setActiveUnit('hour');
+    const nextH = state.hour === 12 ? 1 : state.hour + 1;
+    update({ hour: nextH });
+  };
+
+  const decrementHour = () => {
+    setActiveUnit('hour');
+    const nextH = state.hour === 1 ? 12 : state.hour - 1;
+    update({ hour: nextH });
+  };
+
+  const incrementMinute = () => {
+    setActiveUnit('minute');
+    const nextM = (Math.floor(state.minute / 5) * 5 + 5) % 60;
+    update({ minute: nextM });
+  };
+
+  const decrementMinute = () => {
+    setActiveUnit('minute');
+    const nextM = (Math.ceil(state.minute / 5) * 5 - 5 + 60) % 60;
+    update({ minute: nextM });
+  };
+
+  const togglePeriod = () => {
+    update({ period: state.period === 'am' ? 'pm' : 'am' });
+  };
+
+  return (
+    <div className="flex items-center gap-1" dir="ltr">
+      {/* Hours Column */}
+      <div
+        onClick={() => setActiveUnit('hour')}
+        onWheel={(e) => {
+          e.preventDefault();
+          if (e.deltaY < 0) incrementHour();
+          else decrementHour();
+        }}
+        className={`w-9 bg-white dark:bg-zinc-900 rounded-xl flex flex-col items-center transition cursor-pointer select-none border shrink-0 ${
+          activeUnit === 'hour'
+            ? 'border-[var(--color-imamu-accent)] shadow-2xs ring-1 ring-[var(--color-imamu-accent)]/30'
+            : 'border-slate-200 dark:border-zinc-700/80 hover:border-slate-300 dark:hover:border-zinc-600'
+        }`}
+      >
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            incrementHour();
+          }}
+          className="w-full h-5 flex items-center justify-center text-slate-400 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-t-[11px] transition cursor-pointer text-xs font-bold leading-none active:scale-90"
+          title="زيادة الساعة"
+        >
+          +
+        </button>
+        <div className="w-full py-0.5 border-y border-slate-100 dark:border-zinc-800 text-center font-mono font-bold text-xs sm:text-sm text-slate-900 dark:text-white select-none">
+          {String(state.hour).padStart(2, '0')}
+        </div>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            decrementHour();
+          }}
+          className="w-full h-5 flex items-center justify-center text-slate-400 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-b-[11px] transition cursor-pointer text-xs font-bold leading-none active:scale-90"
+          title="تقليل الساعة"
+        >
+          −
+        </button>
+      </div>
+
+      {/* Separator Colon */}
+      <span className="font-mono font-bold text-xs sm:text-sm text-slate-400 dark:text-zinc-500 select-none px-0.5 shrink-0">
+        :
+      </span>
+
+      {/* Minutes Column */}
+      <div
+        onClick={() => setActiveUnit('minute')}
+        onWheel={(e) => {
+          e.preventDefault();
+          if (e.deltaY < 0) incrementMinute();
+          else decrementMinute();
+        }}
+        className={`w-9 bg-white dark:bg-zinc-900 rounded-xl flex flex-col items-center transition cursor-pointer select-none border shrink-0 ${
+          activeUnit === 'minute'
+            ? 'border-[var(--color-imamu-accent)] shadow-2xs ring-1 ring-[var(--color-imamu-accent)]/30'
+            : 'border-slate-200 dark:border-zinc-700/80 hover:border-slate-300 dark:hover:border-zinc-600'
+        }`}
+      >
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            incrementMinute();
+          }}
+          className="w-full h-5 flex items-center justify-center text-slate-400 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-t-[11px] transition cursor-pointer text-xs font-bold leading-none active:scale-90"
+          title="زيادة الدقائق (+5)"
+        >
+          +
+        </button>
+        <div className="w-full py-0.5 border-y border-slate-100 dark:border-zinc-800 text-center font-mono font-bold text-xs sm:text-sm text-slate-900 dark:text-white select-none">
+          {String(state.minute).padStart(2, '0')}
+        </div>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            decrementMinute();
+          }}
+          className="w-full h-5 flex items-center justify-center text-slate-400 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-b-[11px] transition cursor-pointer text-xs font-bold leading-none active:scale-90"
+          title="تقليل الدقائق (-5)"
+        >
+          −
+        </button>
+      </div>
+
+      {/* AM / PM Toggle Pill */}
+      <button
+        type="button"
+        onClick={togglePeriod}
+        className="ml-1 px-2.5 py-1.5 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 hover:border-[var(--color-imamu-accent)] text-slate-900 dark:text-white font-mono font-bold text-xs transition cursor-pointer shadow-2xs active:scale-95 select-none shrink-0"
+        title="تبديل صباحاً / مساءً"
+      >
+        {state.period.toUpperCase()}
+      </button>
+    </div>
+  );
+}
 
 interface TimingEditorProps {
   schedules: ScheduleItem[];
@@ -96,7 +263,34 @@ export function TimingEditor({
   }, [controlledActiveIdx]);
 
   const activeIdx = controlledActiveIdx !== undefined ? controlledActiveIdx : internalActiveIdx;
+  const [isTeacherDropdownOpen, setIsTeacherDropdownOpen] = useState(false);
+  const teacherDropdownRef = useRef<HTMLDivElement>(null);
+
+  const prevActiveIdxRef = useRef<number | null>(null);
+  const baselineRef = useRef<ScheduleItem | null>(null);
+
+  if (activeIdx !== prevActiveIdxRef.current) {
+    prevActiveIdxRef.current = activeIdx;
+    if (activeIdx !== null && items[activeIdx]) {
+      baselineRef.current = JSON.parse(JSON.stringify(items[activeIdx]));
+    } else {
+      baselineRef.current = null;
+    }
+  }
+
+  useEffect(() => {
+    if (!isTeacherDropdownOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (teacherDropdownRef.current && !teacherDropdownRef.current.contains(e.target as Node)) {
+        setIsTeacherDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isTeacherDropdownOpen]);
+
   const setActiveIdx = (idx: number | null) => {
+    setIsTeacherDropdownOpen(false);
     setInternalActiveIdx(idx);
     onActiveIdxChange?.(idx);
   };
@@ -239,203 +433,233 @@ export function TimingEditor({
           );
         }
 
-        const startOptions = Array.from(new Set([
-          currentStart,
-          ...BASE_TIME_OPTIONS
-        ])).sort((a, b) => (parseTimeToMinutes(a) ?? 0) - (parseTimeToMinutes(b) ?? 0));
-
-        const endOptions = Array.from(new Set([
-          currentEnd,
-          ...BASE_TIME_OPTIONS
-        ])).sort((a, b) => (parseTimeToMinutes(a) ?? 0) - (parseTimeToMinutes(b) ?? 0));
-
-        const startSelectOptions: CustomSelectOption[] = startOptions.map(t => ({ value: t, label: t }));
-        const endSelectOptions: CustomSelectOption[] = endOptions.map(t => ({ value: t, label: t }));
+        const hasChanged = (() => {
+          const baseline = baselineRef.current;
+          if (!baseline) return false;
+          const d1 = [...(item.days || [])].sort().join(',');
+          const d2 = [...(baseline.days || [])].sort().join(',');
+          if (d1 !== d2) return true;
+          if ((item.startTime || '').trim() !== (baseline.startTime || '').trim()) return true;
+          if ((item.endTime || '').trim() !== (baseline.endTime || '').trim()) return true;
+          if ((item.classroom || '').trim() !== (baseline.classroom || '').trim()) return true;
+          if ((item.teacher || '').trim() !== (baseline.teacher || '').trim()) return true;
+          return false;
+        })();
 
         return (
           <div
             key={item.id || idx}
-            className="bg-[#18181b] border-2 border-[var(--color-imamu-accent)]/50 rounded-2xl p-4 shadow-lg text-slate-200 space-y-3.5 animate-in fade-in duration-150"
+            className="bg-white dark:bg-zinc-900 border-2 border-[var(--color-imamu-accent)]/50 rounded-2xl p-4 sm:p-5 shadow-md space-y-4 animate-in fade-in duration-150"
           >
-            {/* Header with Done button */}
-            <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
-              <span className="text-xs font-bold text-[var(--color-imamu-accent)] flex items-center gap-1.5">
+            {/* Header with Save / Cancel button(s) */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-zinc-800">
+              <span className="text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-[var(--color-imamu-accent)]" />
                 <span>تعديل الموعد ({idx + 1})</span>
               </span>
-              <button
-                type="button"
-                onClick={() => setActiveIdx(null)}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-[11px] font-bold transition cursor-pointer shadow-xs"
-              >
-                <Check className="w-3 h-3" />
-                <span>حفظ الموعد</span>
-              </button>
-            </div>
 
-            {/* Day Selector Pills */}
-            <div className="flex flex-wrap items-center justify-between gap-1 pb-3 border-b border-zinc-800/80">
-              {ALL_DAYS.map(dayDef => {
-                const active = isDayActive(item.days, dayDef);
-                return (
+              <div className="flex items-center gap-2">
+                {hasChanged ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        baselineRef.current = null;
+                        setActiveIdx(null);
+                      }}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-xs font-bold transition cursor-pointer shadow-xs active:scale-95"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>حفظ الموعد</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (baselineRef.current) {
+                          const next = [...items];
+                          next[idx] = JSON.parse(JSON.stringify(baselineRef.current));
+                          onChange(next);
+                        }
+                        baselineRef.current = null;
+                        setActiveIdx(null);
+                      }}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-600 dark:text-zinc-300 text-xs font-bold transition cursor-pointer active:scale-95"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>إلغاء</span>
+                    </button>
+                  </>
+                ) : (
                   <button
-                    key={dayDef.key}
                     type="button"
-                    onClick={() => toggleDay(idx, dayDef)}
-                    className={`flex-1 sm:flex-initial min-w-[38px] px-1.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer text-center ${
-                      active
-                        ? 'bg-[var(--color-imamu-brown)] text-white border border-[var(--color-imamu-accent)]/40 shadow-xs'
-                        : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40'
-                    }`}
+                    onClick={() => {
+                      baselineRef.current = null;
+                      setActiveIdx(null);
+                    }}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-600 dark:text-zinc-300 text-xs font-bold transition cursor-pointer active:scale-95"
                   >
-                    <span className="hidden sm:inline">{dayDef.ar}</span>
-                    <span className="sm:hidden">{dayDef.shortAr}</span>
+                    <X className="w-3.5 h-3.5" />
+                    <span>إلغاء</span>
                   </button>
-                );
-              })}
-            </div>
-
-            {/* Time row */}
-            <div className="flex items-center justify-between py-3 border-b border-zinc-800/60" dir="rtl">
-              <span className="text-zinc-400 text-xs font-medium">الوقت</span>
-              <div className="flex items-center gap-2" dir="rtl">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] text-zinc-400 font-bold">من</span>
-                  <CustomSelect
-                    value={currentStart}
-                    onChange={val => {
-                      const sMin = parseTimeToMinutes(val) ?? 0;
-                      const eMin = parseTimeToMinutes(currentEnd) ?? 0;
-                      let newEnd = currentEnd;
-                      if (eMin <= sMin) {
-                        newEnd = formatMinutesToTime(sMin + 50, false);
-                      }
-                      updateField(idx, 'startTime', val);
-                      if (newEnd !== currentEnd) {
-                        updateField(idx, 'endTime', newEnd);
-                      }
-                    }}
-                    options={startSelectOptions}
-                    dir="ltr"
-                    className="w-[114px]"
-                    buttonClassName="!py-1.5 !px-2.5 !text-xs !bg-zinc-900 !border-zinc-800 !text-white hover:!bg-zinc-800 hover:!border-zinc-700 font-medium rounded-xl"
-                    menuClassName="!min-w-[114px] !bg-zinc-900 !border-zinc-800 !text-white"
-                  />
-                </div>
-
-                <span className="text-zinc-500 text-xs shrink-0">←</span>
-
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] text-zinc-400 font-bold">إلى</span>
-                  <CustomSelect
-                    value={currentEnd}
-                    onChange={val => {
-                      const eMin = parseTimeToMinutes(val) ?? 0;
-                      const sMin = parseTimeToMinutes(currentStart) ?? 0;
-                      let newStart = currentStart;
-                      if (eMin <= sMin) {
-                        newStart = formatMinutesToTime(Math.max(7 * 60, eMin - 50), false);
-                      }
-                      updateField(idx, 'endTime', val);
-                      if (newStart !== currentStart) {
-                        updateField(idx, 'startTime', newStart);
-                      }
-                    }}
-                    options={endSelectOptions}
-                    dir="ltr"
-                    className="w-[114px]"
-                    buttonClassName="!py-1.5 !px-2.5 !text-xs !bg-zinc-900 !border-zinc-800 !text-white hover:!bg-zinc-800 hover:!border-zinc-700 font-medium rounded-xl"
-                    menuClassName="!min-w-[114px] !bg-zinc-900 !border-zinc-800 !text-white"
-                  />
-                </div>
+                )}
               </div>
             </div>
 
-            {/* Classroom row */}
-            <div className="flex items-center justify-between py-3 border-b border-zinc-800/60">
-              <span className="text-zinc-400 text-xs font-medium">القاعة الدراسية</span>
-              <input
-                type="text"
-                value={item.classroom || ''}
-                onChange={e => updateField(idx, 'classroom', e.target.value)}
-                placeholder="2168"
-                className="bg-transparent text-white text-xs text-right font-medium outline-none border-b border-transparent focus:border-zinc-700 px-2 py-0.5 max-w-[140px] placeholder-zinc-600"
-              />
+            {/* Day Selector Pills */}
+            <div className="space-y-1.5">
+              <span className="text-xs font-semibold text-slate-600 dark:text-zinc-400 block">
+                أيام المحاضرة
+              </span>
+              <div className="grid grid-cols-5 gap-1.5">
+                {ALL_DAYS.map(dayDef => {
+                  const active = isDayActive(item.days, dayDef);
+                  return (
+                    <button
+                      key={dayDef.key}
+                      type="button"
+                      onClick={() => toggleDay(idx, dayDef)}
+                      className={`py-2 rounded-xl text-xs font-bold transition cursor-pointer text-center border ${
+                        active
+                          ? 'bg-[var(--color-imamu-brown)] border-[var(--color-imamu-accent)] text-white shadow-xs'
+                          : 'bg-slate-50 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700/60 text-slate-600 dark:text-zinc-400 hover:border-slate-300 dark:hover:border-zinc-600'
+                      }`}
+                    >
+                      <span className="hidden sm:inline">{dayDef.ar}</span>
+                      <span className="sm:hidden">{dayDef.shortAr}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            {/* Teacher row */}
-            <div className="flex items-center justify-between py-3 border-b border-zinc-800/60">
-              <span className="text-zinc-400 text-xs font-medium">اسم الدكتور</span>
-              {availableTeachers && availableTeachers.length > 0 ? (
+            {/* Time section: 2 dedicated spacious rows with zero overlap */}
+            <div className="space-y-3 py-2 border-y border-slate-200 dark:border-zinc-800/80">
+              {/* Row 1: Start Time */}
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5">
-                  <select
-                    value={
-                      availableTeachers.includes(item.teacher || '')
-                        ? item.teacher
-                        : item.teacher
-                        ? '__custom__'
-                        : ''
-                    }
-                    onChange={e => {
-                      const val = e.target.value;
-                      if (val === '__custom__') {
-                        updateField(idx, 'teacher', item.teacher || '');
-                      } else {
-                        updateField(idx, 'teacher', val);
-                      }
-                    }}
-                    className="bg-zinc-900 border border-zinc-800 text-white text-xs text-right font-medium outline-none rounded-xl px-2.5 py-1.5 focus:border-[var(--color-imamu-accent)] cursor-pointer max-w-[180px]"
-                  >
-                    <option value="">-- اختر من الدكاترة أعلاه --</option>
-                    {availableTeachers.map(tName => (
-                      <option key={tName} value={tName}>
-                        {tName}
-                      </option>
-                    ))}
-                    <option value="__custom__">✏️ إدخال اسم آخر...</option>
-                  </select>
-
-                  {(!availableTeachers.includes(item.teacher || '') && item.teacher !== undefined) && (
-                    <input
-                      type="text"
-                      value={item.teacher || ''}
-                      onChange={e => updateField(idx, 'teacher', e.target.value)}
-                      placeholder="اسم الدكتور..."
-                      className="bg-transparent text-white text-xs text-right font-medium outline-none border-b border-zinc-700 focus:border-[var(--color-imamu-accent)] px-2 py-0.5 max-w-[130px] placeholder-zinc-600"
-                    />
-                  )}
+                  <Clock className="w-4 h-4 text-[var(--color-imamu-accent)]" />
+                  <span className="text-xs font-bold text-slate-700 dark:text-zinc-300">
+                    من (وقت البدء)
+                  </span>
                 </div>
-              ) : (
+                <ClockStepper
+                  value={item.startTime}
+                  onChange={(newStart) => {
+                    const sMin = parseTimeToMinutes(newStart) ?? 0;
+                    const eMin = parseTimeToMinutes(item.endTime) ?? 0;
+                    let newEnd = item.endTime;
+                    if (eMin <= sMin) {
+                      newEnd = formatMinutesToTime(sMin + 50, false);
+                    }
+                    const next = [...items];
+                    next[idx] = { ...next[idx], startTime: newStart, endTime: newEnd };
+                    onChange(next);
+                  }}
+                />
+              </div>
+
+              {/* Row 2: End Time */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-zinc-800/50">
+                <div className="flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-[var(--color-imamu-accent)]" />
+                  <span className="text-xs font-bold text-slate-700 dark:text-zinc-300">
+                    إلى (وقت الانتهاء)
+                  </span>
+                </div>
+                <ClockStepper
+                  value={item.endTime}
+                  onChange={(newEnd) => {
+                    const next = [...items];
+                    next[idx] = { ...next[idx], endTime: newEnd };
+                    onChange(next);
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Classroom & Teacher inputs */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-600 dark:text-zinc-400 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
+                  <span>القاعة الدراسية</span>
+                </label>
                 <input
                   type="text"
-                  value={item.teacher || ''}
-                  onChange={e => updateField(idx, 'teacher', e.target.value)}
-                  placeholder="د. أحمد..."
-                  className="bg-transparent text-white text-xs text-right font-medium outline-none border-b border-transparent focus:border-zinc-700 px-2 py-0.5 max-w-[180px] placeholder-zinc-600"
+                  value={item.classroom || ''}
+                  onChange={e => updateField(idx, 'classroom', e.target.value)}
+                  placeholder="مثال: 3027"
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 text-slate-800 dark:text-white text-xs font-medium focus:border-[var(--color-imamu-accent)] outline-none transition placeholder-slate-400 dark:placeholder-zinc-500 h-[40px]"
                 />
-              )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-600 dark:text-zinc-400 flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
+                  <span>اسم الدكتور</span>
+                </label>
+                {availableTeachers && availableTeachers.length > 0 ? (
+                  <div ref={teacherDropdownRef} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsTeacherDropdownOpen(prev => !prev)}
+                      className="w-full bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 text-slate-800 dark:text-white text-xs font-bold rounded-xl px-3.5 py-2 flex items-center justify-between gap-2 shadow-xs transition hover:border-[var(--color-imamu-accent)]/80 cursor-pointer h-[40px]"
+                    >
+                      <span className="truncate">{item.teacher || '-- اختر الدكتور --'}</span>
+                      <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-zinc-400 transition-transform duration-200 ${isTeacherDropdownOpen ? 'rotate-180 text-[var(--color-imamu-accent)]' : ''}`} />
+                    </button>
+
+                    {isTeacherDropdownOpen && (
+                      <div className="absolute top-full right-0 left-0 mt-1.5 z-50 bg-white dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-700 shadow-xl max-h-52 overflow-y-auto divide-y divide-slate-100 dark:divide-zinc-800/80 custom-scrollbar animate-in fade-in zoom-in-95 duration-100 text-right">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            updateField(idx, 'teacher', '');
+                            setIsTeacherDropdownOpen(false);
+                          }}
+                          className="w-full px-3.5 py-2.5 text-xs font-bold text-slate-500 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800/80 flex items-center justify-between transition cursor-pointer text-right"
+                        >
+                          <span>-- بدون تحديد --</span>
+                          {!item.teacher && <Check className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />}
+                        </button>
+
+                        {availableTeachers.map(tName => {
+                          const isSelected = item.teacher === tName;
+                          return (
+                            <button
+                              key={tName}
+                              type="button"
+                              onClick={() => {
+                                updateField(idx, 'teacher', tName);
+                                setIsTeacherDropdownOpen(false);
+                              }}
+                              className={`w-full px-3.5 py-2.5 text-xs font-bold flex items-center justify-between transition cursor-pointer text-right ${
+                                isSelected
+                                  ? 'bg-[var(--color-imamu-accent)]/15 text-[var(--color-imamu-accent)]'
+                                  : 'text-slate-800 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800/80'
+                              }`}
+                            >
+                              <span className="truncate">{tName}</span>
+                              {isSelected && <Check className="w-3.5 h-3.5 text-[var(--color-imamu-accent)] shrink-0" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    value={item.teacher || ''}
+                    onChange={e => updateField(idx, 'teacher', e.target.value)}
+                    placeholder="مثال: د. أحمد..."
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 text-slate-800 dark:text-white text-xs font-medium focus:border-[var(--color-imamu-accent)] outline-none transition placeholder-slate-400 dark:placeholder-zinc-500 h-[40px]"
+                  />
+                )}
+              </div>
             </div>
 
-            {/* Remove item button and close editing button */}
-            <div className="pt-2 flex justify-between items-center border-t border-zinc-800/60">
-              {items.length > 1 ? (
-                <button
-                  type="button"
-                  onClick={() => removeItem(idx)}
-                  className="flex items-center gap-1 text-[11px] text-rose-400 hover:text-rose-300 font-medium cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>حذف هذا الموعد</span>
-                </button>
-              ) : <div />}
 
-              <button
-                type="button"
-                onClick={() => setActiveIdx(null)}
-                className="text-[11px] text-zinc-400 hover:text-zinc-200 font-medium cursor-pointer"
-              >
-                إغلاق هذا الموعد
-              </button>
-            </div>
           </div>
         );
       })}

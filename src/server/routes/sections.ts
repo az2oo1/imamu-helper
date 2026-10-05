@@ -1,12 +1,19 @@
 import express from 'express';
 import multer from 'multer';
-import { sql, eq, or, ilike, and } from 'drizzle-orm';
-import { course_sections, community_section_info, subjects } from '../../db/schema';
+import { sql, eq, or, ilike, and, desc } from 'drizzle-orm';
+import { course_sections, community_section_info, subjects, banner_terms } from '../../db/schema';
 import { matchId } from '../../lib/auth-utils';
 import { requireAuth, AuthRequest } from '../../middleware/auth';
 import { checkAdmin } from './admin/common';
 import { normalizeFormattedSchedules, processAndUpsertCatalog } from '../services/sections-importer';
 import { extractFinalExamInfo } from '../../lib/schedule-utils';
+import {
+  BannerClient,
+  syncTermFromBanner,
+  checkTermChangesAndSeats,
+  emptyTermSections,
+  addCrnsToTerm
+} from '../services/banner-service';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -756,6 +763,157 @@ export function createSectionsRouter(db: any) {
     } catch (err: any) {
       console.error('[Admin Import Error]', err);
       res.status(500).json({ error: `فشل الاستيراد: ${err.message || err}` });
+    }
+  });
+  // ============================================================================
+  // 10. BANNER DIRECT INTEGRATION ADMIN ENDPOINTS
+  // ============================================================================
+
+  // GET /admin/banner/detected-terms - Fetch available terms from Banner 9
+  router.get('/admin/banner/detected-terms', requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: 'Admin only' });
+    try {
+      const client = new BannerClient();
+      const detected = await client.getDetectedTerms();
+      res.json({ success: true, terms: detected });
+    } catch (err: any) {
+      console.error('[Banner Detected Terms Error]', err);
+      res.status(500).json({ error: `فشل استعلام الفصول من بانر: ${err.message || err}` });
+    }
+  });
+
+  // GET /admin/banner/terms - List saved/tracked Banner terms
+  router.get('/admin/banner/terms', requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: 'Admin only' });
+    try {
+      const terms = await db.select().from(banner_terms).orderBy(desc(banner_terms.createdAt));
+      res.json({ success: true, terms });
+    } catch (err: any) {
+      console.error('[Banner Get Terms Error]', err);
+      res.status(500).json({ error: 'فشل استرجاع إعدادات الفصول' });
+    }
+  });
+
+  // POST /admin/banner/terms - Add a new term to track from Banner
+  router.post('/admin/banner/terms', requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: 'Admin only' });
+    try {
+      const { termCode, termName, academicYear, semester, syncImmediately } = req.body;
+      if (!termCode || !termName) {
+        return res.status(400).json({ error: 'رمز واسم الفصل الدراسي مطلوبان' });
+      }
+
+      await db.insert(banner_terms).values({
+        termCode,
+        termName,
+        academicYear: academicYear || '1448',
+        semester: semester || 'الفصل الأول',
+        status: syncImmediately ? 'syncing' : 'idle'
+      }).onConflictDoUpdate({
+        target: banner_terms.termCode,
+        set: { termName, academicYear, semester }
+      });
+
+      if (syncImmediately) {
+        // Trigger sync asynchronously so response is fast
+        syncTermFromBanner(termCode, termName, db, academicYear, semester).catch(e => {
+          console.error(`[Async Banner Sync Error] Term ${termCode}:`, e);
+        });
+      }
+
+      const saved = await db.select().from(banner_terms).where(eq(banner_terms.termCode, termCode));
+      res.json({ success: true, term: saved[0] });
+    } catch (err: any) {
+      console.error('[Banner Add Term Error]', err);
+      res.status(500).json({ error: `فشل إضافة الفصل الدراسي: ${err.message || err}` });
+    }
+  });
+
+  // PUT /admin/banner/terms/:termCode - Update settings (monitor, autoUpdate, interval)
+  router.put('/admin/banner/terms/:termCode', requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: 'Admin only' });
+    try {
+      const { termCode } = req.params;
+      const { monitorChanges, autoUpdate, updateIntervalDays } = req.body;
+
+      await db.update(banner_terms).set({
+        ...(monitorChanges !== undefined ? { monitorChanges: Boolean(monitorChanges) } : {}),
+        ...(autoUpdate !== undefined ? { autoUpdate: Boolean(autoUpdate) } : {}),
+        ...(updateIntervalDays !== undefined ? { updateIntervalDays: Number(updateIntervalDays) || 2 } : {})
+      }).where(eq(banner_terms.termCode, termCode));
+
+      const updated = await db.select().from(banner_terms).where(eq(banner_terms.termCode, termCode));
+      res.json({ success: true, term: updated[0] });
+    } catch (err: any) {
+      console.error('[Banner Update Term Settings Error]', err);
+      res.status(500).json({ error: 'فشل تحديث إعدادات الفصل الدراسي' });
+    }
+  });
+
+  // POST /admin/banner/terms/:termCode/sync - Trigger manual full sync
+  router.post('/admin/banner/terms/:termCode/sync', requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: 'Admin only' });
+    try {
+      const { termCode } = req.params;
+      const termRecord = await db.select().from(banner_terms).where(eq(banner_terms.termCode, termCode));
+      const termName = termRecord[0]?.termName || termCode;
+
+      const result = await syncTermFromBanner(
+        termCode,
+        termName,
+        db,
+        termRecord[0]?.academicYear || undefined,
+        termRecord[0]?.semester || undefined
+      );
+
+      res.json(result);
+    } catch (err: any) {
+      console.error('[Banner Sync Term Error]', err);
+      res.status(500).json({ error: `فشل مزامنة الفصل: ${err.message || err}` });
+    }
+  });
+
+  // POST /admin/banner/terms/:termCode/empty - Empty all sections for this term
+  router.post('/admin/banner/terms/:termCode/empty', requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: 'Admin only' });
+    try {
+      const { termCode } = req.params;
+      const result = await emptyTermSections(termCode, db);
+      res.json({ success: true, ...result, message: `تم تفريغ ${result.deletedCount} شعبة لهذا الفصل بنجاح.` });
+    } catch (err: any) {
+      console.error('[Banner Empty Term Error]', err);
+      res.status(500).json({ error: 'فشل تفريغ شعب الفصل الدراسي' });
+    }
+  });
+
+  // POST /admin/banner/terms/:termCode/add-crns - Add CRNs from JSON or list
+  router.post('/admin/banner/terms/:termCode/add-crns', requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: 'Admin only' });
+    try {
+      const { termCode } = req.params;
+      const crns = Array.isArray(req.body.crns) ? req.body.crns : (typeof req.body.crns === 'string' ? req.body.crns.split(/[\s,]+/).filter(Boolean) : []);
+      if (crns.length === 0) {
+        return res.status(400).json({ error: 'يرجى تقديم قائمة أرقام CRN صالحة' });
+      }
+
+      const result = await addCrnsToTerm(termCode, crns, db);
+      res.json({ success: true, ...result, message: `تم جلب وإضافة ${result.addedCount} شعبة بنجاح.` });
+    } catch (err: any) {
+      console.error('[Banner Add CRNs Error]', err);
+      res.status(500).json({ error: `فشل إضافة الـ CRNs: ${err.message || err}` });
+    }
+  });
+
+  // DELETE /admin/banner/terms/:termCode - Remove term from tracking
+  router.delete('/admin/banner/terms/:termCode', requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: 'Admin only' });
+    try {
+      const { termCode } = req.params;
+      await db.delete(banner_terms).where(eq(banner_terms.termCode, termCode));
+      res.json({ success: true, message: 'تم إزالة الفصل الدراسي من المتابعة' });
+    } catch (err: any) {
+      console.error('[Banner Delete Term Error]', err);
+      res.status(500).json({ error: 'فشل إزالة الفصل الدراسي' });
     }
   });
 

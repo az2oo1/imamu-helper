@@ -9,6 +9,7 @@ import { requestLogger, logger } from "./src/middleware/logger";
 import { getFileFromStorage, ensureAllBucketsExist } from "./src/lib/storage";
 
 import { extractTelegramChannelPosts } from './src/server/services/telegram';
+import { startPeriodicBannerSync } from './src/server/services/banner-worker';
 import { cleanupUnregisteredStorageFiles } from './src/lib/storageCleanup';
 import { news_sources } from './src/db/schema';
 import { sql } from 'drizzle-orm';
@@ -237,6 +238,7 @@ async function startServer() {
   };
 
   startPeriodicTelegramFetcher();
+  startPeriodicBannerSync(db);
 
   // Start periodic storage cleanup worker (runs daily to purge unreferenced S3 & disk files)
   const startPeriodicStorageCleanup = () => {
