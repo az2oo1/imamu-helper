@@ -112,10 +112,7 @@ export const news = pgTable('news', {
   content: text('content').notNull(),
   excerpt: text('excerpt'),
   category: text('category'), // e.g. Campus, Academic, Sports, Events
-  source: text('source'),     // e.g. @IMAMU_News
-  authorName: text('author_name'),
-  authorHandle: text('author_handle'),
-  authorAvatar: text('author_avatar'),
+  sourceHandle: text('source_handle'), // Points back to news_sources.handle
   authorId: text('author_id'),
   entityId: text('entity_id'),
   images: text('images'),     // JSON string array of image URLs (first element = cover image)

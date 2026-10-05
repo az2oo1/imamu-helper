@@ -102,7 +102,7 @@ export async function getRegisteredStorageKeys(db: any): Promise<Set<string>> {
     harvest(users, ['profilePicUrl']),
     harvest(subjects, ['syllabus', 'description']),
     harvest(course_resources, ['url', 'boxLink', 'freeResourcesUrl', 'paidResourcesUrl', 'avatarUrl', 'description']),
-    harvest(news, ['images', 'authorAvatar', 'videoUrl', 'content', 'excerpt']),
+    harvest(news, ['images', 'videoUrl', 'content', 'excerpt']),
     harvest(news_sources, ['profilePicUrl', 'bannerUrl', 'links', 'bio']),
     harvest(tutorials, ['videoUrl', 'linkUrl', 'steps', 'text']),
     harvest(contributors, ['photoUrl', 'socialLinks', 'bio']),

@@ -196,12 +196,12 @@ export function createNewsRouter(db: any) {
     
     const userLiked = currentUserId ? likes.some((l: any) => l.userId === currentUserId) : false;
     const userSaved = currentUserId ? bookmarks.some((b: any) => b.userId === currentUserId) : false;
-    const effectiveAvatar = record.profilePicUrl || record.authorAvatar || null;
+    const effectiveAvatar = record.profilePicUrl || null;
 
     let postTitle = record.title;
     if (!postTitle && record.content) {
       const firstLine = record.content.trim().split('\n')[0].replace(/^#+\s*/, '').trim();
-      if (firstLine && firstLine !== record.authorName && firstLine !== record.sourceDisplayName) {
+      if (firstLine && firstLine !== record.sourceDisplayName) {
         postTitle = firstLine.length > 90 ? firstLine.slice(0, 87) + '...' : firstLine;
       }
     }
@@ -215,10 +215,9 @@ export function createNewsRouter(db: any) {
 
     const calculatedReadTime = record.readTime || (Math.max(1, Math.ceil((record.content || '').split(/\s+/).length / 200)) + ' min read');
 
-    const effectiveAuthorName = record.sourceDisplayName || record.authorName || (record.source ? `@${record.source}` : 'إدارة الأخبار');
-    const effectiveAuthorHandle = record.sourceHandle 
-      ? (record.sourceHandle.startsWith('@') ? record.sourceHandle : `@${record.sourceHandle}`)
-      : (record.authorHandle || (record.source ? `@${record.source}` : '@IMAMU'));
+    const cleanSourceHandle = (record.sourceHandle || record.handle || '').replace(/^@/, '');
+    const effectiveAuthorName = record.sourceDisplayName || (cleanSourceHandle ? `@${cleanSourceHandle}` : 'إدارة الأخبار');
+    const effectiveAuthorHandle = cleanSourceHandle ? `@${cleanSourceHandle}` : '@IMAMU';
 
     return {
       ...record,
@@ -228,6 +227,8 @@ export function createNewsRouter(db: any) {
       excerpt: record.excerpt || record.content,
       category: record.category || record.tag || 'General',
       tag: record.category || record.tag || 'General',
+      sourceHandle: cleanSourceHandle || null,
+      source: cleanSourceHandle || null,
       author: effectiveAuthorName,
       authorName: effectiveAuthorName,
       authorHandle: effectiveAuthorHandle,
@@ -265,8 +266,7 @@ export function createNewsRouter(db: any) {
           content: news.content,
           excerpt: news.excerpt,
           category: news.category,
-          source: news.source,
-
+          sourceHandle: news.sourceHandle,
           images: news.images,
           videoUrl: news.videoUrl,
           readTime: news.readTime,
@@ -275,21 +275,18 @@ export function createNewsRouter(db: any) {
           isArchived: news.isArchived,
           date: news.date,
           createdAt: news.createdAt,
-          authorName: news.authorName,
-          authorHandle: news.authorHandle,
-          authorAvatar: news.authorAvatar,
           authorId: news.authorId,
           entityId: news.entityId,
           profilePicUrl: news_sources.profilePicUrl,
           sourceDisplayName: news_sources.displayName,
-          sourceHandle: news_sources.handle
+          sourceHandleFromSource: news_sources.handle
         })
         .from(news)
         .leftJoin(
           news_sources, 
           or(
-            eq(news.source, news_sources.handle),
-            eq(sql`REPLACE(${news.source}, '@', '')`, sql`REPLACE(${news_sources.handle}, '@', '')`)
+            eq(news.sourceHandle, news_sources.handle),
+            eq(sql`REPLACE(${news.sourceHandle}, '@', '')`, sql`REPLACE(${news_sources.handle}, '@', '')`)
           )
         )
         .orderBy(desc(news.isFeatured), desc(news.createdAt), desc(news.date))
@@ -356,8 +353,7 @@ export function createNewsRouter(db: any) {
           content: news.content,
           excerpt: news.excerpt,
           category: news.category,
-          source: news.source,
-
+          sourceHandle: news.sourceHandle,
           images: news.images,
           videoUrl: news.videoUrl,
           readTime: news.readTime,
@@ -366,22 +362,19 @@ export function createNewsRouter(db: any) {
           isArchived: news.isArchived,
           date: news.date,
           createdAt: news.createdAt,
-          authorName: news.authorName,
-          authorHandle: news.authorHandle,
-          authorAvatar: news.authorAvatar,
           authorId: news.authorId,
           entityId: news.entityId,
           profilePicUrl: news_sources.profilePicUrl,
           sourceDisplayName: news_sources.displayName,
-          sourceHandle: news_sources.handle
+          sourceHandleFromSource: news_sources.handle
         })
         .from(news)
         .where(matchId(news.id, newsIdRaw))
         .leftJoin(
           news_sources, 
           or(
-            eq(news.source, news_sources.handle),
-            eq(sql`REPLACE(${news.source}, '@', '')`, sql`REPLACE(${news_sources.handle}, '@', '')`)
+            eq(news.sourceHandle, news_sources.handle),
+            eq(sql`REPLACE(${news.sourceHandle}, '@', '')`, sql`REPLACE(${news_sources.handle}, '@', '')`)
           )
         );
 
@@ -537,9 +530,21 @@ export function createNewsRouter(db: any) {
       }
 
       const userRec = await db.select().from(users).where(eq(users.uid, req.user.uid));
-      const authorName = userRec[0]?.userName || userRec[0]?.email?.split('@')[0] || 'إدارة الأخبار';
-      const authorAvatar = userRec[0]?.profilePicUrl || null;
-      const authorHandle = userRec[0]?.userName ? `@${userRec[0].userName}` : '@admin';
+      const handleCandidate = (req.body.sourceHandle || req.body.source || req.body.authorHandle || userRec[0]?.userName || 'admin').replace(/^@/, '');
+
+      // Ensure the news source exists so this handle points back to it
+      const existingSource = await db.select().from(news_sources).where(
+        or(eq(news_sources.handle, handleCandidate), eq(news_sources.handle, `@${handleCandidate}`))
+      ).limit(1);
+
+      if (existingSource.length === 0) {
+        await db.insert(news_sources).values({
+          handle: handleCandidate,
+          displayName: userRec[0]?.userName || 'إدارة الأخبار',
+          profilePicUrl: userRec[0]?.profilePicUrl || null,
+          isActive: true
+        }).catch(() => {});
+      }
 
       const imageList = parseImageList(images, photoUrl);
       const coverImage = photoUrl || (imageList.length > 0 ? imageList[0] : null);
@@ -552,10 +557,7 @@ export function createNewsRouter(db: any) {
         content: content.trim(),
         excerpt: content.trim(),
         category: categoryName,
-        source: 'UserPost',
-        authorName,
-        authorHandle,
-        authorAvatar,
+        sourceHandle: handleCandidate,
         authorId: req.user.uid,
         entityId: entityId || null,
         images: JSON.stringify(coverImage ? [coverImage, ...imageList.filter((u: string) => u !== coverImage)] : imageList),

@@ -35,6 +35,7 @@ interface NewsItem {
   content: string;
   summary?: string;
   category: string;
+  sourceHandle?: string;
   author: string;
   authorHandle?: string;
   authorAvatar?: string;
@@ -80,12 +81,12 @@ export function NewsPage() {
 
   const handleOpenNewsModal = (item: NewsItem) => {
     if (!item) return;
-    const authorName = item.author || (item as any).authorName || (item.source ? `@${item.source.replace(/^@/, '')}` : 'إدارة الأخبار');
-    const authorHandle = item.authorHandle || (item.source ? `@${item.source.replace(/^@/, '')}` : '@IMAMU');
+    const cleanHandle = (item.sourceHandle || item.authorHandle || item.source || 'IMAMU').replace(/^@/, '');
     setSelectedNews({
       ...item,
-      author: authorName,
-      authorHandle: authorHandle
+      sourceHandle: cleanHandle,
+      author: item.author || `@${cleanHandle}`,
+      authorHandle: `@${cleanHandle}`
     });
   };
 
@@ -350,7 +351,7 @@ export function NewsPage() {
 
     if (searchQuery.trim()) {
       result = result.filter(n => 
-        matchArabicSearch([n.title, n.content, n.author, n.authorHandle, n.category], searchQuery)
+        matchArabicSearch([n.title, n.content, n.sourceHandle, n.author, n.authorHandle, n.category], searchQuery)
       );
     }
 
@@ -582,32 +583,17 @@ export function NewsPage() {
                       </div>
 
                       <div className="flex items-center justify-between w-full border-t border-slate-100 dark:border-zinc-800 pt-3.5 mt-2">
-                        <div 
-                          onClick={(e) => handleAuthorClick(featuredItem.authorHandle || featuredItem.source || '@IMAMU', e)}
-                          className="flex items-center gap-3 cursor-pointer group/author"
-                        >
-                          <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 flex items-center justify-center font-bold text-xs text-slate-700 dark:text-zinc-300 overflow-hidden shrink-0 group-hover/author:border-[var(--color-imamu-accent)] transition">
-                            {featuredItem.authorAvatar ? (
-                              <img 
-                                src={featuredItem.authorAvatar} 
-                                alt={featuredItem.author || 'إدارة الأخبار'} 
-                                className="w-full h-full rounded-full object-cover"
-                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                              />
-                            ) : (
-                              (featuredItem.author || (featuredItem as any).authorName || featuredItem.source || 'إدارة الأخبار').charAt(0)
-                            )}
-                          </div>
-                          <div className="flex flex-col text-right">
-                            <span className="text-xs font-bold text-slate-900 dark:text-white group-hover/author:text-[var(--color-imamu-accent)] transition">
-                              {featuredItem.author || (featuredItem as any).authorName || (featuredItem.source ? `@${featuredItem.source.replace(/^@/, '')}` : 'إدارة الأخبار')}
-                            </span>
-                            <span className="text-[10px] text-slate-400 dark:text-zinc-500 flex items-center gap-1">
-                              <span>{featuredItem.authorHandle || (featuredItem.source ? `@${featuredItem.source.replace(/^@/, '')}` : '@IMAMU')}</span>
-                              <span>•</span>
-                              <span>{formatDate(featuredItem.createdAt, 'ar-display')}</span>
-                            </span>
-                          </div>
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={(e) => handleAuthorClick(featuredItem.sourceHandle || featuredItem.authorHandle || featuredItem.source || '@IMAMU', e)}
+                            className="font-mono text-xs font-bold text-[var(--color-imamu-accent)] hover:underline bg-[var(--color-imamu-accent)]/10 px-2.5 py-1 rounded-full transition cursor-pointer"
+                            title="الانتقال إلى مصدر الخبر"
+                          >
+                            @{((featuredItem.sourceHandle || featuredItem.authorHandle || featuredItem.source || 'IMAMU')).replace(/^@/, '')}
+                          </button>
+                          <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono">
+                            • {formatDate(featuredItem.createdAt, 'ar-display')}
+                          </span>
                         </div>
 
                         <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-zinc-400">
@@ -706,37 +692,22 @@ export function NewsPage() {
                       >
                         <div>
                           <div className="flex items-start justify-between gap-2 mb-4">
-                            <div 
-                              onClick={(e) => handleAuthorClick(item.authorHandle || item.source || '@IMAMU', e)}
-                              className="flex items-center gap-2.5 min-w-0 cursor-pointer group/author"
+                            <button
+                              onClick={(e) => handleAuthorClick(item.sourceHandle || item.authorHandle || item.source || '@IMAMU', e)}
+                              className="font-mono text-xs font-bold text-[var(--color-imamu-accent)] hover:underline bg-[var(--color-imamu-accent)]/10 px-2.5 py-1 rounded-full transition flex items-center gap-1 shrink-0 cursor-pointer"
+                              title="الانتقال إلى مصدر الخبر"
                             >
-                              <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 flex items-center justify-center font-bold text-xs text-slate-700 dark:text-zinc-300 overflow-hidden shrink-0 group-hover/author:border-[var(--color-imamu-accent)] transition">
-                                {item.authorAvatar ? (
-                                  <img 
-                                    src={item.authorAvatar} 
-                                    alt={item.author || 'إدارة الأخبار'} 
-                                    className="w-full h-full rounded-full object-cover"
-                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                                  />
-                                ) : (
-                                  (item.author || (item as any).authorName || item.source || 'إدارة الأخبار').charAt(0)
-                                )}
-                              </div>
-                              <div className="flex flex-col text-right min-w-0">
-                                <span className="text-xs font-bold text-slate-900 dark:text-white line-clamp-1 group-hover/author:text-[var(--color-imamu-accent)] transition">
-                                  {item.author || (item as any).authorName || (item.source ? `@${item.source.replace(/^@/, '')}` : 'إدارة الأخبار')}
-                                </span>
-                                <span className="text-[10px] text-slate-400 dark:text-zinc-500 flex items-center gap-1 min-w-0 truncate">
-                                  <span className="truncate">{item.authorHandle || (item.source ? `@${item.source.replace(/^@/, '')}` : '@IMAMU')}</span>
-                                  <span className="shrink-0">•</span>
-                                  <span className="shrink-0">{formatDate(item.createdAt, 'ar-display')}</span>
-                                </span>
-                              </div>
-                            </div>
+                              @{((item.sourceHandle || item.authorHandle || item.source || 'IMAMU')).replace(/^@/, '')}
+                            </button>
 
-                            <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800/90 border border-slate-200/80 dark:border-zinc-700/80 text-[var(--color-imamu-accent)] text-[10px] font-bold shadow-2xs shrink-0">
-                              {getArabicCategoryLabel(item.category, (item as any).tag || item.summary, item.content, item.title)}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono">
+                                {formatDate(item.createdAt, 'ar-display')}
+                              </span>
+                              <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800/90 border border-slate-200/80 dark:border-zinc-700/80 text-[var(--color-imamu-accent)] text-[10px] font-bold shadow-2xs shrink-0">
+                                {getArabicCategoryLabel(item.category, (item as any).tag || item.summary, item.content, item.title)}
+                              </span>
+                            </div>
                           </div>
 
                           {item.title && item.title !== item.author && (
@@ -809,37 +780,22 @@ export function NewsPage() {
                       >
                         <div>
                           <div className="flex items-start justify-between gap-2 mb-4">
-                            <div 
-                              onClick={(e) => handleAuthorClick(item.authorHandle || item.source || '@IMAMU', e)}
-                              className="flex items-center gap-2.5 min-w-0 cursor-pointer group/author"
+                            <button
+                              onClick={(e) => handleAuthorClick(item.sourceHandle || item.authorHandle || item.source || '@IMAMU', e)}
+                              className="font-mono text-xs font-bold text-[var(--color-imamu-accent)] hover:underline bg-[var(--color-imamu-accent)]/10 px-2.5 py-1 rounded-full transition flex items-center gap-1 shrink-0 cursor-pointer"
+                              title="الانتقال إلى مصدر الخبر"
                             >
-                              <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 flex items-center justify-center font-bold text-xs text-slate-700 dark:text-zinc-300 overflow-hidden shrink-0 group-hover/author:border-[var(--color-imamu-accent)] transition">
-                                {item.authorAvatar ? (
-                                  <img 
-                                    src={item.authorAvatar} 
-                                    alt={item.author || 'إدارة الأخبار'} 
-                                    className="w-full h-full rounded-full object-cover"
-                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                                  />
-                                ) : (
-                                  (item.author || (item as any).authorName || item.source || 'إدارة الأخبار').charAt(0)
-                                )}
-                              </div>
-                              <div className="flex flex-col text-right min-w-0">
-                                <span className="text-xs font-bold text-slate-900 dark:text-white line-clamp-1 group-hover/author:text-[var(--color-imamu-accent)] transition">
-                                  {item.author || (item as any).authorName || (item.source ? `@${item.source.replace(/^@/, '')}` : 'إدارة الأخبار')}
-                                </span>
-                                <span className="text-[10px] text-slate-400 dark:text-zinc-500 flex items-center gap-1 min-w-0 truncate">
-                                  <span className="truncate">{item.authorHandle || (item.source ? `@${item.source.replace(/^@/, '')}` : '@IMAMU')}</span>
-                                  <span className="shrink-0">•</span>
-                                  <span className="shrink-0">{formatDate(item.createdAt, 'ar-display')}</span>
-                                </span>
-                              </div>
-                            </div>
+                              @{((item.sourceHandle || item.authorHandle || item.source || 'IMAMU')).replace(/^@/, '')}
+                            </button>
 
-                            <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800/90 border border-slate-200/80 dark:border-zinc-700/80 text-[var(--color-imamu-accent)] text-[10px] font-bold shadow-2xs shrink-0">
-                              {getArabicCategoryLabel(item.category, (item as any).tag || item.summary, item.content, item.title)}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono">
+                                {formatDate(item.createdAt, 'ar-display')}
+                              </span>
+                              <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800/90 border border-slate-200/80 dark:border-zinc-700/80 text-[var(--color-imamu-accent)] text-[10px] font-bold shadow-2xs shrink-0">
+                                {getArabicCategoryLabel(item.category, (item as any).tag || item.summary, item.content, item.title)}
+                              </span>
+                            </div>
                           </div>
 
                           {item.title && item.title !== item.author && (

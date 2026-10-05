@@ -207,6 +207,8 @@ const SCHEMA_VERIFICATION_STATEMENTS = [
   `ALTER TABLE news ADD COLUMN IF NOT EXISTS is_featured boolean DEFAULT false`,
   `ALTER TABLE news ADD COLUMN IF NOT EXISTS form_id text`,
   `ALTER TABLE news ADD COLUMN IF NOT EXISTS is_archived boolean DEFAULT false`,
+  `ALTER TABLE news ADD COLUMN IF NOT EXISTS source_handle text`,
+  `CREATE INDEX IF NOT EXISTS idx_news_source_handle ON news(source_handle)`,
   `CREATE TABLE IF NOT EXISTS news_bookmarks (
     id serial PRIMARY KEY,
     user_id text NOT NULL,

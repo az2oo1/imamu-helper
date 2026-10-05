@@ -255,12 +255,6 @@ export async function extractTelegramChannelPosts(
     });
   }
 
-  // Determine target author details from the authenticated account entity
-  const targetAuthorName = existingSource[0]?.displayName || existingSource[0]?.handle || channelTitle || channelHandle;
-  const targetAuthorHandle = existingSource[0]?.handle
-    ? (existingSource[0].handle.startsWith('@') ? existingSource[0].handle : `@${existingSource[0].handle}`)
-    : `@${channelHandle}`;
-  const targetAuthorAvatar = existingSource[0]?.profilePicUrl || finalChannelAvatarUrl;
   const targetEntityId = existingSource[0]?.id || null;
 
   // 2. Query existing tweetIds to avoid duplicates
@@ -289,11 +283,8 @@ export async function extractTelegramChannelPosts(
 
     await db.insert(news).values({
       content: postContent,
-      source: channelHandle,
-      authorName: targetAuthorName,
-      authorHandle: targetAuthorHandle,
-      authorAvatar: targetAuthorAvatar,
-      entityId: targetEntityId,
+      sourceHandle: channelHandle.replace(/^@/, ''),
+      entityId: targetEntityId ? String(targetEntityId) : null,
       images: postImages,
       videoUrl: post.videoUrl || null,
       date: post.date,

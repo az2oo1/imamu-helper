@@ -41,6 +41,7 @@ export interface NewsDetailItem {
   commentsCount: number;
   createdAt: string;
   date?: string;
+  sourceHandle?: string;
   source?: string;
 }
 
@@ -307,41 +308,25 @@ export function NewsDetailModal({
 
               {/* Author Profile & Actions Bar (With bottom line separating Profile from Article) */}
               <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-zinc-800/80 mb-3">
-                {/* Author Info & Date */}
-                <div 
-                  onClick={() => {
-                    const handleOrSource = item.authorHandle || item.source || '@IMAMU';
-                    if (onAuthorClick) {
-                      onAuthorClick(handleOrSource);
-                    } else {
-                      const cleanHandle = handleOrSource.replace(/^@/, '');
-                      router.push(`/account/${encodeURIComponent(cleanHandle)}`);
-                    }
-                  }}
-                  className="flex items-center gap-3 min-w-0 cursor-pointer group/author"
-                >
-                  <div className="w-10 h-10 rounded-full bg-stone-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700/80 flex items-center justify-center font-bold text-sm text-[var(--color-imamu-accent)] overflow-hidden shrink-0 group-hover/author:border-[var(--color-imamu-accent)] transition">
-                    {item.authorAvatar ? (
-                      <img 
-                        src={item.authorAvatar} 
-                        alt={item.author || (item as any).authorName || 'إدارة الأخبار'} 
-                        className="w-full h-full rounded-full object-cover"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                      />
-                    ) : (
-                      (item.author || (item as any).authorName || item.source || 'إدارة الأخبار').charAt(0)
-                    )}
-                  </div>
-                  <div className="flex flex-col text-right min-w-0">
-                    <span className="text-sm font-bold text-slate-900 dark:text-white truncate group-hover/author:text-[var(--color-imamu-accent)] transition">
-                      {item.author || (item as any).authorName || (item.source ? `@${item.source.replace(/^@/, '')}` : 'إدارة الأخبار')}
-                    </span>
-                    <span className="text-xs text-slate-400 dark:text-zinc-500 truncate flex items-center gap-1.5 font-mono">
-                      <span>{item.date || formatDate(item.createdAt, 'ar-display')}</span>
-                      <span>•</span>
-                      <span>{item.authorHandle || `@${item.source || 'IMAMU'}`}</span>
-                    </span>
-                  </div>
+                {/* Source Handle & Date */}
+                <div className="flex items-center gap-3 min-w-0">
+                  <button 
+                    onClick={() => {
+                      const cleanHandle = (item.sourceHandle || item.authorHandle || item.source || 'IMAMU').replace(/^@/, '');
+                      if (onAuthorClick) {
+                        onAuthorClick(cleanHandle);
+                      } else {
+                        router.push(`/account/${encodeURIComponent(cleanHandle)}`);
+                      }
+                    }}
+                    className="font-mono text-xs sm:text-sm font-bold text-[var(--color-imamu-accent)] hover:underline bg-[var(--color-imamu-accent)]/10 px-3 py-1.5 rounded-full transition cursor-pointer flex items-center gap-1.5 shrink-0"
+                    title="الانتقال إلى مصدر الخبر"
+                  >
+                    @{((item.sourceHandle || item.authorHandle || item.source || 'IMAMU')).replace(/^@/, '')}
+                  </button>
+                  <span className="text-xs text-slate-400 dark:text-zinc-500 font-mono">
+                    {item.date || formatDate(item.createdAt, 'ar-display')}
+                  </span>
                 </div>
 
                 {/* Actions: Share (circle), Save (circle), Read Full Page (pill) */}

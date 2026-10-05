@@ -92,6 +92,7 @@ export const createNewsSchema = z.object({
   title: z.string().optional(),
   excerpt: z.string().optional(),
   category: z.string().optional(),
+  sourceHandle: z.string().optional(),
   source: z.string().optional(),
   authorName: z.string().optional(),
   authorHandle: z.string().optional(),

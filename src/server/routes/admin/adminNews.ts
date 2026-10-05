@@ -13,9 +13,14 @@ export function createAdminNewsRouter(db: any) {
   router.post("/admin/news", requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
     if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
     try {
-      const { content, source, authorName, authorHandle, authorAvatar, imageUrl, videoUrl, date } = req.body;
+      const { content, source, sourceHandle, authorName, authorHandle, authorAvatar, imageUrl, videoUrl, date } = req.body;
+      const cleanHandle = (sourceHandle || authorHandle || source || 'admin').replace(/^@/, '');
       const [n] = await db.insert(news).values({
-        content, source, authorName, authorHandle, authorAvatar, imageUrl, videoUrl, date: date || new Date().toISOString().split('T')[0]
+        content,
+        sourceHandle: cleanHandle,
+        images: imageUrl ? JSON.stringify([imageUrl]) : null,
+        videoUrl,
+        date: date || new Date().toISOString().split('T')[0]
       }).returning();
       res.json(n);
     } catch (e) {
@@ -184,7 +189,7 @@ export function createAdminNewsRouter(db: any) {
     if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Forbidden - Admin access required" });
     try {
       const handle = req.params.handle.replace(/^@/, '');
-      const deleted = await db.delete(news).where(or(eq(news.source, handle), eq(news.authorHandle, `@${handle}`))).returning();
+      const deleted = await db.delete(news).where(or(eq(news.sourceHandle, handle), eq(news.sourceHandle, `@${handle}`))).returning();
       res.json({ success: true, deletedCount: deleted.length });
     } catch (e: any) {
       res.status(500).json({ error: e.message || "Failed to delete posts" });

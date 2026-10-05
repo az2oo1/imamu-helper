@@ -185,9 +185,9 @@ export function createAuthenticatedAccountsRouter(db: any) {
         .from(news)
         .where(
           or(
-            eq(news.source, account.handle),
-            eq(news.source, cleanHandle),
-            eq(news.source, `@${cleanHandle}`),
+            eq(news.sourceHandle, account.handle),
+            eq(news.sourceHandle, cleanHandle),
+            eq(news.sourceHandle, `@${cleanHandle}`),
             eq(news.entityId, String(account.id))
           )
         )
@@ -404,20 +404,14 @@ export function createAuthenticatedAccountsRouter(db: any) {
       const coverImage = photoUrl || (imageList.length > 0 ? imageList[0] : null);
       const categoryName = tag || category || 'Campus';
       const readTime = Math.max(1, Math.ceil((content || '').split(/\s+/).length / 200)) + ' min read';
-
-      const authorName = account.displayName || account.handle;
-      const authorHandle = account.handle.startsWith('@') ? account.handle : `@${account.handle}`;
-      const authorAvatar = account.profilePicUrl || null;
+      const cleanHandle = account.handle.replace(/^@/, '');
 
       const [newArticle] = await db.insert(news).values({
         title: title || (content.trim().split('\n')[0].replace(/^#+\s*/, '').slice(0, 80)),
         content: content.trim(),
         excerpt: content.trim(),
         category: categoryName,
-        source: account.handle,
-        authorName,
-        authorHandle,
-        authorAvatar,
+        sourceHandle: cleanHandle,
         authorId: req.user.uid,
         entityId: String(account.id),
         images: JSON.stringify(imageList),

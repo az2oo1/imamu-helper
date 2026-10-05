@@ -18,13 +18,12 @@ export async function syncExternalImagesToStorage(db: any) {
       }
     }
 
-    // 2. news authorAvatar and imageUrl
+    // 2. news imageUrl
     const newsItems = await db.select().from(news);
     for (const n of newsItems) {
       const updates: any = {};
-      if (n.authorAvatar && (n.authorAvatar.startsWith('http://') || n.authorAvatar.startsWith('https://'))) {
-        const storedAvatar = await downloadAndUploadToStorage(n.authorAvatar, `news/${n.id}/author`, 'news');
-        if (storedAvatar && storedAvatar !== n.authorAvatar) updates.authorAvatar = storedAvatar;
+      if (n.images) {
+        // images are synced via image URLs
       }
       if (n.imageUrl && (n.imageUrl.startsWith('http://') || n.imageUrl.startsWith('https://'))) {
         const storedImg = await downloadAndUploadToStorage(n.imageUrl, `news/${n.id}/image`, 'news');
