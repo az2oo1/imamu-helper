@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../lib/AuthContext';
 import { BookOpen, Search, ExternalLink, Folder, Plus, Trash2, Pencil, Info, MessageCircle, ChevronDown } from 'lucide-react';
 import { WhatsappIcon } from '../components/WhatsappIcon';
-import { InView, SpotlightCard, CustomSelect } from '../components/ui';
+import { InView, SpotlightCard, CustomSelect, Button, buttonVariants } from '../components/ui';
 import { CourseDetailsModal } from '../components/CourseDetailsModal';
 import CreateResourceModal from '../components/CreateResourceModal';
 import ReportDropdownMenu from '../components/ReportDropdownMenu';
@@ -89,7 +89,7 @@ function DriveLinkButton({ boxLink }: { boxLink?: string }) {
         href={links[0].url}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-800/70 hover:bg-[var(--color-imamu-brown)]/15 dark:hover:bg-[var(--color-imamu-brown)]/25 text-slate-800 dark:text-zinc-200 hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)] border border-slate-200 dark:border-zinc-700/80 hover:border-[var(--color-imamu-accent)]/50 text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer shrink-0 whitespace-nowrap group/btn"
+        className={buttonVariants({ variant: 'secondary', size: 'sm', className: 'group/btn' })}
       >
         <Folder className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-400 group-hover/btn:text-[var(--color-imamu-accent)] transition-colors" />
         <span>الملفات</span>
@@ -103,7 +103,7 @@ function DriveLinkButton({ boxLink }: { boxLink?: string }) {
       <button
         type="button"
         onClick={() => setIsOpen(prev => !prev)}
-        className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-800/70 hover:bg-[var(--color-imamu-brown)]/15 dark:hover:bg-[var(--color-imamu-brown)]/25 text-slate-800 dark:text-zinc-200 hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)] border border-slate-200 dark:border-zinc-700/80 hover:border-[var(--color-imamu-accent)]/50 text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer shrink-0 whitespace-nowrap shadow-xs group/btn"
+        className={buttonVariants({ variant: 'secondary', size: 'sm', className: 'group/btn' })}
       >
         <Folder className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-400 group-hover/btn:text-[var(--color-imamu-accent)] transition-colors" />
         <span>الملفات ({links.length})</span>
@@ -481,13 +481,15 @@ export function Resources() {
 
         {/* Admin Add Resource Button */}
         {isAdmin && (
-          <button
+          <Button
             onClick={() => handleOpenAddResource('course')}
-            className="btn-rise flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-xs font-bold transition shadow-md shadow-[var(--color-imamu-brown)/20] cursor-pointer shrink-0 self-start md:self-auto"
+            variant="primary"
+            size="md"
+            leftIcon={<Plus className="w-4 h-4" />}
+            className="self-start md:self-auto"
           >
-            <Plus className="w-4 h-4" />
-            <span>إضافة باقة / مصدر جديد</span>
-          </button>
+            إضافة باقة / مصدر جديد
+          </Button>
         )}
       </div>
 
@@ -612,13 +614,14 @@ export function Resources() {
 
                     {/* Resource Links */}
                     <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 dark:border-zinc-800/80 pt-3.5 mt-auto w-full relative z-20">
-                  <button
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     onClick={() => setSelectedCourse(item)}
-                    className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-800/70 hover:bg-[var(--color-imamu-brown)]/15 dark:hover:bg-[var(--color-imamu-brown)]/25 text-slate-800 dark:text-zinc-200 hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)] border border-slate-200 dark:border-zinc-700/80 hover:border-[var(--color-imamu-accent)]/50 text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer shrink-0 whitespace-nowrap group/btn"
+                    leftIcon={<Info className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-400 group-hover:text-[var(--color-imamu-accent)] transition-colors" />}
                   >
-                    <Info className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-400 group-hover/btn:text-[var(--color-imamu-accent)] transition-colors" />
-                    <span>التفاصيل</span>
-                  </button>
+                    التفاصيل
+                  </Button>
 
                   <DriveLinkButton boxLink={item.boxLink} />
 
@@ -627,9 +630,9 @@ export function Resources() {
                       href={resolvedWaUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
+                      className={buttonVariants({ variant: 'whatsapp', size: 'sm' })}
                     >
-                      <WhatsappIcon className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 fill-current" />
+                      <WhatsappIcon className="w-3.5 h-3.5 fill-current" />
                       <span>واتساب</span>
                     </a>
                   )}
