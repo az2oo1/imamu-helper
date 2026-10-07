@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Check, Calendar, Clock, ChevronDown, Tag, SlidersHorizontal } from 'lucide-react';
+import {
+  X,
+  Check,
+  ChevronDown,
+  SlidersHorizontal,
+  MapPin,
+  Link2,
+  AlignLeft
+} from 'lucide-react';
 import {
   StudentTask,
   TaskPriority,
@@ -9,6 +17,8 @@ import {
   getCourseColor
 } from '../lib/task-utils';
 import { CourseEntry } from './AddCourseModal';
+import { Button } from './ui/Button';
+import { CompactDateTimePicker } from './CompactDateTimePicker';
 
 interface NewTaskModalProps {
   isOpen: boolean;
@@ -31,34 +41,53 @@ export function NewTaskModal({
 }: NewTaskModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [location, setLocation] = useState('');
+  const [link, setLink] = useState('');
   const [priority, setPriority] = useState<TaskPriority | undefined>(undefined);
   const [selectedCourseCode, setSelectedCourseCode] = useState<string>(initialCourseCode || '');
   const [category, setCategory] = useState<string>('');
-  const [isOptionsOpen, setIsOptionsOpen] = useState(false);
-  const [dueDate, setDueDate] = useState<string>(initialDate || new Date().toISOString().split('T')[0]);
-  const [dueTime, setDueTime] = useState<string>('12:30');
+
+  // Accordion state: 'none' | 'datetime' | 'options'
+  // Closed in all situations by default, opening one closes the other
+  const [activeAccordion, setActiveAccordion] = useState<'none' | 'datetime' | 'options'>('none');
+
+  // Dates and times: default to empty/not added unless editing or provided
+  const [dueDate, setDueDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [dueTime, setDueTime] = useState<string>('');
+  const [endTime, setEndTime] = useState<string>('');
 
   // Reset or initialize on open
   useEffect(() => {
     if (isOpen) {
+      // Tags accordion and datetime accordion must ALWAYS start closed in all situations
+      setActiveAccordion('none');
+
       if (taskToEdit) {
         setTitle(taskToEdit.title || '');
         setDescription(taskToEdit.description || '');
+        setLocation(taskToEdit.location || '');
+        setLink(taskToEdit.link || '');
         setPriority(taskToEdit.priority);
         setSelectedCourseCode(taskToEdit.courseCode || '');
         setCategory(taskToEdit.category || '');
-        setIsOptionsOpen(Boolean(taskToEdit.category || taskToEdit.courseCode || taskToEdit.priority));
-        setDueDate(taskToEdit.dueDate || new Date().toISOString().split('T')[0]);
-        setDueTime(taskToEdit.dueTime || '12:30');
+        setDueDate(taskToEdit.dueDate || '');
+        setEndDate(taskToEdit.endDate || taskToEdit.dueDate || '');
+        setDueTime(taskToEdit.dueTime || '');
+        setEndTime(taskToEdit.endTime || taskToEdit.dueTime || '');
       } else {
         setTitle('');
         setDescription('');
+        setLocation('');
+        setLink('');
         setPriority(undefined);
         setSelectedCourseCode(initialCourseCode || '');
         setCategory('');
-        setIsOptionsOpen(Boolean(initialCourseCode));
-        setDueDate(initialDate || new Date().toISOString().split('T')[0]);
-        setDueTime('12:30');
+        // If initialDate is explicitly provided from calendar click, use it; otherwise empty
+        setDueDate(initialDate || '');
+        setEndDate(initialDate || '');
+        setDueTime('');
+        setEndTime('');
       }
     }
   }, [isOpen, taskToEdit, initialCourseCode, initialDate]);
@@ -90,13 +119,17 @@ export function NewTaskModal({
     onSaveTask({
       title: title.trim(),
       description: description.trim() || undefined,
+      location: location.trim() || undefined,
+      link: link.trim() || undefined,
       priority: priority || undefined,
       category: category || undefined,
       categoryLabel: catObj ? catObj.label : (category || undefined),
       courseCode: selectedCourseCode || undefined,
       courseName: matchedCourse ? (matchedCourse.courseName || matchedCourse.courseCode) : (taskToEdit?.courseCode === selectedCourseCode ? taskToEdit.courseName : undefined),
       dueDate: dueDate || undefined,
+      endDate: (endDate && endDate !== dueDate ? endDate : undefined) || (dueDate || undefined),
       dueTime: dueTime || undefined,
+      endTime: (endTime && endTime !== dueTime ? endTime : undefined) || undefined,
       color: effectiveColor,
     });
 
@@ -136,17 +169,18 @@ export function NewTaskModal({
               {taskToEdit ? 'تعديل المهمة' : 'إضافة مهمة جديدة'}
             </h2>
           </div>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-sm"
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-900 transition cursor-pointer"
           >
-            <X className="w-4.5 h-4.5" />
-          </button>
+            <X className="w-4 h-4" />
+          </Button>
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-4.5">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-4">
           {/* 1. Title Input */}
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">
@@ -162,45 +196,101 @@ export function NewTaskModal({
             />
           </div>
 
-          {/* 2. Date & Time Selection (Placed under Title as requested) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
-                  <span>تاريخ الاستحقاق</span>
-                </label>
-                <span className="text-[10px] text-slate-400 dark:text-zinc-500">اختياري</span>
-              </div>
-              <input
-                type="date"
-                value={dueDate}
-                onChange={e => setDueDate(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[var(--color-imamu-accent)]/30 focus:border-[var(--color-imamu-accent)] transition"
-              />
+          {/* 2. Connected Details & Notes System: المعلومات (Location, Link, Description stacked under each other, above Date & Time) */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-700 dark:text-zinc-300">
+                المعلومات
+              </label>
+              <span className="text-[10px] text-slate-400 dark:text-zinc-500">اختياري</span>
             </div>
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
-                  <span>الوقت</span>
-                </label>
-                <span className="text-[10px] text-slate-400 dark:text-zinc-500">اختياري</span>
+
+            <div className="rounded-2xl border border-slate-200 dark:border-zinc-800 divide-y divide-slate-100 dark:divide-zinc-800/80 bg-slate-50 dark:bg-zinc-900 overflow-hidden focus-within:border-[var(--color-imamu-accent)]/50 focus-within:ring-2 focus-within:ring-[var(--color-imamu-accent)]/20 transition">
+              {/* Field 1: Location */}
+              <div className="flex items-center gap-2.5 px-3.5 py-2.5">
+                <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
+                <input
+                  type="text"
+                  value={location}
+                  onChange={e => setLocation(e.target.value)}
+                  placeholder="المكان أو القاعة (مثال: مبنى 324، قاعة 2B)..."
+                  className="w-full bg-transparent text-xs text-slate-900 dark:text-white outline-none placeholder-slate-400 dark:placeholder-zinc-500 font-medium"
+                />
+                {location && (
+                  <button
+                    type="button"
+                    onClick={() => setLocation('')}
+                    className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 transition cursor-pointer"
+                    title="مسح المكان"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
-              <input
-                type="time"
-                value={dueTime}
-                onChange={e => setDueTime(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[var(--color-imamu-accent)]/30 focus:border-[var(--color-imamu-accent)] transition"
-              />
+
+              {/* Field 2: Link */}
+              <div className="flex items-center gap-2.5 px-3.5 py-2.5">
+                <Link2 className="w-4 h-4 text-slate-400 shrink-0" />
+                <input
+                  type="url"
+                  value={link}
+                  onChange={e => setLink(e.target.value)}
+                  placeholder="الرابط (مثال: https://...)..."
+                  className="w-full bg-transparent text-xs text-slate-900 dark:text-white outline-none placeholder-slate-400 dark:placeholder-zinc-500 font-medium dir-ltr text-right"
+                />
+                {link && (
+                  <button
+                    type="button"
+                    onClick={() => setLink('')}
+                    className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 transition cursor-pointer"
+                    title="مسح الرابط"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Field 3: Description / Notes */}
+              <div className="flex items-start gap-2.5 px-3.5 py-2.5">
+                <AlignLeft className="w-4 h-4 text-slate-400 shrink-0 mt-1" />
+                <textarea
+                  rows={2}
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  placeholder="أضف أي تفاصيل أو ملاحظات تهمك لهذه المهمة..."
+                  className="w-full bg-transparent text-xs text-slate-900 dark:text-white outline-none placeholder-slate-400 dark:placeholder-zinc-500 font-medium resize-none custom-scrollbar"
+                />
+              </div>
             </div>
           </div>
 
-          {/* 3. Categorization Options (المقرر، الأهمية، نوع المهمة - Collapsed under one button) */}
-          <div className="space-y-2 pt-1">
+          {/* 3. Compact Smart Date & Time Selector (Placed below المعلومات) */}
+          <CompactDateTimePicker
+            isOpen={activeAccordion === 'datetime'}
+            onToggle={() => {
+              setActiveAccordion(prev => prev === 'datetime' ? 'none' : 'datetime');
+            }}
+            startDate={dueDate}
+            endDate={endDate}
+            startTime={dueTime}
+            endTime={endTime}
+            onChangeDate={(start, end) => {
+              setDueDate(start || '');
+              setEndDate(end || start || '');
+            }}
+            onChangeTime={(start, end) => {
+              setDueTime(start || '');
+              setEndTime(end || start || '');
+            }}
+          />
+
+          {/* 4. Categorization Options (المقرر، الأهمية، نوع المهمة - Collapsed under one button) */}
+          <div className="space-y-2">
             <button
               type="button"
-              onClick={() => setIsOptionsOpen(prev => !prev)}
+              onClick={() => {
+                setActiveAccordion(prev => prev === 'options' ? 'none' : 'options');
+              }}
               className="w-full flex items-center justify-between px-3.5 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs font-semibold text-slate-700 dark:text-zinc-300 hover:border-slate-300 dark:hover:border-zinc-700 transition cursor-pointer"
             >
               <div className="flex items-center gap-2">
@@ -210,7 +300,7 @@ export function NewTaskModal({
 
               <div className="flex items-center gap-2">
                 {(selectedCourseCode || priority || category) && (
-                  <span className="flex items-center gap-1.5 text-xs font-bold text-[var(--color-imamu-accent)]">
+                  <span className="flex items-center gap-1.5 text-xs font-bold text-[var(--color-imamu-accent)] truncate max-w-[210px]">
                     {selectedCourseCode && <span>{selectedCourseCode}</span>}
                     {priority && <span>• {TASK_PRIORITIES.find(p => p.key === priority)?.badge}</span>}
                     {category && <span>• {TASK_CATEGORIES.find(c => c.key === category)?.label}</span>}
@@ -218,14 +308,14 @@ export function NewTaskModal({
                 )}
                 <ChevronDown
                   className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
-                    isOptionsOpen ? 'rotate-180' : ''
+                    activeAccordion === 'options' ? 'rotate-180' : ''
                   }`}
                 />
               </div>
             </button>
 
             <AnimatePresence>
-              {isOptionsOpen && (
+              {activeAccordion === 'options' && (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
@@ -281,13 +371,12 @@ export function NewTaskModal({
                               onClick={() => setSelectedCourseCode(prev => prev === c.courseCode ? '' : c.courseCode)}
                               className={`py-1 px-2.5 rounded-lg text-xs font-bold transition cursor-pointer border truncate max-w-[190px] ${
                                 isActive
-                                  ? 'text-white shadow-2xs'
+                                  ? 'subject-tag shadow-2xs'
                                   : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 hover:border-slate-300 dark:hover:border-zinc-700'
                               }`}
-                              style={{
-                                backgroundColor: isActive ? cColor : undefined,
-                                borderColor: isActive ? cColor : undefined,
-                              }}
+                              style={isActive ? ({
+                                '--subject-color': cColor,
+                              } as React.CSSProperties) : undefined}
                               title={c.courseName || c.courseCode}
                             >
                               {c.courseName || c.courseCode}
@@ -333,33 +422,18 @@ export function NewTaskModal({
             </AnimatePresence>
           </div>
 
-          {/* 4. Notes / Additional Description */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-bold text-slate-700 dark:text-zinc-300">
-                ملاحظات أو وصف إضافي
-              </label>
-              <span className="text-[10px] text-slate-400 dark:text-zinc-500">اختياري</span>
-            </div>
-            <textarea
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              rows={2}
-              placeholder="أضف أي تفاصيل، روابط، أو ملاحظات تهمك لهذه المهمة..."
-              className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none focus:ring-2 focus:ring-[var(--color-imamu-accent)]/30 focus:border-[var(--color-imamu-accent)] transition resize-none custom-scrollbar"
-            />
-          </div>
-
           {/* Submit Action Button */}
           <div className="pt-2">
-            <button
+            <Button
               type="submit"
+              variant="primary"
+              size="md"
               disabled={!title.trim()}
-              className="w-full py-2.5 px-4 rounded-xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-xs font-bold transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+              leftIcon={<Check className="w-4 h-4" />}
+              className="w-full"
             >
-              <Check className="w-4 h-4" />
-              <span>{taskToEdit ? 'حفظ التعديلات' : 'حفظ المهمة في مهامي وتقويمي'}</span>
-            </button>
+              {taskToEdit ? 'حفظ التعديلات' : 'حفظ المهمة في مهامي وتقويمي'}
+            </Button>
           </div>
         </form>
       </motion.div>

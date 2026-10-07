@@ -37,7 +37,7 @@ export default function CreateCourseModal({
   const isEditing = !!subjectForm.id;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn" dir="rtl">
       <div 
         className="w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border"
         style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
@@ -45,35 +45,35 @@ export default function CreateCourseModal({
         {/* Header */}
         <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-color)' }}>
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-[var(--color-imamu-brown)/10] text-[var(--color-imamu-accent)] border border-amber-700/20">
+            <div className="p-2 rounded-xl bg-amber-500/10 text-[var(--color-imamu-accent)] border border-amber-700/20">
               <BookOpen className="w-5 h-5" />
             </div>
             <div>
               <h3 className="font-bold text-lg leading-tight">
-                {isEditing ? `Edit Course: ${subjectForm.code}` : 'Create New Course (إضافة مقرر جديد)'}
+                {isEditing ? `تعديل المقرر: ${subjectForm.code}` : 'إضافة مقرر دراسي جديد'}
               </h3>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                Basic course metadata (code, name, credit hours, level, tags)
+                البيانات الأساسية للمقرر الأكاديمي
               </p>
             </div>
           </div>
           <button 
             onClick={onClose}
-            className="p-2 rounded-xl hover:bg-[var(--bg-subtle)] transition"
+            className="p-2 rounded-xl hover:bg-[var(--bg-subtle)] transition cursor-pointer"
             style={{ color: 'var(--text-muted)' }}
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Modal Body - Basic Info Only */}
+        {/* Modal Body */}
         <div className="p-6 overflow-y-auto space-y-4 flex-1">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Course Code (رمز المادة) *</label>
+              <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>رمز المقرر *</label>
               <input 
                 type="text" 
-                placeholder="e.g. CS101 or عال101" 
+                placeholder="مثال: عال101 أو CS101" 
                 value={subjectForm.code} 
                 onChange={e => setSubjectForm((s: any) => ({ ...s, code: e.target.value }))} 
                 className="py-2 px-3 rounded-xl text-sm border outline-none" 
@@ -81,10 +81,10 @@ export default function CreateCourseModal({
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Course Name (اسم المادة) *</label>
+              <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>اسم المقرر *</label>
               <input 
                 type="text" 
-                placeholder="e.g. Introduction to Computer Science" 
+                placeholder="مثال: مقدمة في علوم الحاسب" 
                 value={subjectForm.name} 
                 onChange={e => setSubjectForm((s: any) => ({ ...s, name: e.target.value }))} 
                 className="py-2 px-3 rounded-xl text-sm border outline-none" 
@@ -95,10 +95,10 @@ export default function CreateCourseModal({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>College (الكلية)</label>
+              <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>الكلية</label>
               <input 
                 type="text" 
-                placeholder="e.g. كلية علوم الحاسب والمعلومات" 
+                placeholder="مثال: كلية علوم الحاسب والمعلومات" 
                 value={subjectForm.college || ''} 
                 onChange={e => setSubjectForm((s: any) => ({ ...s, college: e.target.value }))} 
                 className="py-2 px-3 rounded-xl text-sm border outline-none" 
@@ -106,10 +106,10 @@ export default function CreateCourseModal({
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Department (القسم)</label>
+              <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>القسم الأكاديمي</label>
               <input 
                 type="text" 
-                placeholder="e.g. علوم الحاسب" 
+                placeholder="مثال: علوم الحاسب" 
                 value={subjectForm.department || ''} 
                 onChange={e => setSubjectForm((s: any) => ({ ...s, department: e.target.value }))} 
                 className="py-2 px-3 rounded-xl text-sm border outline-none" 
@@ -119,12 +119,12 @@ export default function CreateCourseModal({
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-              Prerequisites (المتطلبات السابقة من بانر أو الكلية)
+            <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
+              المتطلبات السابقة
             </label>
             <input 
               type="text" 
-              placeholder="e.g. CS140 or عال140 (البرمجة كينونية التوجه)" 
+              placeholder="مثال: عال140 (البرمجة كينونية التوجه)" 
               value={subjectForm.prereq || ''} 
               onChange={e => setSubjectForm((s: any) => ({ ...s, prereq: e.target.value }))} 
               className="py-2 px-3 rounded-xl text-sm border outline-none" 
@@ -132,40 +132,16 @@ export default function CreateCourseModal({
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Credit Hours (الساعات)</label>
-              <input 
-                type="number" 
-                placeholder="3" 
-                value={subjectForm.creditHours} 
-                onChange={e => setSubjectForm((s: any) => ({ ...s, creditHours: e.target.value }))} 
-                className="py-2 px-3 rounded-xl text-sm border outline-none" 
-                style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} 
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Level (المستوى)</label>
-              <input 
-                type="number" 
-                placeholder="e.g. 1" 
-                value={subjectForm.level} 
-                onChange={e => setSubjectForm((s: any) => ({ ...s, level: e.target.value }))} 
-                className="py-2 px-3 rounded-xl text-sm border outline-none" 
-                style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} 
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Tags (التصنيفات)</label>
-              <input 
-                type="text" 
-                placeholder="e.g. CS, Core, Math" 
-                value={subjectForm.tags} 
-                onChange={e => setSubjectForm((s: any) => ({ ...s, tags: e.target.value }))} 
-                className="py-2 px-3 rounded-xl text-sm border outline-none" 
-                style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} 
-              />
-            </div>
+          <div className="flex flex-col gap-1 sm:w-1/2">
+            <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>عدد الساعات المعتمدة</label>
+            <input 
+              type="number" 
+              placeholder="3" 
+              value={subjectForm.creditHours} 
+              onChange={e => setSubjectForm((s: any) => ({ ...s, creditHours: e.target.value }))} 
+              className="py-2 px-3 rounded-xl text-sm border outline-none" 
+              style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} 
+            />
           </div>
         </div>
 
@@ -173,20 +149,20 @@ export default function CreateCourseModal({
         <div className="px-6 py-4 border-t flex items-center justify-end gap-2 bg-[var(--bg-subtle)]" style={{ borderColor: 'var(--border-color)' }}>
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-xl text-xs font-semibold border hover:bg-[var(--bg-card)] transition"
+            className="px-4 py-2 rounded-xl text-xs font-semibold border hover:bg-[var(--bg-card)] transition cursor-pointer"
             style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
           >
-            Cancel
+            إلغاء
           </button>
           <button
             onClick={() => {
               onSave();
               onClose();
             }}
-            className="px-5 py-2 rounded-xl text-xs font-bold bg-[var(--color-imamu-brown)] text-white hover:bg-[var(--color-imamu-brown-light)] transition flex items-center gap-1.5 shadow-md"
+            className="px-5 py-2 rounded-xl text-xs font-bold bg-[var(--color-imamu-brown)] text-white hover:bg-[var(--color-imamu-brown-dark)] transition flex items-center gap-1.5 shadow-md cursor-pointer"
           >
             <Check className="w-4 h-4" />
-            <span>{isEditing ? 'Save Changes' : 'Create Course'}</span>
+            <span>{isEditing ? 'حفظ التغييرات' : 'إضافة المقرر'}</span>
           </button>
         </div>
       </div>

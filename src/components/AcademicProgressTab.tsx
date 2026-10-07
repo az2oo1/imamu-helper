@@ -15,11 +15,11 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useSWR } from '../lib/swr';
-import { AnimatedNumber } from './ui';
+import { AnimatedNumber, Button } from './ui';
 import {
-  getSubjectPrereqs,
   isCourseCompleted,
-  computeAcademicProgress
+  computeAcademicProgress,
+  evaluateCoursePrerequisites
 } from '../lib/academic-utils';
 
 interface AcademicProgressTabProps {
@@ -81,6 +81,10 @@ export function AcademicProgressTab({
     return computeAcademicProgress(majors, subjects, majorName, completedCourses);
   }, [majors, subjects, majorName, completedCourses]);
 
+  const majorCourseCodes = useMemo(() => {
+    return (progressData.displayedSubjects || []).map((s: any) => s.code);
+  }, [progressData.displayedSubjects]);
+
   const saveProgressToServer = async (updatedCourses: string[], updatedHours: string) => {
     if (!user) return;
     setIsSaving(true);
@@ -120,14 +124,16 @@ export function AcademicProgressTab({
 
   const handleToggleCourse = (s: any) => {
     const isChecked = isCourseCompleted(completedCourses, s.code);
-    const prereqCodes = getSubjectPrereqs(s);
-    const unmetPrereqs = prereqCodes.filter(p => !isCourseCompleted(completedCourses, p));
-    const isLocked = !isChecked && unmetPrereqs.length > 0;
+    const { isLocked, unmetDescriptions } = evaluateCoursePrerequisites({
+      prereqText: s.prereq || (s.description?.startsWith('المتطلب') ? s.description : null),
+      completedCourses,
+      majorCourseCodes
+    });
 
-    if (isLocked) {
+    if (!isChecked && isLocked) {
       setFeedback({
         type: 'error',
-        message: `لا يمكن تحديد المادة (${s.code}) قبل اجتياز المتطلبات السابقة: ${unmetPrereqs.join(', ')}`
+        message: `لا يمكن تحديد المادة (${s.code}) قبل اجتياز المتطلبات السابقة: ${unmetDescriptions.join('، ')}`
       });
       setTimeout(() => setFeedback(null), 4000);
       return;
@@ -273,15 +279,17 @@ export function AcademicProgressTab({
               href="https://msari.vercel.app/index.html"
               target="_blank"
               rel="noopener noreferrer"
-              className="btn-rise inline-flex items-center gap-2 text-xs font-bold text-white bg-[#0E352C] hover:bg-[#13493d] px-4 py-2 rounded-full border border-[#3DC9B0]/40 shadow-sm shadow-[#0E352C]/30 transition-all cursor-pointer shrink-0"
+              className="btn-rise inline-flex items-center gap-2 text-xs font-bold text-white bg-[#0E352C] hover:bg-[#13493d] px-3.5 py-1.5 rounded-xl border border-[#3DC9B0]/40 shadow-xs transition-all cursor-pointer shrink-0"
             >
               <Sparkles className="w-3.5 h-3.5 text-[#3DC9B0] shrink-0" />
               <span>تعمّق مع مساري</span>
               <ArrowUpRight className="w-3.5 h-3.5 text-slate-300 shrink-0" />
             </a>
 
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="sm"
               onClick={() => {
                 const nextState: Record<string, boolean> = {};
                 progressData.allGroupNames.forEach(n => {
@@ -289,12 +297,13 @@ export function AcademicProgressTab({
                 });
                 setCollapsedGroups(nextState);
               }}
-              className="text-xs font-bold text-[var(--color-imamu-accent)] hover:underline px-3.5 py-2 rounded-xl bg-stone-50 dark:bg-stone-950/40 border border-slate-200/80 dark:border-zinc-700/80 cursor-pointer transition hover:bg-stone-100 dark:hover:bg-stone-900"
             >
               توسيع الكل
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={() => {
                 const nextState: Record<string, boolean> = {};
                 progressData.allGroupNames.forEach(n => {
@@ -302,10 +311,9 @@ export function AcademicProgressTab({
                 });
                 setCollapsedGroups(nextState);
               }}
-              className="text-xs font-bold text-slate-600 dark:text-zinc-400 hover:underline px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-zinc-800/80 border border-slate-200/80 dark:border-zinc-700/80 cursor-pointer transition hover:bg-slate-200 dark:hover:bg-zinc-700"
             >
               طي الكل
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -322,24 +330,38 @@ export function AcademicProgressTab({
                 const totalInGroup = groupSubjects.length;
                 const declaredReqCount = groupSubjects[0]?.reqCount || 0;
                 const isLevelGroup = groupName.startsWith('المستوى');
-                const reqCount = (declaredReqCount > 0 && !isLevelGroup) ? declaredReqCount : totalInGroup;
+                const isElective = Boolean(progressData.electiveInfo?.isShared && progressData.electiveInfo?.groupNames?.includes(groupName));
+
+                const reqCount = isElective
+                  ? (progressData.electiveInfo?.sharedReq || declaredReqCount || totalInGroup)
+                  : (declaredReqCount > 0 && !isLevelGroup)
+                  ? declaredReqCount
+                  : totalInGroup;
 
                 const selectedInGroup = groupSubjects.filter(s =>
                   isCourseCompleted(completedCourses, s.code)
                 ).length;
-                const isGroupFull = selectedInGroup >= reqCount;
+                const isGroupFull = isElective
+                  ? (progressData.electiveInfo ? progressData.electiveInfo.totalFinished >= progressData.electiveInfo.sharedReq : false)
+                  : selectedInGroup >= reqCount;
 
                 // Calculate if ALL courses in this batch are locked
                 const allCoursesInGroupLocked =
                   groupSubjects.length > 0 &&
                   groupSubjects.every(s => {
                     if (isCourseCompleted(completedCourses, s.code)) return false;
-                    const prereqs = getSubjectPrereqs(s);
-                    return prereqs.length > 0 && prereqs.some(p => !isCourseCompleted(completedCourses, p));
+                    const evalRes = evaluateCoursePrerequisites({
+                      prereqText: s.prereq || (s.description?.startsWith('المتطلب') ? s.description : null),
+                      completedCourses,
+                      majorCourseCodes
+                    });
+                    return evalRes.isLocked;
                   });
 
                 // Calculate batch completion ratio
-                const completionRatio = totalInGroup > 0 ? selectedInGroup / totalInGroup : 0;
+                const completionRatio = isElective
+                  ? (progressData.electiveInfo && progressData.electiveInfo.sharedReq > 0 ? progressData.electiveInfo.totalFinished / progressData.electiveInfo.sharedReq : 0)
+                  : (totalInGroup > 0 ? selectedInGroup / totalInGroup : 0);
                 const isAtLeast33Percent = completionRatio >= 0.33;
 
                 const defaultCollapsed = isGroupFull || allCoursesInGroupLocked || !isAtLeast33Percent;
@@ -399,7 +421,9 @@ export function AcademicProgressTab({
                               : 'bg-stone-50 dark:bg-stone-950/50 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] border-slate-200/80 dark:border-zinc-700/80'
                           }`}
                         >
-                          المنجز: {selectedInGroup} / {reqCount}
+                          {isElective
+                            ? `المنجز: ${progressData.electiveInfo?.totalFinished} / ${progressData.electiveInfo?.sharedReq} (مشترك)`
+                            : `المنجز: ${selectedInGroup} / ${reqCount}`}
                         </span>
                       </div>
                     </div>
@@ -419,11 +443,11 @@ export function AcademicProgressTab({
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3">
                               {groupSubjects.map((s: any) => {
                                 const isChecked = isCourseCompleted(completedCourses, s.code);
-                                const prereqCodes = getSubjectPrereqs(s);
-                                const unmetPrereqs = prereqCodes.filter(
-                                  p => !isCourseCompleted(completedCourses, p)
-                                );
-                                const isLocked = !isChecked && unmetPrereqs.length > 0;
+                                const { isLocked, unmetDescriptions } = evaluateCoursePrerequisites({
+                                  prereqText: s.prereq || (s.description?.startsWith('المتطلب') ? s.description : null),
+                                  completedCourses,
+                                  majorCourseCodes
+                                });
 
                                 return (
                                   <div
@@ -465,9 +489,9 @@ export function AcademicProgressTab({
                                       ) : isLocked ? (
                                         <span
                                           className="inline-flex items-center gap-1 font-bold text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] truncate"
-                                          title={`يتطلب اجتياز: ${unmetPrereqs.join(', ')}`}
+                                          title={`يتطلب اجتياز: ${unmetDescriptions.join('، ')}`}
                                         >
-                                          <span>🔒 يتطلب: {unmetPrereqs.join(', ')}</span>
+                                          <span>🔒 يتطلب: {unmetDescriptions.join('، ')}</span>
                                         </span>
                                       ) : (
                                         <span className="inline-flex items-center gap-1 font-bold text-slate-500 dark:text-zinc-400 hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)]">

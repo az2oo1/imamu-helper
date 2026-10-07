@@ -46,8 +46,8 @@ export function SpeedDialPlusMenu({
     {
       id: 'course',
       label: 'إضافة مادة',
-      icon: <BookOpen className="w-4 h-4 text-amber-400" />,
-      iconBg: 'bg-amber-500/15 text-amber-400 group-hover:bg-amber-500/25',
+      icon: <BookOpen className="w-4 h-4 text-amber-600 dark:text-amber-400" />,
+      iconBg: 'bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 group-hover:bg-amber-500/20',
       onClick: () => {
         onClose();
         onAddCourse();
@@ -56,8 +56,8 @@ export function SpeedDialPlusMenu({
     {
       id: 'semester',
       label: 'إضافة فصل دراسي',
-      icon: <GraduationCap className="w-4 h-4 text-emerald-400" />,
-      iconBg: 'bg-emerald-500/15 text-emerald-400 group-hover:bg-emerald-500/25',
+      icon: <GraduationCap className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />,
+      iconBg: 'bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-500/20',
       onClick: () => {
         onClose();
         onAddSemester();
@@ -66,8 +66,8 @@ export function SpeedDialPlusMenu({
     {
       id: 'task',
       label: 'إضافة مهمة أو موعد',
-      icon: <CheckSquare className="w-4 h-4 text-sky-400" />,
-      iconBg: 'bg-sky-500/15 text-sky-400 group-hover:bg-sky-500/25',
+      icon: <CheckSquare className="w-4 h-4 text-sky-600 dark:text-sky-400" />,
+      iconBg: 'bg-sky-500/10 dark:bg-sky-500/15 text-sky-600 dark:text-sky-400 group-hover:bg-sky-500/20',
       onClick: () => {
         onClose();
         onAddTask();
@@ -165,7 +165,7 @@ export function SpeedDialPlusMenu({
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={item.onClick}
-                  className="absolute pointer-events-auto h-8.5 px-3 bg-[#18181b] hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 rounded-xl shadow-2xl flex items-center gap-2 text-xs font-bold text-slate-200 hover:text-white transition-colors duration-150 cursor-pointer whitespace-nowrap group focus:outline-hidden"
+                  className="absolute pointer-events-auto h-8.5 px-3 bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 border border-slate-200/90 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700 rounded-xl shadow-xl flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-zinc-200 hover:text-slate-950 dark:hover:text-white transition-colors duration-150 cursor-pointer whitespace-nowrap group focus:outline-hidden"
                   style={{
                     right: '100%',
                     top: '50%',

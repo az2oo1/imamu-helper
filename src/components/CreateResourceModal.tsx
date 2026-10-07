@@ -31,6 +31,7 @@ import ResourceLinksInput from './ResourceLinksInput';
 import { cleanCourseName, isWhatsappUrl, parseAllResourceLinks } from '../lib/url-utils';
 import { WhatsappIcon } from './WhatsappIcon';
 import { matchArabicSearch } from '../lib/search-utils';
+import { Button } from './ui/Button';
 
 interface CreateResourceModalProps {
   isOpen: boolean;
@@ -896,53 +897,50 @@ export default function CreateResourceModal({
 
           {/* Action Footer */}
           <motion.div layout className="p-4 px-6 border-t border-slate-200 dark:border-zinc-800 bg-slate-50/80 dark:bg-zinc-900/80 flex items-center justify-between shrink-0">
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="md"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 text-xs font-bold text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer"
             >
               إلغاء
-            </button>
+            </Button>
 
             <div className="flex items-center gap-2">
               {activeStep > 1 && (
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="md"
                   onClick={handleBack}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 text-xs font-bold text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer flex items-center gap-1.5"
+                  rightIcon={<ArrowRight className="w-4 h-4" />}
                 >
-                  <ArrowRight className="w-4 h-4" />
-                  <span>السابق</span>
-                </button>
+                  السابق
+                </Button>
               )}
 
               {activeStep < totalSteps ? (
-                <button
+                <Button
                   type="button"
+                  variant="primary"
+                  size="md"
                   onClick={handleNext}
-                  className="px-5 py-2.5 rounded-xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-light)] text-white text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer flex items-center gap-1.5"
+                  leftIcon={<ArrowLeft className="w-4 h-4" />}
                 >
-                  <span>الخطوة التالية</span>
-                  <ArrowLeft className="w-4 h-4" />
-                </button>
+                  الخطوة التالية
+                </Button>
               ) : (
-                <button
+                <Button
                   type="button"
+                  variant="primary"
+                  size="md"
                   disabled={isSubmitting || !canAdvance}
+                  isLoading={isSubmitting}
                   onClick={handleSaveSubmit}
-                  className={`px-6 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer flex items-center gap-2 ${
-                    canAdvance 
-                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white' 
-                      : 'bg-emerald-600/40 text-white/50 cursor-not-allowed'
-                  }`}
+                  leftIcon={<Check className="w-4 h-4" />}
                 >
-                  {isSubmitting ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Check className="w-4 h-4" />
-                  )}
-                  <span>{isSubmitting ? 'جاري الحفظ...' : (isEditing ? 'حفظ التعديلات' : (resourceKind === 'manual' ? 'إنشاء المصدر المستقل' : 'إنشاء باقة المقرر'))}</span>
-                </button>
+                  {isSubmitting ? 'جاري الحفظ...' : (isEditing ? 'حفظ التعديلات' : (resourceKind === 'manual' ? 'إنشاء المصدر المستقل' : 'إنشاء باقة المقرر'))}
+                </Button>
               )}
             </div>
           </motion.div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../lib/AuthContext';
 import { Plus, Trash2, Calculator, Award, Search, X, BookOpen, Check, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { AnimatedNumber } from './ui';
+import { AnimatedNumber, Button } from './ui';
 
 const GRADE_POINTS: Record<string, number> = {
   'A+': 5.0,
@@ -304,14 +304,16 @@ export function GpaCalculator() {
                   />
                 </div>
                 <div className="col-span-1 flex justify-center">
-                  <button 
+                  <Button 
+                    variant="ghost"
+                    size="icon-sm"
                     onClick={() => removeCourse(course.id)}
                     disabled={courses.length <= 1}
-                    className="p-2 text-slate-400 dark:text-zinc-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer"
+                    className="text-slate-400 dark:text-zinc-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30"
                     title="حذف المادة"
                   >
                     <Trash2 className="w-4 h-4" />
-                  </button>
+                  </Button>
                 </div>
               </motion.div>
             ))}
@@ -319,23 +321,27 @@ export function GpaCalculator() {
         </div>
 
         <div className="flex flex-col sm:flex-row items-center gap-3">
-          <button 
+          <Button 
+            variant="secondary"
+            size="md"
             onClick={addCourse}
-            className="btn-rise flex-1 w-full flex items-center justify-center gap-1.5 py-3 bg-slate-100 dark:bg-zinc-800 text-slate-800 dark:text-zinc-200 font-bold text-xs rounded-2xl border border-slate-300 dark:border-zinc-700 hover:bg-slate-200 dark:hover:bg-zinc-700 transition cursor-pointer shadow-2xs"
+            leftIcon={<Plus className="w-4 h-4 text-slate-600 dark:text-zinc-300" />}
+            className="flex-1 w-full"
           >
-            <Plus className="w-4 h-4 text-slate-600 dark:text-zinc-300" />
-            <span>إضافة مادة جديدة</span>
-          </button>
-          <button
+            إضافة مادة جديدة
+          </Button>
+          <Button
+            variant="primary"
+            size="md"
             onClick={() => {
               setTargetRowId(null);
               setIsSearchOpen(true);
             }}
-            className="btn-rise flex-1 w-full flex items-center justify-center gap-1.5 py-3 rounded-2xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white border border-[var(--color-imamu-brown-dark)] font-bold text-xs transition cursor-pointer shadow-sm"
+            leftIcon={<Search className="w-4 h-4 text-white" />}
+            className="flex-1 w-full"
           >
-            <Search className="w-4 h-4 text-white" />
-            <span>البحث واختيار مقرر من الكتالوج</span>
-          </button>
+            البحث واختيار مقرر من الكتالوج
+          </Button>
         </div>
       </div>
 

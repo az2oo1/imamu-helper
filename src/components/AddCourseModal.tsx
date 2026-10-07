@@ -38,7 +38,9 @@ import {
   MoreVertical
 } from 'lucide-react';
 import { WhatsappIcon } from './WhatsappIcon';
+import { Button } from './ui/Button';
 import { TimingEditor, ScheduleItem } from './TimingEditor';
+import { CourseBannerPattern } from './CourseBannerPattern';
 import {
   parseScheduleDays,
   parseTimeRange,
@@ -329,7 +331,7 @@ export function AddCourseModal({
     const updateHeight = () => {
       if (element) {
         const fullHeight = element.scrollHeight;
-        const maxHeight = Math.max(200, window.innerHeight * 0.85 - 120);
+        const maxHeight = window.innerHeight * 0.85 - 144;
         setContentHeight(Math.min(fullHeight, maxHeight));
       }
     };
@@ -338,15 +340,8 @@ export function AddCourseModal({
     observer.observe(element);
     updateHeight();
 
-    const raf1 = requestAnimationFrame(updateHeight);
-    const tm1 = setTimeout(updateHeight, 50);
-    const tm2 = setTimeout(updateHeight, 220);
-
     window.addEventListener('resize', updateHeight);
     return () => {
-      cancelAnimationFrame(raf1);
-      clearTimeout(tm1);
-      clearTimeout(tm2);
       observer.disconnect();
       window.removeEventListener('resize', updateHeight);
     };
@@ -358,8 +353,7 @@ export function AddCourseModal({
     isEditingTimings,
     isEditingWaLink,
     loadingDetails,
-    crnError,
-    courseDetails
+    crnError
   ]);
 
   // Sync selectedSemId with activeSemId
@@ -1253,155 +1247,196 @@ export function AddCourseModal({
         exit={{ opacity: 0, y: 24 }}
         transition={{ type: 'spring', stiffness: 380, damping: 32 }}
         onClick={e => e.stopPropagation()}
-        className={`relative bg-white dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800 rounded-t-3xl sm:rounded-3xl w-full ${isBrowsingCatalog && !selectedSubject ? 'max-w-lg' : 'max-w-[480px]'} overflow-hidden shadow-2xl flex flex-col max-h-[92vh] z-10`}
+        className={`relative bg-white dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800 rounded-t-3xl sm:rounded-3xl w-full ${isBrowsingCatalog && !selectedSubject ? 'max-w-lg' : 'max-w-[480px]'} overflow-hidden shadow-2xl flex flex-col max-h-[90vh] z-10`}
       >
-        {/* ─── Simple Clean Modal Header ─── */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200/80 dark:border-zinc-800 shrink-0">
-          <div className="flex items-center gap-3">
-            {/* Interactive Color Box with Hover Pencil & Color Picker Popover */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => hasCourse && setIsColorPickerOpen(prev => !prev)}
-                disabled={!hasCourse}
-                className={clsx(
-                  "group relative w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden p-1 transition-all duration-200 shadow-2xs border-2",
-                  hasCourse
-                    ? "cursor-pointer hover:scale-105 active:scale-95"
-                    : "cursor-default"
-                )}
-                style={{
-                  borderColor: hasCourse ? effectiveCourseColor : 'rgba(140,98,57,0.2)',
-                  backgroundColor: hasCourse ? `${effectiveCourseColor}18` : undefined
-                }}
-                title={hasCourse ? "تخصيص لون المقرر" : undefined}
-                aria-label={hasCourse ? "تخصيص لون المقرر" : undefined}
-              >
-                {/* Course image from resources or book icon (no site logo) */}
-                {courseImage && !imgError ? (
-                  <img
-                    src={courseImage}
-                    alt={fetchedSection?.courseTitle || initialCourse?.courseName || selectedSubject?.name || 'صورة المقرر'}
-                    className="w-full h-full object-cover rounded-xl transition-opacity group-hover:opacity-20"
-                    onError={() => setImgError(true)}
-                  />
-                ) : (
-                  <BookOpen
-                    className="w-5 h-5 transition-opacity group-hover:opacity-20"
-                    style={{ color: effectiveCourseColor }}
-                  />
-                )}
+        {/* ─── Floating Close Button (always accessible on top left) ─── */}
+        <button
+          onClick={handleModalClose}
+          className="absolute top-4 left-4 p-2.5 rounded-full z-30 transition-all duration-300 ease-out cursor-pointer shadow-lg backdrop-blur-md bg-black/40 hover:bg-black/80 dark:bg-white/20 dark:hover:bg-white/40 text-white dark:text-black border border-white/25 dark:border-black/25 hover:scale-110 active:scale-95 group/close"
+          title="إغلاق النافذة"
+        >
+          <X className="w-4 h-4 transition-transform duration-300 group-hover/close:rotate-90" />
+        </button>
 
-                {/* Hover overlay with pencil icon */}
-                {hasCourse && (
-                  <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px] rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none">
-                    <Pencil className="w-4 h-4 text-white drop-shadow" />
-                  </div>
-                )}
-              </button>
+        {fetchedSection ? (
+          <>
+            {/* ─── Premium Course Banner with Pattern (CourseDetailsModal style) ─── */}
+            <div className="relative h-20 sm:h-22 bg-slate-100 dark:bg-zinc-950 shrink-0 transition-colors border-b border-slate-200/80 dark:border-zinc-800/80">
+              <div className="absolute inset-0 overflow-hidden">
+                <CourseBannerPattern courseCode={fetchedSection.courseCode} courseName={fetchedSection.courseTitle} />
+              </div>
 
-              {/* Color Options Popover */}
-              <AnimatePresence>
-                {isColorPickerOpen && (
-                  <>
-                    {/* Click-away backdrop */}
-                    <div
-                      className="fixed inset-0 z-40"
-                      onClick={() => setIsColorPickerOpen(false)}
-                    />
+              {/* Course Avatar with Interactive Color Picker */}
+              <div className="absolute -bottom-8 right-6 z-20">
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => hasCourse && setIsColorPickerOpen(prev => !prev)}
+                    disabled={!hasCourse}
+                    className={clsx(
+                      "group relative w-20 h-20 rounded-2xl border-4 border-white dark:border-zinc-900 overflow-hidden shadow-xl flex items-center justify-center transition-transform hover:scale-105 active:scale-95 cursor-pointer",
+                      hasCourse ? "cursor-pointer" : "cursor-default"
+                    )}
+                    style={{
+                      backgroundColor: effectiveCourseColor
+                    }}
+                    title={hasCourse ? "تخصيص لون المقرر" : undefined}
+                    aria-label={hasCourse ? "تخصيص لون المقرر" : undefined}
+                  >
+                    {courseImage && !imgError ? (
+                      <img
+                        src={courseImage}
+                        alt={fetchedSection?.courseTitle || 'صورة المقرر'}
+                        className="w-full h-full object-cover rounded-xl transition-all duration-200 group-hover:opacity-20"
+                        onError={() => setImgError(true)}
+                      />
+                    ) : (
+                      <BookOpen
+                        className="w-9 h-9 text-white transition-all duration-200 group-hover:opacity-0 group-hover:scale-75 drop-shadow-xs"
+                      />
+                    )}
 
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.92, y: -4 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.92, y: -4 }}
-                      transition={{ duration: 0.15 }}
-                      className="absolute top-full mt-2 right-0 z-50 p-3 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xl w-64"
-                      dir="rtl"
-                      onClick={e => e.stopPropagation()}
-                    >
-                      <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-slate-100 dark:border-zinc-800">
-                        <span className="text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
-                          <Palette className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
-                          <span>اختر لون المقرر</span>
-                        </span>
-                        <button
-                          type="button"
+                    {/* Hover overlay with pencil icon */}
+                    {hasCourse && (
+                      <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                        <Pencil className="w-5 h-5 text-white drop-shadow stroke-[2.5]" />
+                      </div>
+                    )}
+                  </button>
+
+                  {/* Color Options Popover */}
+                  <AnimatePresence>
+                    {isColorPickerOpen && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-40"
                           onClick={() => setIsColorPickerOpen(false)}
-                          className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 transition cursor-pointer"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                        />
 
-                      <div className="grid grid-cols-5 gap-2">
-                        {COURSE_COLOR_OPTIONS.map(c => {
-                          const isSelected = effectiveCourseColor.toLowerCase() === c.hex.toLowerCase();
-                          return (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.92, y: -4 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.92, y: -4 }}
+                          transition={{ duration: 0.15 }}
+                          className="absolute top-full mt-2 right-0 z-50 p-3 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xl w-64"
+                          dir="rtl"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-slate-100 dark:border-zinc-800">
+                            <span className="text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
+                              <Palette className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
+                              <span>اختر لون المقرر</span>
+                            </span>
                             <button
-                              key={c.hex}
                               type="button"
-                              onClick={() => handleColorSelect(c.hex)}
-                              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-150 cursor-pointer hover:scale-110 relative ${
-                                isSelected ? 'ring-2 ring-offset-2 ring-slate-800 dark:ring-white dark:ring-offset-zinc-900 shadow-sm' : ''
-                              }`}
-                              style={{ backgroundColor: c.hex }}
-                              title={c.label}
+                              onClick={() => setIsColorPickerOpen(false)}
+                              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 transition cursor-pointer"
                             >
-                              {isSelected && (
-                                <Check className="w-4 h-4 text-white drop-shadow stroke-[3]" />
-                              )}
+                              <X className="w-3.5 h-3.5" />
                             </button>
-                          );
-                        })}
-                      </div>
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
+                          </div>
+
+                          <div className="grid grid-cols-5 gap-2">
+                            {COURSE_COLOR_OPTIONS.map(c => {
+                              const isSelected = effectiveCourseColor.toLowerCase() === c.hex.toLowerCase();
+                              return (
+                                <button
+                                  key={c.hex}
+                                  type="button"
+                                  onClick={() => handleColorSelect(c.hex)}
+                                  className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-150 cursor-pointer hover:scale-110 relative ${
+                                    isSelected ? 'ring-2 ring-offset-2 ring-slate-800 dark:ring-white dark:ring-offset-zinc-900 shadow-sm' : ''
+                                  }`}
+                                  style={{ backgroundColor: c.hex }}
+                                  title={c.label}
+                                >
+                                  {isSelected && (
+                                    <Check className="w-4 h-4 text-white drop-shadow stroke-[3]" />
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </motion.div>
+                      </>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
             </div>
+
+            {/* Header Content below banner: Tags to the left of the avatar, title below */}
+            <div className="px-6 pt-2 pb-2 shrink-0">
+              {(() => {
+                const hasManyPills = (
+                  (sectionNameDisplay ? 1 : 0) +
+                  (fetchedSection.crn ? 1 : 0) +
+                  (fetchedSection.courseCode ? 1 : 0) +
+                  1
+                ) >= 4 || ((fetchedSection.courseCode?.length || 0) + (sectionNameDisplay?.length || 0) > 16);
+
+                return (
+                  <div className={clsx(
+                    "flex flex-wrap items-center mr-[84px] min-h-[30px]",
+                    hasManyPills ? "gap-1" : "gap-1.5"
+                  )}>
+                    <span className={clsx(
+                      "flex items-center gap-1 border border-slate-200 dark:border-zinc-700/80 bg-slate-100 dark:bg-zinc-800/80 text-slate-800 dark:text-zinc-200 font-bold rounded-md shadow-2xs shrink-0 whitespace-nowrap",
+                      hasManyPills ? "px-1.5 sm:px-2 py-0.5 text-[10.5px] sm:text-[11px]" : "px-2.5 py-0.5 text-xs"
+                    )}>
+                      <Clock className="w-3 h-3 text-[var(--color-imamu-accent)]" /> {fetchedSection.creditHours || 3} ساعات
+                    </span>
+                    <span className={clsx(
+                      "border border-slate-200 dark:border-zinc-700/80 bg-slate-100 dark:bg-zinc-800/80 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700/80 font-mono font-bold rounded-md shadow-2xs shrink-0 whitespace-nowrap",
+                      hasManyPills ? "px-1.5 sm:px-2 py-0.5 text-[10.5px] sm:text-[11px]" : "px-2.5 py-0.5 text-xs"
+                    )} dir="ltr">
+                      {fetchedSection.courseCode}
+                    </span>
+                    {sectionNameDisplay && (
+                      <span className={clsx(
+                        "border border-slate-200 dark:border-zinc-700/80 bg-slate-100 dark:bg-zinc-800/80 text-slate-800 dark:text-zinc-200 font-bold rounded-md shadow-2xs shrink-0 whitespace-nowrap",
+                        hasManyPills ? "px-1.5 sm:px-2 py-0.5 text-[10.5px] sm:text-[11px]" : "px-2.5 py-0.5 text-xs"
+                      )}>
+                        {sectionNameDisplay}
+                      </span>
+                    )}
+                    {fetchedSection.crn && (
+                      <span className={clsx(
+                        "border border-slate-200 dark:border-zinc-700/80 bg-slate-100 dark:bg-zinc-800/80 text-slate-800 dark:text-zinc-200 font-mono font-bold rounded-md shadow-2xs shrink-0 whitespace-nowrap",
+                        hasManyPills ? "px-1.5 sm:px-2 py-0.5 text-[10.5px] sm:text-[11px]" : "px-2.5 py-0.5 text-xs"
+                      )} dir="ltr">
+                        CRN: {fetchedSection.crn}
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Title below */}
+              <h2 className="mt-2 text-xl sm:text-2xl font-bold text-slate-900 dark:text-white leading-snug">
+                {fetchedSection.courseTitle || fetchedSection.courseCode}
+              </h2>
+            </div>
+          </>
+        ) : (
+          /* Simple Clean Modal Header when no course selected yet */
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200/80 dark:border-zinc-800 shrink-0">
             <div>
-              <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-snug">
-                {fetchedSection
-                  ? fetchedSection.courseTitle || fetchedSection.courseCode
-                  : selectedSubject
+              <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-snug">
+                {selectedSubject
                   ? selectedSubject.name
                   : isBrowsingCatalog
                   ? 'دليل المقررات الجامعية'
                   : 'إضافة مقرر دراسي جديد'}
               </h2>
-              {fetchedSection ? (
-                <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
-                  <span className="px-2.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 text-xs font-bold rounded-lg border border-zinc-200 dark:border-zinc-700" dir="ltr">
-                    {fetchedSection.courseCode}
-                  </span>
-                  <span className="px-2.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 text-xs font-bold rounded-lg border border-zinc-200 dark:border-zinc-700">
-                    {sectionNameDisplay}
-                  </span>
-                  <span className="px-2.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 text-xs font-bold rounded-lg border border-zinc-200 dark:border-zinc-700">
-                    {fetchedSection.creditHours || 3} س
-                  </span>
-                  <span className="px-2.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 text-xs font-bold rounded-lg border border-zinc-200 dark:border-zinc-700" dir="ltr">
-                    CRN: {fetchedSection.crn}
-                  </span>
-                </div>
-              ) : (
-                <p className="text-[11px] text-slate-500 dark:text-zinc-400 font-medium">
-                  {selectedSubject
-                    ? `${selectedSubject.code} · ${currentSemesterObj?.label || 'الفصل الدراسي'}`
-                    : currentSemesterObj?.label || 'الفصل الدراسي'}
-                </p>
-              )}
+              <p className="text-[11px] text-slate-500 dark:text-zinc-400 font-medium">
+                {selectedSubject
+                  ? `${selectedSubject.code} · ${currentSemesterObj?.label || 'الفصل الدراسي'}`
+                  : currentSemesterObj?.label || 'الفصل الدراسي'}
+              </p>
             </div>
           </div>
-
-          <button
-            onClick={handleModalClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
-            title="إغلاق النافذة"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+        )}
 
         {/* ─── Body Content with Smooth Height Animation ─── */}
         <motion.div 
@@ -1409,7 +1444,7 @@ export function AddCourseModal({
           transition={{ duration: 0.28, ease: [0.4, 0.2, 0.2, 1] }}
           className="overflow-hidden"
         >
-          <div ref={contentRef} className="p-5 sm:p-6 overflow-y-auto max-h-[calc(85vh-7rem)] custom-scrollbar space-y-5">
+          <div ref={contentRef} className="p-5 sm:p-6 overflow-y-auto max-h-[calc(85vh-7rem)] custom-scrollbar space-y-4">
             {/* Success message banner when updates applied */}
             {updateSuccessMessage && (
               <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-bold flex items-center justify-between gap-2 shadow-xs">
@@ -1670,8 +1705,10 @@ export function AddCourseModal({
                 <div className="space-y-2.5">
                   <div className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 px-1 flex items-center justify-between">
                     <span>هيئة التدريس ({courseInstructors.length})</span>
-                    <button
+                    <Button
                       type="button"
+                      variant={(isEditingInstructors || isEditingTimings) ? "primary" : "secondary"}
+                      size="xs"
                       onClick={() => {
                         const nextVal = !(isEditingInstructors || isEditingTimings);
                         setIsEditingInstructors(nextVal);
@@ -1683,25 +1720,10 @@ export function AddCourseModal({
                           setActiveScheduleIdx(null);
                         }
                       }}
-                      className={clsx(
-                        "flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-xl border transition cursor-pointer active:scale-95",
-                        (isEditingInstructors || isEditingTimings)
-                          ? "bg-[var(--color-imamu-accent)] text-white border-[var(--color-imamu-accent)] shadow-2xs"
-                          : "text-slate-600 hover:text-slate-900 dark:text-zinc-300 dark:hover:text-white border-slate-200/80 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700 bg-slate-100/60 dark:bg-zinc-800/40"
-                      )}
+                      leftIcon={(isEditingInstructors || isEditingTimings) ? <Check className="w-3.5 h-3.5" /> : <Pencil className="w-3.5 h-3.5" />}
                     >
-                      {(isEditingInstructors || isEditingTimings) ? (
-                        <>
-                          <Check className="w-3.5 h-3.5" />
-                          <span>تم</span>
-                        </>
-                      ) : (
-                        <>
-                          <Pencil className="w-3.5 h-3.5" />
-                          <span>تعديل</span>
-                        </>
-                      )}
-                    </button>
+                      {(isEditingInstructors || isEditingTimings) ? 'تم' : 'تعديل'}
+                    </Button>
                   </div>
 
                   {courseInstructors.length === 0 ? (
@@ -1760,33 +1782,26 @@ export function AddCourseModal({
 
                             <div className="flex items-center gap-1.5 shrink-0">
                               {isEditingInstructors ? (
-                                <button
+                                <Button
                                   type="button"
+                                  variant="destructive"
+                                  size="xs"
                                   onClick={() => handleRemoveTeacher(idx)}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 text-xs font-bold transition hover:bg-rose-100 dark:hover:bg-rose-900/50 cursor-pointer shadow-2xs"
+                                  leftIcon={<Trash2 className="w-3.5 h-3.5" />}
                                   title="حذف الدكتور من هذا المقرر"
                                 >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                  <span className="text-[11px]">حذف</span>
-                                </button>
+                                  حذف
+                                </Button>
                               ) : (
-                                <button
+                                <Button
                                   type="button"
+                                  variant="secondary"
+                                  size="xs"
                                   onClick={() => handleCopyEmail(emailToCopy)}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-700 text-xs font-bold text-slate-700 dark:text-zinc-300 transition cursor-pointer"
+                                  leftIcon={copiedEmail === emailToCopy ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
                                 >
-                                  {copiedEmail === emailToCopy ? (
-                                    <>
-                                      <Check className="w-3.5 h-3.5 text-emerald-500" />
-                                      <span className="text-emerald-500 text-[11px]">تم النسخ!</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Copy className="w-3.5 h-3.5 text-slate-400" />
-                                      <span className="text-[11px]">نسخ البريد</span>
-                                    </>
-                                  )}
-                                </button>
+                                  {copiedEmail === emailToCopy ? 'تم النسخ!' : 'نسخ البريد'}
+                                </Button>
                               )}
                             </div>
                           </div>
@@ -2046,14 +2061,16 @@ export function AddCourseModal({
                                 </button>
                               </>
                             ) : (
-                              <button
+                              <Button
                                 type="button"
+                                variant="outline"
+                                size="xs"
                                 onClick={() => { setWaLinkInput(''); setIsEditingWaLink(v => !v); }}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/20 text-[11px] font-bold transition cursor-pointer"
+                                leftIcon={<Plus className="w-3.5 h-3.5" />}
+                                className="text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
                               >
-                                <Plus className="w-3 h-3" />
-                                <span>إضافة رابط</span>
-                              </button>
+                                إضافة رابط
+                              </Button>
                             )}
                           </div>
                         </div>
@@ -2077,20 +2094,22 @@ export function AddCourseModal({
                                 dir="ltr"
                                 autoFocus
                               />
-                              <button
+                              <Button
                                 type="button"
+                                variant="whatsapp"
+                                size="xs"
                                 onClick={() => { setCustomWaLink(waLinkInput.trim()); setIsEditingWaLink(false); setHasUserEdited(true); }}
-                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition cursor-pointer"
                               >
                                 حفظ
-                              </button>
-                              <button
+                              </Button>
+                              <Button
                                 type="button"
+                                variant="secondary"
+                                size="xs"
                                 onClick={() => setIsEditingWaLink(false)}
-                                className="px-2.5 py-1.5 bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300 text-xs rounded-lg transition cursor-pointer"
                               >
                                 إلغاء
-                              </button>
+                              </Button>
                             </motion.div>
                           )}
                         </AnimatePresence>
@@ -2477,7 +2496,6 @@ export function AddCourseModal({
                 </AnimatePresence>
               </div>
             )}
-            <div className="h-10 shrink-0" />
           </div>
         </motion.div>
 

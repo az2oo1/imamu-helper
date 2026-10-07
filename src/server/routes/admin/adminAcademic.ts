@@ -3,11 +3,13 @@ import { eq, or, sql } from 'drizzle-orm';
 import { subjects, majors, majorCourses, course_resources, events, users } from '../../../db/schema';
 import { requireAuth, AuthRequest } from '../../../middleware/auth';
 import { matchId } from '../../../lib/auth-utils';
-import { calculateMokafaaDate, formatDate, parseDate } from '../../../lib/date-utils';
+import { calculateMokafaaDate, formatDate, parseDate, parseTimeIntoDate, formatIcsFloating, escapeIcs } from '../../../lib/date-utils';
+import { normalizeExamDate, normalizeExamTime } from '../../../lib/schedule-utils';
 import { uploadMajorPlanToStorage, listMajorPlansFromS3, deleteFileFromStorage } from '../../../lib/storage';
 import { importMsariData } from '../../services/msari';
 import { syncImamuCalendar } from '../../services/imamuCalendar';
 import { checkAdmin, uploadStorage } from './common';
+import { invalidatePrereqCatalogCache } from '../subjects';
 
 export function createAdminAcademicRouter(db: any) {
   const router = express.Router();
@@ -64,6 +66,7 @@ export function createAdminAcademicRouter(db: any) {
         tags,
         syllabus
       }).returning();
+      invalidatePrereqCatalogCache();
       res.json(subj);
     } catch (e) {
       console.error(e);
@@ -91,6 +94,7 @@ export function createAdminAcademicRouter(db: any) {
 
       const [subj] = await db.update(subjects).set(updates).where(matchId(subjects.id, idRaw)).returning();
       if (!subj) return res.status(404).json({ error: "Subject not found" });
+      invalidatePrereqCatalogCache();
       res.json(subj);
     } catch (e) {
       console.error(e);
@@ -106,6 +110,7 @@ export function createAdminAcademicRouter(db: any) {
       await db.delete(majorCourses).where(matchId(majorCourses.subjectId, idRaw));
       await db.delete(course_resources).where(matchId(course_resources.subjectId, idRaw));
       await db.delete(subjects).where(matchId(subjects.id, idRaw));
+      invalidatePrereqCatalogCache();
       res.json({ success: true });
     } catch (e: any) {
       console.error("[Admin Subject Delete Error]", e);
@@ -115,10 +120,28 @@ export function createAdminAcademicRouter(db: any) {
 
   // Admin Create Major
   router.post("/admin/majors", requireAuth, async (req: AuthRequest, res): Promise<any> => {
-    if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Admin only" });
     try {
-      const { name } = req.body;
-      const [mjr] = await db.insert(majors).values({ name }).returning();
+      const { name, courses: reqCourses, batches } = req.body;
+      const batchesValue = batches ? (typeof batches === 'string' ? batches : JSON.stringify(batches)) : null;
+      const [mjr] = await db.insert(majors).values({ name, batches: batchesValue }).returning();
+      if (!mjr) return res.status(500).json({ error: "Failed to create major" });
+
+      if (Array.isArray(reqCourses) && reqCourses.length > 0) {
+        const rowsToInsert = reqCourses.map((c: any) => ({
+          majorId: mjr.id,
+          subjectId: Number(c.subjectId),
+          optionalGroup: c.optionalGroup || null,
+          optionalGroupReqCount: c.optionalGroupReqCount ? Number(c.optionalGroupReqCount) : null,
+          prereq: c.prereq || null,
+        })).filter((r: any) => !isNaN(r.subjectId));
+
+        if (rowsToInsert.length > 0) {
+          await db.insert(majorCourses).values(rowsToInsert);
+        }
+      }
+
+      invalidatePrereqCatalogCache();
       res.json(mjr);
     } catch (e) {
       console.error(e);
@@ -128,14 +151,35 @@ export function createAdminAcademicRouter(db: any) {
 
   // Admin Update Major
   router.put("/admin/majors/:id", requireAuth, async (req: AuthRequest, res): Promise<any> => {
-    if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: "Admin only" });
     try {
       const idRaw = req.params.id;
-      const { name } = req.body;
+      const { name, courses: reqCourses, batches } = req.body;
       const updates: any = {};
       if (name !== undefined) updates.name = name;
+      if (batches !== undefined) {
+        updates.batches = batches ? (typeof batches === 'string' ? batches : JSON.stringify(batches)) : null;
+      }
       const [mjr] = await db.update(majors).set(updates).where(matchId(majors.id, idRaw)).returning();
       if (!mjr) return res.status(404).json({ error: "Major not found" });
+
+      if (reqCourses !== undefined && Array.isArray(reqCourses)) {
+        await db.delete(majorCourses).where(matchId(majorCourses.majorId, idRaw));
+
+        const rowsToInsert = reqCourses.map((c: any) => ({
+          majorId: mjr.id,
+          subjectId: Number(c.subjectId),
+          optionalGroup: c.optionalGroup || null,
+          optionalGroupReqCount: c.optionalGroupReqCount ? Number(c.optionalGroupReqCount) : null,
+          prereq: c.prereq || null,
+        })).filter((r: any) => !isNaN(r.subjectId));
+
+        if (rowsToInsert.length > 0) {
+          await db.insert(majorCourses).values(rowsToInsert);
+        }
+      }
+
+      invalidatePrereqCatalogCache();
       res.json(mjr);
     } catch (e) {
       console.error(e);
@@ -236,14 +280,20 @@ export function createAdminAcademicRouter(db: any) {
   router.post("/admin/events", requireAuth, async (req: AuthRequest, res): Promise<any> => {
     if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
     try {
-      const { title, date, description, isHoliday, isHolidayEnd, isSemesterStart, isSemesterEnd, isEid, isNationalDay } = req.body;
+      const { title, date, endDate, time, endTime, location, link, description, isHoliday, isHolidayEnd, isSemester, isSemesterStart, isSemesterEnd, isEid, isNationalDay } = req.body;
       const [ev] = await db.insert(events).values({ 
         title, 
         date, 
-        description,
+        endDate: endDate || null,
+        time: time || null,
+        endTime: endTime || null,
+        location: location || null,
+        link: link || null,
+        description: description || null,
         isHoliday: !!isHoliday,
         isHolidayEnd: !!isHolidayEnd,
-        isSemesterStart: !!isSemesterStart,
+        isSemester: !!(isSemester ?? isSemesterStart),
+        isSemesterStart: !!(isSemesterStart ?? isSemester),
         isSemesterEnd: !!isSemesterEnd,
         isEid: !!isEid,
         isNationalDay: !!isNationalDay
@@ -259,15 +309,21 @@ export function createAdminAcademicRouter(db: any) {
     if (!(await checkAdmin(req))) return res.status(403).json({ error: "Admin only" });
     try {
       const idRaw = req.params.id;
-      const { title, date, description, isHoliday, isHolidayEnd, isSemesterStart, isSemesterEnd, isEid, isNationalDay } = req.body;
+      const { title, date, endDate, time, endTime, location, link, description, isHoliday, isHolidayEnd, isSemester, isSemesterStart, isSemesterEnd, isEid, isNationalDay } = req.body;
       const [ev] = await db.update(events)
         .set({ 
           title, 
           date, 
-          description,
+          endDate: endDate || null,
+          time: time || null,
+          endTime: endTime || null,
+          location: location || null,
+          link: link || null,
+          description: description || null,
           isHoliday: !!isHoliday,
           isHolidayEnd: !!isHolidayEnd,
-          isSemesterStart: !!isSemesterStart,
+          isSemester: !!(isSemester ?? isSemesterStart),
+          isSemesterStart: !!(isSemesterStart ?? isSemester),
           isSemesterEnd: !!isSemesterEnd,
           isEid: !!isEid,
           isNationalDay: !!isNationalDay
@@ -321,6 +377,48 @@ export function createAdminAcademicRouter(db: any) {
     }
   });
 
+function extractUserExamEvents(u: any, fallbackUserId: string): any[] {
+  const examEvents: any[] = [];
+  if (!u || !u.semesters) return examEvents;
+  try {
+    const userSemesters = typeof u.semesters === 'string' ? JSON.parse(u.semesters) : u.semesters;
+    if (Array.isArray(userSemesters)) {
+      for (const sem of userSemesters) {
+        if (Array.isArray(sem?.courses)) {
+          for (const c of sem.courses) {
+            if (c && c.examDate) {
+              const normDate = normalizeExamDate(c.examDate);
+              if (!normDate) continue;
+              const normTime = normalizeExamTime(c.examTime);
+              const examDateStr = normTime ? `${normDate}T${normTime}:00` : normDate;
+              const courseName = c.courseName || c.courseCode || 'المقرر';
+              const details = [
+                `اختبار نهائي مقرر ${courseName} (${c.courseCode || ''})`,
+                c.crn ? `CRN: ${c.crn}` : '',
+                c.sectionNumber ? `الشعبة: ${c.sectionNumber}` : '',
+                c.classroom ? `القاعة: ${c.classroom}` : ''
+              ].filter(Boolean).join(' | ');
+
+              examEvents.push({
+                id: `exam-${c.courseCode || 'course'}-${normDate}`,
+                title: `اختبار نهائي - ${courseName}`,
+                date: examDateStr,
+                description: details,
+                calendarType: 'user',
+                userId: u.uid || fallbackUserId,
+                createdAt: new Date().toISOString()
+              });
+            }
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error("[ICS User Semesters Error]", e);
+  }
+  return examEvents;
+}
+
   // Calendar .ics live subscription & export
   router.get("/calendar.ics", async (req, res): Promise<any> => {
     try {
@@ -332,15 +430,6 @@ export function createAdminAcademicRouter(db: any) {
       
       let filtered: any[] = [];
       let calName = 'تقويم جامعة الإمام';
-
-      const escapeIcs = (str: string) => {
-        if (!str) return '';
-        return String(str)
-          .replace(/\\/g, '\\\\')
-          .replace(/;/g, '\\;')
-          .replace(/,/g, '\\,')
-          .replace(/\r?\n/g, '\\n');
-      };
 
       if (type === 'entity') {
         calName = 'فعاليات الجهات والأندية - جامعة الإمام';
@@ -393,41 +482,7 @@ export function createAdminAcademicRouter(db: any) {
         });
 
         // Include final exams from user's account semesters
-        if (u && u.semesters) {
-          try {
-            const userSemesters = typeof u.semesters === 'string' ? JSON.parse(u.semesters) : u.semesters;
-            if (Array.isArray(userSemesters)) {
-              for (const sem of userSemesters) {
-                if (Array.isArray(sem?.courses)) {
-                  for (const c of sem.courses) {
-                    if (c && c.examDate) {
-                      const examDateStr = c.examTime ? `${c.examDate}T${c.examTime}:00` : c.examDate;
-                      const courseName = c.courseName || c.courseCode || 'المقرر';
-                      const details = [
-                        `اختبار نهائي مقرر ${courseName} (${c.courseCode || ''})`,
-                        c.crn ? `CRN: ${c.crn}` : '',
-                        c.sectionNumber ? `الشعبة: ${c.sectionNumber}` : '',
-                        c.classroom ? `القاعة: ${c.classroom}` : ''
-                      ].filter(Boolean).join(' | ');
-
-                      userEvents.push({
-                        id: `exam-${c.courseCode || 'course'}-${c.examDate}`,
-                        title: `اختبار نهائي - ${courseName}`,
-                        date: examDateStr,
-                        description: details,
-                        calendarType: 'user',
-                        userId: u.uid || userId,
-                        createdAt: new Date().toISOString()
-                      });
-                    }
-                  }
-                }
-              }
-            }
-          } catch (e) {
-            console.error("[ICS User Semesters Error]", e);
-          }
-        }
+        userEvents.push(...extractUserExamEvents(u, userId));
 
         if (includeAcademic) {
           const academicEvents = allEvents.filter((ev: any) => !ev.calendarType || ev.calendarType === 'academic');
@@ -437,13 +492,32 @@ export function createAdminAcademicRouter(db: any) {
         }
       } else if (type === 'all') {
         calName = 'تقويم جامعة الإمام الشامل';
-        filtered = allEvents.filter((ev: any) => {
-          if (!ev.calendarType || ev.calendarType === 'academic' || ev.calendarType === 'entity') return true;
-          if (ev.calendarType === 'user') {
-            return userId && (ev.userId === userId);
+        const publicEvents = allEvents.filter((ev: any) => !ev.calendarType || ev.calendarType === 'academic' || ev.calendarType === 'entity');
+        
+        let userSpecificEvents: any[] = [];
+        if (userId) {
+          const userRecs = await db.select().from(users).where(
+            or(
+              eq(users.uid, userId),
+              matchId(users.id, userId),
+              eq(users.email, userId)
+            )
+          );
+          const u = userRecs[0];
+          const validIds = new Set<string>([userId]);
+          if (u) {
+            if (u.uid) validIds.add(String(u.uid));
+            if (u.id) validIds.add(String(u.id));
+            if (u.email) validIds.add(String(u.email));
           }
-          return true;
-        });
+
+          userSpecificEvents = allEvents.filter((ev: any) => {
+            return ev.calendarType === 'user' && ev.userId && validIds.has(String(ev.userId));
+          });
+
+          userSpecificEvents.push(...extractUserExamEvents(u, userId));
+        }
+        filtered = [...publicEvents, ...userSpecificEvents];
       } else {
         calName = 'التقويم الأكاديمي - جامعة الإمام';
         filtered = allEvents.filter((ev: any) => !ev.calendarType || ev.calendarType === 'academic');
@@ -462,40 +536,68 @@ export function createAdminAcademicRouter(db: any) {
       ].join("\r\n") + "\r\n";
 
       for (const ev of filtered) {
-        const d = parseDate(ev.date);
-        if (!d) continue;
+        const startBase = parseDate(ev.date);
+        if (!startBase) continue;
 
         const dtstamp = ev.createdAt ? formatDate(new Date(ev.createdAt), 'ics') : formatDate(new Date(), 'ics');
-        const hasTime = typeof ev.date === 'string' && (ev.date.includes('T') || ev.date.includes(':'));
+        
+        // Determine whether event has a specific time
+        let hasTime = false;
+        let startD = startBase;
+        let endD: Date | null = null;
+
+        if (ev.time) {
+          const parsedStart = parseTimeIntoDate(startBase, ev.time);
+          if (parsedStart.hasTime) {
+            hasTime = true;
+            startD = parsedStart.date;
+
+            const endBase = ev.endDate ? (parseDate(ev.endDate) || startBase) : startBase;
+            if (ev.endTime) {
+              const parsedEnd = parseTimeIntoDate(endBase, ev.endTime);
+              endD = parsedEnd.date;
+            } else if (ev.endDate && ev.endDate !== ev.date) {
+              endD = parseTimeIntoDate(endBase, ev.time).date;
+            } else {
+              endD = new Date(startD.getTime() + 60 * 60 * 1000);
+            }
+          }
+        } else if (typeof ev.date === 'string' && (ev.date.includes('T') || ev.date.includes(':'))) {
+          hasTime = true;
+          startD = startBase;
+          endD = new Date(startD.getTime() + 60 * 60 * 1000);
+        }
 
         ics += "BEGIN:VEVENT\r\n";
-        ics += `UID:event-${ev.id}@imamu-helper\r\n`;
+        ics += `UID:event-${ev.id || Math.random().toString(36).substring(2)}@imamu-helper\r\n`;
         ics += `DTSTAMP:${dtstamp}\r\n`;
         ics += `LAST-MODIFIED:${dtstamp}\r\n`;
         ics += "SEQUENCE:0\r\n";
         ics += "STATUS:CONFIRMED\r\n";
 
-        if (hasTime) {
-          const dtstart = formatDate(d, 'ics');
-          const dtend = formatDate(new Date(d.getTime() + 60 * 60 * 1000), 'ics');
-          ics += `DTSTART:${dtstart}\r\n`;
-          ics += `DTEND:${dtend}\r\n`;
+        if (hasTime && endD) {
+          ics += `DTSTART:${formatIcsFloating(startD)}\r\n`;
+          ics += `DTEND:${formatIcsFloating(endD)}\r\n`;
         } else {
-          const dtstart = formatDate(d, 'iso-date').replace(/-/g, '');
+          const dtstart = formatDate(startBase, 'iso-date').replace(/-/g, '');
           ics += `DTSTART;VALUE=DATE:${dtstart}\r\n`;
-          if (ev.endDate) {
-            const endD = parseDate(ev.endDate);
-            if (endD) {
-              const nextDay = new Date(endD.getTime() + 24 * 60 * 60 * 1000);
-              const dtend = formatDate(nextDay, 'iso-date').replace(/-/g, '');
-              ics += `DTEND;VALUE=DATE:${dtend}\r\n`;
-            }
+          const endBase = ev.endDate ? parseDate(ev.endDate) : startBase;
+          if (endBase) {
+            const nextDay = new Date(endBase.getTime() + 24 * 60 * 60 * 1000);
+            const dtend = formatDate(nextDay, 'iso-date').replace(/-/g, '');
+            ics += `DTEND;VALUE=DATE:${dtend}\r\n`;
           }
         }
 
         ics += `SUMMARY:${escapeIcs(ev.title)}\r\n`;
-        if (ev.description) {
-          ics += `DESCRIPTION:${escapeIcs(ev.description)}\r\n`;
+
+        let descText = ev.description || '';
+        if (ev.link) {
+          descText = descText ? `${descText}\n\nالرابط: ${ev.link}` : `الرابط: ${ev.link}`;
+          ics += `URL:${ev.link}\r\n`;
+        }
+        if (descText) {
+          ics += `DESCRIPTION:${escapeIcs(descText)}\r\n`;
         }
         if (ev.location) {
           ics += `LOCATION:${escapeIcs(ev.location)}\r\n`;

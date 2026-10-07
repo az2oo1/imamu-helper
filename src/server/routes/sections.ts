@@ -12,7 +12,9 @@ import {
   syncTermFromBanner,
   checkTermChangesAndSeats,
   emptyTermSections,
-  addCrnsToTerm
+  addCrnsToTerm,
+  getSyncProgress,
+  getAllSyncProgress
 } from '../services/banner-service';
 
 const upload = multer({
@@ -769,19 +771,6 @@ export function createSectionsRouter(db: any) {
   // 10. BANNER DIRECT INTEGRATION ADMIN ENDPOINTS
   // ============================================================================
 
-  // GET /admin/banner/detected-terms - Fetch available terms from Banner 9
-  router.get('/admin/banner/detected-terms', requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
-    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: 'Admin only' });
-    try {
-      const client = new BannerClient();
-      const detected = await client.getDetectedTerms();
-      res.json({ success: true, terms: detected });
-    } catch (err: any) {
-      console.error('[Banner Detected Terms Error]', err);
-      res.status(500).json({ error: `فشل استعلام الفصول من بانر: ${err.message || err}` });
-    }
-  });
-
   // GET /admin/banner/terms - List saved/tracked Banner terms
   router.get('/admin/banner/terms', requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
     if (!(await checkAdmin(req, db))) return res.status(403).json({ error: 'Admin only' });
@@ -834,23 +823,101 @@ export function createSectionsRouter(db: any) {
     if (!(await checkAdmin(req, db))) return res.status(403).json({ error: 'Admin only' });
     try {
       const { termCode } = req.params;
-      const { monitorChanges, autoUpdate, updateIntervalDays } = req.body;
+      const { monitorChanges, autoUpdate, updateIntervalDays, termName, academicYear, semester, newTermCode } = req.body;
 
-      await db.update(banner_terms).set({
-        ...(monitorChanges !== undefined ? { monitorChanges: Boolean(monitorChanges) } : {}),
-        ...(autoUpdate !== undefined ? { autoUpdate: Boolean(autoUpdate) } : {}),
-        ...(updateIntervalDays !== undefined ? { updateIntervalDays: Number(updateIntervalDays) || 2 } : {})
-      }).where(eq(banner_terms.termCode, termCode));
+      const finalTermCode = (newTermCode && typeof newTermCode === 'string' && newTermCode.trim()) ? newTermCode.trim() : termCode;
 
-      const updated = await db.select().from(banner_terms).where(eq(banner_terms.termCode, termCode));
+      // Prepare updates object
+      const termUpdates: Record<string, any> = {};
+      if (termName !== undefined) termUpdates.termName = String(termName).trim();
+      if (academicYear !== undefined) termUpdates.academicYear = String(academicYear).trim();
+      if (semester !== undefined) termUpdates.semester = String(semester).trim();
+      if (monitorChanges !== undefined) termUpdates.monitorChanges = Boolean(monitorChanges);
+      if (autoUpdate !== undefined) termUpdates.autoUpdate = Boolean(autoUpdate);
+      if (updateIntervalDays !== undefined) termUpdates.updateIntervalDays = Number(updateIntervalDays) || 2;
+
+      // Check existing records in banner_terms
+      const oldRecords = await db.select().from(banner_terms).where(eq(banner_terms.termCode, termCode));
+      const targetRecords = (finalTermCode !== termCode)
+        ? await db.select().from(banner_terms).where(eq(banner_terms.termCode, finalTermCode))
+        : oldRecords;
+
+      if (targetRecords.length > 0) {
+        // Target record already exists: update its fields if any
+        if (Object.keys(termUpdates).length > 0) {
+          await db.update(banner_terms).set(termUpdates).where(eq(banner_terms.termCode, finalTermCode));
+        }
+        // If old record was under a different termCode, remove old record
+        if (finalTermCode !== termCode && oldRecords.length > 0) {
+          await db.delete(banner_terms).where(eq(banner_terms.termCode, termCode));
+        }
+      } else if (oldRecords.length > 0) {
+        // Old record exists and target termCode doesn't exist yet: rename & update
+        await db.update(banner_terms).set({
+          ...termUpdates,
+          ...(finalTermCode !== termCode ? { termCode: finalTermCode } : {})
+        }).where(eq(banner_terms.termCode, termCode));
+      } else {
+        // Neither exists: insert new record
+        await db.insert(banner_terms).values({
+          termCode: finalTermCode,
+          termName: termName ? String(termName).trim() : finalTermCode,
+          academicYear: academicYear ? String(academicYear).trim() : null,
+          semester: semester ? String(semester).trim() : null,
+          monitorChanges: monitorChanges !== undefined ? Boolean(monitorChanges) : false,
+          autoUpdate: autoUpdate !== undefined ? Boolean(autoUpdate) : false,
+          updateIntervalDays: updateIntervalDays ? Number(updateIntervalDays) : 2,
+        });
+      }
+
+      // Update course_sections if needed
+      const csUpdates: Record<string, any> = {};
+      if (finalTermCode !== termCode) csUpdates.term = finalTermCode;
+      if (academicYear !== undefined) csUpdates.academicYear = String(academicYear).trim();
+      if (semester !== undefined) csUpdates.semester = String(semester).trim();
+
+      if (Object.keys(csUpdates).length > 0) {
+        try {
+          if (finalTermCode !== termCode) {
+            // Delete duplicates in old term that already exist in target to prevent unq violation
+            const inTarget = await db.select({ crn: course_sections.crn })
+              .from(course_sections)
+              .where(eq(course_sections.term, finalTermCode));
+            for (const s of inTarget) {
+              if (s.crn) {
+                await db.delete(course_sections).where(and(eq(course_sections.term, termCode), eq(course_sections.crn, s.crn)));
+              }
+            }
+          }
+          await db.update(course_sections).set(csUpdates).where(eq(course_sections.term, termCode));
+        } catch (csErr) {
+          console.warn('[Banner Update course_sections Warning]', csErr);
+        }
+      }
+
+      const updated = await db.select().from(banner_terms).where(eq(banner_terms.termCode, finalTermCode));
       res.json({ success: true, term: updated[0] });
     } catch (err: any) {
       console.error('[Banner Update Term Settings Error]', err);
-      res.status(500).json({ error: 'فشل تحديث إعدادات الفصل الدراسي' });
+      res.status(500).json({ error: err?.message || 'فشل تحديث إعدادات الفصل الدراسي' });
     }
   });
 
-  // POST /admin/banner/terms/:termCode/sync - Trigger manual full sync
+  // GET /admin/banner/sync-progress - Get all active sync progress
+  router.get('/admin/banner/sync-progress', requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: 'Admin only' });
+    res.json({ success: true, progress: await getAllSyncProgress(db) });
+  });
+
+  // GET /admin/banner/terms/:termCode/progress - Get sync progress for a specific term
+  router.get('/admin/banner/terms/:termCode/progress', requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
+    if (!(await checkAdmin(req, db))) return res.status(403).json({ error: 'Admin only' });
+    const { termCode } = req.params;
+    const all = await getAllSyncProgress(db);
+    res.json({ success: true, progress: all[termCode] || null });
+  });
+
+  // POST /admin/banner/terms/:termCode/sync - Trigger manual full sync (async background)
   router.post('/admin/banner/terms/:termCode/sync', requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
     if (!(await checkAdmin(req, db))) return res.status(403).json({ error: 'Admin only' });
     try {
@@ -858,18 +925,25 @@ export function createSectionsRouter(db: any) {
       const termRecord = await db.select().from(banner_terms).where(eq(banner_terms.termCode, termCode));
       const termName = termRecord[0]?.termName || termCode;
 
-      const result = await syncTermFromBanner(
+      // Start the sync in background
+      syncTermFromBanner(
         termCode,
         termName,
         db,
         termRecord[0]?.academicYear || undefined,
         termRecord[0]?.semester || undefined
-      );
+      ).catch((err: any) => {
+        console.error(`[Banner Sync Error for ${termCode}]`, err);
+      });
 
-      res.json(result);
+      res.json({
+        success: true,
+        started: true,
+        message: `تم بدء مزامنة الفصل «${termName}» في الخلفية بنجاح.`
+      });
     } catch (err: any) {
       console.error('[Banner Sync Term Error]', err);
-      res.status(500).json({ error: `فشل مزامنة الفصل: ${err.message || err}` });
+      res.status(500).json({ error: `فشل بدء مزامنة الفصل: ${err.message || err}` });
     }
   });
 

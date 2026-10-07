@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, MapPin, User, Pencil, Check, Trash2, Clock, ChevronDown } from 'lucide-react';
+import { X, MapPin, User, Pencil, Check, Trash2, Clock, ChevronDown, ArrowLeft } from 'lucide-react';
 import {
   formatTo12Hour,
   parseTimeToMinutes,
   formatMinutesToTime,
   DAY_MAP_AR
 } from '../lib/schedule-utils';
+import { Button } from './ui/Button';
 
 export interface ScheduleItem {
   id?: string;
@@ -75,7 +76,6 @@ export function ClockStepper({
   onChange: (val: string) => void;
 }) {
   const state = parseTo12State(value);
-  const [activeUnit, setActiveUnit] = useState<'hour' | 'minute'>('hour');
 
   const update = (partial: Partial<Time12State>) => {
     const next = { ...state, ...partial };
@@ -83,25 +83,21 @@ export function ClockStepper({
   };
 
   const incrementHour = () => {
-    setActiveUnit('hour');
     const nextH = state.hour === 12 ? 1 : state.hour + 1;
     update({ hour: nextH });
   };
 
   const decrementHour = () => {
-    setActiveUnit('hour');
     const nextH = state.hour === 1 ? 12 : state.hour - 1;
     update({ hour: nextH });
   };
 
   const incrementMinute = () => {
-    setActiveUnit('minute');
     const nextM = (Math.floor(state.minute / 5) * 5 + 5) % 60;
     update({ minute: nextM });
   };
 
   const decrementMinute = () => {
-    setActiveUnit('minute');
     const nextM = (Math.ceil(state.minute / 5) * 5 - 5 + 60) % 60;
     update({ minute: nextM });
   };
@@ -113,39 +109,21 @@ export function ClockStepper({
   return (
     <div className="flex items-center gap-1" dir="ltr">
       {/* Hours Column */}
-      <div
-        onClick={() => setActiveUnit('hour')}
-        onWheel={(e) => {
-          e.preventDefault();
-          if (e.deltaY < 0) incrementHour();
-          else decrementHour();
-        }}
-        className={`w-9 bg-white dark:bg-zinc-900 rounded-xl flex flex-col items-center transition cursor-pointer select-none border shrink-0 ${
-          activeUnit === 'hour'
-            ? 'border-[var(--color-imamu-accent)] shadow-2xs ring-1 ring-[var(--color-imamu-accent)]/30'
-            : 'border-slate-200 dark:border-zinc-700/80 hover:border-slate-300 dark:hover:border-zinc-600'
-        }`}
-      >
+      <div className="w-9 bg-white dark:bg-zinc-900 rounded-xl flex flex-col items-center select-none border border-slate-200 dark:border-zinc-700/80 shrink-0">
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            incrementHour();
-          }}
+          onClick={incrementHour}
           className="w-full h-5 flex items-center justify-center text-slate-400 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-t-[11px] transition cursor-pointer text-xs font-bold leading-none active:scale-90"
           title="زيادة الساعة"
         >
           +
         </button>
-        <div className="w-full py-0.5 border-y border-slate-100 dark:border-zinc-800 text-center font-mono font-bold text-xs sm:text-sm text-slate-900 dark:text-white select-none">
+        <div className="w-full py-0.5 border-y border-slate-100 dark:border-zinc-800 text-center font-mono font-bold text-xs sm:text-sm text-slate-900 dark:text-white select-none cursor-default">
           {String(state.hour).padStart(2, '0')}
         </div>
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            decrementHour();
-          }}
+          onClick={decrementHour}
           className="w-full h-5 flex items-center justify-center text-slate-400 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-b-[11px] transition cursor-pointer text-xs font-bold leading-none active:scale-90"
           title="تقليل الساعة"
         >
@@ -159,39 +137,21 @@ export function ClockStepper({
       </span>
 
       {/* Minutes Column */}
-      <div
-        onClick={() => setActiveUnit('minute')}
-        onWheel={(e) => {
-          e.preventDefault();
-          if (e.deltaY < 0) incrementMinute();
-          else decrementMinute();
-        }}
-        className={`w-9 bg-white dark:bg-zinc-900 rounded-xl flex flex-col items-center transition cursor-pointer select-none border shrink-0 ${
-          activeUnit === 'minute'
-            ? 'border-[var(--color-imamu-accent)] shadow-2xs ring-1 ring-[var(--color-imamu-accent)]/30'
-            : 'border-slate-200 dark:border-zinc-700/80 hover:border-slate-300 dark:hover:border-zinc-600'
-        }`}
-      >
+      <div className="w-9 bg-white dark:bg-zinc-900 rounded-xl flex flex-col items-center select-none border border-slate-200 dark:border-zinc-700/80 shrink-0">
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            incrementMinute();
-          }}
+          onClick={incrementMinute}
           className="w-full h-5 flex items-center justify-center text-slate-400 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-t-[11px] transition cursor-pointer text-xs font-bold leading-none active:scale-90"
           title="زيادة الدقائق (+5)"
         >
           +
         </button>
-        <div className="w-full py-0.5 border-y border-slate-100 dark:border-zinc-800 text-center font-mono font-bold text-xs sm:text-sm text-slate-900 dark:text-white select-none">
+        <div className="w-full py-0.5 border-y border-slate-100 dark:border-zinc-800 text-center font-mono font-bold text-xs sm:text-sm text-slate-900 dark:text-white select-none cursor-default">
           {String(state.minute).padStart(2, '0')}
         </div>
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            decrementMinute();
-          }}
+          onClick={decrementMinute}
           className="w-full h-5 flex items-center justify-center text-slate-400 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-b-[11px] transition cursor-pointer text-xs font-bold leading-none active:scale-90"
           title="تقليل الدقائق (-5)"
         >
@@ -403,30 +363,33 @@ export function TimingEditor({
               </div>
 
               <div className="flex items-center gap-1.5 shrink-0">
-                <button
+                <Button
                   type="button"
+                  variant="secondary"
+                  size="xs"
                   onClick={(e) => {
                     e.stopPropagation();
                     setActiveIdx(idx);
                   }}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-[var(--color-imamu-accent)] bg-[var(--color-imamu-accent)]/10 hover:bg-[var(--color-imamu-accent)]/20 transition cursor-pointer"
+                  leftIcon={<Pencil className="w-3 h-3" />}
                 >
-                  <Pencil className="w-3 h-3" />
-                  <span>تعديل</span>
-                </button>
+                  تعديل
+                </Button>
 
                 {items.length > 1 && (
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon-xs"
                     onClick={(e) => {
                       e.stopPropagation();
                       removeItem(idx);
                     }}
-                    className="p-1 rounded-lg text-slate-400 hover:text-rose-500 transition cursor-pointer"
+                    className="text-slate-400 hover:text-rose-500"
                     title="حذف هذا الموعد"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
@@ -461,19 +424,22 @@ export function TimingEditor({
               <div className="flex items-center gap-2">
                 {hasChanged ? (
                   <>
-                    <button
+                    <Button
                       type="button"
+                      variant="primary"
+                      size="xs"
                       onClick={() => {
                         baselineRef.current = null;
                         setActiveIdx(null);
                       }}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-xs font-bold transition cursor-pointer shadow-xs active:scale-95"
+                      leftIcon={<Check className="w-3.5 h-3.5" />}
                     >
-                      <Check className="w-3.5 h-3.5" />
-                      <span>حفظ الموعد</span>
-                    </button>
-                    <button
+                      حفظ الموعد
+                    </Button>
+                    <Button
                       type="button"
+                      variant="secondary"
+                      size="xs"
                       onClick={() => {
                         if (baselineRef.current) {
                           const next = [...items];
@@ -483,24 +449,24 @@ export function TimingEditor({
                         baselineRef.current = null;
                         setActiveIdx(null);
                       }}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-600 dark:text-zinc-300 text-xs font-bold transition cursor-pointer active:scale-95"
+                      leftIcon={<X className="w-3.5 h-3.5" />}
                     >
-                      <X className="w-3.5 h-3.5" />
-                      <span>إلغاء</span>
-                    </button>
+                      إلغاء
+                    </Button>
                   </>
                 ) : (
-                  <button
+                  <Button
                     type="button"
+                    variant="secondary"
+                    size="xs"
                     onClick={() => {
                       baselineRef.current = null;
                       setActiveIdx(null);
                     }}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-600 dark:text-zinc-300 text-xs font-bold transition cursor-pointer active:scale-95"
+                    leftIcon={<X className="w-3.5 h-3.5" />}
                   >
-                    <X className="w-3.5 h-3.5" />
-                    <span>إلغاء</span>
-                  </button>
+                    إلغاء
+                  </Button>
                 )}
               </div>
             </div>
@@ -532,48 +498,45 @@ export function TimingEditor({
               </div>
             </div>
 
-            {/* Time section: 2 dedicated spacious rows with zero overlap */}
-            <div className="space-y-3 py-2 border-y border-slate-200 dark:border-zinc-800/80">
-              {/* Row 1: Start Time */}
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-[var(--color-imamu-accent)]" />
-                  <span className="text-xs font-bold text-slate-700 dark:text-zinc-300">
-                    من (وقت البدء)
-                  </span>
-                </div>
-                <ClockStepper
-                  value={item.startTime}
-                  onChange={(newStart) => {
-                    const sMin = parseTimeToMinutes(newStart) ?? 0;
-                    const eMin = parseTimeToMinutes(item.endTime) ?? 0;
-                    let newEnd = item.endTime;
-                    if (eMin <= sMin) {
-                      newEnd = formatMinutesToTime(sMin + 50, false);
-                    }
-                    const next = [...items];
-                    next[idx] = { ...next[idx], startTime: newStart, endTime: newEnd };
-                    onChange(next);
-                  }}
-                />
+            {/* Time section: Side-by-side with arrow pointer */}
+            <div className="py-2.5 border-y border-slate-200 dark:border-zinc-800/80 flex flex-wrap items-center justify-between gap-2.5">
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Clock className="w-4 h-4 text-[var(--color-imamu-accent)]" />
+                <span className="text-xs font-bold text-slate-700 dark:text-zinc-300">
+                  الوقت
+                </span>
               </div>
 
-              {/* Row 2: End Time */}
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-zinc-800/50">
-                <div className="flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-[var(--color-imamu-accent)]" />
-                  <span className="text-xs font-bold text-slate-700 dark:text-zinc-300">
-                    إلى (وقت الانتهاء)
-                  </span>
+              <div className="flex items-center gap-2 sm:gap-2.5 shrink-0" dir="rtl">
+                <div title="وقت البدء">
+                  <ClockStepper
+                    value={item.startTime}
+                    onChange={(newStart) => {
+                      const sMin = parseTimeToMinutes(newStart) ?? 0;
+                      const eMin = parseTimeToMinutes(item.endTime) ?? 0;
+                      let newEnd = item.endTime;
+                      if (eMin <= sMin) {
+                        newEnd = formatMinutesToTime(sMin + 50, false);
+                      }
+                      const next = [...items];
+                      next[idx] = { ...next[idx], startTime: newStart, endTime: newEnd };
+                      onChange(next);
+                    }}
+                  />
                 </div>
-                <ClockStepper
-                  value={item.endTime}
-                  onChange={(newEnd) => {
-                    const next = [...items];
-                    next[idx] = { ...next[idx], endTime: newEnd };
-                    onChange(next);
-                  }}
-                />
+
+                <ArrowLeft className="w-4 h-4 text-slate-400 dark:text-zinc-500 shrink-0" />
+
+                <div title="وقت الانتهاء">
+                  <ClockStepper
+                    value={item.endTime}
+                    onChange={(newEnd) => {
+                      const next = [...items];
+                      next[idx] = { ...next[idx], endTime: newEnd };
+                      onChange(next);
+                    }}
+                  />
+                </div>
               </div>
             </div>
 

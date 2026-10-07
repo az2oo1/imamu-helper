@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 
 import { cleanCourseName, cleanUrlProtocol, parseResourceUrl, parseAllResourceLinks, isWhatsappUrl, decodeHtmlEntities } from '../lib/url-utils';
+import { normalizeCourseCode } from '../lib/academic-utils';
 import { WhatsappIcon } from './WhatsappIcon';
 import { CourseBannerPattern } from './CourseBannerPattern';
 
@@ -73,7 +74,19 @@ function CourseAvatar({ avatarUrl, bannerUrl, name }: { avatarUrl?: string; what
   );
 }
 
-function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any; activeTab: string; setActiveTab: (t: any) => void }) {
+function CourseContentDetails({ 
+  course, 
+  activeTab, 
+  setActiveTab,
+  detailsLoading,
+  onNavigateCourse
+}: { 
+  course: any; 
+  activeTab: string; 
+  setActiveTab: (t: any) => void;
+  detailsLoading?: boolean;
+  onNavigateCourse?: (target: any) => void;
+}) {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   // Sections State & Link Management
@@ -179,7 +192,7 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
   const decodedCourseTitle = decodeHtmlEntities(course.name || course.title);
   const rawName = decodedCourseTitle ? decodedCourseTitle.replace(/^مصادر مادة\s+مادة\s*/gi, '').replace(/^مصادر مادة\s*/gi, '').trim() : '';
   
-  const displayCode = isNonCourseRes ? rawCode : rawCode.replace(/\s*\([^)]*\)/g, '').trim();
+  const displayCode = isNonCourseRes ? rawCode : (normalizeCourseCode(rawCode) || rawCode.replace(/\s*\([^)]*\)/g, '').trim());
   const displayName = isNonCourseRes ? (rawName || decodedCourseTitle) : (rawName.replace(/\s*\([^)]*\)/g, '').trim() || decodedCourseTitle);
 
   const isAcademicSubject = !isNonCourseRes && course.isAcademicSubject !== false && Boolean(
@@ -294,19 +307,42 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
       {/* Header Information */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
         <div>
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            {displayCode && displayCode !== 'مادة' && displayCode !== 'مصدر أكاديمي' && !/[\u0600-\u06FF]/.test(displayCode) && (
-              <span className="px-2.5 py-1 bg-slate-100 dark:bg-zinc-800/80 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700/80 text-xs font-mono font-bold rounded-lg" dir="ltr">
+          <div className="flex flex-wrap items-center gap-1.5 mb-2.5 min-h-[30px]">
+            {course.creditHours ? (
+              <span className="flex items-center gap-1 px-2.5 py-0.5 bg-slate-100 dark:bg-zinc-800/80 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700/80 text-xs font-bold rounded-md shadow-2xs shrink-0 whitespace-nowrap">
+                <Clock className="w-3 h-3 text-[var(--color-imamu-accent)] shrink-0" />
+                <span>{course.creditHours} ساعات</span>
+              </span>
+            ) : detailsLoading && course.isAcademicSubject !== false ? (
+              <span 
+                className="flex items-center gap-1 px-2.5 py-0.5 bg-slate-100 dark:bg-zinc-800/80 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700/80 text-xs font-bold rounded-md shadow-2xs shrink-0 whitespace-nowrap animate-pulse select-none"
+                title="جاري التحميل..."
+              >
+                <Clock className="w-3 h-3 text-[var(--color-imamu-accent)] opacity-40 shrink-0" />
+                <span className="w-10 h-2 bg-slate-300 dark:bg-zinc-700/80 rounded shrink-0" />
+              </span>
+            ) : null}
+
+            {displayCode && displayCode !== 'مادة' && displayCode !== 'مصدر أكاديمي' && displayCode !== 'مجموعة طلابية' && displayCode !== displayName && (
+              <span className="px-2.5 py-0.5 bg-slate-100 dark:bg-zinc-800/80 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700/80 text-xs font-mono font-bold rounded-md shadow-2xs shrink-0 whitespace-nowrap" dir="ltr">
                 {displayCode}
               </span>
             )}
-            {course.creditHours && (
-              <span className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 text-xs font-semibold rounded-lg">
-                <Clock className="w-3 h-3 text-[var(--color-imamu-accent)]" /> {course.creditHours} ساعات
+
+            {(course.sectionNumber || course.section) && (
+              <span className="px-2.5 py-0.5 bg-slate-100 dark:bg-zinc-800/80 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700/80 text-xs font-bold rounded-md shadow-2xs shrink-0 whitespace-nowrap">
+                شعبة {course.sectionNumber || course.section}
               </span>
             )}
+
+            {course.crn && (
+              <span className="px-2.5 py-0.5 bg-slate-100 dark:bg-zinc-800/80 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700/80 text-xs font-mono font-bold rounded-md shadow-2xs shrink-0 whitespace-nowrap" dir="ltr">
+                CRN: {course.crn}
+              </span>
+            )}
+
             {course.level && (
-              <span className="px-2.5 py-1 bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 text-xs font-semibold rounded-lg">
+              <span className="px-2.5 py-0.5 bg-slate-100 dark:bg-zinc-800/80 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700/80 text-xs font-bold rounded-md shadow-2xs shrink-0 whitespace-nowrap">
                 المستوى {course.level}
               </span>
             )}
@@ -454,18 +490,44 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
 
               {/* Prerequisite & Dependent Subjects info included cleanly in Description card */}
               {isAcademicSubject && ((course.prerequisites && course.prerequisites.length > 0) || (course.dependents && course.dependents.length > 0)) && (
-                <div className="pt-3 border-t border-slate-200/60 dark:border-zinc-700/60 space-y-1.5 text-xs text-slate-600 dark:text-zinc-400">
+                <div className="pt-3 border-t border-slate-200/60 dark:border-zinc-700/60 space-y-2 text-xs text-slate-600 dark:text-zinc-400">
                   {course.prerequisites && course.prerequisites.length > 0 && (
-                    <p className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-bold text-slate-900 dark:text-white">• المتطلب السابق:</span>
-                      <span className="font-medium text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)]">{course.prerequisites.map((p: any) => `${p.code} (${p.name})`).join('، ')}</span>
-                    </p>
+                    <div className="flex items-start gap-2 flex-wrap">
+                      <span className="font-bold text-slate-900 dark:text-white shrink-0 mt-1">• المتطلب السابق:</span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {course.prerequisites.map((p: any, idx: number) => (
+                          <button
+                            key={p.id || p.code || idx}
+                            type="button"
+                            onClick={() => onNavigateCourse?.(p.id || p.code)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#8C6239]/10 hover:bg-[#8C6239]/20 text-[#7A542D] dark:text-[#D4A373] border border-[#8C6239]/25 dark:border-[#8C6239]/35 transition-all cursor-pointer shadow-2xs active:scale-95 text-right"
+                            title={`عرض تفاصيل مقرر ${p.code} - ${p.name}`}
+                          >
+                            <span className="font-bold">{p.code}</span>
+                            <span className="opacity-80 font-normal">({p.name})</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   )}
                   {course.dependents && course.dependents.length > 0 && (
-                    <p className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-bold text-slate-900 dark:text-white">• تفتح المواد التالية:</span>
-                      <span className="font-medium text-emerald-700 dark:text-emerald-400">{course.dependents.map((d: any) => `${d.code} (${d.name})`).join('، ')}</span>
-                    </p>
+                    <div className="flex items-start gap-2 flex-wrap">
+                      <span className="font-bold text-slate-900 dark:text-white shrink-0 mt-1">• تفتح المواد التالية:</span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {course.dependents.map((d: any, idx: number) => (
+                          <button
+                            key={d.id || d.code || idx}
+                            type="button"
+                            onClick={() => onNavigateCourse?.(d.id || d.code)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-500/10 hover:bg-slate-500/15 text-slate-700 dark:text-zinc-300 border border-slate-300/50 dark:border-zinc-700/60 transition-all cursor-pointer shadow-2xs active:scale-95 text-right"
+                            title={`عرض تفاصيل مقرر ${d.code} - ${d.name}`}
+                          >
+                            <span className="font-bold">{d.code}</span>
+                            <span className="opacity-80 font-normal">({d.name})</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
@@ -680,9 +742,65 @@ function CourseContentDetails({ course, activeTab, setActiveTab }: { course: any
   );
 }
 
+function buildInitialCourse(initialData: any, courseIdOrCode: any) {
+  if (!initialData) return null;
+  const isNonCourseInitial = !initialData.subjectId || initialData.isAcademicSubject === false || initialData.courseCode === 'مجموعة طلابية' || initialData.courseCode === 'مصدر أكاديمي';
+  return {
+    id: initialData.subjectId || initialData.id,
+    subjectId: initialData.subjectId || null,
+    code: initialData.courseCode || initialData.code || String(courseIdOrCode || ''),
+    name: initialData.title || initialData.name || initialData.courseName,
+    title: initialData.title || initialData.name,
+    isAcademicSubject: !isNonCourseInitial,
+    avatarUrl: initialData.avatarUrl || null,
+    bannerUrl: initialData.bannerUrl || null,
+    whatsappLink: initialData.whatsappLink || initialData.whatsappUrl || null,
+    boxLink: initialData.boxLink || initialData.driveLink || null,
+    freeResourcesUrl: initialData.freeResourcesUrl || null,
+    paidResourcesUrl: initialData.paidResourcesUrl || null,
+    description: initialData.description || null,
+    creditHours: initialData.creditHours || null,
+    level: initialData.level || null,
+    section: initialData.section || initialData.sectionNumber || null,
+    sectionNumber: initialData.sectionNumber || initialData.section || null,
+    crn: initialData.crn || null,
+    resources: initialData.resources || [],
+    sectionsEnabled: initialData.sectionsEnabled !== false
+  };
+}
+
 export function CourseDetailsModal({ isOpen, onClose, courseIdOrCode, initialData }: CourseDetailsModalProps) {
-  const [course, setCourse] = useState<any>(null);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [activeTarget, setActiveTarget] = useState<any>(courseIdOrCode);
+  const [navHistory, setNavHistory] = useState<any[]>([]);
+  const courseCache = useRef<Map<string, any>>(new Map());
+
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTarget(courseIdOrCode);
+      setNavHistory([]);
+    } else {
+      courseCache.current.clear();
+    }
+  }, [isOpen, courseIdOrCode]);
+
+  const handleNavigateToCourse = (target: any) => {
+    if (!target) return;
+    setNavHistory(prev => [...prev, activeTarget]);
+    setActiveTarget(target);
+    setActiveTab('overview');
+  };
+
+  const handleGoBack = () => {
+    if (navHistory.length === 0) return;
+    const previous = navHistory[navHistory.length - 1];
+    setNavHistory(prev => prev.slice(0, -1));
+    setActiveTarget(previous);
+    setActiveTab('overview');
+  };
+
+  const [course, setCourse] = useState<any>(() => buildInitialCourse(initialData, activeTarget));
+  const [loading, setLoading] = useState<boolean>(() => isOpen && activeTarget ? !buildInitialCourse(initialData, activeTarget) : false);
+  const [detailsLoading, setDetailsLoading] = useState<boolean>(() => Boolean(isOpen && activeTarget));
   const [activeTab, setActiveTab] = useState<'overview' | 'explanations' | 'files' | 'syllabus'>('overview');
   const [contentHeight, setContentHeight] = useState<number | 'auto'>('auto');
   const contentRef = useRef<HTMLDivElement>(null);
@@ -707,51 +825,47 @@ export function CourseDetailsModal({ isOpen, onClose, courseIdOrCode, initialDat
       observer.disconnect();
       window.removeEventListener('resize', updateHeight);
     };
-  }, [course, activeTab, loading]);
+  }, [course, activeTab, loading, detailsLoading]);
 
   useEffect(() => {
-    if (!isOpen || !courseIdOrCode) {
+    if (!isOpen || !activeTarget) {
       setCourse(null);
       setActiveTab('overview');
       setLoading(false);
+      setDetailsLoading(false);
+      return;
+    }
+
+    const targetCode = typeof activeTarget === 'object' ? (activeTarget as any).courseCode || (activeTarget as any).code || (activeTarget as any).id : activeTarget;
+    const cacheKey = String(targetCode || '').trim();
+
+    // Check if course is already cached in memory
+    if (courseCache.current.has(cacheKey)) {
+      const cached = courseCache.current.get(cacheKey);
+      setCourse(cached);
+      setLoading(false);
+      setDetailsLoading(false);
       return;
     }
 
     // Populate initial course data immediately if provided (0ms instant render)
-    const isNonCourseInitial = initialData ? (!initialData.subjectId || initialData.isAcademicSubject === false || initialData.courseCode === 'مجموعة طلابية' || initialData.courseCode === 'مصدر أكاديمي') : false;
-    const initObj = initialData ? {
-      id: initialData.subjectId || initialData.id,
-      subjectId: initialData.subjectId || null,
-      code: initialData.courseCode || initialData.code || String(courseIdOrCode),
-      name: initialData.title || initialData.name || initialData.courseName,
-      title: initialData.title || initialData.name,
-      isAcademicSubject: !isNonCourseInitial,
-      avatarUrl: initialData.avatarUrl || null,
-      bannerUrl: initialData.bannerUrl || null,
-      whatsappLink: initialData.whatsappLink || initialData.whatsappUrl || null,
-      boxLink: initialData.boxLink || initialData.driveLink || null,
-      freeResourcesUrl: initialData.freeResourcesUrl || null,
-      paidResourcesUrl: initialData.paidResourcesUrl || null,
-      description: initialData.description || null,
-      creditHours: initialData.creditHours || null,
-      level: initialData.level || null,
-      resources: initialData.resources || [],
-      sectionsEnabled: initialData.sectionsEnabled !== false
-    } : null;
+    const isNonCourseInitial = (activeTarget === courseIdOrCode && initialData) ? (!initialData.subjectId || initialData.isAcademicSubject === false || initialData.courseCode === 'مجموعة طلابية' || initialData.courseCode === 'مصدر أكاديمي') : false;
+    const initObj = (activeTarget === courseIdOrCode) ? buildInitialCourse(initialData, activeTarget) : null;
 
     if (initObj) {
-      setCourse(initObj);
+      setCourse((prev: any) => prev || initObj);
       setLoading(false);
+      setDetailsLoading(true);
     } else {
       setCourse(null);
       setLoading(true);
+      setDetailsLoading(true);
     }
 
     // Silent background fetch to enrich with prerequisites & extra details
     const abortController = new AbortController();
     const token = localStorage.getItem('token');
     const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
-    const targetCode = typeof courseIdOrCode === 'object' ? (courseIdOrCode as any).courseCode || (courseIdOrCode as any).code || (courseIdOrCode as any).id : courseIdOrCode;
 
     fetch(`/api/subjects/${encodeURIComponent(String(targetCode))}/details`, { headers, signal: abortController.signal })
       .then(res => res.ok ? res.json() : null)
@@ -769,7 +883,7 @@ export function CourseDetailsModal({ isOpen, onClose, courseIdOrCode, initialDat
             ? initDesc
             : (apiDescValid ? apiDesc : (initDesc || apiDesc || null));
 
-          setCourse({
+          const enrichedCourse = {
             ...data.course,
             sectionsEnabled: data.course.sectionsEnabled !== false && (initObj ? initObj.sectionsEnabled !== false : true),
             name: (isNonCourse && (initObj?.name || initObj?.title)) ? (initObj.name || initObj.title) : (data.course.name || initObj?.name || initObj?.title),
@@ -780,21 +894,32 @@ export function CourseDetailsModal({ isOpen, onClose, courseIdOrCode, initialDat
             boxLink: data.course.boxLink || initObj?.boxLink || null,
             whatsappLink: data.course.whatsappLink || initObj?.whatsappLink || null,
             avatarUrl: data.course.avatarUrl || initObj?.avatarUrl || null,
-            bannerUrl: data.course.bannerUrl || initObj?.bannerUrl || null
-          });
+            bannerUrl: data.course.bannerUrl || initObj?.bannerUrl || null,
+            sectionNumber: data.course.sectionNumber || initObj?.sectionNumber || null,
+            section: data.course.section || initObj?.section || null,
+            crn: data.course.crn || initObj?.crn || null
+          };
+
+          courseCache.current.set(cacheKey, enrichedCourse);
+          if (data.course.code) courseCache.current.set(String(data.course.code), enrichedCourse);
+          if (data.course.id) courseCache.current.set(String(data.course.id), enrichedCourse);
+
+          setCourse(enrichedCourse);
         }
         setLoading(false);
+        setDetailsLoading(false);
       })
       .catch(err => {
         if (abortController.signal.aborted) return;
         console.error('Failed to load course details:', err);
         setLoading(false);
+        setDetailsLoading(false);
       });
 
     return () => {
       abortController.abort();
     };
-  }, [isOpen, courseIdOrCode, initialData]);
+  }, [isOpen, activeTarget, courseIdOrCode, initialData]);
 
   if (!isOpen) return null;
 
@@ -818,6 +943,18 @@ export function CourseDetailsModal({ isOpen, onClose, courseIdOrCode, initialDat
           transition={{ type: 'spring', stiffness: 380, damping: 32 }}
           className="relative bg-white dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800 rounded-t-3xl sm:rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] z-10"
         >
+          {/* Back Button if navigated */}
+          {navHistory.length > 0 && (
+            <button
+              onClick={handleGoBack}
+              className="absolute top-4 right-4 py-1.5 px-3 rounded-full z-30 transition-all duration-300 ease-out cursor-pointer shadow-lg backdrop-blur-md bg-black/40 hover:bg-black/80 dark:bg-white/20 dark:hover:bg-white/40 text-white dark:text-black border border-white/25 dark:border-black/25 flex items-center gap-1.5 text-xs font-bold active:scale-95"
+              title="العودة للمقرر السابق"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 rotate-180" />
+              <span>رجوع</span>
+            </button>
+          )}
+
           {/* Close Button */}
           <button
             onClick={onClose}
@@ -865,6 +1002,10 @@ export function CourseDetailsModal({ isOpen, onClose, courseIdOrCode, initialDat
                 <div className="space-y-6 animate-pulse" dir="rtl">
                   <div className="flex items-center justify-between gap-4">
                     <div className="space-y-2 flex-1">
+                      <div className="flex items-center gap-1.5 mb-2.5 min-h-[30px]">
+                        <div className="h-6 w-20 bg-slate-200/80 dark:bg-zinc-800 rounded-md border border-slate-200/50 dark:border-zinc-700/50 shrink-0" />
+                        <div className="h-6 w-16 bg-slate-200/80 dark:bg-zinc-800 rounded-md border border-slate-200/50 dark:border-zinc-700/50 shrink-0" />
+                      </div>
                       <div className="h-6 w-48 bg-slate-200 dark:bg-zinc-800 rounded-xl" />
                       <div className="h-4 w-32 bg-slate-100 dark:bg-zinc-800/60 rounded-lg" />
                     </div>
@@ -901,6 +1042,8 @@ export function CourseDetailsModal({ isOpen, onClose, courseIdOrCode, initialDat
                   course={course} 
                   activeTab={activeTab} 
                   setActiveTab={setActiveTab} 
+                  detailsLoading={detailsLoading}
+                  onNavigateCourse={handleNavigateToCourse}
                 />
               )}
             </div>

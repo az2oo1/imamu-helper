@@ -7,104 +7,22 @@ import {
   BookOpen, ChevronRight, ChevronLeft, Eye, X, FileText, Loader2,
   Check, Layers, Sparkles, Folder, FolderOpen, FolderPlus, ArrowRight,
   Copy, Mail, UserCheck, ChevronDown, ChevronUp, Plus, RotateCcw,
-  Activity, Play, Pause, Radio, Globe, Sliders
+  Activity, Play, Pause, Sliders, Settings, Pencil
 } from 'lucide-react';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatScheduleDaysDisplay } from '../../lib/schedule-utils';
 import { formatDate } from '../../lib/date-utils';
-
-interface ScheduleMeeting {
-  type?: string;
-  meetingType?: string;
-  days?: string[] | string;
-  daysString?: string;
-  startTime?: string;
-  endTime?: string;
-  timeRange?: string;
-  startDate?: string;
-  endDate?: string;
-  building?: string;
-  buildingCode?: string;
-  room?: string;
-  campus?: string;
-}
-
-interface SectionItem {
-  id: number;
-  crn: string;
-  sectionNumber: string;
-  courseCode: string;
-  courseTitle: string;
-  subjectId?: number;
-  academicYear?: string;
-  semester?: string;
-  term?: string;
-  campus?: string;
-  scheduleType?: string;
-  instructionalMethod?: string;
-  creditHours?: number;
-  primaryInstructor?: string;
-  instructors?: { name: string; email?: string; isPrimary?: boolean }[];
-  schedules?: ScheduleMeeting[];
-  scheduleSummary?: string;
-  isOpen?: boolean;
-  maxEnrollment?: number | null;
-  currentEnrollment?: number | null;
-  seatsAvailable?: number | null;
-  finalExam?: any;
-  createdAt?: string;
-}
-
-export interface BannerTermItem {
-  termCode: string;
-  termName: string;
-  academicYear: string;
-  semester: string;
-  monitorChanges: boolean;
-  autoUpdate: boolean;
-  updateIntervalDays: number;
-  lastSyncAt?: string | null;
-  lastCheckAt?: string | null;
-  totalSections: number;
-  status: 'idle' | 'syncing' | 'error';
-  lastError?: string | null;
-}
-
-export interface DetectedTermItem {
-  termCode: string;
-  termName: string;
-  academicYear: string;
-  semester: string;
-}
-
-export interface FolderItem {
-  id: string;
-  name: string;
-  academicYear?: string;
-  semester?: string;
-  term?: string;
-  termCode?: string;
-  count: number;
-  bannerConfig?: BannerTermItem;
-}
-
-const FOLDERS_STORAGE_KEY = 'imamu_section_folders';
-
-export function saveSharedFolders(folderList: Array<{ name: string; academicYear?: string; semester?: string; term?: string; count?: number }>) {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(FOLDERS_STORAGE_KEY, JSON.stringify(folderList));
-  } catch {}
-}
-
-export function loadSharedFolders(): Array<{ name: string; academicYear?: string; semester?: string; term?: string; count?: number }> {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(FOLDERS_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-}
+import {
+  AvailableTerm,
+  BannerTermItem,
+  FolderItem,
+  SectionItem,
+  buildSectionFolders,
+  loadSharedFolders,
+  saveSharedFolders
+} from './admin-sections-model';
+import { SectionDetailsModal } from './SectionDetailsModal';
 
 export default function AdminSectionsTab({
   getToken,
@@ -141,7 +59,7 @@ export default function AdminSectionsTab({
   const [campusFilter, setCampusFilter] = useState('');
   const [academicYearFilter, setAcademicYearFilter] = useState('');
   const [semesterFilter, setSemesterFilter] = useState('');
-  const [availableTerms, setAvailableTerms] = useState<Array<{ academicYear?: string; semester?: string; term?: string; count?: number }>>([]);
+  const [availableTerms, setAvailableTerms] = useState<AvailableTerm[]>([]);
 
   // Folder View State
   // Folder View State: null = root explorer (show folders only), 'all' = all sections, FolderItem = specific term
@@ -156,10 +74,6 @@ export default function AdminSectionsTab({
 
   // Add Term Modal State
   const [isAddTermModalOpen, setIsAddTermModalOpen] = useState(false);
-  const [detectedTerms, setDetectedTerms] = useState<DetectedTermItem[]>([]);
-  const [detectedLoading, setDetectedLoading] = useState(false);
-  const [selectedTermMode, setSelectedTermMode] = useState<'detected' | 'custom'>('detected');
-  const [selectedTermCode, setSelectedTermCode] = useState<string>('');
   const [customTermCode, setCustomTermCode] = useState('');
   const [customTermName, setCustomTermName] = useState('');
   const [customYear, setCustomYear] = useState('1448');
@@ -179,6 +93,32 @@ export default function AdminSectionsTab({
   // Action status indicators
   const [syncingTermCode, setSyncingTermCode] = useState<string | null>(null);
   const [emptyingTermCode, setEmptyingTermCode] = useState<string | null>(null);
+  const [optionsModalTermCode, setOptionsModalTermCode] = useState<string | null>(null);
+
+  // Real-time Banner Sync Progress State
+  const [activeSyncProgress, setActiveSyncProgress] = useState<Record<string, {
+    termCode: string;
+    termName?: string;
+    status: 'idle' | 'connecting' | 'fetching_sections' | 'fetching_prereqs' | 'saving' | 'completed' | 'error';
+    currentStep: string;
+    progressPercent: number;
+    totalSections: number;
+    fetchedSections: number;
+    totalCourses: number;
+    message: string;
+    startedAt: number;
+    updatedAt: number;
+    error?: string;
+  }>>({});
+  const [dismissedSyncCodes, setDismissedSyncCodes] = useState<Set<string>>(new Set());
+
+  // Existing Term Discovered Selection State (Options Modal)
+  const [isEditingExistingTerm, setIsEditingExistingTerm] = useState(false);
+  const [existingEditName, setExistingEditName] = useState('');
+  const [existingEditCode, setExistingEditCode] = useState('');
+  const [existingEditYear, setExistingEditYear] = useState('');
+  const [existingEditSemester, setExistingEditSemester] = useState('');
+  const [savingExistingTerm, setSavingExistingTerm] = useState(false);
 
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
   const copyEmail = (email: string) => {
@@ -188,45 +128,15 @@ export default function AdminSectionsTab({
   };
 
   // Derive folder list from bannerTerms and availableTerms
-  const folders: FolderItem[] = useMemo(() => {
-    const list: FolderItem[] = [];
-    const bannerCodeSet = new Set<string>();
+  const folders = useMemo(
+    () => buildSectionFolders(bannerTerms, availableTerms),
+    [bannerTerms, availableTerms]
+  );
 
-    for (const bt of bannerTerms) {
-      bannerCodeSet.add(bt.termCode);
-      list.push({
-        id: bt.termCode,
-        name: bt.termName,
-        academicYear: bt.academicYear,
-        semester: bt.semester,
-        term: bt.termCode,
-        termCode: bt.termCode,
-        count: bt.totalSections || 0,
-        bannerConfig: bt
-      });
-    }
-
-    // Also include any terms from availableTerms that aren't already represented
-    for (const t of availableTerms) {
-      const codeOrTerm = t.term || '';
-      if (codeOrTerm && bannerCodeSet.has(codeOrTerm)) continue;
-      const name = t.term || (t.academicYear && t.semester ? `${t.academicYear} - ${t.semester}` : t.academicYear || t.semester || 'غير مصنف');
-      const id = t.term || `${t.academicYear || ''}-${t.semester || ''}`;
-      if (!list.some(f => f.name === name || f.id === id)) {
-        list.push({
-          id,
-          name,
-          academicYear: t.academicYear,
-          semester: t.semester,
-          term: t.term,
-          termCode: t.term,
-          count: t.count || 0
-        });
-      }
-    }
-
-    return list;
-  }, [bannerTerms, availableTerms]);
+  const optionsFolder = useMemo(() => {
+    if (!optionsModalTermCode) return null;
+    return folders.find(f => (f.termCode || f.id) === optionsModalTermCode) || null;
+  }, [optionsModalTermCode, folders]);
 
   const grandTotalSections = folders.reduce((sum, t) => sum + (Number(t.count) || 0), 0);
 
@@ -276,63 +186,67 @@ export default function AdminSectionsTab({
     }
   }, [getToken]);
 
-  useEffect(() => {
-    fetchTerms();
-    fetchBannerTerms();
-  }, [fetchTerms, fetchBannerTerms]);
-
-  // Open Add Term Modal and query detected terms
-  const openAddTermModal = async () => {
-    setIsAddTermModalOpen(true);
-    setDetectedLoading(true);
+  // Fetch active sync progress from Banner
+  const fetchSyncProgress = useCallback(async () => {
     try {
       const token = await getToken();
-      const res = await fetch('/api/admin/banner/detected-terms', {
+      const res = await fetch('/api/admin/banner/sync-progress', {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
-        const terms = data.terms || [];
-        setDetectedTerms(terms);
-        if (terms.length > 0) {
-          setSelectedTermCode(terms[0].termCode);
+        if (data.progress) {
+          setActiveSyncProgress(data.progress);
         }
       }
-    } catch (e) {
-      console.error(e);
-      toast('error', 'تعذر جلب الفصول المكتشفة من بانر');
-    } finally {
-      setDetectedLoading(false);
+    } catch {
+      // Ignore background poll errors
     }
+  }, [getToken]);
+
+  useEffect(() => {
+    fetchTerms();
+    fetchBannerTerms();
+    fetchSyncProgress();
+  }, [fetchTerms, fetchBannerTerms, fetchSyncProgress]);
+
+  // Live polling for active sync progress
+  useEffect(() => {
+    const isAnyActive = syncingTermCode !== null ||
+      folders.some(f => f.bannerConfig?.status === 'syncing') ||
+      Object.values(activeSyncProgress).some(p =>
+        ['connecting', 'fetching_sections', 'fetching_prereqs', 'saving'].includes(p.status)
+      );
+
+    if (!isAnyActive) return;
+
+    fetchSyncProgress();
+    let tickCount = 0;
+    const interval = setInterval(() => {
+      fetchSyncProgress();
+      tickCount++;
+      if (tickCount % 3 === 0) {
+        fetchBannerTerms();
+        fetchTerms();
+      }
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [syncingTermCode, folders, activeSyncProgress, fetchSyncProgress, fetchBannerTerms, fetchTerms]);
+
+  const openAddTermModal = () => {
+    setIsAddTermModalOpen(true);
   };
 
   // Submit adding term
   const handleAddTermSubmit = async () => {
-    let termCode = '';
-    let termName = '';
-    let academicYear = '';
-    let semester = '';
-
-    if (selectedTermMode === 'detected') {
-      const found = detectedTerms.find(t => t.termCode === selectedTermCode);
-      if (!found) {
-        toast('warning', 'يرجى اختيار فصل دراسي محدد');
-        return;
-      }
-      termCode = found.termCode;
-      termName = found.termName;
-      academicYear = found.academicYear;
-      semester = found.semester;
-    } else {
-      if (!customTermCode.trim() || !customTermName.trim()) {
-        toast('warning', 'يرجى إدخال رمز الفصل واسمه');
-        return;
-      }
-      termCode = customTermCode.trim();
-      termName = customTermName.trim();
-      academicYear = customYear.trim();
-      semester = customSemester.trim();
+    if (!customTermCode.trim() || !customTermName.trim()) {
+      toast('warning', 'يرجى إدخال رمز الفصل واسمه');
+      return;
     }
+    const termCode = customTermCode.trim();
+    const termName = customTermName.trim();
+    const academicYear = customYear.trim();
+    const semester = customSemester.trim();
 
     setAddingTerm(true);
     try {
@@ -449,27 +363,96 @@ export default function AdminSectionsTab({
     }
   };
 
+  // Save Discovered Term to Existing Folder (From Options Modal)
+  const handleSaveDiscoveredToExisting = async () => {
+    if (!optionsFolder) return;
+    if (!existingEditCode.trim() || !existingEditName.trim()) {
+      toast('warning', 'يرجى إدخال رمز الفصل واسمه');
+      return;
+    }
+    const finalName = existingEditName.trim();
+    const finalYear = existingEditYear.trim();
+    const finalSemester = existingEditSemester.trim();
+    const currentCode = optionsFolder.termCode || optionsFolder.id;
+    const newCode = existingEditCode.trim();
+
+    setSavingExistingTerm(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/admin/banner/terms/${encodeURIComponent(currentCode)}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          termName: finalName,
+          academicYear: finalYear,
+          semester: finalSemester,
+          newTermCode: newCode
+        })
+      });
+      if (res.ok) {
+        toast('success', `تم اعتماد وربط الفصل «${finalName}» بنجاح!`);
+        setIsEditingExistingTerm(false);
+        setOptionsModalTermCode(newCode);
+        if (selectedFolder && selectedFolder !== 'all' && (selectedFolder.termCode === currentCode || selectedFolder.id === currentCode)) {
+          setSelectedFolder((prev) => (prev && prev !== 'all') ? {
+            ...prev,
+            name: finalName,
+            academicYear: finalYear,
+            semester: finalSemester,
+            term: newCode,
+            termCode: newCode
+          } : prev);
+        }
+        await fetchBannerTerms();
+        await fetchTerms();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast('error', err.error || 'فشل تحديث بيانات الفصل');
+      }
+    } catch {
+      toast('error', 'خطأ في الاتصال بالخادم');
+    } finally {
+      setSavingExistingTerm(false);
+    }
+  };
+
   // Immediate Full Sync for Term
   const handleSyncNow = async (termCode: string) => {
     setSyncingTermCode(termCode);
+    setDismissedSyncCodes(prev => {
+      const next = new Set(prev);
+      next.delete(termCode);
+      return next;
+    });
+    fetchSyncProgress();
     try {
       const token = await getToken();
-      toast('info', 'بدأت مزامنة بيانات الشعب ومقاعدها من بانر الآن...');
+      toast('info', 'بدأت مزامنة وتحديث بيانات الفصل من بانر الآن...');
       const res = await fetch(`/api/admin/banner/terms/${encodeURIComponent(termCode)}/sync`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.success) {
-        toast('success', `اكتملت المزامنة بنجاح! تم استيراد ${data.sectionsCount?.toLocaleString() || 0} شعبة و ${data.coursesCount?.toLocaleString() || 0} مقرر.`);
-        fetchBannerTerms();
-        fetchTerms();
-        if (selectedFolder) fetchSections();
+        if (data.started) {
+          toast('info', data.message || 'بدأت المزامنة في الخلفية بنجاح.');
+        } else {
+          toast('success', `اكتملت المزامنة بنجاح! تم استيراد ${data.sectionsCount?.toLocaleString() || 0} شعبة و ${data.coursesCount?.toLocaleString() || 0} مقرر.`);
+          fetchBannerTerms();
+          fetchTerms();
+          if (selectedFolder) fetchSections();
+        }
+        fetchSyncProgress();
       } else {
         toast('error', data.error || 'فشلت المزامنة من بانر');
+        fetchSyncProgress();
       }
     } catch (e: any) {
       toast('error', e.message || 'خطأ أثناء المزامنة');
+      fetchSyncProgress();
     } finally {
       setSyncingTermCode(null);
     }
@@ -843,7 +826,15 @@ export default function AdminSectionsTab({
                 <Layers className="w-5 h-5" />
               </div>
               <div>
-                <h1 className="text-base font-black" style={{ color: 'var(--text-main)' }}>الشعب والمواعيد</h1>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-base font-black" style={{ color: 'var(--text-main)' }}>الشعب والمواعيد</h1>
+                  <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500/10 text-[var(--color-imamu-accent)] border border-amber-500/20">
+                    {folders.length} فصول دراسية
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700">
+                    {grandTotalSections.toLocaleString()} شعبة مسجلة
+                  </span>
+                </div>
                 <p className="text-[11px] text-slate-500 dark:text-zinc-400 font-medium">إدارة الفصول الدراسية والمزامنة التلقائية مع بانر</p>
               </div>
             </>
@@ -851,6 +842,21 @@ export default function AdminSectionsTab({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {activeSubTab === 'sections' && grandTotalSections > 0 && selectedFolder === null && (
+            <button
+              onClick={handleDeleteAllSections}
+              disabled={isDeletingAll}
+              className="flex items-center gap-1.5 px-3 py-2 bg-rose-600/10 hover:bg-rose-600 text-rose-600 hover:text-white border border-rose-500/30 font-bold text-xs rounded-xl transition cursor-pointer disabled:opacity-50"
+              title="حذف ومسح جميع الشعب الدراسية"
+            >
+              {isDeletingAll ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="w-3.5 h-3.5" />
+              )}
+              <span>حذف جميع الشعب</span>
+            </button>
+          )}
           <button
             onClick={openAddTermModal}
             className="flex items-center gap-2 px-4 py-2 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl transition shadow-md border border-amber-700/30 cursor-pointer"
@@ -864,7 +870,7 @@ export default function AdminSectionsTab({
               else { fetchSections(); fetchTerms(); fetchBannerTerms(); }
             }}
             disabled={loading || teachersLoading || bannerTermsLoading}
-            className="p-2 rounded-xl border transition hover:bg-slate-100 dark:hover:bg-zinc-800"
+            className="p-2 rounded-xl border transition hover:bg-slate-100 dark:hover:bg-zinc-800 cursor-pointer shadow-xs"
             style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
             title="تحديث البيانات"
           >
@@ -1009,9 +1015,9 @@ export default function AdminSectionsTab({
                               className="overflow-hidden"
                             >
                               <div className="flex flex-wrap gap-1.5 pt-2 border-t mt-1" style={{ borderColor: 'var(--border-color)' }}>
-                                {teacher.courses.map((c: any) => (
+                                {teacher.courses.map((c: any, cIdx: number) => (
                                   <div
-                                    key={c.courseCode}
+                                    key={`${c.courseCode || 'course'}-${cIdx}`}
                                     className="px-2.5 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5"
                                     style={{ background: 'var(--bg-main)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
                                   >
@@ -1038,60 +1044,9 @@ export default function AdminSectionsTab({
         /* VIEW A: Folders Explorer (استعراض الفصول كمجلدات فقط)             */
         /* ================================================================ */
         <div className="space-y-6">
-          {/* Header & Stats */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-xl sm:text-2xl font-black" style={{ color: 'var(--text-main)' }}>
-                  الشعب الدراسية والمواعيد
-                </h2>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/10 text-[var(--color-imamu-accent)] border border-amber-500/20">
-                  {folders.length} فصول دراسية
-                </span>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700">
-                  {grandTotalSections.toLocaleString()} شعبة مسجلة
-                </span>
-              </div>
-              <p className="text-xs sm:text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-                تصفح الفصول الدراسية كمجلدات. اضغط على أي فصل لاستعراض وتحميل الشعب والمواعيد الخاصة به.
-              </p>
-            </div>
 
-            <div className="flex items-center gap-2 flex-wrap">
-              {grandTotalSections > 0 && (
-                <button
-                  onClick={handleDeleteAllSections}
-                  disabled={isDeletingAll}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl transition shadow-md border border-rose-700/30 disabled:opacity-50"
-                  title="حذف ومسح جميع الشعب الدراسية للبدء بفصل دراسي جديد"
-                >
-                  {isDeletingAll ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="w-4 h-4" />
-                  )}
-                  <span>حذف جميع الشعب</span>
-                </button>
-              )}
 
-              <button
-                onClick={openAddTermModal}
-                className="flex items-center gap-2 px-4 py-2.5 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl transition shadow-md border border-amber-700/30 cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>إضافة فصل دراسي</span>
-              </button>
 
-              <button
-                onClick={() => { fetchTerms(); fetchBannerTerms(); }}
-                className="p-2.5 rounded-xl border transition hover:bg-slate-100 dark:hover:bg-zinc-800"
-                style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
-                title="تحديث قائمة الفصول"
-              >
-                <RefreshCw className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
 
           {/* Folders Explorer Container */}
           <div className="p-5 rounded-2xl border space-y-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
@@ -1181,80 +1136,45 @@ export default function AdminSectionsTab({
                         </span>
                       </div>
 
-                      {/* Syncing Progress Banner if active */}
-                      {isSyncing && (
-                        <div className="p-2 rounded-xl bg-amber-500/15 text-[var(--color-imamu-accent)] text-xs font-bold flex items-center gap-2 animate-pulse">
-                          <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                          <span>جاري المزامنة والتحديث من بانر...</span>
-                        </div>
-                      )}
-
-                      {/* Options & Controls (1: Monitoring, 2: Auto Update) */}
-                      {folder.bannerConfig && (
+                      {/* Active Status Badges if Banner Config is present */}
+                      {folder.bannerConfig && (folder.bannerConfig.monitorChanges || folder.bannerConfig.autoUpdate) && (
                         <div
-                          className="p-2.5 rounded-xl border border-slate-200/80 dark:border-zinc-800/80 space-y-2 bg-white/50 dark:bg-zinc-900/50"
-                          onClick={(e) => e.stopPropagation()}
+                          className="flex items-center gap-1.5 flex-wrap pt-0.5 cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOptionsModalTermCode(folder.termCode || folder.id);
+                          }}
+                          title="انقر لتعديل الخيارات والإعدادات"
                         >
-                          {/* Option 1: Monitoring for changes */}
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-1.5">
-                              <Activity className={clsx("w-3.5 h-3.5", folder.bannerConfig.monitorChanges ? "text-emerald-500" : "text-slate-400")} />
-                              <span className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300">مراقبة التغييرات:</span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleToggleMonitor(folder.termCode!, folder.bannerConfig!.monitorChanges)}
-                              className={clsx(
-                                "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
-                                folder.bannerConfig.monitorChanges ? "bg-emerald-500" : "bg-slate-300 dark:bg-zinc-700"
-                              )}
-                              title={folder.bannerConfig.monitorChanges ? "المراقبة مفعلة (فحص دوري للمقاعد والشعب)" : "المراقبة متوقفة"}
-                            >
-                              <span className={clsx(
-                                "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
-                                folder.bannerConfig.monitorChanges ? "translate-x-0" : "-translate-x-4"
-                              )} />
-                            </button>
-                          </div>
-
-                          {/* Option 2: Regularly updating + Frequency */}
-                          <div className="flex items-center justify-between text-xs gap-2 pt-1 border-t border-slate-200/40 dark:border-zinc-800/60">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <RefreshCw className={clsx("w-3.5 h-3.5", folder.bannerConfig.autoUpdate ? "text-amber-500" : "text-slate-400")} />
-                              <span className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300 shrink-0">تحديث دوري:</span>
-                              {folder.bannerConfig.autoUpdate && (
-                                <select
-                                  value={folder.bannerConfig.updateIntervalDays || 2}
-                                  onChange={(e) => handleChangeInterval(folder.termCode!, Number(e.target.value))}
-                                  className="text-[10px] font-bold py-0.5 px-1.5 rounded-lg border bg-white dark:bg-zinc-800 border-slate-200 dark:border-zinc-700 text-[var(--color-imamu-accent)] cursor-pointer"
-                                >
-                                  <option value={1}>كل 1 يوم</option>
-                                  <option value={2}>كل يومين</option>
-                                  <option value={3}>كل 3 أيام</option>
-                                  <option value={7}>كل أسبوع</option>
-                                </select>
-                              )}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleToggleAutoUpdate(folder.termCode!, folder.bannerConfig!.autoUpdate)}
-                              className={clsx(
-                                "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
-                                folder.bannerConfig.autoUpdate ? "bg-amber-500" : "bg-slate-300 dark:bg-zinc-700"
-                              )}
-                              title={folder.bannerConfig.autoUpdate ? "التحديث الدوري مفعل" : "التحديث الدوري متوقف"}
-                            >
-                              <span className={clsx(
-                                "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
-                                folder.bannerConfig.autoUpdate ? "translate-x-0" : "-translate-x-4"
-                              )} />
-                            </button>
-                          </div>
+                          {folder.bannerConfig.monitorChanges && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              مراقبة نشطة
+                            </span>
+                          )}
+                          {folder.bannerConfig.autoUpdate && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-[var(--color-imamu-accent)] border border-amber-500/20">
+                              <RefreshCw className="w-2.5 h-2.5" />
+                              تحديث كل {folder.bannerConfig.updateIntervalDays || 2} {folder.bannerConfig.updateIntervalDays === 1 ? 'يوم' : folder.bannerConfig.updateIntervalDays === 2 ? 'يومين' : 'أيام'}
+                            </span>
+                          )}
                         </div>
                       )}
 
                       {/* Quick Actions Strip */}
                       <div className="flex items-center justify-between border-t pt-2.5 border-slate-200/60 dark:border-zinc-800/80 text-[11px]" onClick={(e) => e.stopPropagation()}>
+                        {/* Options / Settings Button */}
+                        <button
+                          type="button"
+                          onClick={() => setOptionsModalTermCode(folder.termCode || folder.id)}
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-200/80 dark:border-zinc-800 hover:bg-amber-500/15 text-slate-600 dark:text-zinc-300 hover:text-[var(--color-imamu-accent)] transition cursor-pointer font-bold text-xs"
+                          title="خيارات وإعدادات الفصل"
+                        >
+                          <Sliders className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
+                          <span>خيارات الفصل</span>
+                        </button>
+
+                        {/* Open Folder Button */}
                         <button
                           type="button"
                           onClick={() => handleSelectFolder(folder)}
@@ -1263,65 +1183,6 @@ export default function AdminSectionsTab({
                           <span>فتح المجلد</span>
                           <ChevronLeft className="w-3.5 h-3.5" />
                         </button>
-
-                        <div className="flex items-center gap-1">
-                          {/* Sync Now Button */}
-                          <button
-                            type="button"
-                            onClick={() => handleSyncNow(folder.termCode || folder.id)}
-                            disabled={isSyncing}
-                            className="p-1.5 rounded-lg hover:bg-amber-500/15 text-slate-400 hover:text-[var(--color-imamu-accent)] transition cursor-pointer disabled:opacity-40"
-                            title="مزامنة فورية وتحديث كامل من بانر الآن"
-                          >
-                            <RefreshCw className={clsx("w-3.5 h-3.5", isSyncing && "animate-spin")} />
-                          </button>
-
-                          {/* Option 4: Add CRNs by JSON */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const bt = folder.bannerConfig || {
-                                termCode: folder.termCode || folder.id,
-                                termName: folder.name,
-                                academicYear: folder.academicYear || '',
-                                semester: folder.semester || '',
-                                monitorChanges: false,
-                                autoUpdate: false,
-                                updateIntervalDays: 2,
-                                totalSections: folder.count,
-                                status: 'idle'
-                              };
-                              setAddCrnsTerm(bt);
-                              setCrnsInputText('');
-                              setAddCrnsResult(null);
-                            }}
-                            className="p-1.5 rounded-lg hover:bg-amber-500/15 text-slate-400 hover:text-[var(--color-imamu-accent)] transition cursor-pointer"
-                            title="إضافة شعب بالرقم المرجعي (CRN) أو JSON"
-                          >
-                            <FileText className="w-3.5 h-3.5" />
-                          </button>
-
-                          {/* Option 3: Empty Term */}
-                          <button
-                            type="button"
-                            onClick={() => handleEmptyTerm(folder.termCode || folder.id, folder.name)}
-                            disabled={isEmptying}
-                            className="p-1.5 rounded-lg hover:bg-amber-500/15 text-slate-400 hover:text-amber-600 transition cursor-pointer disabled:opacity-40"
-                            title="تفريغ كافة شعب هذا الفصل"
-                          >
-                            <RotateCcw className={clsx("w-3.5 h-3.5", isEmptying && "animate-spin")} />
-                          </button>
-
-                          {/* Delete Term */}
-                          <button
-                            type="button"
-                            onClick={() => folder.bannerConfig ? handleDeleteTerm(folder.termCode!, folder.name) : handleDeleteFolder(folder)}
-                            className="p-1.5 rounded-lg hover:bg-red-500/15 text-slate-400 hover:text-red-500 transition cursor-pointer"
-                            title="حذف الفصل الدراسي بالكامل"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
                       </div>
                     </div>
                   );
@@ -1335,7 +1196,7 @@ export default function AdminSectionsTab({
                 >
                   <div className="flex items-start justify-between gap-2.5">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-slate-200 dark:bg-zinc-700 text-slate-600 dark:text-zinc-300 group-hover:bg-[var(--color-imamu-brown)] group-hover:text-white transition flex items-center justify-center shrink-0 shadow-xs">
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-[var(--color-imamu-accent)] group-hover:bg-[var(--color-imamu-brown)] group-hover:text-white transition flex items-center justify-center shrink-0 shadow-xs">
                         <Layers className="w-5 h-5" />
                       </div>
                       <div className="min-w-0">
@@ -1348,18 +1209,27 @@ export default function AdminSectionsTab({
                       </div>
                     </div>
 
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-200/70 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 shrink-0">
-                      {grandTotalSections.toLocaleString()}
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-[var(--color-imamu-accent)] shrink-0">
+                      {grandTotalSections.toLocaleString()} شعبة
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200/50 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border border-slate-200 dark:border-zinc-700/60">
+                      جميع الفصول ({folders.length})
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between border-t pt-2.5 border-slate-200/60 dark:border-zinc-800/80 text-[11px]" onClick={(e) => e.stopPropagation()}>
+                    <span className="text-[10px] text-slate-400">
+                      مجلد مجمّع
+                    </span>
                     <button
                       type="button"
                       onClick={() => handleSelectFolder('all')}
                       className="text-[var(--color-imamu-accent)] font-bold flex items-center gap-1 group-hover:translate-x-[-2px] transition-transform cursor-pointer"
                     >
-                      <span>استعراض الكل</span>
+                      <span>فتح المجلد</span>
                       <ChevronLeft className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -1374,146 +1244,119 @@ export default function AdminSectionsTab({
         /* ================================================================ */
         <div className="space-y-6">
           {/* Active Folder Navigation & Actions Banner */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-amber-500/10 border border-amber-500/25 rounded-2xl">
-            <div className="flex items-center gap-3 min-w-0">
-              <button
-                type="button"
-                onClick={() => handleSelectFolder(null)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-zinc-700 text-xs font-bold transition shadow-xs cursor-pointer shrink-0"
-              >
-                <ChevronRight className="w-4 h-4" />
-                <span>العودة إلى مجلدات الفصول</span>
-              </button>
+          {(() => {
+            const folderCode = selectedFolder !== 'all' ? (selectedFolder.termCode || selectedFolder.id) : null;
+            const isFolderSyncing = Boolean(folderCode && (
+              syncingTermCode === folderCode ||
+              (selectedFolder !== 'all' && selectedFolder.bannerConfig?.status === 'syncing') ||
+              (activeSyncProgress[folderCode] && ['connecting', 'fetching_sections', 'fetching_prereqs', 'saving'].includes(activeSyncProgress[folderCode].status))
+            ));
+            const prog = folderCode ? activeSyncProgress[folderCode] : null;
 
-              <div className="h-5 w-px bg-amber-500/30 shrink-0" />
-
-              <div className="flex items-center gap-2 min-w-0">
-                {selectedFolder === 'all' ? (
-                  <Layers className="w-5 h-5 text-[var(--color-imamu-accent)] shrink-0" />
-                ) : (
-                  <FolderOpen className="w-5 h-5 text-[var(--color-imamu-accent)] shrink-0" />
-                )}
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs text-slate-500 dark:text-zinc-400">المجلد:</span>
-                    <h3 className="text-sm font-black text-slate-900 dark:text-white truncate">
-                      {selectedFolder === 'all' ? 'كافة الشعب الدراسية' : selectedFolder.name}
-                    </h3>
-                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-[var(--color-imamu-accent)]">
-                      {loading ? 'جاري التحميل...' : `${totalCount.toLocaleString()} شعبة`}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap shrink-0">
-              {selectedFolder !== 'all' && (
-                <>
-                  {/* Quick Toggles if Banner Config is available */}
-                  {selectedFolder.bannerConfig && (
-                    <div className="flex items-center gap-2 p-1 bg-white/70 dark:bg-zinc-800/70 border border-slate-200 dark:border-zinc-700 rounded-xl px-2.5 text-xs">
-                      {/* Monitor toggle */}
-                      <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-semibold text-slate-700 dark:text-zinc-200" title="مراقبة التغييرات وتحديث المقاعد والشعب">
-                        <Activity className={clsx("w-3.5 h-3.5", selectedFolder.bannerConfig.monitorChanges ? "text-emerald-500" : "text-slate-400")} />
-                        <span>مراقبة</span>
-                        <input
-                          type="checkbox"
-                          checked={selectedFolder.bannerConfig.monitorChanges}
-                          onChange={() => handleToggleMonitor(selectedFolder.termCode || selectedFolder.id, selectedFolder.bannerConfig!.monitorChanges)}
-                          className="w-3.5 h-3.5 accent-emerald-500 rounded cursor-pointer"
-                        />
-                      </label>
-
-                      <div className="w-px h-3.5 bg-slate-200 dark:bg-zinc-700" />
-
-                      {/* Auto update toggle */}
-                      <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-semibold text-slate-700 dark:text-zinc-200" title="تحديث دوري تلقائي">
-                        <RefreshCw className={clsx("w-3.5 h-3.5", selectedFolder.bannerConfig.autoUpdate ? "text-amber-500" : "text-slate-400")} />
-                        <span>تحديث دوري</span>
-                        <input
-                          type="checkbox"
-                          checked={selectedFolder.bannerConfig.autoUpdate}
-                          onChange={() => handleToggleAutoUpdate(selectedFolder.termCode || selectedFolder.id, selectedFolder.bannerConfig!.autoUpdate)}
-                          className="w-3.5 h-3.5 accent-amber-500 rounded cursor-pointer"
-                        />
-                      </label>
+            return (
+              <>
+                <div
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl border relative overflow-hidden shadow-xs"
+                  style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+                >
+                  {/* Subtle brand sync progress bar at bottom of folder header */}
+                  {isFolderSyncing && (
+                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-100 dark:bg-zinc-800 overflow-hidden">
+                      <div
+                        className="h-full bg-[var(--color-imamu-brown)] transition-all duration-300"
+                        style={{ width: `${Math.max(4, prog?.progressPercent || 30)}%` }}
+                      />
                     </div>
                   )}
 
-                  {/* Immediate Sync Button */}
-                  <button
-                    type="button"
-                    onClick={() => handleSyncNow(selectedFolder.termCode || selectedFolder.id)}
-                    disabled={syncingTermCode === (selectedFolder.termCode || selectedFolder.id)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition cursor-pointer shadow-xs disabled:opacity-50"
-                    title="مزامنة وتحديث الشعب فوراً من بانر"
-                  >
-                    <RefreshCw className={clsx("w-3.5 h-3.5", syncingTermCode === (selectedFolder.termCode || selectedFolder.id) && "animate-spin")} />
-                    <span>مزامنة فورية من بانر</span>
-                  </button>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectFolder(null)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-zinc-700 text-xs font-bold transition shadow-xs cursor-pointer shrink-0"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                      <span>العودة إلى مجلدات الفصول</span>
+                    </button>
 
-                  {/* Add CRNs Button */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const bt = selectedFolder.bannerConfig || {
-                        termCode: selectedFolder.termCode || selectedFolder.id,
-                        termName: selectedFolder.name,
-                        academicYear: selectedFolder.academicYear || '',
-                        semester: selectedFolder.semester || '',
-                        monitorChanges: false,
-                        autoUpdate: false,
-                        updateIntervalDays: 2,
-                        totalSections: selectedFolder.count,
-                        status: 'idle'
-                      };
-                      setAddCrnsTerm(bt);
-                      setCrnsInputText('');
-                      setAddCrnsResult(null);
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-bold text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 transition cursor-pointer shadow-xs"
-                    title="إضافة وتحديث أرقام CRN محددة عبر JSON"
-                  >
-                    <FileText className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
-                    <span>إضافة شعب (JSON)</span>
-                  </button>
+                    <div className="h-5 w-px bg-slate-200 dark:bg-zinc-800 shrink-0" />
 
-                  {/* Empty Term Sections Button */}
-                  <button
-                    type="button"
-                    onClick={() => handleEmptyTerm(selectedFolder.termCode || selectedFolder.id, selectedFolder.name)}
-                    disabled={emptyingTermCode === (selectedFolder.termCode || selectedFolder.id)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-xs font-bold text-amber-700 dark:text-amber-300 transition cursor-pointer disabled:opacity-50"
-                    title="تفريغ جميع شعب هذا الفصل"
-                  >
-                    <RotateCcw className={clsx("w-3.5 h-3.5", emptyingTermCode === (selectedFolder.termCode || selectedFolder.id) && "animate-spin")} />
-                    <span>تفريغ الشعب</span>
-                  </button>
+                    <div className="flex items-center gap-2 min-w-0">
+                      {selectedFolder === 'all' ? (
+                        <Layers className="w-5 h-5 text-[var(--color-imamu-accent)] shrink-0" />
+                      ) : (
+                        <FolderOpen className="w-5 h-5 text-[var(--color-imamu-accent)] shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs text-slate-500 dark:text-zinc-400">المجلد:</span>
+                          <h3 className="text-sm font-black text-slate-900 dark:text-white truncate">
+                            {selectedFolder === 'all' ? 'كافة الشعب الدراسية' : selectedFolder.name}
+                          </h3>
+                          <span className={clsx(
+                            "px-2 py-0.5 rounded-full text-[11px] font-bold",
+                            isFolderSyncing
+                              ? "bg-amber-500/10 text-[var(--color-imamu-accent)] flex items-center gap-1.5"
+                              : "bg-amber-500/20 text-[var(--color-imamu-accent)]"
+                          )}>
+                            {isFolderSyncing ? (
+                              <>
+                                <Loader2 className="w-3 h-3 animate-spin shrink-0 text-[var(--color-imamu-brown)]" />
+                                <span>{prog?.currentStep || 'جاري التحديث...'} ({prog?.progressPercent || 30}%)</span>
+                              </>
+                            ) : (
+                              loading ? 'جاري التحميل...' : `${totalCount.toLocaleString()} شعبة`
+                            )}
+                          </span>
+                        </div>
+                        {isFolderSyncing && prog?.message && (
+                          <div className="text-[11px] text-slate-400 dark:text-zinc-400 mt-0.5 truncate">
+                            {prog.message}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
-                  {/* Delete Term Button */}
-                  <button
-                    type="button"
-                    onClick={() => selectedFolder.bannerConfig ? handleDeleteTerm(selectedFolder.termCode!, selectedFolder.name) : handleDeleteFolder(selectedFolder)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-xs font-bold text-red-600 dark:text-red-400 transition cursor-pointer"
-                    title="حذف الفصل الدراسي بالكامل"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>حذف الفصل</span>
-                  </button>
-                </>
-              )}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {selectedFolder !== 'all' && (
+                      <button
+                        type="button"
+                        onClick={() => handleSyncNow(selectedFolder.termCode || selectedFolder.id)}
+                        disabled={isFolderSyncing}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-xs font-bold text-[var(--color-imamu-accent)] transition cursor-pointer shadow-xs disabled:opacity-60"
+                        title="مزامنة وتحديث الشعب مباشرة من بانر"
+                      >
+                        <RefreshCw className={clsx("w-3.5 h-3.5", isFolderSyncing && "animate-spin")} />
+                        <span>{isFolderSyncing ? 'جاري التحديث...' : 'تحديث من بانر'}</span>
+                      </button>
+                    )}
 
-              <button
-                onClick={() => fetchSections()}
-                className="p-2 rounded-xl border transition hover:bg-slate-100 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-800"
-                style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
-                title="تحديث البيانات"
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              </button>
-            </div>
-          </div>
+                    {selectedFolder !== 'all' && selectedFolder.bannerConfig && (
+                      <button
+                        type="button"
+                        onClick={() => setOptionsModalTermCode(selectedFolder.termCode || selectedFolder.id)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 text-xs font-bold transition cursor-pointer shadow-xs text-slate-800 dark:text-slate-100"
+                        title="خيارات وإعدادات الفصل"
+                      >
+                        <Sliders className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
+                        <span>خيارات الفصل</span>
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => fetchSections()}
+                      className="p-2 rounded-xl border transition hover:bg-slate-100 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-800 cursor-pointer shadow-xs"
+                      style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
+                      title="تحديث الجدول محلياً"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
 
           {/* Search & Filter Bar */}
           <div className="p-4 rounded-2xl border flex flex-col md:flex-row items-center gap-3" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
@@ -1756,176 +1599,8 @@ export default function AdminSectionsTab({
         </div>
       ))}
 
-      {/* ==================================================================== */}
-      {/* MODAL 1: Section Details (المواعيد والقاعات التفصيلية) */}
-      {/* ==================================================================== */}
       {selectedSection && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn" dir="rtl">
-          <div className="w-full max-w-xl rounded-2xl border shadow-2xl overflow-hidden p-6 space-y-5" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-            <div className="flex items-start justify-between border-b pb-4" style={{ borderColor: 'var(--border-color)' }}>
-              <div>
-                <span className="px-2.5 py-0.5 rounded-md text-xs font-mono font-bold bg-amber-500/10 text-[var(--color-imamu-accent)]">
-                  CRN: {selectedSection.crn}
-                </span>
-                <h3 className="text-base font-bold mt-1" style={{ color: 'var(--text-main)' }}>
-                  {selectedSection.courseTitle || selectedSection.courseCode} (شعبة {selectedSection.sectionNumber})
-                </h3>
-                <span className="text-xs text-slate-400 font-mono">{selectedSection.courseCode}</span>
-              </div>
-              <button
-                onClick={() => setSelectedSection(null)}
-                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800 transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Quick Info Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-zinc-800/60">
-                <span className="text-slate-400 block mb-1">الفصل والسنة:</span>
-                <span className="font-bold text-[var(--color-imamu-accent)] truncate block">
-                  {selectedSection.term || (selectedSection.academicYear && selectedSection.semester ? `${selectedSection.academicYear} - ${selectedSection.semester}` : selectedSection.academicYear || selectedSection.semester || 'عام / غير محدد')}
-                </span>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-zinc-800/60">
-                <span className="text-slate-400 block mb-1">المحاضر الرئيسي:</span>
-                <span className="font-bold text-slate-800 dark:text-slate-200 truncate block">
-                  {selectedSection.primaryInstructor || selectedSection.instructors?.[0]?.name || 'غير محدد'}
-                </span>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-zinc-800/60">
-                <span className="text-slate-400 block mb-1">المقر:</span>
-                <span className="font-bold text-slate-800 dark:text-slate-200 truncate block">{selectedSection.campus || 'غير محدد'}</span>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-zinc-800/60">
-                <span className="text-slate-400 block mb-1">المقاعد المتاحة:</span>
-                <span className="font-bold text-slate-800 dark:text-slate-200 truncate block">
-                  {selectedSection.seatsAvailable !== undefined && selectedSection.seatsAvailable !== null
-                    ? `${selectedSection.seatsAvailable} متاح (${selectedSection.currentEnrollment ?? 0}/${selectedSection.maxEnrollment ?? '—'})`
-                    : (selectedSection.instructionalMethod || 'تقليدي')}
-                </span>
-              </div>
-            </div>
-
-            {/* All Instructors List */}
-            {selectedSection.instructors && selectedSection.instructors.length > 0 && (
-              <div className="space-y-2">
-                <h4 className="text-xs font-bold text-slate-400 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 text-blue-500" />
-                    <span>أساتذة ومحاضرو الشعبة ({selectedSection.instructors.length}):</span>
-                  </span>
-                </h4>
-                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
-                  {selectedSection.instructors.map((inst, iIdx) => (
-                    <div
-                      key={iIdx}
-                      className="p-2.5 rounded-xl border flex items-center justify-between text-xs"
-                      style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xs shrink-0">
-                          {inst.name.slice(0, 1)}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="font-bold text-slate-800 dark:text-slate-100 truncate flex items-center gap-1.5">
-                            <span>{inst.name}</span>
-                            {inst.isPrimary ? (
-                              <span className="px-1.5 py-0.2 text-[10px] font-bold rounded bg-amber-500/15 text-amber-700 dark:text-amber-300">
-                                أستاذ رئيسي
-                              </span>
-                            ) : (
-                              <span className="px-1.5 py-0.2 text-[10px] font-semibold rounded bg-slate-200 dark:bg-zinc-700 text-slate-600 dark:text-zinc-300">
-                                أستاذ مشارك
-                              </span>
-                            )}
-                          </div>
-                          {inst.email && (
-                            <div className="text-[11px] text-slate-400 font-mono truncate dir-ltr text-right">
-                              {inst.email}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {inst.email && (
-                        <button
-                          type="button"
-                          onClick={() => copyEmail(inst.email!)}
-                          className="p-1.5 rounded-lg border hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-500 transition shrink-0 ml-2 cursor-pointer"
-                          title="نسخ البريد الإلكتروني"
-                        >
-                          {copiedEmail === inst.email ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-500" />
-                          ) : (
-                            <Copy className="w-3.5 h-3.5" />
-                          )}
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Schedules List */}
-            <div className="space-y-2">
-              <h4 className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-amber-500" />
-                <span>أوقات المحاضرات والقاعات:</span>
-              </h4>
-
-              {selectedSection.schedules && selectedSection.schedules.length > 0 ? (
-                <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
-                  {selectedSection.schedules.map((sch, idx) => (
-                    <div key={idx} className="p-3 rounded-xl border flex items-center justify-between text-xs" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}>
-                      <div>
-                        <div className="font-bold text-slate-800 dark:text-slate-100">
-                          {formatScheduleDaysDisplay(sch)} ({sch.timeRange || 'الموعد غير محدد'})
-                        </div>
-                        <div className="text-[11px] text-slate-400 mt-0.5">
-                          {sch.building ? `${sch.building} - ` : ''}قاعة: {sch.room || 'غير محددة'}
-                        </div>
-                      </div>
-                      <span className="px-2 py-1 rounded bg-amber-500/10 text-[var(--color-imamu-accent)] font-bold text-[11px]">
-                        {sch.type || 'محاضرة'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-4 rounded-xl bg-slate-50 dark:bg-zinc-800/40 text-center text-xs text-slate-400">
-                  لا توجد مواعيد مفصلة مسجلة لهذه الشعبة.
-                </div>
-              )}
-            </div>
-
-            {/* Final Exam Info if present */}
-            {selectedSection.finalExam && (
-              <div className="p-3 rounded-xl border border-purple-500/20 bg-purple-500/5 text-xs flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-purple-500 shrink-0" />
-                  <div>
-                    <span className="text-[11px] text-purple-600 dark:text-purple-400 font-bold block">موعد الاختبار النهائي:</span>
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">
-                      {typeof selectedSection.finalExam === 'object'
-                        ? `${selectedSection.finalExam.examDate || ''} ${selectedSection.finalExam.examTime ? `(${selectedSection.finalExam.examTime})` : ''}`
-                        : String(selectedSection.finalExam)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <button
-              onClick={() => setSelectedSection(null)}
-              className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-xs font-bold transition cursor-pointer"
-            >
-              إغلاق
-            </button>
-          </div>
-        </div>
+        <SectionDetailsModal section={selectedSection} onClose={() => setSelectedSection(null)} />
       )}
 
       {/* ==================================================================== */}
@@ -1957,88 +1632,6 @@ export default function AdminSectionsTab({
               </button>
             </div>
 
-            {/* Mode Selector: Detected vs Custom */}
-            <div className="flex items-center gap-1 p-1 bg-slate-200/70 dark:bg-zinc-800/80 rounded-xl border border-slate-300/60 dark:border-zinc-700/60">
-              <button
-                type="button"
-                onClick={() => setSelectedTermMode('detected')}
-                className={clsx(
-                  "flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer",
-                  selectedTermMode === 'detected'
-                    ? "bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-xs"
-                    : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
-                )}
-              >
-                <Globe className="w-3.5 h-3.5 text-amber-500" />
-                <span>الفصول المكتشفة في بانر</span>
-                {detectedTerms.length > 0 && (
-                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-500/15 text-[var(--color-imamu-accent)] font-mono">
-                    {detectedTerms.length}
-                  </span>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedTermMode('custom')}
-                className={clsx(
-                  "flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer",
-                  selectedTermMode === 'custom'
-                    ? "bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-xs"
-                    : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
-                )}
-              >
-                <Sliders className="w-3.5 h-3.5 text-emerald-500" />
-                <span>إدخال كود مخصص يدوي</span>
-              </button>
-            </div>
-
-            {/* Mode 1: Detected Terms */}
-            {selectedTermMode === 'detected' ? (
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300">
-                  اختر الفصل الدراسي المكتشف:
-                </label>
-                {detectedLoading ? (
-                  <div className="p-8 text-center space-y-2 rounded-xl border border-slate-200 dark:border-zinc-800">
-                    <Loader2 className="w-5 h-5 animate-spin mx-auto text-amber-600" />
-                    <p className="text-xs text-slate-400">جاري الاتصال ببانر واستكشاف الفصول...</p>
-                  </div>
-                ) : detectedTerms.length === 0 ? (
-                  <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-800 dark:text-amber-300">
-                    لم يتم العثور على فصول دراسية مباشرة. يمكنك استخدام خيار «إدخال كود مخصص يدوي» لإضافة الفصل.
-                  </div>
-                ) : (
-                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                    {detectedTerms.map((t) => (
-                      <div
-                        key={t.termCode}
-                        onClick={() => setSelectedTermCode(t.termCode)}
-                        className={clsx(
-                          "p-3 rounded-xl border transition cursor-pointer flex items-center justify-between text-xs",
-                          selectedTermCode === t.termCode
-                            ? "border-[var(--color-imamu-brown)] bg-amber-500/10 font-bold"
-                            : "border-slate-200 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800/60"
-                        )}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <Radio className={clsx("w-4 h-4", selectedTermCode === t.termCode ? "text-[var(--color-imamu-accent)] fill-amber-500/30" : "text-slate-400")} />
-                          <div>
-                            <div className="text-slate-900 dark:text-white font-bold">{t.termName}</div>
-                            <div className="text-[10px] text-slate-400 mt-0.5">
-                              {t.academicYear} • {t.semester}
-                            </div>
-                          </div>
-                        </div>
-                        <span className="font-mono text-xs px-2 py-0.5 rounded-md bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-[var(--color-imamu-accent)]">
-                          {t.termCode}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* Mode 2: Custom Term */
               <div className="space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
@@ -2098,7 +1691,6 @@ export default function AdminSectionsTab({
                   </div>
                 </div>
               </div>
-            )}
 
             {/* Automation Options (Monitoring, Regular Update, Immediate Sync) */}
             <div className="p-4 rounded-xl border space-y-3" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}>
@@ -2178,7 +1770,7 @@ export default function AdminSectionsTab({
                 إلغاء
               </button>
               <button
-                disabled={addingTerm || (selectedTermMode === 'detected' && !selectedTermCode)}
+                disabled={addingTerm}
                 onClick={handleAddTermSubmit}
                 className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold text-white bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] transition shadow-md disabled:opacity-50 cursor-pointer"
               >
@@ -2283,6 +1875,291 @@ export default function AdminSectionsTab({
                     <span>بدء الجلب والإضافة من بانر ({detectedCrnsCount})</span>
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Term Options & Settings Modal Popup */}
+      {optionsFolder && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn"
+          dir="rtl"
+          onClick={() => setOptionsModalTermCode(null)}
+        >
+          <div
+            className="relative w-full max-w-md bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-2xl p-6 overflow-hidden space-y-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 dark:border-zinc-800 pb-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-[var(--color-imamu-accent)] flex items-center justify-center shrink-0">
+                  <Sliders className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-black text-slate-900 dark:text-white truncate">
+                    خيارات وإعدادات الفصل الدراسي
+                  </h3>
+                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                    <span className="text-xs font-bold text-slate-600 dark:text-zinc-300">
+                      {optionsFolder.name}
+                    </span>
+                    {optionsFolder.termCode && (
+                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-md bg-amber-500/10 text-[var(--color-imamu-accent)] border border-amber-500/20">
+                        {optionsFolder.termCode}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOptionsModalTermCode(null)}
+                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Options Body */}
+            {optionsFolder.bannerConfig ? (
+              <div className="space-y-3">
+                {/* Option 1: Live Change Monitoring */}
+                <div className="p-3.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-800/40 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={clsx(
+                        "w-8 h-8 rounded-lg flex items-center justify-center transition",
+                        optionsFolder.bannerConfig.monitorChanges
+                          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                          : "bg-slate-200 dark:bg-zinc-700 text-slate-400"
+                      )}>
+                        <Activity className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-900 dark:text-white">
+                          مراقبة التغييرات الفورية
+                        </div>
+                        <div className="text-[10px] text-slate-500 dark:text-zinc-400">
+                          فحص مستمر وتحديث مقاعد الشعب الشاغرة
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleToggleMonitor(optionsFolder.termCode || optionsFolder.id, optionsFolder.bannerConfig!.monitorChanges)}
+                      className={clsx(
+                        "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                        optionsFolder.bannerConfig.monitorChanges ? "bg-emerald-500" : "bg-slate-300 dark:bg-zinc-700"
+                      )}
+                      title={optionsFolder.bannerConfig.monitorChanges ? "المراقبة مفعلة" : "المراقبة متوقفة"}
+                    >
+                      <span className={clsx(
+                        "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                        optionsFolder.bannerConfig.monitorChanges ? "translate-x-0" : "-translate-x-4"
+                      )} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Option 2: Automatic Periodic Sync */}
+                <div className="p-3.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-800/40 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={clsx(
+                        "w-8 h-8 rounded-lg flex items-center justify-center transition",
+                        optionsFolder.bannerConfig.autoUpdate
+                          ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                          : "bg-slate-200 dark:bg-zinc-700 text-slate-400"
+                      )}>
+                        <RefreshCw className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-900 dark:text-white">
+                          التحديث الدوري التلقائي
+                        </div>
+                        <div className="text-[10px] text-slate-500 dark:text-zinc-400">
+                          إعادة مزامنة وسحب الشعب كاملة بشكل مجدول
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleToggleAutoUpdate(optionsFolder.termCode || optionsFolder.id, optionsFolder.bannerConfig!.autoUpdate)}
+                      className={clsx(
+                        "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                        optionsFolder.bannerConfig.autoUpdate ? "bg-amber-500" : "bg-slate-300 dark:bg-zinc-700"
+                      )}
+                      title={optionsFolder.bannerConfig.autoUpdate ? "التحديث الدوري مفعل" : "التحديث الدوري متوقف"}
+                    >
+                      <span className={clsx(
+                        "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                        optionsFolder.bannerConfig.autoUpdate ? "translate-x-0" : "-translate-x-4"
+                      )} />
+                    </button>
+                  </div>
+
+                  {/* Interval selector when autoUpdate is ON */}
+                  {optionsFolder.bannerConfig.autoUpdate && (
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-zinc-700/60 text-xs">
+                      <span className="text-[11px] font-bold text-slate-600 dark:text-zinc-300">
+                        تكرار التحديث الدوري:
+                      </span>
+                      <select
+                        value={optionsFolder.bannerConfig.updateIntervalDays || 2}
+                        onChange={(e) => handleChangeInterval(optionsFolder.termCode || optionsFolder.id, Number(e.target.value))}
+                        className="text-xs font-bold py-1 px-2.5 rounded-lg border bg-white dark:bg-zinc-800 border-slate-200 dark:border-zinc-700 text-[var(--color-imamu-accent)] cursor-pointer"
+                      >
+                        <option value={1}>كل 1 يوم (يومياً)</option>
+                        <option value={2}>كل يومين</option>
+                        <option value={3}>كل 3 أيام</option>
+                        <option value={7}>كل أسبوع</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                {/* Option 3: Edit Term Details */}
+                <div className="p-3.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-800/40 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Pencil className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <div className="text-xs font-bold text-slate-900 dark:text-white">تعديل اسم وبيانات الفصل</div>
+                    </div>
+                    <button type="button" onClick={() => {
+                      if (!isEditingExistingTerm) {
+                        setExistingEditCode(optionsFolder.termCode || optionsFolder.id);
+                        setExistingEditName(optionsFolder.name || '');
+                        setExistingEditYear(optionsFolder.academicYear || '');
+                        setExistingEditSemester(optionsFolder.semester || '');
+                      }
+                      setIsEditingExistingTerm(!isEditingExistingTerm);
+                    }} className="text-xs font-bold px-2.5 py-1 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 cursor-pointer">
+                      {isEditingExistingTerm ? 'إلغاء' : 'تعديل البيانات'}
+                    </button>
+                  </div>
+                  {isEditingExistingTerm && (
+                    <div className="space-y-2 pt-2 border-t border-slate-200/60 dark:border-zinc-700/60">
+                      <input value={existingEditCode} onChange={(e) => setExistingEditCode(e.target.value)} placeholder="رمز الفصل، مثال: 144810" className="w-full px-3 py-2 rounded-xl text-xs border bg-white dark:bg-zinc-900 font-mono" />
+                      <input value={existingEditName} onChange={(e) => setExistingEditName(e.target.value)} placeholder="اسم الفصل" className="w-full px-3 py-2 rounded-xl text-xs border bg-white dark:bg-zinc-900" />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input value={existingEditYear} onChange={(e) => setExistingEditYear(e.target.value)} placeholder="السنة الأكاديمية" className="w-full px-3 py-2 rounded-xl text-xs border bg-white dark:bg-zinc-900" />
+                        <input value={existingEditSemester} onChange={(e) => setExistingEditSemester(e.target.value)} placeholder="الفصل" className="w-full px-3 py-2 rounded-xl text-xs border bg-white dark:bg-zinc-900" />
+                      </div>
+                      <button type="button" onClick={handleSaveDiscoveredToExisting} disabled={savingExistingTerm} className="w-full py-2 px-3 rounded-xl bg-[var(--color-imamu-brown)] text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50">
+                        {savingExistingTerm ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} حفظ تعديل الفصل
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Modal Active Sync Progress widget */}
+                {activeSyncProgress[optionsFolder.termCode || optionsFolder.id] && (() => {
+                  const prog = activeSyncProgress[optionsFolder.termCode || optionsFolder.id];
+                  return (
+                    <div className="p-3 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/60 dark:bg-zinc-900/60 space-y-1.5 text-right">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="flex items-center gap-1.5 text-slate-700 dark:text-zinc-300 font-medium truncate">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 text-[var(--color-imamu-brown)]" />
+                          <span className="truncate">{prog.currentStep || 'جاري التحديث والمزامنة...'}</span>
+                        </span>
+                        <span className="font-mono text-xs font-bold text-[var(--color-imamu-brown)] shrink-0">
+                          {prog.progressPercent}%
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-200/80 dark:bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className="bg-[var(--color-imamu-brown)] h-full rounded-full transition-all duration-300"
+                          style={{ width: `${Math.max(4, prog.progressPercent)}%` }}
+                        />
+                      </div>
+                      {prog.message && (
+                        <div className="text-[10px] text-slate-400 dark:text-zinc-500 truncate">
+                          {prog.message}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Additional Quick Actions inside the modal */}
+                <div className="pt-2">
+                  <div className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 mb-2">
+                    إجراءات سريعة:
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleSyncNow(optionsFolder.termCode || optionsFolder.id);
+                        setOptionsModalTermCode(null);
+                      }}
+                      disabled={syncingTermCode === (optionsFolder.termCode || optionsFolder.id)}
+                      className="p-2.5 rounded-xl border border-slate-200 dark:border-zinc-800 hover:bg-amber-500/10 hover:text-[var(--color-imamu-accent)] transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40"
+                    >
+                      <RefreshCw className={clsx("w-3.5 h-3.5", syncingTermCode === (optionsFolder.termCode || optionsFolder.id) && "animate-spin")} />
+                      <span>مزامنة فورية الآن</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const bt = optionsFolder.bannerConfig!;
+                        setAddCrnsTerm(bt);
+                        setCrnsInputText('');
+                        setAddCrnsResult(null);
+                        setOptionsModalTermCode(null);
+                      }}
+                      className="p-2.5 rounded-xl border border-slate-200 dark:border-zinc-800 hover:bg-amber-500/10 hover:text-[var(--color-imamu-accent)] transition flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>إضافة شعب (CRN)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleEmptyTerm(optionsFolder.termCode || optionsFolder.id, optionsFolder.name);
+                        setOptionsModalTermCode(null);
+                      }}
+                      className="p-2.5 rounded-xl border border-slate-200 dark:border-zinc-800 hover:bg-amber-500/10 text-amber-700 dark:text-amber-400 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>تفريغ الشعب</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleDeleteTerm(optionsFolder.termCode || optionsFolder.id, optionsFolder.name);
+                        setOptionsModalTermCode(null);
+                      }}
+                      className="p-2.5 rounded-xl border border-red-200 dark:border-red-900/50 hover:bg-red-500/10 text-red-600 dark:text-red-400 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>حذف الفصل</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-800 dark:text-amber-300">
+                هذا المجلد غير مربوط ببانر مباشرة لتفعيل المراقبة الآلية.
+              </div>
+            )}
+
+            {/* Modal Footer */}
+            <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setOptionsModalTermCode(null)}
+                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-xs font-bold text-slate-700 dark:text-zinc-200 transition cursor-pointer"
+              >
+                إغلاق
               </button>
             </div>
           </div>

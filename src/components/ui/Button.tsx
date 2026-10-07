@@ -85,6 +85,14 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   rightIcon?: React.ReactNode;
 }
 
+export interface ButtonLinkProps extends React.AnchorHTMLAttributes<HTMLAnchorElement> {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  rounded?: ButtonRounded;
+  leftIcon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
+}
+
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   {
     variant = 'primary',
@@ -119,3 +127,31 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
 });
 
 Button.displayName = 'Button';
+
+export const ButtonLink = forwardRef<HTMLAnchorElement, ButtonLinkProps>(function ButtonLink(
+  {
+    variant = 'primary',
+    size = 'md',
+    rounded = 'xl',
+    leftIcon,
+    rightIcon,
+    className,
+    children,
+    ...props
+  },
+  ref
+) {
+  return (
+    <a
+      ref={ref}
+      className={buttonVariants({ variant, size, rounded, className })}
+      {...props}
+    >
+      {leftIcon && <span className="shrink-0 flex items-center">{leftIcon}</span>}
+      {children}
+      {rightIcon && <span className="shrink-0 flex items-center">{rightIcon}</span>}
+    </a>
+  );
+});
+
+ButtonLink.displayName = 'ButtonLink';

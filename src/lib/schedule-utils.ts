@@ -346,8 +346,131 @@ export function parseTimeRange(
   };
 }
 
+const MONTH_NAME_MAP: Record<string, string> = {
+  january: '01', jan: '01', 'يناير': '01',
+  february: '02', feb: '02', 'فبراير': '02',
+  march: '03', mar: '03', 'مارس': '03',
+  april: '04', apr: '04', 'أبريل': '04', 'ابريل': '04',
+  may: '05', 'مايو': '05',
+  june: '06', jun: '06', 'يونيو': '06',
+  july: '07', jul: '07', 'يوليو': '07',
+  august: '08', aug: '08', 'أغسطس': '08', 'اغسطس': '08',
+  september: '09', sep: '09', sept: '09', 'سبتمبر': '09',
+  october: '10', oct: '10', 'أكتوبر': '10', 'اكتوبر': '10',
+  november: '11', nov: '11', 'نوفمبر': '11',
+  december: '12', dec: '12', 'ديسمبر': '12',
+};
+
 /**
- * Extracts normalized examDate and examTime from a section or exam object
+ * Normalizes any exam date string into strict YYYY-MM-DD format.
+ * Handles Banner formats like '30/December/2026', '22/March/2026', 'DD/MM/YYYY', 'YYYY-MM-DD', Arabic month names, etc.
+ */
+export function normalizeExamDate(dateStr?: any): string | undefined {
+  if (!dateStr) return undefined;
+  let str = String(dateStr).trim();
+  if (!str || str.toLowerCase().includes('nan')) return undefined;
+
+  // If input contains full text like "الأربعاء 30/December/2026 (12:30 - 14:00)"
+  const datePattern = /(\d{1,2}[/.\s-][a-zA-Z\u0621-\u064A]+[/.\s-]\d{4}|\d{4}[/.\s-]\d{1,2}[/.\s-]\d{1,2}|\d{1,2}[/.\s-]\d{1,2}[/.\s-]\d{4})/;
+  const match = str.match(datePattern);
+  if (match) {
+    str = match[0].trim();
+  }
+
+  // Already standard YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    const [y, m, d] = str.split('-').map(Number);
+    if (y >= 1900 && y <= 2100 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      return str;
+    }
+  }
+
+  // Split by slashes, dashes, dots, or whitespace
+  const parts = str.split(/[/.\s-]+/).filter(Boolean);
+  if (parts.length === 3) {
+    let year = '';
+    let month = '';
+    let day = '';
+
+    // 1. Identify 4-digit year
+    const yearIdx = parts.findIndex(p => /^\d{4}$/.test(p));
+    if (yearIdx >= 0) {
+      year = parts[yearIdx];
+      const remaining = parts.filter((_, idx) => idx !== yearIdx);
+
+      // 2. Identify month name (English or Arabic)
+      const monthIdx = remaining.findIndex(p => MONTH_NAME_MAP[p.toLowerCase()]);
+      if (monthIdx >= 0) {
+        month = MONTH_NAME_MAP[remaining[monthIdx].toLowerCase()];
+        day = remaining[1 - monthIdx];
+      } else {
+        // Both are numeric
+        const n1 = parseInt(remaining[0], 10);
+        const n2 = parseInt(remaining[1], 10);
+        if (!isNaN(n1) && !isNaN(n2)) {
+          if (n1 > 12) {
+            day = String(n1);
+            month = String(n2);
+          } else if (n2 > 12) {
+            day = String(n2);
+            month = String(n1);
+          } else if (yearIdx === 0) {
+            // YYYY/MM/DD
+            month = String(n1);
+            day = String(n2);
+          } else {
+            // Default regional / Banner format: DD/MM/YYYY
+            day = String(n1);
+            month = String(n2);
+          }
+        }
+      }
+
+      if (year && month && day) {
+        const dNum = parseInt(day, 10);
+        const mNum = parseInt(month, 10);
+        const yNum = parseInt(year, 10);
+        if (!isNaN(dNum) && !isNaN(mNum) && !isNaN(yNum) && dNum >= 1 && dNum <= 31 && mNum >= 1 && mNum <= 12 && yNum >= 1900 && yNum <= 2100) {
+          return `${year}-${String(mNum).padStart(2, '0')}-${String(dNum).padStart(2, '0')}`;
+        }
+      }
+    }
+  }
+
+  // Fallback to JS Date
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    const y = parsed.getFullYear();
+    const m = String(parsed.getMonth() + 1).padStart(2, '0');
+    const d = String(parsed.getDate()).padStart(2, '0');
+    if (y >= 1900 && y <= 2100) return `${y}-${m}-${d}`;
+  }
+
+  return undefined;
+}
+
+/**
+ * Normalizes exam time into clean HH:mm (24h) format.
+ */
+export function normalizeExamTime(timeStr?: any): string | undefined {
+  if (!timeStr) return undefined;
+  const str = String(timeStr).trim();
+  if (!str || str.toLowerCase().includes('nan')) return undefined;
+
+  const firstPart = str.split(/[-–—]/)[0].trim();
+  const match = firstPart.match(/(\d{1,2}):(\d{2})/);
+  if (match) {
+    const h = parseInt(match[1], 10);
+    const m = match[2];
+    if (h >= 0 && h <= 23) {
+      return `${String(h).padStart(2, '0')}:${m}`;
+    }
+  }
+  return firstPart || undefined;
+}
+
+/**
+ * Extracts normalized examDate (YYYY-MM-DD) and examTime (HH:mm) from a section or exam object
  */
 export function extractFinalExamInfo(sec: any): { examDate?: string; examTime?: string } {
   if (!sec) return {};
@@ -363,52 +486,18 @@ export function extractFinalExamInfo(sec: any): { examDate?: string; examTime?: 
 
   if (fe && typeof fe === 'object') {
     examDate = examDate || fe.examDate || fe.date || fe.finalExamDate || fe.startDate;
-    examTime = examTime || fe.examTime || fe.time || fe.finalExamTime || fe.startTime;
-    if (!examTime && fe.timeRange) {
-      examTime = String(fe.timeRange).split(/[-–—]/)[0].trim();
-    }
+    examTime = examTime || fe.examTime || fe.time || fe.finalExamTime || fe.startTime || fe.timeRange;
   } else if (typeof fe === 'string' && fe.trim()) {
     const trimmed = fe.trim();
-    const parts = trimmed.split(/[\sT]+/);
-    if (parts[0] && (parts[0].includes('-') || parts[0].includes('/'))) {
-      examDate = examDate || parts[0];
-      if (parts[1]) examTime = examTime || parts[1];
-    } else {
-      examDate = examDate || trimmed;
-    }
+    examDate = examDate || trimmed;
+    examTime = examTime || trimmed;
   }
 
-  // Normalize date format if it's MM/DD/YYYY, DD/MM/YYYY, or YYYY/MM/DD
-  if (examDate) {
-    let dStr = String(examDate).trim();
-    if (dStr.includes('/')) {
-      const p = dStr.split('/');
-      if (p.length === 3) {
-        if (p[2].length === 4) {
-          const mOrD1 = parseInt(p[0], 10);
-          const mOrD2 = parseInt(p[1], 10);
-          if (mOrD1 > 12) {
-            // DD/MM/YYYY -> YYYY-MM-DD
-            dStr = `${p[2]}-${String(mOrD2).padStart(2, '0')}-${String(mOrD1).padStart(2, '0')}`;
-          } else {
-            // MM/DD/YYYY -> YYYY-MM-DD
-            dStr = `${p[2]}-${String(mOrD1).padStart(2, '0')}-${String(mOrD2).padStart(2, '0')}`;
-          }
-        } else if (p[0].length === 4) {
-          // YYYY/MM/DD -> YYYY-MM-DD
-          dStr = `${p[0]}-${String(p[1]).padStart(2, '0')}-${String(p[2]).padStart(2, '0')}`;
-        }
-      }
-    }
-    examDate = dStr;
-  }
-
-  if (examTime) {
-    examTime = String(examTime).trim();
-  }
+  const normalizedDate = normalizeExamDate(examDate);
+  const normalizedTime = normalizeExamTime(examTime);
 
   return {
-    examDate: examDate ? String(examDate).trim() : undefined,
-    examTime: examTime ? String(examTime).trim() : undefined
+    examDate: normalizedDate,
+    examTime: normalizedTime
   };
 }

@@ -1,25 +1,31 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
-import { Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight, LayoutGrid, List, X, Info, ExternalLink, Download, CalendarPlus, Search, Loader2, Trash2, Building2, User, Plus, Sparkles } from 'lucide-react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { 
-  format, parseISO, addMonths, subMonths, startOfWeek, endOfWeek, 
+  Clock, ChevronLeft, ChevronRight, LayoutGrid, List, X, 
+  Info, ExternalLink, Download, Search, Trash2, Plus
+} from 'lucide-react';
+import { 
+  format, addMonths, subMonths, startOfWeek, endOfWeek, 
   startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, 
-  isSameDay, isToday, addWeeks, subWeeks, isAfter, startOfDay
+  isSameDay, isToday, addWeeks, subWeeks, isAfter, startOfDay 
 } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { parseDate, formatDate, formatHijriDate, formatHijriMonthDay, getCountdown, getEventCategoryMeta } from '../lib/date-utils';
+import { 
+  parseDate, formatDate, formatHijriDate, formatHijriMonthDay, 
+  getEventCategoryMeta, formatIcsFloating, getEventDateTimeBounds, escapeIcs 
+} from '../lib/date-utils';
 import { AnimatePresence } from 'motion/react';
 import ReportDropdownMenu from '../components/ReportDropdownMenu';
 import CalendarSelector from '../components/CalendarSelector';
 import { NewTaskModal } from '../components/NewTaskModal';
+import { formatTimeArabic } from '../components/CompactDateTimePicker';
 import { useSWR } from '../lib/swr';
 import { StudentTask, TASK_CATEGORIES, getCourseColor } from '../lib/task-utils';
 import { matchArabicSearch } from '../lib/search-utils';
-
+import { Button, ButtonLink } from '../components/ui';
 
 export function CalendarPage() {
-  const [events, setEvents] = useState<any[]>([]);
   const [taskEvents, setTaskEvents] = useState<any[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewState, setViewState] = useState<'month' | 'week'>('month');
@@ -27,22 +33,26 @@ export function CalendarPage() {
   const [expandedSidebarEventId, setExpandedSidebarEventId] = useState<string | null>(null);
   const [highlightedEventId, setHighlightedEventId] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(10);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [hoveredDot, setHoveredDot] = useState<{
-    event: any;
-    rect: DOMRect;
-    day: Date;
-  } | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const [visibleCalendars, setVisibleCalendars] = useState<Record<'academic' | 'entity' | 'user', boolean>>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('imamu_calendar_visibility');
-        if (saved) return JSON.parse(saved);
-      } catch (e) {}
-    }
-    return { academic: true, entity: true, user: true };
+  // New Task Modal State & registered courses
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [registeredCourses, setRegisteredCourses] = useState<any[]>([]);
+
+  const [visibleCalendars, setVisibleCalendars] = useState<Record<'academic' | 'entity' | 'user', boolean>>({
+    academic: true,
+    entity: true,
+    user: true,
   });
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('imamu_calendar_visibility');
+      if (saved) {
+        setVisibleCalendars(JSON.parse(saved));
+      }
+    } catch {}
+  }, []);
 
   const handleToggleCalendar = (id: 'academic' | 'entity' | 'user') => {
     setVisibleCalendars(prev => {
@@ -62,10 +72,25 @@ export function CalendarPage() {
     }
   };
 
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('imamu_my_semesters');
+      if (!raw) {
+        setRegisteredCourses([]);
+        return;
+      }
+      const sems = JSON.parse(raw);
+      const activeSemId = localStorage.getItem('imamu_active_semester_id');
+      const active = sems.find((s: any) => s.id === activeSemId) || sems[0];
+      setRegisteredCourses(active?.courses || []);
+    } catch {
+      setRegisteredCourses([]);
+    }
+  }, [isTaskModalOpen]);
+
   const loadTaskEvents = () => {
     if (typeof window === 'undefined') return;
     try {
-      // Load unified student tasks and personal appointments
       const saved = localStorage.getItem('imamu_student_tasks');
       if (!saved) {
         setTaskEvents([]);
@@ -85,6 +110,10 @@ export function CalendarPage() {
             title: `${t.title}${t.courseName ? ` – ${t.courseName}` : ''}`,
             date: dateTime,
             time: t.dueTime || undefined,
+            endDate: t.endDate,
+            endTime: t.endTime,
+            location: t.location,
+            link: t.link,
             description: t.description || `${catLabel}${t.courseName ? ` | مقرر: ${t.courseName}` : ''}${t.priority ? ` [أهمية: ${t.priority}]` : ''}`,
             calendarType: 'user' as const,
             color: t.color || (t.courseCode ? getCourseColor(t.courseCode) : '#0284c7'),
@@ -99,23 +128,6 @@ export function CalendarPage() {
       setTaskEvents([]);
     }
   };
-
-  // New Task Modal State (Task Maker)
-  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
-
-  const registeredCourses = React.useMemo(() => {
-    if (typeof window === 'undefined') return [];
-    try {
-      const raw = localStorage.getItem('imamu_my_semesters');
-      if (!raw) return [];
-      const sems = JSON.parse(raw);
-      const activeSemId = localStorage.getItem('imamu_active_semester_id');
-      const active = sems.find((s: any) => s.id === activeSemId) || sems[0];
-      return active?.courses || [];
-    } catch {
-      return [];
-    }
-  }, [isTaskModalOpen]);
 
   useEffect(() => {
     loadTaskEvents();
@@ -132,15 +144,88 @@ export function CalendarPage() {
 
   const { data: eventsData, mutate } = useSWR<any[]>('/api/events');
 
-  useEffect(() => {
+  // Combined all events sorted by date
+  const allEvents = useMemo(() => {
     const combined = [...(Array.isArray(eventsData) ? eventsData : [])];
     taskEvents.forEach(te => {
       if (!combined.some(e => e.id === te.id)) {
         combined.push(te);
       }
     });
-    setEvents(combined.sort((a, b) => (parseDate(a.date)?.getTime() || 0) - (parseDate(b.date)?.getTime() || 0)));
+    return combined.sort((a, b) => (parseDate(a.date)?.getTime() || 0) - (parseDate(b.date)?.getTime() || 0));
   }, [eventsData, taskEvents]);
+
+  // Filter by calendar visibility
+  const filteredEvents = useMemo(() => {
+    return allEvents.filter(e => {
+      const type = e.calendarType || 'academic';
+      if (type === 'academic') return visibleCalendars.academic;
+      if (type === 'entity') return visibleCalendars.entity;
+      if (type === 'user') return visibleCalendars.user;
+      return true;
+    });
+  }, [allEvents, visibleCalendars]);
+
+  // Index events by YYYY-MM-DD for instant O(1) day lookups
+  const eventsByDayKey = useMemo(() => {
+    const map = new Map<string, any[]>();
+    const addEvent = (key: string, ev: any) => {
+      const existing = map.get(key);
+      if (existing) {
+        existing.push(ev);
+      } else {
+        map.set(key, [ev]);
+      }
+    };
+
+    for (const ev of filteredEvents) {
+      const startD = parseDate(ev.date);
+      if (startD && !isNaN(startD.getTime())) {
+        const startKey = format(startD, 'yyyy-MM-dd');
+        addEvent(startKey, { ...ev, isStart: true });
+      }
+
+      // Add deadline marker if there's a distinct end date
+      if (ev.endDate) {
+        const endD = parseDate(ev.endDate);
+        if (endD && !isNaN(endD.getTime())) {
+          const endKey = format(endD, 'yyyy-MM-dd');
+          if (startD && !isSameDay(startD, endD)) {
+            addEvent(endKey, { ...ev, isDeadline: true });
+          }
+        }
+      }
+    }
+
+    return map;
+  }, [filteredEvents]);
+
+  // Filtered upcoming events with instant search
+  const upcomingEvents = useMemo(() => {
+    const todayStart = startOfDay(new Date());
+    const query = searchQuery.trim();
+
+    return filteredEvents
+      .map(e => ({ ...e, parsedDate: parseDate(e.date) }))
+      .filter(e => {
+        if (!e.parsedDate || isNaN(e.parsedDate.getTime())) return false;
+        if (query) {
+          return matchArabicSearch([e.title, e.description, e.entityName], query);
+        }
+        return isAfter(e.parsedDate, todayStart) || isSameDay(e.parsedDate, todayStart);
+      })
+      .sort((a, b) => (a.parsedDate?.getTime() || 0) - (b.parsedDate?.getTime() || 0));
+  }, [filteredEvents, searchQuery]);
+
+  const displayedUpcomingEvents = useMemo(() => {
+    return searchQuery.trim() ? upcomingEvents : upcomingEvents.slice(0, visibleCount);
+  }, [upcomingEvents, visibleCount, searchQuery]);
+
+  const hasMoreUpcomingEvents = !searchQuery.trim() && upcomingEvents.length > visibleCount;
+
+  useEffect(() => {
+    setVisibleCount(10);
+  }, [searchQuery]);
 
   const handleSaveNewTask = (taskData: Omit<StudentTask, 'id' | 'completed' | 'createdAt'>) => {
     try {
@@ -165,6 +250,23 @@ export function CalendarPage() {
           },
           body: JSON.stringify({ tasks: updated })
         }).catch(() => {});
+
+        if ((newTask.category === 'Event' || newTask.category === 'موعد شخصي') && newTask.dueDate) {
+          const dateTime = newTask.dueTime ? `${newTask.dueDate}T${newTask.dueTime}` : newTask.dueDate;
+          fetch('/api/user-events', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              title: newTask.title,
+              date: dateTime,
+              description: newTask.description || '',
+              location: newTask.location || ''
+            })
+          }).then(() => mutate()).catch(() => {});
+        }
       }
 
       window.dispatchEvent(new Event('imamu_tasks_updated'));
@@ -181,75 +283,80 @@ export function CalendarPage() {
   };
   const goToday = () => setCurrentDate(new Date());
 
-  const formatGoogleCalendarDate = (dateString: string) => {
-    const d = parseDate(dateString);
-    if (!d || isNaN(d.getTime())) return '';
-    const formatDatePart = (dateObj: Date) => {
-      const year = dateObj.getFullYear();
-      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-      const day = String(dateObj.getDate()).padStart(2, '0');
-      const hours = String(dateObj.getHours()).padStart(2, '0');
-      const minutes = String(dateObj.getMinutes()).padStart(2, '0');
-      const seconds = String(dateObj.getSeconds()).padStart(2, '0');
-      return `${year}${month}${day}T${hours}${minutes}${seconds}`;
-    };
-    
-    const startStr = formatDatePart(d);
-    const endD = new Date(d.getTime() + 60 * 60 * 1000);
-    const endStr = formatDatePart(endD);
-    return `${startStr}/${endStr}`;
-  };
-
   const getGoogleCalendarUrl = (ev: any) => {
-    const datesStr = formatGoogleCalendarDate(ev.date);
-    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(ev.title)}&dates=${datesStr}&details=${encodeURIComponent(ev.description || '')}&sf=true&output=xml`;
+    const bounds = getEventDateTimeBounds(ev);
+    if (!bounds) return '#';
+
+    let datesStr = '';
+    if (bounds.hasTime && bounds.endD) {
+      datesStr = `${formatIcsFloating(bounds.startD)}/${formatIcsFloating(bounds.endD)}`;
+    } else {
+      const startStr = formatDate(bounds.startBase, 'iso-date').replace(/-/g, '');
+      const endBase = ev.endDate ? (parseDate(ev.endDate) || bounds.startBase) : bounds.startBase;
+      const nextDay = new Date(endBase.getTime() + 24 * 60 * 60 * 1000);
+      const endStr = formatDate(nextDay, 'iso-date').replace(/-/g, '');
+      datesStr = `${startStr}/${endStr}`;
+    }
+
+    let details = ev.description || '';
+    if (ev.link) {
+      details = details ? `${details}\n\nالرابط: ${ev.link}` : `الرابط: ${ev.link}`;
+    }
+
+    let url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(ev.title)}&dates=${datesStr}&details=${encodeURIComponent(details)}&sf=true&output=xml`;
+    if (ev.location) {
+      url += `&location=${encodeURIComponent(ev.location)}`;
+    }
+    return url;
   };
 
   const downloadSingleIcs = (ev: any) => {
-    const d = parseDate(ev.date) || parseISO(ev.date);
-    if (!d || isNaN(d.getTime())) return;
+    const bounds = getEventDateTimeBounds(ev);
+    if (!bounds) return;
 
-    if (ev.time && typeof ev.time === 'string' && ev.time.includes(':')) {
-      const [h, m] = ev.time.split(':').map(Number);
-      if (!isNaN(h) && !isNaN(m)) {
-        d.setHours(h, m, 0, 0);
-      }
+    const stampStr = formatIcsFloating(new Date()) + 'Z';
+    const cleanTitle = escapeIcs(ev.title);
+
+    let descText = ev.description || '';
+    if (ev.link) {
+      descText = descText ? `${descText}\n\nالرابط: ${ev.link}` : `الرابط: ${ev.link}`;
+    }
+    const cleanDesc = escapeIcs(descText);
+
+    let dateLines = '';
+    if (bounds.hasTime && bounds.endD) {
+      dateLines = `DTSTART:${formatIcsFloating(bounds.startD)}\r\nDTEND:${formatIcsFloating(bounds.endD)}`;
+    } else {
+      const dtstart = formatDate(bounds.startBase, 'iso-date').replace(/-/g, '');
+      const endBase = ev.endDate ? (parseDate(ev.endDate) || bounds.startBase) : bounds.startBase;
+      const nextDay = new Date(endBase.getTime() + 24 * 60 * 60 * 1000);
+      const dtend = formatDate(nextDay, 'iso-date').replace(/-/g, '');
+      dateLines = `DTSTART;VALUE=DATE:${dtstart}\r\nDTEND;VALUE=DATE:${dtend}`;
     }
 
-    const formatDatePart = (dateObj: Date) => {
-      const year = dateObj.getFullYear();
-      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-      const day = String(dateObj.getDate()).padStart(2, '0');
-      const hours = String(dateObj.getHours()).padStart(2, '0');
-      const minutes = String(dateObj.getMinutes()).padStart(2, '0');
-      const seconds = String(dateObj.getSeconds()).padStart(2, '0');
-      return `${year}${month}${day}T${hours}${minutes}${seconds}`;
-    };
-    
-    const startStr = formatDatePart(d);
-    const endD = new Date(d.getTime() + 60 * 60 * 1000);
-    const endStr = formatDatePart(endD);
-    const stampStr = formatDatePart(new Date()) + 'Z';
-
-    const cleanTitle = ev.title.replace(/[\\,;]/g, '\\$&');
-    const cleanDesc = (ev.description || '').replace(/\n/g, '\\n').replace(/[\\,;]/g, '\\$&');
-
-    const icsText = [
+    const icsLines = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//Imam University Student Hub//EN',
+      'PRODID:-//IMAMU Helper//AR',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      'X-WR-TIMEZONE:Asia/Riyadh',
       'BEGIN:VEVENT',
-      `UID:${ev.id || Math.random().toString(36).substring(2)}@imam-hub`,
+      `UID:${ev.id || Math.random().toString(36).substring(2)}@imamu-helper`,
       `DTSTAMP:${stampStr}`,
-      `DTSTART:${startStr}`,
-      `DTEND:${endStr}`,
+      `LAST-MODIFIED:${stampStr}`,
+      `SEQUENCE:0`,
+      `STATUS:CONFIRMED`,
+      dateLines,
       `SUMMARY:${cleanTitle}`,
-      `DESCRIPTION:${cleanDesc}`,
+      cleanDesc ? `DESCRIPTION:${cleanDesc}` : '',
+      ev.location ? `LOCATION:${escapeIcs(ev.location)}` : '',
+      ev.link ? `URL:${ev.link}` : '',
       'END:VEVENT',
       'END:VCALENDAR'
-    ].join('\r\n');
+    ].filter(Boolean).join('\r\n');
 
-    const blob = new Blob([icsText], { type: 'text/calendar;charset=utf-8' });
+    const blob = new Blob([icsLines], { type: 'text/calendar;charset=utf-8' });
     const link = document.createElement('a');
     link.href = window.URL.createObjectURL(blob);
     link.setAttribute('download', `${ev.title}.ics`);
@@ -266,104 +373,120 @@ export function CalendarPage() {
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
 
-  const daysToShow = viewState === 'month' 
-    ? eachDayOfInterval({ start: startDateMonth, end: endDateMonth })
-    : eachDayOfInterval({ start: weekStart, end: weekEnd });
+  const daysToShow = useMemo(() => {
+    return viewState === 'month' 
+      ? eachDayOfInterval({ start: startDateMonth, end: endDateMonth })
+      : eachDayOfInterval({ start: weekStart, end: weekEnd });
+  }, [viewState, startDateMonth, endDateMonth, weekStart, weekEnd]);
 
   const isTodayDate = isToday(currentDate);
 
-  const filteredEvents = events.filter(e => {
-    const type = e.calendarType || 'academic';
-    if (type === 'academic') return visibleCalendars.academic;
-    if (type === 'entity') return visibleCalendars.entity;
-    if (type === 'user') return visibleCalendars.user;
-    return true;
-  });
-
-  const getDotColor = (ev: any) => {
-    if (ev.calendarType === 'entity') return 'bg-emerald-500 ring-2 ring-emerald-400/30';
-    if (ev.isHoliday || ev.isHolidayEnd || ev.isNationalDay) return 'bg-emerald-500 ring-2 ring-emerald-400/30';
-    if (ev.isEid) return 'bg-purple-500 ring-2 ring-purple-400/30';
-    if (ev.isSemesterStart || ev.isSemesterEnd) return 'bg-indigo-500 ring-2 ring-indigo-400/30';
-    if (ev.title?.includes('تسجيل') || ev.title?.includes('التحويل') || ev.title?.includes('القبول') || ev.title?.includes('إعادة القيد') || ev.title?.includes('الاعتذار') || ev.title?.includes('التأجيل')) {
-      return 'bg-sky-500 ring-2 ring-sky-400/30';
+  const getEventVisualClasses = (ev: any) => {
+    if (ev.calendarType === 'entity') {
+      return {
+        lineAccent: 'border-r-emerald-500',
+        badgeColor: 'text-emerald-700 dark:text-emerald-400',
+        activeHighlight: 'bg-emerald-600 dark:bg-emerald-500 text-white dark:text-zinc-950 border-r-emerald-700 dark:border-r-emerald-400 font-bold shadow-sm',
+      };
     }
-    if (ev.title?.includes('اختبار') || ev.title?.includes('امتحان')) return 'bg-rose-500 ring-2 ring-rose-400/30';
-    if (ev.title?.includes('مكافأة')) return 'bg-blue-500 ring-2 ring-blue-400/30';
-    return 'bg-amber-500 ring-2 ring-amber-400/30';
-  };
-
-  const getEventsForDay = (day: Date) => {
-    const dayStart = startOfDay(day);
-    return filteredEvents.filter(e => {
-      const startD = parseDate(e.date);
-      if (!startD) return false;
-      const isStart = isSameDay(startD, dayStart);
-      if (isStart) return true;
-
-      // If the event has an endDate, show it on the final deadline day as well
-      if (e.endDate) {
-        const endD = parseDate(e.endDate);
-        if (endD && isSameDay(endD, dayStart)) {
-          return true;
-        }
+    if (ev.calendarType === 'user') {
+      if (ev.isTask && ev.color) {
+        return {
+          lineAccent: '',
+          badgeColor: '',
+          activeHighlight: 'text-white dark:text-zinc-950 font-bold shadow-sm',
+        };
       }
-      return false;
-    });
-  };
-
-  const getOngoingEventsForDay = (day: Date) => {
-    const dayStart = startOfDay(day);
-    return filteredEvents.filter(e => {
-      if (!e.endDate) return false;
-      const startD = parseDate(e.date);
-      const endD = parseDate(e.endDate);
-      if (!startD || !endD) return false;
-
-      const s = startOfDay(startD);
-      const ed = startOfDay(endD);
-      // Strictly intermediate days between start and end date
-      return dayStart > s && dayStart < ed;
-    });
-  };
-
-  const [searchQuery, setSearchQuery] = useState('');
-
-  const upcomingEvents = filteredEvents
-    .map(e => ({ ...e, parsedDate: parseDate(e.date) }))
-    .filter(e => {
-      if (!e.parsedDate) return false;
-      const matchesSearch = matchArabicSearch([e.title, e.description, e.entityName], searchQuery);
-      
-      if (searchQuery.trim()) return matchesSearch;
-      return isAfter(e.parsedDate, startOfDay(new Date())) || isSameDay(e.parsedDate, new Date());
-    })
-    .sort((a, b) => (a.parsedDate?.getTime() || 0) - (b.parsedDate?.getTime() || 0));
-
-  const displayedUpcomingEvents = upcomingEvents;
-  const hasMoreUpcomingEvents = false;
-
-  useEffect(() => {
-    setVisibleCount(8);
-  }, [searchQuery]);
-
-  const handleUpcomingScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-    if (scrollHeight - scrollTop - clientHeight < 25 && hasMoreUpcomingEvents && !isLoadingMore) {
-      setIsLoadingMore(true);
-      setTimeout(() => {
-        setVisibleCount(prev => Math.min(prev + 5, upcomingEvents.length));
-        setIsLoadingMore(false);
-      }, 500);
+      return {
+        lineAccent: 'border-r-sky-500',
+        badgeColor: 'text-sky-700 dark:text-sky-400',
+        activeHighlight: 'bg-sky-600 dark:bg-sky-500 text-white dark:text-zinc-950 border-r-sky-700 dark:border-r-sky-400 font-bold shadow-sm',
+      };
     }
+
+    const meta = getEventCategoryMeta(ev);
+    if (meta) {
+      if (meta.label.includes('الوطني') || meta.label.includes('التأسيس')) {
+        return {
+          lineAccent: 'border-r-emerald-600',
+          badgeColor: 'text-emerald-700 dark:text-emerald-300',
+          activeHighlight: 'bg-emerald-700 dark:bg-emerald-600 text-white dark:text-zinc-950 border-r-emerald-800 dark:border-r-emerald-400 font-bold shadow-sm',
+        };
+      }
+      if (meta.label.includes('العيد')) {
+        return {
+          lineAccent: 'border-r-purple-500',
+          badgeColor: 'text-purple-700 dark:text-purple-400',
+          activeHighlight: 'bg-purple-600 dark:bg-purple-500 text-white dark:text-zinc-950 border-r-purple-700 dark:border-r-purple-400 font-bold shadow-sm',
+        };
+      }
+      if (meta.label.includes('اختبار')) {
+        return {
+          lineAccent: 'border-r-rose-500',
+          badgeColor: 'text-rose-700 dark:text-rose-400',
+          activeHighlight: 'bg-rose-600 dark:bg-rose-500 text-white dark:text-zinc-950 border-r-rose-700 dark:border-r-rose-400 font-bold shadow-sm',
+        };
+      }
+      if (meta.label.includes('حركة')) {
+        return {
+          lineAccent: 'border-r-sky-500',
+          badgeColor: 'text-sky-700 dark:text-sky-400',
+          activeHighlight: 'bg-sky-600 dark:bg-sky-500 text-white dark:text-zinc-950 border-r-sky-700 dark:border-r-sky-400 font-bold shadow-sm',
+        };
+      }
+      if (meta.label.includes('إجازة')) {
+        return {
+          lineAccent: 'border-r-emerald-600/70 dark:border-emerald-500/60',
+          badgeColor: 'text-emerald-700 dark:text-emerald-400',
+          activeHighlight: 'bg-emerald-600 dark:bg-emerald-500 text-white dark:text-zinc-950 border-r-emerald-700 dark:border-r-emerald-400 font-bold shadow-sm',
+        };
+      }
+      if (meta.label.includes('فصل')) {
+        return {
+          lineAccent: 'border-r-indigo-600/70 dark:border-indigo-500/60',
+          badgeColor: 'text-indigo-700 dark:text-indigo-400',
+          activeHighlight: 'bg-indigo-600 dark:bg-indigo-500 text-white dark:text-zinc-950 border-r-indigo-700 dark:border-r-indigo-400 font-bold shadow-sm',
+        };
+      }
+      if (meta.label.includes('مكافأة')) {
+        return {
+          lineAccent: 'border-r-blue-600/70 dark:border-blue-500/60',
+          badgeColor: 'text-blue-700 dark:text-blue-400',
+          activeHighlight: 'bg-blue-600 dark:bg-blue-500 text-white dark:text-zinc-950 border-r-blue-700 dark:border-r-blue-400 font-bold shadow-sm',
+        };
+      }
+    }
+
+    return {
+      lineAccent: 'border-r-amber-600/70 dark:border-amber-500/60',
+      badgeColor: 'text-amber-700 dark:text-amber-400',
+      activeHighlight: 'bg-[var(--color-imamu-accent)] text-white dark:text-zinc-950 border-r-[var(--color-imamu-brown-dark)] dark:border-r-[var(--color-imamu-accent)] font-bold shadow-sm',
+    };
   };
 
   const handleDeletePersonalEvent = async (ev: any) => {
-    if (!window.confirm('هل أنت متأكد من الحذف؟')) return;
+    if (!window.confirm('هل أنت متأكد من حذف هذا الموعد؟')) return;
     try {
       const evIdStr = String(ev.id || '');
       const evTaskIdStr = String(ev.taskId || '');
       const evDateOnly = String(ev.date || '').split('T')[0];
+
+      // If it's an exam task, record in dismissed exam list
+      if (evIdStr.startsWith('task-exam-') || evIdStr.startsWith('exam-') || evTaskIdStr.startsWith('exam-')) {
+        try {
+          const rawDismissed = localStorage.getItem('imamu_dismissed_exam_tasks');
+          const dismissed: string[] = rawDismissed ? JSON.parse(rawDismissed) : [];
+          const targetKey = evTaskIdStr.startsWith('exam-')
+            ? evTaskIdStr
+            : evIdStr.startsWith('task-')
+            ? evIdStr.slice(5)
+            : evIdStr;
+          if (!dismissed.includes(targetKey)) {
+            dismissed.push(targetKey);
+            localStorage.setItem('imamu_dismissed_exam_tasks', JSON.stringify(dismissed));
+          }
+        } catch {}
+      }
 
       // 1. Clean from unified student tasks & personal events
       try {
@@ -384,7 +507,6 @@ export function CalendarPage() {
             window.dispatchEvent(new Event('imamu_tasks_updated'));
             window.dispatchEvent(new Event('storage'));
 
-            // Also sync remaining tasks to server if logged in
             const token = localStorage.getItem('token') || localStorage.getItem('imamu_token') || '';
             if (token) {
               fetch('/api/user-tasks', {
@@ -395,11 +517,9 @@ export function CalendarPage() {
             }
           }
         }
-      } catch (err) {
-        console.error('Failed to clean student_tasks:', err);
-      }
+      } catch {}
 
-      // 2. Also clean from server DB (if numeric ID)
+      // 2. Clean from server DB
       const numId = Number(ev.id);
       if (!isNaN(numId) && numId > 0 && !evIdStr.startsWith('task-') && !evIdStr.startsWith('exam-')) {
         const token = localStorage.getItem('token') || localStorage.getItem('imamu_token') || '';
@@ -408,24 +528,12 @@ export function CalendarPage() {
             method: 'DELETE',
             headers: token ? { Authorization: `Bearer ${token}` } : {}
           });
-        } catch (err) {
-          console.error('Failed to delete user event from server:', err);
-        }
+        } catch {}
       }
 
-      // 3. Optimistically remove from state & mutate SWR
-      setEvents(prev => prev.filter(e => {
-        if (String(e.id) === evIdStr) return false;
-        if (evTaskIdStr && String(e.taskId) === evTaskIdStr) return false;
-        if (e.title === ev.title && e.date === ev.date) return false;
-        return true;
-      }));
-      setTaskEvents(prev => prev.filter(e => String(e.id) !== evIdStr && String(e.taskId || '') !== evTaskIdStr && !(e.title === ev.title && e.date === ev.date)));
-      
       setSelectedEvent(null);
       mutate();
-    } catch (e) {
-      console.error(e);
+    } catch {
       setSelectedEvent(null);
     }
   };
@@ -436,7 +544,7 @@ export function CalendarPage() {
       {/* Sidebar: Upcoming Events & Calendar Selector */}
       <div className="w-full md:w-80 md:shrink-0 border-b md:border-b-0 md:border-l border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex flex-col self-stretch max-h-[calc(100vh-65px)] min-h-0 overflow-hidden">
         
-        {/* Google Calendar Style Calendar Selector */}
+        {/* Streamlined Calendar Selector */}
         <CalendarSelector
           visibleCalendars={visibleCalendars}
           onToggleCalendar={handleToggleCalendar}
@@ -450,20 +558,23 @@ export function CalendarPage() {
         
         <div className="p-3 flex-1 flex flex-col min-h-0 overflow-hidden">
 
+          {/* Search Box */}
           <div className="mb-2.5 relative shrink-0">
             <div className="relative flex items-center">
               <Search className="w-3.5 h-3.5 absolute right-3 text-slate-400 dark:text-zinc-500 pointer-events-none" />
               <input
                 type="text"
-                placeholder="ابحث في المواعيد أو الانتقال..."
+                placeholder="ابحث في المواعيد والفعاليات..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pr-8 pl-3 py-1.5 bg-slate-50 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:border-[var(--color-imamu-brown)] transition placeholder:text-slate-400 dark:placeholder:text-zinc-600"
+                className="w-full pr-8 pl-8 py-1.5 bg-slate-50 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:border-[var(--color-imamu-brown)] transition placeholder:text-slate-400 dark:placeholder:text-zinc-600"
               />
               {searchQuery && (
                 <button
+                  type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute left-2.5 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded-full"
+                  className="absolute left-2.5 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded-full cursor-pointer"
+                  title="مسح البحث"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -475,21 +586,17 @@ export function CalendarPage() {
             {searchQuery ? `نتائج البحث (${upcomingEvents.length})` : 'المواعيد القادمة'}
           </h2>
           
-          {/* Scrollable Invisible Box Container to Sidebar Edges */}
-          <div 
-            onScroll={handleUpcomingScroll}
-            onWheel={(e) => {
-              e.stopPropagation();
-              e.currentTarget.scrollTop += e.deltaY;
-            }}
-            className="flex-1 min-h-0 max-h-full overflow-y-auto overscroll-contain space-y-2.5 px-0.5 scrollbar-none"
-          >
+          {/* Scrollable Events List */}
+          <div className="flex-1 min-h-0 max-h-full overflow-y-auto space-y-2 px-0.5 scrollbar-thin">
             {displayedUpcomingEvents.map((ev, i) => {
               const d = ev.parsedDate || parseDate(ev.date);
               const isValidDate = !!(d && !isNaN(d.getTime()));
               const dayStr = isValidDate ? format(d, 'd') : '-';
               const monthStr = isValidDate ? format(d, 'MMM', { locale: ar }) : '';
-              const timeStr = isValidDate ? format(d, 'h:mm a', { locale: ar }) : (ev.time || '');
+              const hasSpecificTime = !!(ev.time || (typeof ev.date === 'string' && (ev.date.includes('T') || ev.date.includes(':'))));
+              const timeStr = ev.time 
+                ? formatTimeArabic(ev.time) 
+                : (isValidDate && (ev.date.includes('T') || ev.date.includes(':')) ? format(d, 'h:mm a', { locale: ar }) : '');
               const meta = getEventCategoryMeta(ev);
               const eventKey = ev.id || `${ev.title}-${ev.date}`;
               const isExpanded = expandedSidebarEventId === eventKey;
@@ -505,26 +612,30 @@ export function CalendarPage() {
                       setCurrentDate(d);
                     }
                   }}
-                  className={`w-full rounded-2xl border transition-all duration-300 ease-out cursor-pointer text-right p-3.5 shadow-none animate-in fade-in slide-in-from-bottom-2 ${
+                  className={`w-full rounded-2xl border transition-all duration-200 cursor-pointer text-right p-3 ${
                     isExpanded
                       ? 'bg-slate-50 dark:bg-zinc-950/90 border-[var(--color-imamu-brown)] dark:border-[var(--color-imamu-accent)]'
-                      : 'bg-slate-50 dark:bg-zinc-950/60 border-slate-200 dark:border-zinc-800/80 hover:border-slate-300 dark:hover:border-zinc-700'
+                      : 'bg-slate-50/70 dark:bg-zinc-950/50 border-slate-200/90 dark:border-zinc-800/80 hover:border-slate-300 dark:hover:border-zinc-700'
                   }`}
                 >
                   <div className="flex justify-between items-baseline gap-2 mb-1">
                     <h3 className="text-xs font-bold text-slate-900 dark:text-white truncate max-w-[170px]">
                       {ev.title}
                     </h3>
-                    <span className="text-[10px] font-bold text-[var(--color-imamu-brown)] dark:text-[var(--color-imamu-accent)] bg-[var(--color-imamu-brown)]/10 dark:bg-zinc-900 border border-[var(--color-imamu-brown)]/20 dark:border-zinc-800 px-2 py-0.5 rounded-lg shrink-0">
+                    <span className="text-[10px] font-bold text-[var(--color-imamu-brown)] dark:text-[var(--color-imamu-accent)] bg-[var(--color-imamu-brown)]/10 dark:bg-zinc-900 border border-[var(--color-imamu-brown)]/20 dark:border-zinc-800 px-2 py-0.5 rounded-xl shrink-0">
                       {dayStr} {monthStr}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between gap-2 overflow-hidden">
                     <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-zinc-400 font-medium shrink-0">
-                      <Clock className="w-3 h-3 opacity-80 shrink-0" />
-                      <span className="shrink-0">{timeStr}</span>
-                      <span className="opacity-40 shrink-0">•</span>
+                      {hasSpecificTime && (
+                        <>
+                          <Clock className="w-3 h-3 opacity-80 shrink-0" />
+                          <span className="shrink-0">{timeStr}</span>
+                          <span className="opacity-40 shrink-0">•</span>
+                        </>
+                      )}
                       <span className="shrink-0">{formatHijriMonthDay(ev.date)}</span>
                     </div>
                     {meta ? (
@@ -547,86 +658,94 @@ export function CalendarPage() {
                     ) : null}
                   </div>
 
-                  {/* Smooth Expandable Content Container */}
-                  <div 
-                    className={`grid transition-all duration-300 ease-in-out ${
-                      isExpanded ? 'grid-rows-[1fr] opacity-100 mt-3 pt-3 border-t border-[var(--color-imamu-brown)]/20 dark:border-zinc-800' : 'grid-rows-[0fr] opacity-0 mt-0 pt-0 border-t-0'
-                    }`}
-                  >
-                    <div className={`${isExpanded ? 'overflow-visible' : 'overflow-hidden'} p-0.5`}>
+                  {/* Expandable Details Container */}
+                  {isExpanded && (
+                    <div className="mt-2.5 pt-2.5 border-t border-slate-200 dark:border-zinc-800 animate-in fade-in duration-150">
                       {ev.description ? (
-                        <div className="text-[11px] text-slate-700 dark:text-zinc-300 bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl p-2.5 leading-relaxed mb-3 text-right" dir="auto">
+                        <div className="text-[11px] text-slate-700 dark:text-zinc-300 bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl p-2.5 leading-relaxed mb-2.5 text-right" dir="auto">
                           {ev.description}
                         </div>
                       ) : (
-                        <span className="text-[11px] italic text-slate-400 dark:text-zinc-500 block mb-3">لا يوجد وصف متاح لهذا الموعد.</span>
+                        <span className="text-[11px] italic text-slate-400 dark:text-zinc-500 block mb-2.5">
+                          لا يوجد وصف إضافي متاح.
+                        </span>
                       )}
 
-                      <div className="flex gap-2 px-0.5 pt-0.5 pb-0.5 items-center">
-                        <a 
+                      {ev.location && (
+                        <div className="text-[11px] text-slate-600 dark:text-zinc-400 mb-2 flex items-center gap-1.5 font-medium">
+                          <span>📍</span>
+                          <span>{ev.location}</span>
+                        </div>
+                      )}
+
+                      {ev.link && (
+                        <div className="text-[11px] text-sky-600 dark:text-sky-400 mb-2.5">
+                          <a 
+                            href={ev.link.startsWith('http') ? ev.link : `https://${ev.link}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            onClick={(e) => e.stopPropagation()}
+                            className="hover:underline inline-flex items-center gap-1 font-medium"
+                          >
+                            <span>🔗</span>
+                            <span className="truncate max-w-[200px]">{ev.link}</span>
+                          </a>
+                        </div>
+                      )}
+
+                      <div className="flex gap-2 items-center">
+                        <ButtonLink
                           href={getGoogleCalendarUrl(ev)}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                          target="_blank" 
+                          rel="noopener noreferrer" 
                           onClick={(e) => e.stopPropagation()}
-                          className="btn-rise flex-1 text-[10px] bg-[var(--color-imamu-accent)] text-white dark:text-zinc-950 hover:opacity-95 py-1.5 px-2 rounded-xl font-bold inline-flex items-center justify-center gap-1 transition cursor-pointer shadow-2xs"
+                          variant="primary"
+                          size="xs"
+                          className="flex-1 text-[10px]"
                         >
-                          <ExternalLink className="w-3 h-3 text-white dark:text-zinc-950" /> ربط بتقويم قوقل
-                        </a>
-                        <button 
+                          <ExternalLink className="w-3 h-3" /> ربط بتقويم Google
+                        </ButtonLink>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="xs"
+                          className="flex-1 text-[10px]"
                           onClick={(e) => {
                             e.stopPropagation();
                             downloadSingleIcs(ev);
                           }}
-                          className="btn-rise flex-1 text-[10px] bg-slate-200 dark:bg-zinc-800 text-slate-800 dark:text-zinc-200 py-1.5 px-2 rounded-xl font-bold inline-flex items-center justify-center gap-1 hover:bg-slate-300 dark:hover:bg-zinc-700 transition cursor-pointer"
                         >
-                          <Download className="w-3 h-3" /> ICS
-                        </button>
+                          <Download className="w-3 h-3" /> تحميل ICS
+                        </Button>
                         <ReportDropdownMenu
                           targetType="event"
                           targetId={ev.id}
                           targetTitle={ev.title}
-                          buttonClassName="btn-rise p-1.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-200 dark:bg-zinc-800 text-slate-400 hover:text-white transition cursor-pointer"
+                          buttonClassName="p-1.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-200 dark:bg-zinc-800 text-slate-400 hover:text-white transition cursor-pointer"
                         />
                       </div>
-
                     </div>
-                  </div>
+                  )}
                 </div>
               );
             })}
             
-            {/* Load More Button */}
+            {/* Show More Button (Instant, No fake spinner) */}
             {hasMoreUpcomingEvents && (
-              <div className="pt-2 pb-1 text-center">
+              <div className="pt-1 pb-1 text-center">
                 <button
-                  onClick={() => {
-                    if (isLoadingMore) return;
-                    setIsLoadingMore(true);
-                    setTimeout(() => {
-                      setVisibleCount(prev => Math.min(prev + 10, upcomingEvents.length));
-                      setIsLoadingMore(false);
-                    }, 500);
-                  }}
-                  disabled={isLoadingMore}
-                  className="btn-rise w-full py-2.5 px-4 rounded-xl text-xs font-bold transition-all duration-300 bg-slate-100 dark:bg-zinc-900/90 border border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-[var(--color-imamu-brown)] hover:text-white dark:hover:bg-[var(--color-imamu-accent)] dark:hover:text-zinc-950 flex items-center justify-center gap-2 cursor-pointer shadow-2xs disabled:opacity-70"
+                  type="button"
+                  onClick={() => setVisibleCount(prev => Math.min(prev + 10, upcomingEvents.length))}
+                  className="w-full py-2 px-3 rounded-xl text-xs font-bold transition-colors bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-200 dark:hover:bg-zinc-800 cursor-pointer"
                 >
-                  {isLoadingMore ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin text-[var(--color-imamu-brown)] dark:text-[var(--color-imamu-accent)]" />
-                      <span>جاري تحميل المواعيد...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>عرض المزيد من المواعيد ({upcomingEvents.length - visibleCount})</span>
-                    </>
-                  )}
+                  عرض المزيد ({upcomingEvents.length - visibleCount})
                 </button>
               </div>
             )}
 
             {upcomingEvents.length === 0 && (
               <div className="text-xs text-slate-400 dark:text-zinc-500 text-center py-6 border border-dashed border-slate-200 dark:border-zinc-800 rounded-xl bg-slate-50 dark:bg-zinc-950/40">
-                لا توجد مواعيد قادمة حالياً.
+                لا توجد مواعيد قادمة مطابقة.
               </div>
             )}
           </div>
@@ -637,7 +756,7 @@ export function CalendarPage() {
       <div className="flex-1 flex flex-col self-stretch max-h-[calc(100vh-65px)] max-w-full min-h-0 overflow-hidden bg-white dark:bg-zinc-950">
         
         {/* Calendar Navigation Header & Filter Bar */}
-        <div className="p-3 sm:p-4 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between gap-3 bg-white dark:bg-zinc-900 shrink-0 relative">
+        <div className="p-3 sm:p-4 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between gap-3 bg-white dark:bg-zinc-900 shrink-0">
           <div className="flex items-center gap-3">
             <h2 className="text-lg sm:text-xl font-serif font-extrabold text-slate-900 dark:text-white shrink-0">
               {viewState === 'month' 
@@ -647,15 +766,17 @@ export function CalendarPage() {
             
             <div className="flex items-center bg-slate-100 dark:bg-zinc-950 rounded-2xl p-1 border border-slate-200 dark:border-zinc-800 shrink-0" dir="ltr">
               <button 
+                type="button"
                 onClick={nextPeriod}
-                className="btn-rise p-1.5 text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer"
-                title="الفترة القادمة"
+                className="p-1.5 text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer"
+                title="الشهر القادم"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <button 
+                type="button"
                 onClick={goToday}
-                className={`btn-rise px-3 py-1 text-xs font-bold rounded-xl transition-colors cursor-pointer ${
+                className={`px-3 py-1 text-xs font-bold rounded-xl transition-colors cursor-pointer ${
                   isTodayDate 
                     ? 'text-[var(--color-imamu-accent)] bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 shadow-2xs' 
                     : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-200 dark:hover:bg-zinc-800'
@@ -664,9 +785,10 @@ export function CalendarPage() {
                 اليوم
               </button>
               <button 
+                type="button"
                 onClick={prevPeriod}
-                className="btn-rise p-1.5 text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer"
-                title="الفترة السابقة"
+                className="p-1.5 text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer"
+                title="الشهر السابق"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -674,11 +796,11 @@ export function CalendarPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* New Add Task Button (Replaced quick-add date popover with task maker) */}
-            <button
+            {/* New Task Button */}
+            <button 
               type="button"
               onClick={() => setIsTaskModalOpen(true)}
-              className="btn-rise inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer shadow-2xs active:scale-95 border shrink-0 bg-slate-100 dark:bg-zinc-950 text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-800 hover:text-[var(--color-imamu-accent)] hover:border-[var(--color-imamu-accent)]/50"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 transition-colors shadow-2xs border border-slate-200 dark:border-zinc-700 cursor-pointer shrink-0"
               title="إضافة مهمة جديدة"
             >
               <Plus className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
@@ -690,7 +812,7 @@ export function CalendarPage() {
               <button 
                 type="button"
                 onClick={() => setViewState('month')}
-                className={`btn-rise px-3 py-1 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer ${
+                className={`px-3 py-1 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer ${
                   viewState === 'month' 
                     ? 'bg-white dark:bg-zinc-800 text-[var(--color-imamu-accent)] shadow-2xs border border-slate-200 dark:border-zinc-700' 
                     : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
@@ -701,7 +823,7 @@ export function CalendarPage() {
               <button 
                 type="button"
                 onClick={() => setViewState('week')}
-                className={`btn-rise px-3 py-1 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer ${
+                className={`px-3 py-1 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer ${
                   viewState === 'week' 
                     ? 'bg-white dark:bg-zinc-800 text-[var(--color-imamu-accent)] shadow-2xs border border-slate-200 dark:border-zinc-700' 
                     : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
@@ -717,14 +839,14 @@ export function CalendarPage() {
         <div className="grid grid-cols-7 border-b border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-900/90 shrink-0">
           {['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'].map((day, i) => (
             <div key={day} className="py-2 text-center">
-              <span className={`text-xs font-bold ${i === 5 || i === 6 ? 'text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)]' : 'text-slate-700 dark:text-zinc-300'}`}>
+              <span className={`text-xs font-bold ${i === 5 || i === 6 ? 'text-[var(--color-imamu-accent)]' : 'text-slate-700 dark:text-zinc-300'}`}>
                 {day}
               </span>
             </div>
           ))}
         </div>
 
-        {/* Calendar Grid Cells - Stretched 5 Rows to 100% Height */}
+        {/* Calendar Grid Cells */}
         <div 
           className={`flex-1 grid grid-cols-7 bg-white dark:bg-zinc-950 h-full min-h-0 overflow-hidden ${
             viewState === 'month' ? '' : 'auto-rows-[minmax(280px,1fr)] overflow-y-auto'
@@ -734,23 +856,23 @@ export function CalendarPage() {
           {daysToShow.map((day) => {
             const isCurrMonth = isSameMonth(day, currentDate);
             const isDayToday = isToday(day);
-            const dayEvents = getEventsForDay(day);
-            const ongoingEvents = getOngoingEventsForDay(day);
+            const dayKey = format(day, 'yyyy-MM-dd');
+            const dayEvents = eventsByDayKey.get(dayKey) || [];
 
             return (
               <div 
-                key={day.toString()} 
-                className={`border-l border-b border-slate-200 dark:border-zinc-800/80 p-2 flex flex-col transition-colors duration-200 ${
+                key={dayKey} 
+                className={`border-l border-b border-slate-200 dark:border-zinc-800/80 p-1.5 sm:p-2 flex flex-col transition-colors duration-150 ${
                   !isCurrMonth && viewState === 'month' 
-                    ? 'bg-slate-50/70 dark:bg-zinc-950/90 opacity-75' 
+                    ? 'bg-slate-50/70 dark:bg-zinc-950/90 opacity-70' 
                     : 'bg-white dark:bg-zinc-900/40 hover:bg-stone-50/40 dark:hover:bg-zinc-900/80'
                 }`}
               >
-                <div className="flex justify-between items-center mb-1.5 min-h-[28px]">
+                <div className="flex justify-between items-center mb-1">
                   <span 
-                    className={`inline-flex items-center justify-center w-7 h-7 rounded-xl text-xs font-bold ${
+                    className={`inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-xl text-xs font-bold ${
                       isDayToday 
-                        ? 'bg-[var(--color-imamu-brown)] text-white shadow-md shadow-[var(--color-imamu-brown)/20] font-black' 
+                        ? 'bg-[var(--color-imamu-brown)] text-white shadow-xs font-black' 
                         : !isCurrMonth && viewState === 'month'
                         ? 'text-slate-400 dark:text-zinc-500 font-semibold' 
                         : 'text-slate-800 dark:text-zinc-200 font-bold'
@@ -758,81 +880,21 @@ export function CalendarPage() {
                   >
                     {format(day, 'd')}
                   </span>
-
-                  {ongoingEvents.length > 0 && (
-                    <div className="flex items-center gap-1 flex-wrap justify-end pl-0.5">
-                      {ongoingEvents.slice(0, 3).map((ev: any, idx: number) => {
-                        const dotColor = getDotColor(ev);
-                        return (
-                          <button
-                            key={ev.id || `${ev.title}-${idx}`}
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedEvent(ev);
-                            }}
-                            onMouseEnter={(e) => {
-                              const rect = e.currentTarget.getBoundingClientRect();
-                              setHoveredDot({ event: ev, rect, day });
-                            }}
-                            onMouseLeave={() => setHoveredDot(null)}
-                            className={`w-2.5 h-2.5 rounded-full transition-transform hover:scale-135 cursor-pointer shadow-xs ${dotColor}`}
-                            aria-label={ev.title}
-                          />
-                        );
-                      })}
-                      {ongoingEvents.length > 3 && (
-                        <span className="text-[9px] font-bold text-slate-400 dark:text-zinc-500">
-                          +{ongoingEvents.length - 3}
-                        </span>
-                      )}
-                    </div>
-                  )}
                 </div>
                 
-                <div className="flex-1 overflow-x-hidden overflow-y-auto space-y-1.5 pr-0.5 min-h-0 scrollbar-none">
+                {/* Events in cell */}
+                <div className="flex-1 overflow-x-hidden overflow-y-auto space-y-1 pr-0.5 min-h-0 scrollbar-none">
                   {dayEvents.map((ev, i) => {
                     const eventKey = ev.id || `${ev.title}-${ev.date}`;
                     const isModalSelected = selectedEvent && selectedEvent.title === ev.title && selectedEvent.date === ev.date;
                     const isSidebarHighlighted = highlightedEventId === eventKey;
                     const isHighlighted = isModalSelected || isSidebarHighlighted;
                     const meta = getEventCategoryMeta(ev);
-                    
-                    let lineAccentClass = 'border-r-amber-600/70 dark:border-amber-500/60';
-                    let badgeColor = 'text-amber-700 dark:text-amber-400';
-                    let activeHighlightClass = 'bg-[var(--color-imamu-accent)] text-white dark:text-zinc-950 border-r-[var(--color-imamu-brown-dark)] dark:border-r-[var(--color-imamu-accent)] font-bold shadow-sm';
-
-                    if (ev.calendarType === 'entity') {
-                      lineAccentClass = 'border-r-emerald-500';
-                      badgeColor = 'text-emerald-700 dark:text-emerald-400';
-                      activeHighlightClass = 'bg-emerald-600 dark:bg-emerald-500 text-white dark:text-zinc-950 border-r-emerald-700 dark:border-r-emerald-400 font-bold shadow-sm';
-                    } else if (ev.calendarType === 'user') {
-                      if (ev.isTask && ev.color) {
-                        lineAccentClass = '';
-                        badgeColor = '';
-                        activeHighlightClass = 'text-white dark:text-zinc-950 font-bold shadow-sm';
-                      } else {
-                        lineAccentClass = 'border-r-sky-500';
-                        badgeColor = 'text-sky-700 dark:text-sky-400';
-                        activeHighlightClass = 'bg-sky-600 dark:bg-sky-500 text-white dark:text-zinc-950 border-r-sky-700 dark:border-r-sky-400 font-bold shadow-sm';
-                      }
-                    } else if (ev.isHoliday || ev.isHolidayEnd || ev.isNationalDay) {
-                      lineAccentClass = 'border-r-emerald-600/70 dark:border-emerald-500/60';
-                      badgeColor = 'text-emerald-700 dark:text-emerald-400';
-                      activeHighlightClass = 'bg-emerald-600 dark:bg-emerald-500 text-white dark:text-zinc-950 border-r-emerald-700 dark:border-r-emerald-400 font-bold shadow-sm';
-                    } else if (ev.isSemesterStart || ev.isSemesterEnd) {
-                      lineAccentClass = 'border-r-indigo-600/70 dark:border-indigo-500/60';
-                      badgeColor = 'text-indigo-700 dark:text-indigo-400';
-                      activeHighlightClass = 'bg-indigo-600 dark:bg-indigo-500 text-white dark:text-zinc-950 border-r-indigo-700 dark:border-r-indigo-400 font-bold shadow-sm';
-                    } else if (ev.title?.includes('مكافأة') || ev.title?.includes('المكافأة') || ev.title?.includes('إيداع')) {
-                      lineAccentClass = 'border-r-blue-600/70 dark:border-blue-500/60';
-                      badgeColor = 'text-blue-700 dark:text-blue-400';
-                      activeHighlightClass = 'bg-blue-600 dark:bg-blue-500 text-white dark:text-zinc-950 border-r-blue-700 dark:border-r-blue-400 font-bold shadow-sm';
-                    }
+                    const { lineAccent: lineAccentClass, badgeColor, activeHighlight: activeHighlightClass } = getEventVisualClasses(ev);
 
                     return (
                       <div 
-                        key={ev.id || i}
+                        key={ev.id ? `${ev.id}-${ev.isDeadline ? 'dl' : 'st'}` : i}
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedEvent(ev);
@@ -844,25 +906,34 @@ export function CalendarPage() {
                               : { borderRightColor: ev.color }
                             : undefined
                         }
-                        className={`w-full py-1 px-2 pr-2.5 rounded-r-none rounded-l-lg border-r-3 transition-all duration-200 cursor-pointer text-right overflow-hidden ${
+                        className={`w-full py-1 px-2 rounded-l-lg border-r-3 transition-all duration-150 cursor-pointer text-right overflow-hidden ${
                           isHighlighted
                             ? activeHighlightClass
                             : `${lineAccentClass} bg-slate-100/70 dark:bg-zinc-900/60 hover:bg-slate-200/80 dark:hover:bg-zinc-800/80 text-slate-800 dark:text-zinc-200`
                         }`}
                       >
                         <div className="font-bold truncate text-[11px] leading-snug">
-                          {ev.endDate && isSameDay(parseDate(ev.endDate) || new Date(0), day) && !isSameDay(parseDate(ev.date) || new Date(0), day)
-                            ? `⚠️ آخر موعد: ${ev.title}`
-                            : ev.title}
+                          {ev.isDeadline ? `⚠️ آخر موعد: ${ev.title}` : ev.title}
                         </div>
                         <div className="flex items-center gap-1.5 mt-0.5 text-[9.5px] truncate opacity-90">
-                          <span className="inline-flex items-center gap-0.5 shrink-0">
-                            <Clock className="w-2.5 h-2.5 inline" />
-                            {(() => {
+                          {(() => {
+                            let displayTime = '';
+                            if (ev.time) {
+                              displayTime = formatTimeArabic(ev.time);
+                            } else if (typeof ev.date === 'string' && (ev.date.includes('T') || ev.date.includes(':'))) {
                               const evD = parseDate(ev.date);
-                              return evD && !isNaN(evD.getTime()) ? format(evD, 'h:mm a', { locale: ar }) : (ev.time || '');
-                            })()}
-                          </span>
+                              if (evD && !isNaN(evD.getTime())) {
+                                displayTime = format(evD, 'h:mm a', { locale: ar });
+                              }
+                            }
+                            if (!displayTime) return null;
+                            return (
+                              <span className="inline-flex items-center gap-0.5 shrink-0 font-medium">
+                                <Clock className="w-2.5 h-2.5 inline" />
+                                {displayTime}
+                              </span>
+                            );
+                          })()}
                           {meta ? (
                             <>
                               <span className="opacity-40">•</span>
@@ -902,17 +973,18 @@ export function CalendarPage() {
       {/* Event Details Popup Modal */}
       {selectedEvent && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
           onClick={() => setSelectedEvent(null)}
         >
           <div 
-            className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 max-w-md w-full shadow-2xl relative text-right animate-in zoom-in-95 duration-200"
+            className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 max-w-md w-full shadow-2xl relative text-right animate-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
             dir="rtl"
           >
             <button 
+              type="button"
               onClick={() => setSelectedEvent(null)}
-              className="btn-rise absolute top-4 left-4 p-1.5 text-slate-400 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-zinc-200 rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer z-10"
+              className="absolute top-4 left-4 p-1.5 text-slate-400 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-zinc-200 rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer z-10"
               title="إغلاق"
             >
               <X className="w-5 h-5" />
@@ -963,9 +1035,17 @@ export function CalendarPage() {
             </h3>
 
             <div className="text-xs text-slate-600 dark:text-zinc-300 mb-4 bg-slate-50 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-800/80 rounded-2xl p-3.5 space-y-1.5">
-              <div className="flex items-center gap-2 font-medium">
+              <div className="flex items-center gap-2 font-medium flex-wrap">
                 <Clock className="w-4 h-4 text-[var(--color-imamu-accent)] shrink-0" />
                 <span>{formatDate(selectedEvent.date, 'ar-full')}</span>
+                {selectedEvent.endDate && selectedEvent.endDate !== selectedEvent.date && (
+                  <span> إلى {formatDate(selectedEvent.endDate, 'ar-full')}</span>
+                )}
+                {selectedEvent.time && (
+                  <span className="text-[var(--color-imamu-accent)] font-semibold">
+                    • {formatTimeArabic(selectedEvent.time)}{selectedEvent.endTime && selectedEvent.endTime !== selectedEvent.time ? ` - ${formatTimeArabic(selectedEvent.endTime)}` : ''}
+                  </span>
+                )}
               </div>
               <div className="text-xs text-slate-400 dark:text-zinc-500 mr-6">
                 {formatHijriDate(selectedEvent.date)}
@@ -973,6 +1053,19 @@ export function CalendarPage() {
               {selectedEvent.location && (
                 <div className="text-xs text-slate-500 dark:text-zinc-400 mr-6 pt-1">
                   📍 {selectedEvent.location}
+                </div>
+              )}
+              {selectedEvent.link && (
+                <div className="text-xs text-sky-600 dark:text-sky-400 mr-6 pt-1">
+                  <a
+                    href={selectedEvent.link.startsWith('http') ? selectedEvent.link : `https://${selectedEvent.link}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 hover:underline font-medium"
+                  >
+                    <span>🔗</span>
+                    <span className="truncate max-w-[200px]">{selectedEvent.link}</span>
+                  </a>
                 </div>
               )}
             </div>
@@ -988,25 +1081,30 @@ export function CalendarPage() {
             )}
 
             <div className="flex gap-2.5 border-t border-slate-200 dark:border-zinc-800 pt-4 mt-2 items-center">
-              <a 
+              <ButtonLink
                 href={getGoogleCalendarUrl(selectedEvent)}
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="btn-rise flex-1 text-xs bg-[var(--color-imamu-accent)] text-white dark:text-zinc-950 hover:opacity-95 py-2.5 px-3 rounded-xl font-bold inline-flex items-center justify-center gap-1.5 transition shadow-xs cursor-pointer"
+                variant="primary"
+                size="sm"
+                className="flex-1 text-xs"
               >
-                <ExternalLink className="w-4 h-4 text-white dark:text-zinc-950" /> ربط بتقويم قوقل
-              </a>
-              <button 
+                <ExternalLink className="w-4 h-4" /> ربط بتقويم Google
+              </ButtonLink>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="flex-1 text-xs"
                 onClick={() => downloadSingleIcs(selectedEvent)}
-                className="btn-rise flex-1 text-xs bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-slate-800 dark:text-zinc-200 py-2.5 px-3 rounded-xl font-bold inline-flex items-center justify-center gap-1.5 hover:bg-slate-200 dark:hover:bg-zinc-700 transition cursor-pointer"
               >
-                <Download className="w-4 h-4 text-slate-400 dark:text-zinc-400" /> ICS
-              </button>
+                <Download className="w-4 h-4 text-slate-400 dark:text-zinc-400" /> تحميل ICS
+              </Button>
               {selectedEvent.calendarType === 'user' && (
                 <button
                   type="button"
                   onClick={() => handleDeletePersonalEvent(selectedEvent)}
-                  className="btn-rise p-2.5 rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition cursor-pointer"
+                  className="p-2.5 rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition cursor-pointer"
                   title="حذف هذا الموعد الشخصي"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -1016,7 +1114,7 @@ export function CalendarPage() {
                 targetType="event"
                 targetId={selectedEvent.id}
                 targetTitle={selectedEvent.title}
-                buttonClassName="btn-rise p-2.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-100 dark:bg-zinc-800 text-slate-400 hover:text-white transition cursor-pointer"
+                buttonClassName="p-2.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-100 dark:bg-zinc-800 text-slate-400 hover:text-white transition cursor-pointer"
               />
             </div>
 
@@ -1035,49 +1133,6 @@ export function CalendarPage() {
           />
         )}
       </AnimatePresence>
-
-      {/* Floating Tooltip for Hovered Ongoing Event Dot */}
-      {hoveredDot && typeof window !== 'undefined' && (
-        <div 
-          className="fixed z-9999 pointer-events-none p-3 rounded-2xl shadow-2xl border bg-slate-900/95 dark:bg-zinc-900/95 text-white border-slate-700/80 dark:border-zinc-700/80 backdrop-blur-md text-right text-xs max-w-[280px] transition-all animate-in fade-in zoom-in-95 duration-150"
-          style={{
-            top: Math.max(12, hoveredDot.rect.top - 120),
-            left: Math.min(window.innerWidth - 290, Math.max(12, hoveredDot.rect.left + hoveredDot.rect.width / 2 - 140)),
-          }}
-        >
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <span className={`w-2 h-2 rounded-full shrink-0 ${getDotColor(hoveredDot.event)}`} />
-            <span className="font-bold text-[10px] text-amber-400 px-1.5 py-0.5 rounded-md bg-amber-400/10 border border-amber-400/20">
-              فترة مستمرة
-            </span>
-          </div>
-          <p className="font-bold text-xs text-white leading-snug line-clamp-2">
-            {hoveredDot.event.title}
-          </p>
-          <div className="mt-2 space-y-1 text-[11px] text-slate-300 dark:text-zinc-400 border-t border-slate-800 dark:border-zinc-800 pt-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-slate-400">آخر موعد:</span>
-              <span className="font-semibold text-rose-300">{hoveredDot.event.endDate}</span>
-            </div>
-            {(() => {
-              const endD = parseDate(hoveredDot.event.endDate);
-              if (!endD) return null;
-              const diffDays = Math.ceil((endD.getTime() - hoveredDot.day.getTime()) / (1000 * 60 * 60 * 24));
-              return (
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-slate-400">المتبقي:</span>
-                  <span className="font-semibold text-emerald-400">
-                    {diffDays <= 0 ? 'اليوم الأخير' : `${diffDays} أيام متبقية`}
-                  </span>
-                </div>
-              );
-            })()}
-          </div>
-          <div className="mt-2 text-[9.5px] text-slate-400 text-center">
-            (انقر على النقطة لعرض التفاصيل)
-          </div>
-        </div>
-      )}
 
     </div>
   );

@@ -9,9 +9,9 @@ import {
   BookOpen, GraduationCap, Sparkles, X, Check, ChevronRight,
   ChevronLeft, Search, Loader2, AlertCircle, CalendarPlus,
   Trash2, TrendingUp, Tv, Settings, Folder, FolderOpen, FolderPlus,
-  Pencil, Edit3, MoreVertical
+  Pencil, Edit3, MoreVertical, CalendarClock, CheckSquare, Link2
 } from 'lucide-react';
-import { SpotlightCard, AnimatedNumber } from '../components/ui';
+import { SpotlightCard, AnimatedNumber, Button } from '../components/ui';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   parseDate, formatDate, getCountdown, calculateMokafaaDate
@@ -23,7 +23,7 @@ import { AddCourseModal } from '../components/AddCourseModal';
 import { SpeedDialPlusMenu } from '../components/SpeedDialPlusMenu';
 import { WeeklySchedule } from '../components/WeeklySchedule';
 import { AcademicProgressTab } from '../components/AcademicProgressTab';
-import { parseScheduleDays, parseTimeRange, COURSE_CARD_PALETTES, extractFinalExamInfo, parseTimeToMinutes, DAY_MAP_AR, formatMinutesToTime } from '../lib/schedule-utils';
+import { parseScheduleDays, parseTimeRange, COURSE_CARD_PALETTES, extractFinalExamInfo, normalizeExamDate, normalizeExamTime, parseTimeToMinutes, DAY_MAP_AR, formatMinutesToTime } from '../lib/schedule-utils';
 import { NewTaskModal } from '../components/NewTaskModal';
 import {
   StudentTask,
@@ -291,7 +291,7 @@ export function syncExamToStudentTasks(course: CourseEntry, allCourses?: CourseE
     }
     const taskData: StudentTask = {
       id: taskId,
-      title: 'أختبار نهائي',
+      title: 'اختبار نهائي',
       completed: existingIndex >= 0 ? curTasks[existingIndex].completed : false,
       priority: 'high',
       category: 'Final Exam',
@@ -310,7 +310,7 @@ export function syncExamToStudentTasks(course: CourseEntry, allCourses?: CourseE
       updatedTasks[existingIndex] = {
         ...updatedTasks[existingIndex],
         ...taskData,
-        title: 'أختبار نهائي',
+        title: 'اختبار نهائي',
         completed: curTasks[existingIndex].completed,
       };
     } else {
@@ -385,17 +385,25 @@ const COURSE_COLORS = [
 // ─────────────────────────────────────────────
 // Segmented progress bar (matching screenshot)
 // ─────────────────────────────────────────────
-function SegmentedBar({ percent, total = 22 }: { percent: number; total?: number }) {
+function SegmentedBar({
+  percent,
+  total = 34,
+  filledColor = 'bg-[var(--color-imamu-accent)]',
+}: {
+  percent: number;
+  total?: number;
+  filledColor?: string;
+}) {
   const filled = Math.round((percent / 100) * total);
   return (
-    <div className="flex gap-0.5 items-center w-full">
+    <div className="flex gap-[2px] items-center w-full">
       {Array.from({ length: total }).map((_, i) => (
         <div
           key={i}
-          className={`flex-1 h-3.5 rounded-[2.5px] transition-colors ${
+          className={`flex-1 h-2 rounded-[1px] transition-colors ${
             i < filled
-              ? 'bg-emerald-500'
-              : 'bg-slate-200 dark:bg-zinc-800 border border-slate-300/40 dark:border-zinc-700/50'
+              ? filledColor
+              : 'bg-slate-200 dark:bg-zinc-800'
           }`}
         />
       ))}
@@ -415,7 +423,8 @@ function ProgressMetricCard({
   percent,
   startDate,
   endDate,
-  remainingColor = 'text-emerald-600 dark:text-emerald-400',
+  remainingColor = 'text-[var(--color-imamu-accent)]',
+  barColor = 'bg-[var(--color-imamu-accent)]',
 }: {
   icon: string;
   title: string;
@@ -426,6 +435,7 @@ function ProgressMetricCard({
   startDate: Date | null;
   endDate: Date | null;
   remainingColor?: string;
+  barColor?: string;
 }) {
   const fmtDate = (d: Date | null) => d
     ? `${d.getDate()}-${d.getMonth() + 1}-${d.getFullYear()}`
@@ -455,7 +465,7 @@ function ProgressMetricCard({
       {/* Segmented bar + percent */}
       <div className="flex items-center gap-2.5">
         <div className="flex-1 min-w-0">
-          <SegmentedBar percent={percent} total={22} />
+          <SegmentedBar percent={percent} total={34} filledColor={barColor} />
         </div>
         <span className="text-xs font-extrabold text-slate-900 dark:text-white w-9 text-left tabular-nums shrink-0">
           {percent}%
@@ -524,7 +534,10 @@ function EditSemesterModal({
       if (semester.academicYear) params.set('academicYear', semester.academicYear);
       if (semester.semester) params.set('semester', semester.semester);
 
-      const res = await fetch(`/api/sections/by-crn?${params}`);
+      const token = typeof window !== 'undefined' ? (localStorage.getItem('token') || localStorage.getItem('imamu_token') || '') : '';
+      const res = await fetch(`/api/sections/by-crn?${params}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
       const data = await res.json().catch(() => ({}));
       const foundSections: any[] = Array.isArray(data?.sections) ? data.sections : [];
 
@@ -687,27 +700,15 @@ function EditSemesterModal({
                 </div>
               </div>
 
-              <button
+              <Button
                 type="button"
+                variant={isEditingCourses ? "primary" : "secondary"}
+                size="xs"
                 onClick={() => setIsEditingCourses(prev => !prev)}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer shrink-0 ${
-                  isEditingCourses
-                    ? 'bg-[var(--color-imamu-accent)] text-white shadow-2xs hover:opacity-90'
-                    : 'bg-white dark:bg-zinc-800 text-[var(--color-imamu-accent)] hover:bg-slate-50 dark:hover:bg-zinc-700/70 border border-slate-200 dark:border-zinc-700 shadow-2xs'
-                }`}
+                leftIcon={isEditingCourses ? <Check className="w-3.5 h-3.5 stroke-[2.5]" /> : <Edit3 className="w-3.5 h-3.5" />}
               >
-                {isEditingCourses ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                    <span>إنهاء التعديل</span>
-                  </>
-                ) : (
-                  <>
-                    <Edit3 className="w-3.5 h-3.5" />
-                    <span>تعديل المواد</span>
-                  </>
-                )}
-              </button>
+                {isEditingCourses ? 'إنهاء التعديل' : 'تعديل المواد'}
+              </Button>
             </div>
 
             {/* List of Courses */}
@@ -797,14 +798,16 @@ function EditSemesterModal({
                 <label className="text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-2">
                   <span>الرقم المرجعي للشعبة (CRN)</span>
                 </label>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="xs"
                   onClick={() => setShowSubjectPicker(!showSubjectPicker)}
-                  className="text-[11px] font-bold text-[var(--color-imamu-accent)] hover:underline flex items-center gap-1 cursor-pointer"
+                  leftIcon={<Plus className="w-3.5 h-3.5" />}
+                  className="text-[var(--color-imamu-accent)]"
                 >
-                  <Plus className="w-3 h-3" />
                   إضافة من دليل المواد
-                </button>
+                </Button>
               </div>
 
               <div className="flex gap-2">
@@ -826,24 +829,18 @@ function EditSemesterModal({
                     className="w-full px-4 py-2.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 outline-none focus:border-[var(--color-imamu-accent)] focus:ring-1 focus:ring-[var(--color-imamu-accent)] shadow-xs transition text-center sm:text-right"
                   />
                 </div>
-                <button
+                <Button
                   type="button"
+                  variant="primary"
+                  size="md"
                   disabled={isFetchingCrn || !crnInput.trim()}
+                  isLoading={isFetchingCrn}
                   onClick={handleFetchCrn}
-                  className="px-4 py-2.5 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] disabled:opacity-40 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shrink-0 shadow-xs"
+                  leftIcon={<Search className="w-4 h-4" />}
+                  className="shrink-0"
                 >
-                  {isFetchingCrn ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>جلب...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Search className="w-4 h-4" />
-                      <span>جلب البيانات</span>
-                    </>
-                  )}
-                </button>
+                  {isFetchingCrn ? 'جلب...' : 'جلب البيانات'}
+                </Button>
               </div>
 
               {crnFeedback && (
@@ -903,18 +900,20 @@ function EditSemesterModal({
           {/* Under it: Delete Term Button (not in the save changes bar) */}
           {onDelete && (
             <div className="pt-2">
-              <button
+              <Button
                 type="button"
+                variant="destructive"
+                size="md"
                 onClick={() => {
                   if (confirm(`هل أنت متأكد من حذف فصل "${semester.label || 'هذا الفصل'}"؟`)) {
                     onDelete();
                   }
                 }}
-                className="w-full py-2.5 px-4 rounded-xl border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer"
+                leftIcon={<Trash2 className="w-3.5 h-3.5" />}
+                className="w-full"
               >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>حذف هذا الفصل الدراسي</span>
-              </button>
+                حذف هذا الفصل الدراسي
+              </Button>
             </div>
           )}
         </div>
@@ -923,32 +922,37 @@ function EditSemesterModal({
         <div className="flex gap-2 pt-3.5 border-t border-slate-100 dark:border-zinc-800 shrink-0">
           {hasChanges ? (
             <>
-              <button
+              <Button
                 type="button"
+                variant="primary"
+                size="md"
                 onClick={() => {
                   onSave(label.trim() || semester.label, courses, emoji);
                 }}
-                className="flex-1 py-2.5 rounded-xl bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                leftIcon={<Check className="w-4 h-4" />}
+                className="flex-1"
               >
-                <Check className="w-4 h-4" />
                 حفظ التغييرات
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="secondary"
+                size="md"
                 onClick={onClose}
-                className="px-5 py-2.5 rounded-xl bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 text-xs font-bold hover:bg-slate-200 dark:hover:bg-zinc-700 transition cursor-pointer"
               >
                 إلغاء
-              </button>
+              </Button>
             </>
           ) : (
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="md"
               onClick={onClose}
-              className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 text-xs font-bold hover:bg-slate-200 dark:hover:bg-zinc-700 transition cursor-pointer flex items-center justify-center gap-1.5"
+              className="w-full"
             >
               إغلاق
-            </button>
+            </Button>
           )}
         </div>
       </motion.div>
@@ -987,6 +991,7 @@ function SidebarInsights({
   subjects?: any[];
 }) {
   const now = useCurrentTime();
+  const { data: settingsData } = useSWR<{ semesterStartDate?: string; semesterEndDate?: string }>('/api/settings');
   const [semesterStart, setSemesterStart] = useState<Date | null>(null);
   const [semesterEnd, setSemesterEnd] = useState<Date | null>(null);
   const [nextMokafaa, setNextMokafaa] = useState<Date | null>(null);
@@ -1003,6 +1008,7 @@ function SidebarInsights({
   const [tasks, setTasks] = useState<StudentTask[]>([]);
   const [isUpcomingOpen, setIsUpcomingOpen] = useState(true);
   const [isLateOpen, setIsLateOpen] = useState(true);
+  const [isUndatedOpen, setIsUndatedOpen] = useState(true);
   const [isFinishedOpen, setIsFinishedOpen] = useState(false);
   const [activeTaskMenu, setActiveTaskMenu] = useState<{
     task: StudentTask;
@@ -1027,7 +1033,41 @@ function SidebarInsights({
     const loadTasks = () => {
       try {
         const raw = localStorage.getItem('imamu_student_tasks');
-        if (raw) setTasks(JSON.parse(raw));
+        if (raw) {
+          const parsed: StudentTask[] = JSON.parse(raw);
+          const cleaned = parsed.map(t => {
+            let due = t.dueDate;
+            let time = t.dueTime;
+            if (due) {
+              const str = String(due).trim();
+              if (str.toLowerCase().includes('nan')) {
+                due = undefined;
+              } else {
+                const norm = normalizeExamDate(due);
+                if (norm && !norm.toLowerCase().includes('nan')) {
+                  due = norm;
+                } else {
+                  due = undefined;
+                }
+              }
+            }
+            if (time) {
+              const strT = String(time).trim();
+              if (strT.toLowerCase().includes('nan')) {
+                time = undefined;
+              } else {
+                time = normalizeExamTime(time) || time;
+              }
+            }
+            return { ...t, dueDate: due, dueTime: time };
+          });
+          setTasks(cleaned);
+          if (JSON.stringify(cleaned) !== raw) {
+            try {
+              localStorage.setItem('imamu_student_tasks', JSON.stringify(cleaned));
+            } catch {}
+          }
+        }
       } catch {
         // ignore
       }
@@ -1062,15 +1102,19 @@ function SidebarInsights({
     });
     saveTasks(updated);
     window.dispatchEvent(new Event('imamu_tasks_updated'));
+    window.dispatchEvent(new Event('storage'));
   };
 
   const deleteTask = (id: string) => {
     removeTaskFromCalendar();
-    if (id.startsWith('exam-')) {
+    if (id.startsWith('exam-') || id.startsWith('task-exam-')) {
       try {
+        const rawExamId = id.replace(/^task-/, '');
         const dismissed: string[] = JSON.parse(localStorage.getItem('imamu_dismissed_exam_tasks') || '[]');
-        if (!dismissed.includes(id)) {
-          dismissed.push(id);
+        let changed = false;
+        if (!dismissed.includes(id)) { dismissed.push(id); changed = true; }
+        if (!dismissed.includes(rawExamId)) { dismissed.push(rawExamId); changed = true; }
+        if (changed) {
           localStorage.setItem('imamu_dismissed_exam_tasks', JSON.stringify(dismissed));
         }
       } catch {}
@@ -1078,15 +1122,16 @@ function SidebarInsights({
     const updated = tasks.filter(t => t.id !== id);
     saveTasks(updated);
     window.dispatchEvent(new Event('imamu_tasks_updated'));
+    window.dispatchEvent(new Event('storage'));
   };
 
   useEffect(() => {
-    if (!events?.length) return;
+    if (!events?.length && !settingsData) return;
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
     // Mokafaa
-    const mokafaaEvents = events
+    const mokafaaEvents = (events || [])
       .filter((e: any) => e.title?.includes('مكافأة') || e.title?.includes('mokafaa'))
       .map((e: any) => parseDate(e.date))
       .filter((d: Date | null): d is Date => d !== null && d >= todayStart)
@@ -1098,43 +1143,50 @@ function SidebarInsights({
     }
     setNextMokafaa(mo);
 
-    // Holiday
-    const holidays = events
-      .filter((e: any) => (e.isHoliday || e.isEid || e.isNationalDay) && !e.isHolidayEnd)
-      .map((e: any) => ({ title: e.title, date: parseDate(e.date) }))
-      .filter((x: any): x is { title: string; date: Date } => x.date && x.date >= todayStart)
-      .sort((a: any, b: any) => a.date.getTime() - b.date.getTime());
-    setNextHoliday(holidays[0] || null);
+    // Holiday (Unified single holiday concept with active [startDate, endDate] & upcoming support)
+    let foundActiveHoliday: { title: string; startDate: Date; endDate: Date } | null = null;
+    const allHolidays = (events || [])
+      .filter((e: any) => (e.isHoliday || e.isHolidayEnd || e.isEid || e.isNationalDay || e.title?.includes('إجازة')) && !e.title?.includes('بعد إجازة') && !e.title?.includes('استئناف'))
+      .map((e: any) => {
+        const startDate = parseDate(e.date);
+        let endDate = parseDate(e.endDate);
+        if (!endDate && startDate) {
+          const legacyEnd = (events || []).find((x: any) => 
+            (x.isHolidayEnd || (x.title && (x.title.includes('نهاية إجازة') || x.title.includes('استئناف')))) &&
+            parseDate(x.date) && parseDate(x.date)! >= startDate
+          );
+          endDate = legacyEnd ? parseDate(legacyEnd.date) : startDate;
+        }
+        return {
+          title: e.title,
+          startDate,
+          endDate: endDate || startDate,
+        };
+      })
+      .filter((x: any): x is { title: string; startDate: Date; endDate: Date } => x.startDate !== null && x.endDate !== null);
 
-    // Active holiday: one that has already started (date <= todayStart) and whose end date is >= todayStart
-    const pastOrTodayHolidayStarts = events
-      .filter((e: any) => (e.isHoliday || e.isEid || e.isNationalDay) && !e.isHolidayEnd)
-      .map((e: any) => ({ title: e.title, date: parseDate(e.date) }))
-      .filter((x: any): x is { title: string; date: Date } => x.date !== null && x.date <= todayStart)
-      .sort((a: any, b: any) => b.date.getTime() - a.date.getTime());
-
-    const recentStart = pastOrTodayHolidayStarts[0];
-    if (recentStart) {
-      const endEv = events
-        .filter((e: any) => e.isHolidayEnd || e.title?.includes('نهاية إجازة') || e.title?.includes('نهاية الإجازة'))
-        .map((e: any) => ({ title: e.title, date: parseDate(e.date) }))
-        .filter((x: any): x is { title: string; date: Date } => x.date !== null && x.date >= recentStart.date)
-        .sort((a: any, b: any) => a.date.getTime() - b.date.getTime())[0];
-
-      if (endEv && endEv.date >= todayStart) {
-        setActiveHoliday(recentStart);
-        setVacationEnd(endEv.date);
-      } else {
-        setActiveHoliday(null);
-        setVacationEnd(null);
+    for (const h of allHolidays) {
+      if (h.startDate <= todayStart && h.endDate >= todayStart) {
+        foundActiveHoliday = h;
+        break;
       }
+    }
+
+    if (foundActiveHoliday) {
+      setActiveHoliday({ title: foundActiveHoliday.title, date: foundActiveHoliday.startDate });
+      setVacationEnd(foundActiveHoliday.endDate);
     } else {
       setActiveHoliday(null);
       setVacationEnd(null);
     }
 
+    const upcomingHolidays = allHolidays
+      .filter(h => h.startDate >= todayStart)
+      .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+    setNextHoliday(upcomingHolidays[0] ? { title: upcomingHolidays[0].title, date: upcomingHolidays[0].startDate } : null);
+
     // Next academic milestone (non-holiday)
-    const milestones = events
+    const milestones = (events || [])
       .filter((e: any) => !e.isHoliday && !e.isEid && !e.isNationalDay && !e.title?.includes('مكافأة') && !e.title?.includes('mokafaa'))
       .map((e: any) => ({ title: e.title, date: parseDate(e.date) }))
       .filter((x: any): x is { title: string; date: Date } => x.date && x.date >= todayStart)
@@ -1142,34 +1194,78 @@ function SidebarInsights({
     setUpcomingEvent(milestones[0] || null);
 
     // Semester start/end
-    const startEs = events
-      .filter((e: any) => e.isSemesterStart)
+    const startEs = (events || [])
+      .filter((e: any) => 
+        (e.isSemester || e.isSemesterStart) &&
+        !e.isHoliday && !e.isEid && !e.isNationalDay &&
+        !e.title?.includes('اختبار') && !e.title?.includes('امتحان') &&
+        !e.title?.includes('اعتذار') && !e.title?.includes('الاعتذار') &&
+        !e.title?.includes('تسجيل') && !e.title?.includes('تحويل') &&
+        !e.title?.includes('بعد إجازة')
+      )
       .map((e: any) => parseDate(e.date))
       .filter((d: Date | null): d is Date => d !== null)
       .sort((a: Date, b: Date) => a.getTime() - b.getTime());
-    const endEs = events
-      .filter((e: any) => e.isSemesterEnd)
-      .map((e: any) => parseDate(e.date))
+    const endEs = (events || [])
+      .filter((e: any) => 
+        !e.title?.includes('اختبار') && !e.title?.includes('امتحان') &&
+        !e.title?.includes('اعتذار') && !e.title?.includes('الاعتذار') &&
+        !e.title?.includes('تسجيل') && !e.title?.includes('تحويل')
+      )
+      .flatMap((e: any) => {
+        const res: (Date | null)[] = [];
+        if (e.isSemesterEnd) res.push(parseDate(e.date));
+        if ((e.isSemester || e.isSemesterStart) && e.endDate) res.push(parseDate(e.endDate));
+        return res;
+      })
       .filter((d: Date | null): d is Date => d !== null)
       .sort((a: Date, b: Date) => a.getTime() - b.getTime());
+
+    // Fallback to settings if no semester start/end events found
+    if (startEs.length === 0 && settingsData?.semesterStartDate) {
+      const d = parseDate(settingsData.semesterStartDate);
+      if (d) startEs.push(d);
+    }
+    if (endEs.length === 0 && settingsData?.semesterEndDate) {
+      const d = parseDate(settingsData.semesterEndDate);
+      if (d) endEs.push(d);
+    }
 
     const lastStart = [...startEs].reverse().find(d => d <= todayStart) || null;
+    const upcomingStart = startEs.find(d => d > todayStart) || null;
     const upcomingEnd = endEs.find(d => d >= todayStart) || null;
-    setSemesterStart(lastStart);
+    setSemesterStart(lastStart || upcomingStart);
     setSemesterEnd(upcomingEnd || endEs[endEs.length - 1] || null);
-  }, [events]);
+  }, [events, settingsData]);
+
+  // Stable calendar day computations (midnight-to-midnight)
+  const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   // 1. Term progress calculations
-  const totalDays = semesterStart && semesterEnd
-    ? Math.max(1, Math.round((semesterEnd.getTime() - semesterStart.getTime()) / 86400000))
-    : 137;
-  const passedDays = semesterStart
-    ? Math.max(0, Math.round((now.getTime() - semesterStart.getTime()) / 86400000))
-    : 25;
-  const remainingDays = semesterEnd
-    ? Math.max(0, Math.round((semesterEnd.getTime() - now.getTime()) / 86400000))
-    : 112;
-  const progressPercent = Math.min(100, Math.round((passedDays / totalDays) * 100));
+  const startDay = semesterStart ? new Date(semesterStart.getFullYear(), semesterStart.getMonth(), semesterStart.getDate()) : null;
+  const endDay = semesterEnd ? new Date(semesterEnd.getFullYear(), semesterEnd.getMonth(), semesterEnd.getDate()) : null;
+
+  const isUpcomingSemester = !!(startDay && todayDateOnly.getTime() < startDay.getTime());
+  const isEndedSemester = !!(endDay && todayDateOnly.getTime() > endDay.getTime());
+
+  const totalDays = startDay && endDay
+    ? Math.max(1, Math.round((endDay.getTime() - startDay.getTime()) / 86400000))
+    : 115;
+  const passedDays = isUpcomingSemester
+    ? 0
+    : startDay
+      ? (isEndedSemester ? totalDays : Math.max(0, Math.round((todayDateOnly.getTime() - startDay.getTime()) / 86400000)))
+      : 0;
+  const remainingDays = isEndedSemester
+    ? 0
+    : endDay
+      ? Math.max(0, Math.round((endDay.getTime() - todayDateOnly.getTime()) / 86400000))
+      : 0;
+  const progressPercent = isUpcomingSemester
+    ? 0
+    : isEndedSemester
+      ? 100
+      : Math.min(100, Math.max(0, Math.round((passedDays / totalDays) * 100)));
 
   // 2. Mokafaa progress calculations
   const prevMokafaa = nextMokafaa
@@ -1182,34 +1278,38 @@ function SidebarInsights({
       })()
     : null;
 
-  const mokafaaTotalDays = prevMokafaa && nextMokafaa
-    ? Math.max(1, Math.round((nextMokafaa.getTime() - prevMokafaa.getTime()) / 86400000))
+  const moStart = prevMokafaa ? new Date(prevMokafaa.getFullYear(), prevMokafaa.getMonth(), prevMokafaa.getDate()) : null;
+  const moTarget = nextMokafaa ? new Date(nextMokafaa.getFullYear(), nextMokafaa.getMonth(), nextMokafaa.getDate()) : null;
+
+  const mokafaaTotalDays = moStart && moTarget
+    ? Math.max(1, Math.round((moTarget.getTime() - moStart.getTime()) / 86400000))
     : 30;
 
-  const mokafaaPassedDays = prevMokafaa
-    ? Math.max(0, Math.min(mokafaaTotalDays, Math.round((now.getTime() - prevMokafaa.getTime()) / 86400000)))
+  const mokafaaPassedDays = moStart
+    ? Math.max(0, Math.min(mokafaaTotalDays, Math.round((todayDateOnly.getTime() - moStart.getTime()) / 86400000)))
     : 25;
 
-  const mokafaaRemainingDays = nextMokafaa
-    ? Math.max(0, Math.round((nextMokafaa.getTime() - now.getTime()) / 86400000))
-    : 5;
+  const mokafaaRemainingDays = moTarget
+    ? Math.max(0, Math.round((moTarget.getTime() - todayDateOnly.getTime()) / 86400000))
+    : 0;
 
   const mokafaaPercent = Math.min(100, Math.max(0, Math.round((mokafaaPassedDays / mokafaaTotalDays) * 100)));
 
   // 3. Next Vacation progress calculations
-  const holidayStart = semesterStart || (nextHoliday ? new Date(nextHoliday.date.getTime() - 31 * 86400000) : null);
+  const holTarget = nextHoliday ? new Date(nextHoliday.date.getFullYear(), nextHoliday.date.getMonth(), nextHoliday.date.getDate()) : null;
+  const holStart = startDay || (holTarget ? new Date(holTarget.getTime() - 30 * 86400000) : null);
   
-  const holidayTotalDays = holidayStart && nextHoliday
-    ? Math.max(1, Math.round((nextHoliday.date.getTime() - holidayStart.getTime()) / 86400000))
-    : 31;
+  const holidayTotalDays = holStart && holTarget
+    ? Math.max(1, Math.round((holTarget.getTime() - holStart.getTime()) / 86400000))
+    : 30;
 
-  const holidayPassedDays = holidayStart
-    ? Math.max(0, Math.min(holidayTotalDays, Math.round((now.getTime() - holidayStart.getTime()) / 86400000)))
+  const holidayPassedDays = holStart
+    ? Math.max(0, Math.min(holidayTotalDays, Math.round((todayDateOnly.getTime() - holStart.getTime()) / 86400000)))
     : 25;
 
-  const holidayRemainingDays = nextHoliday
-    ? Math.max(0, Math.round((nextHoliday.date.getTime() - now.getTime()) / 86400000))
-    : 6;
+  const holidayRemainingDays = holTarget
+    ? Math.max(0, Math.round((holTarget.getTime() - todayDateOnly.getTime()) / 86400000))
+    : 0;
 
   const holidayPercent = Math.min(100, Math.max(0, Math.round((holidayPassedDays / holidayTotalDays) * 100)));
 
@@ -1218,7 +1318,8 @@ function SidebarInsights({
     .filter(c => c.examDate)
     .map(c => {
       const d = parseDate(c.examDate!);
-      const days = d ? Math.round((d.getTime() - now.getTime()) / 86400000) : null;
+      const examDay = d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : null;
+      const days = examDay ? Math.round((examDay.getTime() - todayDateOnly.getTime()) / 86400000) : null;
       return { course: c, date: d, daysRemaining: days };
     })
     .filter((x): x is { course: CourseEntry; date: Date; daysRemaining: number } => x.date !== null && x.daysRemaining !== null && x.daysRemaining >= 0)
@@ -1448,12 +1549,17 @@ function SidebarInsights({
     return `خلال ${days} يوماً`;
   };
 
-  const startedText = semesterStart
-    ? formatDaysPhrase(passedDays, 'بدأ قبل')
-    : 'بدأ قبل 25 يوماً';
-  const endsText = semesterEnd
-    ? formatDaysPhrase(remainingDays, 'ينتهي خلال')
-    : 'ينتهي خلال 112 يوماً';
+  const daysUntilStart = semesterStart ? Math.ceil((semesterStart.getTime() - now.getTime()) / 86400000) : 0;
+  const startedText = isUpcomingSemester
+    ? `يبدأ ${formatCountdownPhrase(daysUntilStart)}`
+    : semesterStart
+      ? formatDaysPhrase(passedDays, 'بدأ قبل')
+      : 'لم يبدأ بعد';
+  const endsText = isEndedSemester
+    ? 'انتهى الفصل'
+    : semesterEnd
+      ? formatDaysPhrase(remainingDays, 'ينتهي خلال')
+      : '—';
 
   return (
     <div className="flex flex-col gap-3.5 w-full">
@@ -1481,42 +1587,64 @@ function SidebarInsights({
 
       {/* ── Card 1: Semester overview ── */}
       {activeSemester ? (
-        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800/90 rounded-2xl overflow-hidden shadow-xs">
-          <div className="p-4">
-            {/* Top header row */}
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-zinc-800 flex items-center justify-center border border-slate-200/60 dark:border-zinc-700/50 text-base leading-none select-none">
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800/90 rounded-2xl p-4 shadow-xs relative overflow-hidden transition-all duration-200 hover:border-slate-300 dark:hover:border-zinc-700/80">
+          {/* Subtle decorative gradient glow */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--color-imamu-brown)]/5 rounded-full blur-2xl pointer-events-none" />
+
+          {/* Top header row */}
+          <div className="flex items-center justify-between mb-3.5 relative">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-stone-100 dark:bg-zinc-800 border border-stone-200/80 dark:border-zinc-700/60 flex items-center justify-center text-lg leading-none shadow-2xs select-none">
                 {activeSemester.emoji ? (
                   <span>{activeSemester.emoji}</span>
                 ) : (
-                  <Tv className="w-4 h-4 text-slate-600 dark:text-zinc-300" />
+                  <GraduationCap className="w-5 h-5 text-[var(--color-imamu-accent)]" />
                 )}
               </div>
-              <button
-                type="button"
-                onClick={() => setShowEditModal(true)}
-                className="w-8 h-8 rounded-xl bg-slate-100/50 dark:bg-zinc-800/50 flex items-center justify-center text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
-                title="إدارة وتعديل الفصل والمواد"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-              </button>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-tight">
+                    {activeSemester.label}
+                  </h3>
+                  <span className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    الفصل الحالي
+                  </span>
+                </div>
+              </div>
             </div>
 
-            {/* Title row */}
-            <div className="flex items-center gap-2 mb-3 flex-wrap">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
-                {activeSemester.label}
-              </h3>
-              <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                (الفصل الحالي)
+            <button
+              type="button"
+              onClick={() => setShowEditModal(true)}
+              className="w-8 h-8 rounded-xl bg-slate-100/60 dark:bg-zinc-800/60 flex items-center justify-center text-slate-400 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-zinc-700"
+              title="إدارة وتعديل الفصل والمواد"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* 3 Modern KPI stat pills */}
+          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 dark:border-zinc-800/80">
+            <div className="flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-slate-50/70 dark:bg-zinc-800/40 border border-slate-100 dark:border-zinc-800/60">
+              <span className="text-[10px] font-medium text-slate-400 dark:text-zinc-500 mb-0.5">الساعات</span>
+              <span className="text-xs font-bold text-slate-800 dark:text-zinc-200 tabular-nums">
+                {semesterCreditHours > 0 ? `${semesterCreditHours} س` : '0 س'}
               </span>
             </div>
 
-            {/* 3 Stats row */}
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400 pt-1 pb-3">
-              <span className="font-semibold">{semesterCreditHours > 0 ? `${semesterCreditHours} ساعة` : '0 ساعة'}</span>
-              <span className="font-semibold">{gpa > 0 ? `${gpa.toFixed(2)} GPA` : '— GPA'}</span>
-              <span className="font-semibold">{finishedHours > 0 ? `${finishedHours} منجز` : '0 منجز'}</span>
+            <div className="flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-[var(--color-imamu-brown)]/5 dark:bg-[var(--color-imamu-brown)]/10 border border-[var(--color-imamu-brown)]/15">
+              <span className="text-[10px] font-medium text-[var(--color-imamu-brown)] dark:text-[var(--color-imamu-accent)] mb-0.5">المعدل</span>
+              <span className="text-xs font-black text-[var(--color-imamu-brown)] dark:text-[var(--color-imamu-accent)] tabular-nums">
+                {gpa > 0 ? gpa.toFixed(2) : '—'}
+              </span>
+            </div>
+
+            <div className="flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-slate-50/70 dark:bg-zinc-800/40 border border-slate-100 dark:border-zinc-800/60">
+              <span className="text-[10px] font-medium text-slate-400 dark:text-zinc-500 mb-0.5">المكتسبة</span>
+              <span className="text-xs font-bold text-slate-800 dark:text-zinc-200 tabular-nums">
+                {finishedHours > 0 ? `${finishedHours} س` : '0 س'}
+              </span>
             </div>
           </div>
         </div>
@@ -1543,69 +1671,102 @@ function SidebarInsights({
         </div>
       )}
 
-      {/* ── Progress Section Controls (Tabs) ── */}
-      <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-zinc-900/90 rounded-xl border border-slate-200/70 dark:border-zinc-800/80">
+      {/* ── Card 2: Progress Section & Tasks ── */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800/90 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col gap-1.5 transition-all duration-200 hover:border-slate-300 dark:hover:border-zinc-700/80">
+        {/* ── Progress Section Controls (Tabs) ── */}
+        <div className="relative flex items-center border-b border-slate-200 dark:border-zinc-800/80 mb-0 pb-0" dir="rtl">
         <button
           type="button"
           onClick={() => setProgressView('upcoming')}
           className={clsx(
-            "flex-1 py-1.5 px-2 rounded-lg text-[11px] font-bold transition text-center cursor-pointer whitespace-nowrap",
+            "relative flex-1 pb-2.5 px-1 font-bold transition-colors duration-200 text-xs sm:text-sm flex items-center justify-center gap-1.5 select-none cursor-pointer whitespace-nowrap",
             progressView === 'upcoming'
-              ? "bg-white dark:bg-zinc-800 text-slate-900 dark:text-white shadow-xs"
-              : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
+              ? "text-[var(--color-imamu-accent)]"
+              : "text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200"
           )}
         >
-          القادم ⏰
+          <CalendarClock className={clsx("w-4 h-4 transition-colors", progressView === 'upcoming' ? "text-[var(--color-imamu-accent)]" : "text-slate-400 dark:text-zinc-500")} />
+          <span>اليوم</span>
+          {totalTodayItems > 0 && (
+            <span className={clsx(
+              "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+              progressView === 'upcoming' ? "bg-[var(--color-imamu-brown)] text-white" : "bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400"
+            )}>
+              {totalTodayItems}
+            </span>
+          )}
+          {progressView === 'upcoming' && (
+            <motion.div
+              layoutId="sidebarActiveTabUnderline"
+              className="absolute bottom-0 right-0 left-0 h-0.5 bg-[var(--color-imamu-brown)] dark:bg-[var(--color-imamu-brown)] rounded-full shadow-xs"
+              transition={{ type: "spring", stiffness: 400, damping: 32 }}
+            />
+          )}
         </button>
+
         <button
           type="button"
           onClick={() => setProgressView('courses')}
           className={clsx(
-            "flex-1 py-1.5 px-2 rounded-lg text-[11px] font-bold transition text-center cursor-pointer whitespace-nowrap",
+            "relative flex-1 pb-2.5 px-1 font-bold transition-colors duration-200 text-xs sm:text-sm flex items-center justify-center gap-1.5 select-none cursor-pointer whitespace-nowrap",
             progressView === 'courses'
-              ? "bg-white dark:bg-zinc-800 text-slate-900 dark:text-white shadow-xs"
-              : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
+              ? "text-[var(--color-imamu-accent)]"
+              : "text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200"
           )}
         >
-          المواد 📚
+          <BookOpen className={clsx("w-4 h-4 transition-colors", progressView === 'courses' ? "text-[var(--color-imamu-accent)]" : "text-slate-400 dark:text-zinc-500")} />
+          <span>المواد</span>
+          {activeSemester?.courses && activeSemester.courses.length > 0 && (
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full font-bold bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400">
+              {activeSemester.courses.length}
+            </span>
+          )}
+          {progressView === 'courses' && (
+            <motion.div
+              layoutId="sidebarActiveTabUnderline"
+              className="absolute bottom-0 right-0 left-0 h-0.5 bg-[var(--color-imamu-brown)] dark:bg-[var(--color-imamu-brown)] rounded-full shadow-xs"
+              transition={{ type: "spring", stiffness: 400, damping: 32 }}
+            />
+          )}
         </button>
+
         <button
           type="button"
           onClick={() => setProgressView('tasks')}
           className={clsx(
-            "flex-1 py-1.5 px-2 rounded-lg text-[11px] font-bold transition text-center cursor-pointer whitespace-nowrap",
+            "relative flex-1 pb-2.5 px-1 font-bold transition-colors duration-200 text-xs sm:text-sm flex items-center justify-center gap-1.5 select-none cursor-pointer whitespace-nowrap",
             progressView === 'tasks'
-              ? "bg-white dark:bg-zinc-800 text-slate-900 dark:text-white shadow-xs"
-              : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
+              ? "text-[var(--color-imamu-accent)]"
+              : "text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200"
           )}
         >
-          المهام 📝
+          <CheckSquare className={clsx("w-4 h-4 transition-colors", progressView === 'tasks' ? "text-[var(--color-imamu-accent)]" : "text-slate-400 dark:text-zinc-500")} />
+          <span>المهام</span>
+          {tasks.filter(t => !t.completed).length > 0 && (
+            <span className={clsx(
+              "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+              progressView === 'tasks' ? "bg-[var(--color-imamu-brown)] text-white" : "bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400"
+            )}>
+              {tasks.filter(t => !t.completed).length}
+            </span>
+          )}
+          {progressView === 'tasks' && (
+            <motion.div
+              layoutId="sidebarActiveTabUnderline"
+              className="absolute bottom-0 right-0 left-0 h-0.5 bg-[var(--color-imamu-brown)] dark:bg-[var(--color-imamu-brown)] rounded-full shadow-xs"
+              transition={{ type: "spring", stiffness: 400, damping: 32 }}
+            />
+          )}
         </button>
       </div>
 
       {/* ── Progress Cards & Widgets ── */}
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2 pt-0.5">
         {/* 1. UPCOMING TAB */}
         {progressView === 'upcoming' && (
           <div className="flex flex-col px-1 gap-6">
             {/* ── Today's Schedule & Tasks Section ── */}
             <div className="flex flex-col">
-              {/* Header */}
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-[var(--color-imamu-accent)] animate-pulse" />
-                  <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                    اليوم
-                  </h3>
-                  <span className="text-[11px] text-slate-400 dark:text-zinc-500 font-medium">
-                    ({['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'][todayDayOfWeek]})
-                  </span>
-                </div>
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300">
-                  {totalTodayItems > 0 ? (doneTodayItems > 0 ? `${doneTodayItems}/${totalTodayItems}` : `${totalTodayItems}`) : '0'}
-                </span>
-              </div>
-
               {/* Items list: Today's Classes + Today's Tasks */}
               {totalTodayItems === 0 ? (
                 <div className="text-center py-6">
@@ -1614,7 +1775,7 @@ function SidebarInsights({
                   </p>
                 </div>
               ) : (
-                <div className="flex flex-col divide-y divide-slate-100 dark:divide-zinc-800/60">
+                <div className="flex flex-col divide-y divide-slate-100 dark:divide-zinc-800/60 pt-1">
                   {/* 1. Today's Classes */}
                   {todayClasses.map(slot => {
                     const isDone = manualCheckedClasses[slot.id] !== undefined ? manualCheckedClasses[slot.id] : slot.isPassed;
@@ -1657,10 +1818,10 @@ function SidebarInsights({
 
                             {/* Timing & Status badge */}
                             <div className="flex items-center gap-1.5 shrink-0">
-                              <span className="text-[10.5px] font-medium text-slate-500 dark:text-zinc-400 inline-flex items-center gap-1" dir="ltr">
+                              <span className="text-[10.5px] font-medium text-slate-500 dark:text-zinc-400 inline-flex items-center gap-1" dir="rtl">
                                 <Clock className="w-3 h-3 text-slate-400 dark:text-zinc-500 shrink-0" />
                                 <span>{formatMinutesToTime(slot.startMinutes, true)}</span>
-                                <span className="text-slate-400 font-normal">→</span>
+                                <span className="text-slate-400 font-normal">←</span>
                                 <span>{formatMinutesToTime(slot.endMinutes, true)}</span>
                               </span>
 
@@ -1673,16 +1834,16 @@ function SidebarInsights({
                           </div>
 
                           {/* Tags in pills: Course Code & Classroom */}
-                          <div className="flex flex-wrap items-center gap-1.5 mt-1.5 text-[11px]">
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2 text-[10px]">
                             <span
-                              className="px-2 py-0.5 rounded-lg font-bold text-white shadow-2xs text-[10px]"
-                              style={{ backgroundColor: slot.color }}
+                              className="subject-tag px-2 py-0.5 rounded-md font-bold text-[10px] shadow-2xs shrink-0"
+                              style={{ '--subject-color': slot.color } as React.CSSProperties}
                             >
                               {slot.courseCode}
                             </span>
 
                             {slot.room && (
-                              <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-medium text-[10px] flex items-center gap-1">
+                              <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-medium text-[10px] flex items-center gap-1">
                                 <MapPin className="w-2.5 h-2.5 text-slate-400" />
                                 <span>{slot.room}</span>
                               </span>
@@ -1748,11 +1909,11 @@ function SidebarInsights({
                           </div>
 
                           {/* Tags in pills: Course, Category */}
-                          <div className="flex flex-wrap items-center gap-1.5 mt-1.5 text-[11px]">
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2 text-[10px]">
                             {t.courseName && (
                               <span
-                                className="px-2.5 py-0.5 rounded-lg font-bold text-white shadow-2xs truncate max-w-[140px] text-[10px]"
-                                style={{ backgroundColor: taskColor }}
+                                className="subject-tag px-2 py-0.5 rounded-md font-bold text-[10px] truncate max-w-[140px] shadow-2xs"
+                                style={{ '--subject-color': taskColor } as React.CSSProperties}
                                 title={t.courseName}
                               >
                                 {t.courseName}
@@ -1760,7 +1921,7 @@ function SidebarInsights({
                             )}
 
                             {categoryLabel && (
-                              <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-medium text-[10px]">
+                              <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-medium text-[10px]">
                                 {categoryLabel}
                               </span>
                             )}
@@ -1796,26 +1957,29 @@ function SidebarInsights({
                 percent={progressPercent}
                 startDate={semesterStart || new Date(Date.now() - 25 * 86400000)}
                 endDate={semesterEnd || new Date(Date.now() + 112 * 86400000)}
-                remainingColor="text-emerald-600 dark:text-emerald-400"
+                remainingColor="text-[var(--color-imamu-accent)]"
               />
 
               {/* Vacation Card */}
               {activeHoliday && vacationEnd ? (() => {
-                const vTotalDays = Math.max(1, Math.round((vacationEnd.getTime() - activeHoliday.date.getTime()) / 86400000));
-                const vPassedDays = Math.max(0, Math.min(vTotalDays, Math.round((now.getTime() - activeHoliday.date.getTime()) / 86400000)));
-                const vRemainingDays = Math.max(0, Math.round((vacationEnd.getTime() - now.getTime()) / 86400000));
-                const vPercent = Math.min(100, Math.round((vPassedDays / vTotalDays) * 100));
+                const vStart = new Date(activeHoliday.date.getFullYear(), activeHoliday.date.getMonth(), activeHoliday.date.getDate());
+                const vEnd = new Date(vacationEnd.getFullYear(), vacationEnd.getMonth(), vacationEnd.getDate());
+                const vTotalDays = Math.max(1, Math.round((vEnd.getTime() - vStart.getTime()) / 86400000) + 1);
+                const vPassedDays = Math.max(0, Math.min(vTotalDays, Math.round((todayDateOnly.getTime() - vStart.getTime()) / 86400000) + 1));
+                const vRemainingDays = Math.max(0, Math.round((vEnd.getTime() - todayDateOnly.getTime()) / 86400000));
+                const vPercent = Math.min(100, Math.max(0, Math.round((vPassedDays / vTotalDays) * 100)));
                 return (
                   <ProgressMetricCard
                     icon="🌴"
-                    title={`نهاية ${activeHoliday.title}`}
+                    title={`إجازة ${activeHoliday.title.replace(/^إجازة\s*/, '')}`}
                     passedDays={vPassedDays}
                     totalDays={vTotalDays}
                     remainingDays={vRemainingDays}
                     percent={vPercent}
                     startDate={activeHoliday.date}
                     endDate={vacationEnd}
-                    remainingColor="text-red-500 dark:text-red-400"
+                    remainingColor="text-emerald-600 dark:text-emerald-400"
+                    barColor="bg-emerald-500"
                   />
                 );
               })() : nextHoliday ? (
@@ -1826,9 +1990,9 @@ function SidebarInsights({
                   totalDays={holidayTotalDays}
                   remainingDays={holidayRemainingDays}
                   percent={holidayPercent}
-                  startDate={holidayStart || new Date(Date.now() - 25 * 86400000)}
+                  startDate={holStart || new Date(Date.now() - 25 * 86400000)}
                   endDate={nextHoliday.date}
-                  remainingColor="text-emerald-600 dark:text-emerald-400"
+                  remainingColor="text-[var(--color-imamu-accent)]"
                 />
               ) : null}
 
@@ -1842,7 +2006,7 @@ function SidebarInsights({
                 percent={mokafaaPercent}
                 startDate={prevMokafaa || new Date(Date.now() - 25 * 86400000)}
                 endDate={nextMokafaa || new Date(Date.now() + 5 * 86400000)}
-                remainingColor="text-emerald-600 dark:text-emerald-400"
+                remainingColor="text-[var(--color-imamu-accent)]"
               />
             </div>
           </div>
@@ -1852,16 +2016,6 @@ function SidebarInsights({
         {/* 2. COURSES TAB */}
         {progressView === 'courses' && (
           <div className="flex flex-col px-1">
-            {/* Header: المواد المسجلة */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800">
-              <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                المواد المسجلة
-              </h3>
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300">
-                {activeSemester?.courses.length || 0} مواد · {semesterCreditHours} ساعة
-              </span>
-            </div>
-
             {(!activeSemester || !activeSemester.courses.length) ? (
               <p className="text-xs text-slate-400 dark:text-zinc-500 text-center py-6">
                 لم تقم بإضافة مواد لهذا الفصل بعد.
@@ -1874,8 +2028,8 @@ function SidebarInsights({
                   );
                   const matchingSecIdx = effectiveSections?.findIndex(
                     s => (c.crn && String(s.crn) === String(c.crn)) || s.courseCode === c.courseCode
-                  ) ?? -1;
-                  const colorIdx = (matchingSecIdx >= 0 ? matchingSecIdx : idx) % COURSE_HEX_COLORS.length;
+                  );
+                  const colorIdx = (matchingSecIdx !== undefined && matchingSecIdx >= 0 ? matchingSecIdx : idx) % COURSE_HEX_COLORS.length;
                   const courseColor = c.color || matchingSec?.color || COURSE_HEX_COLORS[colorIdx];
 
                   return (
@@ -1928,43 +2082,21 @@ function SidebarInsights({
         {/* 3. TASKS TAB */}
         {progressView === 'tasks' && (
           <div className="flex flex-col px-1">
-            {/* Header: المهام */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800">
-              <div className="flex items-center gap-2">
-                <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                  المهام
-                </h3>
-                {tasks.filter(t => !t.completed).length > 0 && (
-                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300">
-                    {tasks.filter(t => !t.completed).length}
-                  </span>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => onOpenNewTaskModal?.()}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--color-imamu-brown)]/10 hover:bg-[var(--color-imamu-brown)]/20 text-[var(--color-imamu-brown)] dark:text-[var(--color-imamu-accent)] text-xs font-bold transition cursor-pointer"
-                title="إضافة مهمة جديدة"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>مهمة جديدة</span>
-              </button>
-            </div>
-
             {/* Tasks list items */}
             {tasks.length === 0 ? (
               <div className="text-center py-6 px-4">
                 <p className="text-xs text-slate-400 dark:text-zinc-500 mb-2">
                   لا توجد مهام حالياً.
                 </p>
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => onOpenNewTaskModal?.()}
-                  className="text-xs font-bold text-[var(--color-imamu-accent)] hover:underline cursor-pointer"
+                  leftIcon={<Plus className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />}
                 >
-                  + أضف أول مهمة أو واجب دراسي
-                </button>
+                  أضف أول مهمة أو واجب دراسي
+                </Button>
               </div>
             ) : (() => {
               const getTaskTimestamp = (t: StudentTask): number => {
@@ -1990,12 +2122,20 @@ function SidebarInsights({
               };
 
               const lateTasks = tasks
-                .filter(t => !t.completed && Boolean(formatTaskCountdown(t.dueDate, t.dueTime)?.isOverdue))
+                .filter(t => !t.completed && Boolean(t.dueDate) && Boolean(formatTaskCountdown(t.dueDate, t.dueTime)?.isOverdue))
                 .sort((a, b) => getTaskTimestamp(a) - getTaskTimestamp(b));
 
               const upcomingTasks = tasks
-                .filter(t => !t.completed && !formatTaskCountdown(t.dueDate, t.dueTime)?.isOverdue)
+                .filter(t => !t.completed && Boolean(t.dueDate) && !formatTaskCountdown(t.dueDate, t.dueTime)?.isOverdue)
                 .sort((a, b) => getTaskTimestamp(a) - getTaskTimestamp(b));
+
+              const undatedTasks = tasks
+                .filter(t => !t.completed && !t.dueDate)
+                .sort((a, b) => {
+                  const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                  const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                  return timeB - timeA;
+                });
 
               const finishedTasks = tasks
                 .filter(t => t.completed)
@@ -2003,14 +2143,14 @@ function SidebarInsights({
 
               const renderTaskItem = (t: StudentTask) => {
                 const countdown = formatTaskCountdown(t.dueDate, t.dueTime);
-                const duePill = formatTaskDuePill(t.dueDate, t.dueTime);
+                const duePill = formatTaskDuePill(t.dueDate, t.dueTime, t.endDate, t.endTime);
                 const taskColor = resolveTaskColor(t);
                 const categoryLabel = TASK_CATEGORIES.find(c => c.key === t.category || c.label === t.category)?.label || t.categoryLabel || t.category;
 
                 return (
                   <div
                     key={t.id}
-                    className={`group relative flex flex-col gap-2 py-3 transition-colors border-b border-slate-100 dark:border-zinc-800 last:border-0 ${
+                    className={`group relative flex flex-col gap-2.5 py-3 transition-colors border-b border-slate-100 dark:border-zinc-800 last:border-0 ${
                       t.completed ? 'opacity-50' : ''
                     }`}
                   >
@@ -2043,7 +2183,7 @@ function SidebarInsights({
                       {/* Countdown badge */}
                       {countdown && (
                         <span
-                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0 ${
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-md shrink-0 ${
                             countdown.isOverdue
                               ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
                               : countdown.isToday
@@ -2083,19 +2223,45 @@ function SidebarInsights({
                     </div>
 
                     {/* Bottom Row: Tags starting right under the circle */}
-                    <div className="flex items-center gap-1.5 flex-wrap text-[11px] w-full">
+                    <div className="flex items-center gap-1.5 flex-wrap text-[10px] w-full mt-1">
                       {/* Date/time pill */}
                       {duePill && (
-                        <span className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 font-medium" dir="rtl">
+                        <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 font-medium" dir="rtl">
                           <Clock className="w-3 h-3 shrink-0" />
                           {duePill}
                         </span>
                       )}
 
+                      {/* Location pill */}
+                      {t.location && (
+                        <span
+                          className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 font-medium truncate max-w-[140px]"
+                          title={t.location}
+                        >
+                          <MapPin className="w-3 h-3 text-[var(--color-imamu-accent)] shrink-0" />
+                          <span className="truncate">{t.location}</span>
+                        </span>
+                      )}
+
+                      {/* Link pill */}
+                      {t.link && (
+                        <a
+                          href={t.link.startsWith('http') ? t.link : `https://${t.link}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-600 dark:text-sky-400 font-medium hover:underline truncate max-w-[130px] cursor-pointer"
+                          title={t.link}
+                        >
+                          <Link2 className="w-3 h-3 shrink-0" />
+                          <span>رابط</span>
+                        </a>
+                      )}
+
                       {t.courseName && (
                         <span
-                          className="px-2.5 py-0.5 rounded-lg font-bold text-white shadow-2xs truncate max-w-[140px]"
-                          style={{ backgroundColor: taskColor }}
+                          className="subject-tag px-2 py-0.5 rounded-md font-bold text-[10px] truncate max-w-[140px] shadow-2xs"
+                          style={{ '--subject-color': taskColor } as React.CSSProperties}
                           title={t.courseName}
                         >
                           {t.courseName}
@@ -2103,23 +2269,23 @@ function SidebarInsights({
                       )}
 
                       {categoryLabel && (
-                        <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-medium">
+                        <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-medium text-[10px]">
                           {categoryLabel}
                         </span>
                       )}
 
                       {t.priority === 'high' && (
-                        <span className="px-1.5 py-0.5 rounded-md bg-rose-500/15 text-rose-600 dark:text-rose-400 font-bold border border-rose-500/20 text-[10px]">
+                        <span className="px-2 py-0.5 rounded-md bg-rose-500/15 text-rose-600 dark:text-rose-400 font-bold border border-rose-500/20 text-[10px]">
                           عالية !!!
                         </span>
                       )}
                       {t.priority === 'medium' && (
-                        <span className="px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/20 text-[10px]">
+                        <span className="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/20 text-[10px]">
                           متوسطة !!
                         </span>
                       )}
                       {t.priority === 'low' && (
-                        <span className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 font-medium text-[10px]">
+                        <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 font-medium text-[10px]">
                           منخفضة !
                         </span>
                       )}
@@ -2129,7 +2295,7 @@ function SidebarInsights({
               };
 
               return (
-                <div className="flex flex-col gap-3 pt-2">
+                <div className="flex flex-col gap-2 pt-0.5">
                   {/* 1. LATE TASKS (Open by default, only shown if tasks exist under it) */}
                   {lateTasks.length > 0 && (
                     <div className="flex flex-col">
@@ -2178,7 +2344,31 @@ function SidebarInsights({
                     </div>
                   )}
 
-                  {/* 3. FINISHED TASKS (Compressed by default, only shown if tasks exist under it) */}
+                  {/* 3. UNDATED TASKS (Open by default, only shown if tasks exist under it) */}
+                  {undatedTasks.length > 0 && (
+                    <div className="flex flex-col">
+                      <button
+                        type="button"
+                        onClick={() => setIsUndatedOpen(!isUndatedOpen)}
+                        className="flex items-center justify-between py-1 text-xs font-bold text-slate-700 dark:text-zinc-300 cursor-pointer select-none group"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>بدون تاريخ</span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300">
+                            {undatedTasks.length}
+                          </span>
+                          <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isUndatedOpen ? '' : 'rotate-90'}`} />
+                        </div>
+                      </button>
+                      {isUndatedOpen && (
+                        <div className="flex flex-col divide-y divide-slate-100 dark:divide-zinc-800/60">
+                          {undatedTasks.map(renderTaskItem)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 4. FINISHED TASKS (Compressed by default, only shown if tasks exist under it) */}
                   {finishedTasks.length > 0 && (
                     <div className="flex flex-col">
                       <button
@@ -2206,6 +2396,7 @@ function SidebarInsights({
             })()}
           </div>
         )}
+      </div>
       </div>
 
       {/* ── Fixed Portal for 3-dots Task Action Menu ── */}
@@ -2307,7 +2498,7 @@ function SemesterWizard({ onClose, onSave, subjects }: WizardProps) {
 
   // Fetch available folders from /api/sections/terms-public and merge with user-created folders
   useEffect(() => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('imamu_token') : '';
+    const token = typeof window !== 'undefined' ? (localStorage.getItem('token') || localStorage.getItem('imamu_token') || '') : '';
     fetch('/api/sections/terms-public', {
       headers: token ? { Authorization: `Bearer ${token}` } : {}
     })
@@ -2432,7 +2623,10 @@ function SemesterWizard({ onClose, onSave, subjects }: WizardProps) {
       if (academicYear) params.set('academicYear', academicYear);
       if (semesterName) params.set('semester', semesterName);
 
-      const res = await fetch(`/api/sections/by-crn?${params}`);
+      const token = typeof window !== 'undefined' ? (localStorage.getItem('token') || localStorage.getItem('imamu_token') || '') : '';
+      const res = await fetch(`/api/sections/by-crn?${params}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
       const data = await res.json().catch(() => ({}));
       const foundSections: any[] = Array.isArray(data?.sections) ? data.sections : [];
 

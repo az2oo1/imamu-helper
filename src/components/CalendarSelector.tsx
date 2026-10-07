@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Check, MoreVertical, Calendar as CalendarIcon, 
-  ExternalLink, Smartphone, Plus, Eye, X, Loader2, Sparkles, Building2, User
+  ExternalLink, Smartphone, Plus, Eye, Download, Building2, User
 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 
@@ -11,7 +11,7 @@ export interface CalendarInfo {
   id: 'academic' | 'entity' | 'user';
   name: string;
   subtitle: string;
-  color: string; // Hex color for checkbox and badge
+  color: string;
   icon: React.ComponentType<{ className?: string }>;
 }
 
@@ -28,13 +28,11 @@ export default function CalendarSelector({
   onToggleCalendar,
   onShowOnlyCalendar,
   onOpenAddEvent,
-  onEventCreated
 }: CalendarSelectorProps) {
   const { user, dbUser } = useAuth();
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown on click outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -60,26 +58,26 @@ export default function CalendarSelector({
       id: 'academic',
       name: 'التقويم الأكاديمي',
       subtitle: 'المواعيد الرسمية للجامعة',
-      color: '#d97706', // Warm Amber / Imam brand color
+      color: '#d97706',
       icon: CalendarIcon,
     },
     {
       id: 'entity',
       name: 'فعاليات الجهات والأندية',
       subtitle: 'أنشطة الأندية والجهات المعتمدة',
-      color: '#10b981', // Emerald Green (matching Birthdays in GCal)
+      color: '#10b981',
       icon: Building2,
     },
     ...(isAuthed ? [{
       id: 'user' as const,
       name: userName,
       subtitle: 'التقويم الشخصي والمهام',
-      color: '#0284c7', // Sky / Royal Blue (matching user in GCal)
+      color: '#0284c7',
       icon: User,
     }] : [])
   ];
 
-  const getDirectIcsUrl = (calId: 'academic' | 'entity' | 'user', download = false) => {
+  const getDirectIcsUrl = (calId: 'academic' | 'entity' | 'user' | 'all', download = false) => {
     if (typeof window === 'undefined') return '#';
     const origin = window.location.origin;
     let url = `${origin}/api/calendar.ics?type=${calId}`;
@@ -92,12 +90,12 @@ export default function CalendarSelector({
     return url;
   };
 
-  const getGoogleCalendarUrl = (calId: 'academic' | 'entity' | 'user') => {
+  const getGoogleCalendarUrl = (calId: 'academic' | 'entity' | 'user' | 'all') => {
     const icsUrl = getDirectIcsUrl(calId, false);
     return `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(icsUrl)}`;
   };
 
-  const getWebcalUrl = (calId: 'academic' | 'entity' | 'user') => {
+  const getWebcalUrl = (calId: 'academic' | 'entity' | 'user' | 'all') => {
     if (typeof window === 'undefined') return '#';
     const host = window.location.host;
     let url = `webcal://${host}/api/calendar.ics?type=${calId}`;
@@ -107,8 +105,6 @@ export default function CalendarSelector({
     return url;
   };
 
-
-
   return (
     <div className="p-3 border-b border-slate-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/95 backdrop-blur z-10 text-right shrink-0" dir="rtl">
       
@@ -116,11 +112,11 @@ export default function CalendarSelector({
       <div className="flex items-center justify-between mb-2.5 px-1">
         <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-zinc-500 flex items-center gap-1.5">
           <CalendarIcon className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
-          التقاويم
+          التقاويم المعروضة
         </span>
       </div>
 
-      {/* Calendar List (Google Calendar Style) */}
+      {/* Calendar List with individual 3-dot options menu */}
       <div className="space-y-1" ref={menuRef}>
         {calendars.map((cal) => {
           const isChecked = visibleCalendars[cal.id] ?? true;
@@ -129,21 +125,18 @@ export default function CalendarSelector({
           return (
             <div
               key={cal.id}
-              className={`group relative flex items-center justify-between px-2 py-1.5 rounded-xl transition-colors duration-150 select-none ${
+              className={`group relative flex items-center justify-between px-2.5 py-1.5 rounded-xl transition-colors duration-150 select-none ${
                 isMenuOpen ? 'bg-slate-100 dark:bg-zinc-800' : 'hover:bg-slate-100/80 dark:hover:bg-zinc-800/60'
               }`}
             >
-              {/* Left/Right Clickable Row: Checkbox + Label */}
+              {/* Checkbox + Label */}
               <div 
                 onClick={() => onToggleCalendar(cal.id)}
                 className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer py-0.5"
               >
-                {/* Custom Google Calendar Checkbox */}
                 <div
-                  className={`w-4 h-4 rounded-[4px] flex items-center justify-center transition-all duration-150 shrink-0 ${
-                    isChecked 
-                      ? 'shadow-2xs' 
-                      : 'border-2 hover:opacity-80'
+                  className={`w-4 h-4 rounded-[5px] flex items-center justify-center transition-all duration-150 shrink-0 ${
+                    isChecked ? 'shadow-2xs' : 'border-2 opacity-60 group-hover:opacity-100'
                   }`}
                   style={{
                     backgroundColor: isChecked ? cal.color : 'transparent',
@@ -157,7 +150,6 @@ export default function CalendarSelector({
                   )}
                 </div>
 
-                {/* Calendar Title & Subtitle */}
                 <div className="flex flex-col min-w-0">
                   <span className={`text-xs font-bold leading-tight truncate transition-colors ${
                     isChecked ? 'text-slate-800 dark:text-zinc-100' : 'text-slate-400 dark:text-zinc-500'
@@ -183,8 +175,8 @@ export default function CalendarSelector({
                       ? 'opacity-100 bg-slate-200 dark:bg-zinc-700 text-slate-900 dark:text-white' 
                       : 'opacity-40 group-hover:opacity-100 text-slate-600 dark:text-zinc-400 hover:bg-slate-200 dark:hover:bg-zinc-700'
                   }`}
-                  title={`خيارات ${cal.name}`}
-                  aria-label={`خيارات ${cal.name}`}
+                  title={`خيارات واشتراك ${cal.name}`}
+                  aria-label={`خيارات واشتراك ${cal.name}`}
                 >
                   <MoreVertical className="w-3.5 h-3.5" />
                 </button>
@@ -192,7 +184,7 @@ export default function CalendarSelector({
                 {/* Dropdown Menu */}
                 {isMenuOpen && (
                   <div 
-                    className="absolute left-0 mt-1.5 w-52 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xl py-1.5 z-50 text-right animate-in fade-in zoom-in-95 duration-150"
+                    className="absolute left-0 mt-1.5 w-56 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xl py-1.5 z-50 text-right animate-in fade-in zoom-in-95 duration-150"
                     dir="rtl"
                   >
                     {/* Menu Header with indicator */}
@@ -215,32 +207,42 @@ export default function CalendarSelector({
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={() => setActiveMenuId(null)}
-                          className="flex items-center justify-between px-3 py-2 text-xs font-medium text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+                          className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
                         >
-                          <div className="flex items-center gap-2">
-                            <ExternalLink className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                            <div className="flex flex-col text-right">
-                              <span>اشتراك في تقويم Google</span>
-                              <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-normal">
-                                مزامنة وتحديث تلقائي
-                              </span>
-                            </div>
+                          <ExternalLink className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                          <div className="flex flex-col text-right">
+                            <span>اشتراك في تقويم Google</span>
+                            <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-normal">
+                              مزامنة وتحديث تلقائي
+                            </span>
                           </div>
                         </a>
 
                         <a
                           href={getWebcalUrl(cal.id)}
                           onClick={() => setActiveMenuId(null)}
-                          className="flex items-center justify-between px-3 py-2 text-xs font-medium text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+                          className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
                         >
-                          <div className="flex items-center gap-2">
-                            <Smartphone className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                            <div className="flex flex-col text-right">
-                              <span>أشتراك في تقويم الجهاز</span>
-                              <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-normal">
-                                للآيفون، الآيباد، الماك، وOutlook
-                              </span>
-                            </div>
+                          <Smartphone className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                          <div className="flex flex-col text-right">
+                            <span>اشتراك في تقويم الجهاز</span>
+                            <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-normal">
+                              للآيفون، الآيباد، الماك، وOutlook
+                            </span>
+                          </div>
+                        </a>
+
+                        <a
+                          href={getDirectIcsUrl(cal.id, true)}
+                          onClick={() => setActiveMenuId(null)}
+                          className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer border-t border-slate-100 dark:border-zinc-800"
+                        >
+                          <Download className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                          <div className="flex flex-col text-right">
+                            <span>تحميل ملف التقويم (.ics)</span>
+                            <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-normal">
+                              تصدير مباشر للأحداث
+                            </span>
                           </div>
                         </a>
                       </>

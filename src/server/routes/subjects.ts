@@ -6,6 +6,140 @@ import { matchId, matchSubjectIds } from '../../lib/auth-utils';
 import { cleanCourseName, decodeHtmlEntities } from '../../lib/url-utils';
 import { listMajorPlansFromS3 } from '../../lib/storage';
 import { querySections, formatSectionRow } from './sections';
+import { extractPrereqCodes, areCourseCodesEqual, normalizeCourseCode, cleanPrereqText } from '../../lib/academic-utils';
+
+interface PrereqCatalogCache {
+  allSimpleSubjects: any[];
+  allMajorCourses: any[];
+  majorCoursesBySubjId: Map<string, any[]>;
+  subjectById: Map<string, any>;
+  subjectByNormCode: Map<string, any>;
+  dependentsByNormCode: Map<string, any[]>;
+  cachedAt: number;
+}
+
+let prereqCatalogCache: PrereqCatalogCache | null = null;
+let prereqCatalogPromise: Promise<PrereqCatalogCache> | null = null;
+
+export function invalidatePrereqCatalogCache() {
+  prereqCatalogCache = null;
+  prereqCatalogPromise = null;
+}
+
+async function getOrBuildPrereqCatalog(db: any): Promise<PrereqCatalogCache> {
+  const now = Date.now();
+  if (prereqCatalogCache && (now - prereqCatalogCache.cachedAt < 30 * 60 * 1000)) {
+    return prereqCatalogCache;
+  }
+  if (prereqCatalogPromise) {
+    return prereqCatalogPromise;
+  }
+
+  prereqCatalogPromise = (async () => {
+    try {
+      const allSimpleSubjects = await db.select({
+        id: subjects.id,
+        code: subjects.code,
+        name: subjects.name,
+        prereq: subjects.prereq,
+        description: subjects.description
+      }).from(subjects);
+
+      const allMajorCourses = await db.select().from(majorCourses);
+
+      const subjectById = new Map<string, any>();
+      const subjectByNormCode = new Map<string, any>();
+
+      for (const s of allSimpleSubjects) {
+        subjectById.set(String(s.id), s);
+        const norm = normalizeCourseCode(s.code).replace(/\s+/g, '').toLowerCase();
+        if (norm && !subjectByNormCode.has(norm)) {
+          subjectByNormCode.set(norm, s);
+        }
+      }
+
+      const majorCoursesBySubjId = new Map<string, any[]>();
+      for (const mc of allMajorCourses) {
+        const k = String(mc.subjectId);
+        let list = majorCoursesBySubjId.get(k);
+        if (!list) {
+          list = [];
+          majorCoursesBySubjId.set(k, list);
+        }
+        list.push(mc);
+      }
+
+      // Precompute reverse index: Map<targetNormCode, dependents[]>
+      const dependentsByNormCode = new Map<string, any[]>();
+
+      for (const other of allSimpleSubjects) {
+        const otherBannerCodes = extractPrereqCodes(other.prereq);
+        const otherMajorLinks = majorCoursesBySubjId.get(String(other.id)) || [];
+        const otherCollegeCodes = [
+          ...otherMajorLinks.flatMap((l: any) => extractPrereqCodes(l.prereq)),
+          ...(other.description && (other.description.startsWith('المتطلبات السابقة:') || other.description.startsWith('المتطلب السابق:'))
+            ? extractPrereqCodes(other.description)
+            : [])
+        ];
+
+        const normOtherCode = normalizeCourseCode(other.code) || other.code;
+        const otherInfo = {
+          id: other.id,
+          code: normOtherCode,
+          name: decodeHtmlEntities(other.name)
+        };
+
+        for (const reqCode of otherBannerCodes) {
+          const normReq = normalizeCourseCode(reqCode).replace(/\s+/g, '').toLowerCase();
+          if (!normReq) continue;
+
+          let list = dependentsByNormCode.get(normReq);
+          if (!list) {
+            list = [];
+            dependentsByNormCode.set(normReq, list);
+          }
+          if (!list.some(d => d.id === other.id || areCourseCodesEqual(d.code, other.code))) {
+            list.push({ ...otherInfo, source: 'banner' });
+          }
+        }
+
+        for (const reqCode of otherCollegeCodes) {
+          const normReq = normalizeCourseCode(reqCode).replace(/\s+/g, '').toLowerCase();
+          if (!normReq) continue;
+
+          let list = dependentsByNormCode.get(normReq);
+          if (!list) {
+            list = [];
+            dependentsByNormCode.set(normReq, list);
+          }
+          const existing = list.find(d => d.id === other.id || areCourseCodesEqual(d.code, other.code));
+          if (existing) {
+            existing.source = 'both';
+          } else {
+            list.push({ ...otherInfo, source: 'college' });
+          }
+        }
+      }
+
+      const built: PrereqCatalogCache = {
+        allSimpleSubjects,
+        allMajorCourses,
+        majorCoursesBySubjId,
+        subjectById,
+        subjectByNormCode,
+        dependentsByNormCode,
+        cachedAt: Date.now()
+      };
+
+      prereqCatalogCache = built;
+      return built;
+    } finally {
+      prereqCatalogPromise = null;
+    }
+  })();
+
+  return prereqCatalogPromise;
+}
 
 export function createSubjectsRouter(db: any) {
   const router = express.Router();
@@ -88,8 +222,10 @@ export function createSubjectsRouter(db: any) {
 
       const mapped = allSubjects.map((s: any) => ({
         ...s,
+        code: normalizeCourseCode(s.code) || s.code,
         name: decodeHtmlEntities(s.name),
         description: decodeHtmlEntities(s.description),
+        prereq: cleanPrereqText(s.prereq),
         majorId: majorMap.get(String(s.id)) || null,
         resources: resourceMap.get(String(s.id)) || []
       }));
@@ -126,9 +262,15 @@ export function createSubjectsRouter(db: any) {
         }
       }
       if (subjectList.length === 0 && !isNumeric) {
-        subjectList = await db.select().from(subjects).where(
-          sql`LOWER(${subjects.name}) LIKE LOWER(${'%' + realId + '%'}) OR LOWER(${subjects.code}) LIKE LOWER(${'%' + realId + '%'})`
-        );
+        const allSubjs = await db.select().from(subjects);
+        const matchByCode = allSubjs.find((s: any) => areCourseCodesEqual(s.code, realId));
+        if (matchByCode) {
+          subjectList = [matchByCode];
+        } else {
+          subjectList = await db.select().from(subjects).where(
+            sql`LOWER(${subjects.name}) LIKE LOWER(${'%' + realId + '%'}) OR LOWER(${subjects.code}) LIKE LOWER(${'%' + realId + '%'})`
+          );
+        }
       }
 
       // Regex extraction fallback if realId was a title string like "مصادر مادة CS1111 - ..."
@@ -165,8 +307,7 @@ export function createSubjectsRouter(db: any) {
         if (firstRes) {
           // 1. Resolve parent subject if firstRes has a linked subjectId
           if (firstRes.subjectId) {
-            const allSubjs = await db.select().from(subjects);
-            const linkedSubj = allSubjs.find((s: any) => matchSubjectIds(s.id, firstRes.subjectId));
+            const [linkedSubj] = await db.select().from(subjects).where(matchId(subjects.id, firstRes.subjectId));
             if (linkedSubj) {
               subject = linkedSubj;
             }
@@ -236,10 +377,12 @@ export function createSubjectsRouter(db: any) {
         ? await db.select().from(course_resources).where(matchId(course_resources.subjectId, subject.id))
         : [];
 
+      let sisterSubjs: any[] = [];
+
       // Link resources by course name or sister subject representations (e.g. 'علوم الحاسب 1140' <=> 'عال 1140')
       if (subject.name) {
         const cleanSubjName = subject.name.trim();
-        const sisterSubjs = await db.select().from(subjects).where(
+        sisterSubjs = await db.select().from(subjects).where(
           sql`LOWER(TRIM(${subjects.name})) = LOWER(TRIM(${cleanSubjName}))`
         );
         const sisterIds = sisterSubjs.map((s: any) => s.id).filter(Boolean);
@@ -266,45 +409,68 @@ export function createSubjectsRouter(db: any) {
 
       const connectUrl = process.env.CONNECT_APP_URL || 'http://localhost:3000';
 
-      const subjectMajorLinks = await db.select().from(majorCourses).where(matchId(majorCourses.subjectId, subject.id));
-      const allMajorCourses = await db.select().from(majorCourses);
+      // Gather prerequisites and dependents via in-memory precomputed reverse index
+      const catalog = await getOrBuildPrereqCatalog(db);
+      const subjectMajorLinks = catalog.majorCoursesBySubjId.get(String(subject.id)) || [];
 
-      let prereqCodes: string[] = [];
-      subjectMajorLinks.forEach((link: any) => {
-        if (link.prereq) {
-          const codes = link.prereq.split(/[,|،+/]+/).map((s: string) => s.trim()).filter(Boolean);
-          prereqCodes.push(...codes);
+      // Extract all prereq codes across Banner & College Plan
+      // Only include sister subjects if they represent the exact same course code,
+      // preventing cross-contamination between different courses that share the same title (e.g. ريض 1227 vs ريض 1222).
+      const bannerPrereqCodes = [
+        ...extractPrereqCodes(subject.prereq),
+        ...(Array.isArray(sisterSubjs)
+          ? sisterSubjs
+              .filter((s: any) => areCourseCodesEqual(s.code, subject.code))
+              .flatMap((s: any) => extractPrereqCodes(s.prereq))
+          : [])
+      ];
+
+      const collegePrereqCodes = [
+        ...subjectMajorLinks.flatMap((l: any) => extractPrereqCodes(l.prereq)),
+        ...(subject.description && (subject.description.startsWith('المتطلبات السابقة:') || subject.description.startsWith('المتطلب السابق:'))
+          ? extractPrereqCodes(subject.description)
+          : [])
+      ];
+
+      const combinedPrereqCodes = Array.from(new Set([...bannerPrereqCodes, ...collegePrereqCodes]));
+
+      // Match each prereq code to subjects in the catalog in O(1)
+      const prerequisites: { id: number | null; code: string; name: string; source: 'banner' | 'college' | 'both' }[] = [];
+      const seenPrereqCodes = new Set<string>();
+
+      for (const pCode of combinedPrereqCodes) {
+        const normCode = normalizeCourseCode(pCode);
+        const canonKey = normCode.replace(/\s+/g, '').toLowerCase();
+        if (seenPrereqCodes.has(canonKey)) continue;
+        seenPrereqCodes.add(canonKey);
+
+        const isFromBanner = bannerPrereqCodes.some(c => areCourseCodesEqual(c, pCode));
+        const isFromCollege = collegePrereqCodes.some(c => areCourseCodesEqual(c, pCode));
+        const source: 'banner' | 'college' | 'both' = (isFromBanner && isFromCollege) ? 'both' : (isFromBanner ? 'banner' : 'college');
+
+        const matchedSubj = catalog.subjectByNormCode.get(canonKey);
+        if (matchedSubj) {
+          prerequisites.push({
+            id: matchedSubj.id,
+            code: normalizeCourseCode(matchedSubj.code) || matchedSubj.code,
+            name: decodeHtmlEntities(matchedSubj.name),
+            source
+          });
+        } else {
+          prerequisites.push({
+            id: null,
+            code: normCode,
+            name: normCode,
+            source
+          });
         }
-      });
-      if (prereqCodes.length === 0 && subject.description) {
-        const match = subject.description.match(/(?:المتطلبات السابقة:|prereq:?)\s*([A-Z0-9,\s\u0600-\u06FF]+)/i);
-        if (match) {
-          const codes = match[1].match(/[A-Z]{2,4}\s*\d{3,4}|[\u0600-\u06FF]{2,4}\s*\d{3,4}/g);
-          if (codes) prereqCodes.push(...codes.map(c => c.trim()));
-        }
-      }
-      prereqCodes = Array.from(new Set(prereqCodes));
-
-      let prerequisites: { id: number; code: string; name: string }[] = [];
-      if (prereqCodes.length > 0) {
-        const allSimpleSubjects = await db.select({ id: subjects.id, code: subjects.code, name: subjects.name }).from(subjects);
-        prerequisites = allSimpleSubjects.filter((s: any) => prereqCodes.some(code => 
-          code && s.code && code.replace(/\s+/g, '').toLowerCase() === s.code.replace(/\s+/g, '').toLowerCase()
-        ));
       }
 
-      const normalizedSubjCode = subject?.code ? subject.code.replace(/\s+/g, '').toLowerCase() : '';
-      const dependentSubjectIds = allMajorCourses.filter((mc: any) => {
-        if (!mc.prereq || !normalizedSubjCode) return false;
-        return mc.prereq.replace(/\s+/g, '').toLowerCase().includes(normalizedSubjCode);
-      }).map((mc: any) => mc.subjectId);
-
-      let dependents: { id: any; code: string; name: string }[] = [];
-      if (dependentSubjectIds.length > 0) {
-        const depSet = new Set(dependentSubjectIds.map((id: any) => String(id)));
-        const allSubjectsList = await db.select({ id: subjects.id, code: subjects.code, name: subjects.name }).from(subjects);
-        dependents = allSubjectsList.filter((s: any) => depSet.has(String(s.id)));
-      }
+      // Compute dependents in O(1) from precomputed reverse index
+      const normSubjCode = normalizeCourseCode(subject.code).replace(/\s+/g, '').toLowerCase();
+      const dependents = (catalog.dependentsByNormCode.get(normSubjCode) || []).filter(
+        (d: any) => !areCourseCodesEqual(d.code, subject.code)
+      );
 
       const firstWaResource = allResources.find((r: any) => r.whatsappLink || r.whatsappUrl || (r.url && r.url.includes('whatsapp')));
       const resolvedWhatsappLink = firstWaResource?.whatsappLink || firstWaResource?.whatsappUrl || firstWaResource?.url || null;
@@ -320,14 +486,18 @@ export function createSubjectsRouter(db: any) {
       try {
         sectionsList = await querySections(db, {
           subjectId: subject.id,
-          courseCode: subject.code
+          courseCode: normalizeCourseCode(subject.code) || subject.code
         });
       } catch (_secErr) {}
+
+      const canonicalCode = normalizeCourseCode(subject.code) || subject.code;
 
       res.json({
         course: {
           ...subject,
+          code: canonicalCode,
           name: decodeHtmlEntities(subject.name),
+          prereq: cleanPrereqText(subject.prereq),
           description: decodeHtmlEntities(resolvedDescription),
           avatarUrl: firstAvatar,
           whatsappLink: resolvedWhatsappLink,
@@ -340,7 +510,7 @@ export function createSubjectsRouter(db: any) {
           sectionsEnabled: allResources.length > 0 ? !allResources.every((r: any) => r.sectionsEnabled === false) : true,
           prerequisites,
           dependents,
-          connectUrl: `${connectUrl.replace(/\/$/, '')}/academics?courseId=${encodeURIComponent(subject.code)}`
+          connectUrl: `${connectUrl.replace(/\/$/, '')}/academics?courseId=${encodeURIComponent(canonicalCode)}`
         }
       });
     } catch (error) {
@@ -418,8 +588,17 @@ export function createSubjectsRouter(db: any) {
           subjectId: String(mc.subjectId), optionalGroup: mc.optionalGroup, optionalGroupReqCount: mc.optionalGroupReqCount, prereq: mc.prereq
         }));
         const plans = await listMajorPlansFromS3(m.id, m.name);
+        let parsedBatches = null;
+        if (m.batches) {
+          try {
+            parsedBatches = typeof m.batches === 'string' ? JSON.parse(m.batches) : m.batches;
+          } catch (e) {
+            console.error('Failed to parse batches for major', m.id, e);
+          }
+        }
         return {
           ...m,
+          batches: parsedBatches,
           plans,
           courseIds,
           courses
@@ -530,6 +709,8 @@ export function createSubjectsRouter(db: any) {
           telegramUrl: cr.type === 'telegram' ? cr.url : undefined,
           description: cr.description,
           sectionsEnabled: isCourseResource ? (cr.sectionsEnabled !== false) : false,
+          creditHours: s?.creditHours || null,
+          level: s?.level || null,
           createdAt: cr.createdAt ? new Date(cr.createdAt).toISOString() : new Date().toISOString()
         });
       }

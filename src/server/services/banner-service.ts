@@ -2,12 +2,15 @@ import { sql, eq, and } from 'drizzle-orm';
 import { subjects, course_sections, banner_terms } from '../../db/schema';
 import { processAndUpsertCatalog, TermInfo } from './sections-importer';
 import { decodeHtmlEntities } from '../../lib/url-utils';
+import { cleanPrereqText, normalizeCourseCode } from '../../lib/academic-utils';
 
 const BANNER_BASE_URL = 'https://bstureg.imamu.edu.sa/StudentRegistrationSsb';
 
 export interface DetectedTerm {
   code: string;
+  termCode?: string;
   name: string;
+  termName?: string;
   academicYear: string;
   semester: string;
 }
@@ -72,16 +75,6 @@ export class BannerClient {
       await this.request('/ssb/registration', { redirect: 'manual' });
     }
     return this.cookies.has('JSESSIONID');
-  }
-
-  async getDetectedTerms(): Promise<DetectedTerm[]> {
-    // Standard detected terms from IMAMU Banner pattern
-    return [
-      { code: '144810', name: 'الفصل الدراسي الأول 1448', academicYear: '1448', semester: 'الفصل الأول' },
-      { code: '144720', name: 'الفصل الدراسي الثاني 1447', academicYear: '1447', semester: 'الفصل الثاني' },
-      { code: '144710', name: 'الفصل الدراسي الأول 1447', academicYear: '1447', semester: 'الفصل الأول' },
-      { code: '144630', name: 'الفصل الصيفي 1446', academicYear: '1446', semester: 'الفصل الصيفي' }
-    ];
   }
 
   async initTerm(term: string): Promise<boolean> {
@@ -322,19 +315,56 @@ export class BannerClient {
             return { courseCode: item.courseCode, text: null };
           }
 
-          const rows: string[] = [];
           const trMatches = html.match(/<tr[\s\S]*?<\/tr>/gi) || [];
-          for (let r = 1; r < trMatches.length; r++) {
-            const tr = trMatches[r];
-            const tdMatches = tr.match(/<td[\s\S]*?<\/td>/gi) || [];
-            const cells = tdMatches.map(td => td.replace(/<[^>]+>/g, '').trim()).filter(Boolean);
-            if (cells.length > 0) {
-              rows.push(cells.join(' '));
+          const firstRow = trMatches[0];
+          if (trMatches.length > 1 && firstRow) {
+            const thMatches = firstRow.match(/<th[\s\S]*?<\/th>/gi) || [];
+            const headerTexts = thMatches.map(th => th.replace(/<[^>]+>/g, '').trim());
+
+            let connectorIdx = headerTexts.findIndex(h => h.includes('و') && h.includes('أو'));
+            let subjectIdx = headerTexts.findIndex(h => h.includes('المادة') || /subject/i.test(h));
+            let numberIdx = headerTexts.findIndex(h => h.includes('المقرر') || /course\s*number/i.test(h));
+
+            if (connectorIdx === -1) connectorIdx = 0;
+            if (subjectIdx === -1) subjectIdx = 4;
+            if (numberIdx === -1) numberIdx = 5;
+
+            const rowTokens: string[] = [];
+            for (let r = 1; r < trMatches.length; r++) {
+              const tr = trMatches[r];
+              if (!tr) continue;
+              const tdMatches: string[] = tr.match(/<td[\s\S]*?<\/td>/gi) || [];
+              const rawCells = tdMatches.map(td => td.replace(/<[^>]+>/g, '').trim());
+
+              const connector = rawCells[connectorIdx] || '';
+              const subject = rawCells[subjectIdx] || '';
+              const courseNum = rawCells[numberIdx] || '';
+
+              const hasOpenParen = rawCells.some(c => c === '(');
+              const hasCloseParen = rawCells.some(c => c === ')');
+
+              if (subject && courseNum) {
+                const canonicalCode = normalizeCourseCode(`${subject} ${courseNum}`);
+                let token = '';
+                if (connector && (connector === 'أو' || connector === 'او' || connector === 'و')) {
+                  token += connector + ' ';
+                }
+                if (hasOpenParen) token += '(';
+                token += canonicalCode;
+                if (hasCloseParen) token += ')';
+                rowTokens.push(token);
+              }
+            }
+
+            if (rowTokens.length > 0) {
+              const finalText = rowTokens.join(' | ');
+              return { courseCode: item.courseCode, text: cleanPrereqText(finalText) || null };
             }
           }
 
-          const finalText = rows.length > 0 ? rows.join(' | ') : bodyText;
-          return { courseCode: item.courseCode, text: finalText };
+          const rawText = bodyText;
+          const finalText = cleanPrereqText(rawText);
+          return { courseCode: item.courseCode, text: finalText || null };
         } catch (e) {
           return { courseCode: item.courseCode, text: null };
         }
@@ -350,6 +380,98 @@ export class BannerClient {
   }
 }
 
+export interface BannerSyncProgress {
+  termCode: string;
+  termName?: string;
+  status: 'idle' | 'syncing' | 'connecting' | 'fetching_sections' | 'fetching_prereqs' | 'saving' | 'completed' | 'error';
+  currentStep: string;
+  progressPercent: number; // 0 - 100
+  totalSections: number;
+  fetchedSections: number;
+  totalCourses: number;
+  message: string;
+  startedAt: number;
+  updatedAt: number;
+  error?: string;
+}
+
+const syncProgressStore = new Map<string, BannerSyncProgress>();
+
+export function getSyncProgress(termCode: string): BannerSyncProgress | null {
+  return syncProgressStore.get(termCode) || null;
+}
+
+export async function getAllSyncProgress(db?: any): Promise<Record<string, BannerSyncProgress>> {
+  const result: Record<string, BannerSyncProgress> = {};
+  if (db) {
+    try {
+      const rows = await db.select().from(banner_terms);
+      for (const row of rows) {
+        result[row.termCode] = {
+          termCode: row.termCode,
+          termName: row.termName,
+          status: row.status === 'syncing' ? 'syncing' : (row.status === 'error' ? 'error' : 'completed'),
+          currentStep: row.syncStage || (row.status === 'syncing' ? 'جاري المزامنة...' : 'جاهز'),
+          progressPercent: row.syncProgress ?? (row.status === 'idle' ? 100 : 0),
+          totalSections: row.totalSections || 0,
+          fetchedSections: row.totalSections || 0,
+          totalCourses: 0,
+          message: row.syncMessage || '',
+          startedAt: 0,
+          updatedAt: Date.now(),
+          error: row.lastError || undefined
+        };
+      }
+    } catch (_e) {}
+  }
+
+  for (const [code, prog] of syncProgressStore.entries()) {
+    result[code] = { ...(result[code] || {}), ...prog };
+  }
+  return result;
+}
+
+export function updateSyncProgress(termCode: string, patch: Partial<BannerSyncProgress>, db?: any) {
+  const prev = syncProgressStore.get(termCode) || {
+    termCode,
+    status: 'connecting',
+    currentStep: 'بدء الاتصال',
+    progressPercent: 0,
+    totalSections: 0,
+    fetchedSections: 0,
+    totalCourses: 0,
+    message: '',
+    startedAt: Date.now(),
+    updatedAt: Date.now()
+  };
+  const updated: BannerSyncProgress = {
+    ...prev,
+    ...patch,
+    updatedAt: Date.now()
+  };
+  syncProgressStore.set(termCode, updated);
+
+  if (db) {
+    const dbUpdates: Record<string, any> = {};
+    if (patch.progressPercent !== undefined) dbUpdates.syncProgress = patch.progressPercent;
+    if (patch.currentStep !== undefined) dbUpdates.syncStage = patch.currentStep;
+    if (patch.message !== undefined) dbUpdates.syncMessage = patch.message;
+    if (patch.status !== undefined) {
+      if (patch.status === 'completed') dbUpdates.status = 'idle';
+      else if (patch.status === 'error') dbUpdates.status = 'error';
+      else dbUpdates.status = 'syncing';
+    }
+    if (patch.error !== undefined) dbUpdates.lastError = patch.error;
+    if (patch.totalSections !== undefined && patch.totalSections > 0) dbUpdates.totalSections = patch.totalSections;
+
+    if (Object.keys(dbUpdates).length > 0) {
+      db.update(banner_terms).set(dbUpdates).where(eq(banner_terms.termCode, termCode)).catch(() => {});
+    }
+  }
+
+  return updated;
+}
+
 /**
  * High-level: Synchronize all sections and courses for a term directly from Banner into DB
  */
@@ -360,10 +482,33 @@ export async function syncTermFromBanner(
   academicYear?: string,
   semester?: string
 ): Promise<{ success: boolean; sectionsCount: number; coursesCount: number; message: string }> {
+  const setProgress = (patch: Partial<BannerSyncProgress>) => updateSyncProgress(termCode, patch, db);
+
+  setProgress({
+    termName,
+    status: 'connecting',
+    currentStep: 'الاتصال بنظام بانر',
+    progressPercent: 5,
+    totalSections: 0,
+    fetchedSections: 0,
+    totalCourses: 0,
+    message: 'جاري الاتصال بنظام بانر 9 وتجهيز الجلسة...',
+    startedAt: Date.now(),
+    error: undefined
+  });
+
   const client = new BannerClient();
   const ok = await client.connect();
   if (!ok) {
-    throw new Error('فشل الاتصال بنظام بانر 9.');
+    const errorMsg = 'فشل الاتصال بنظام بانر 9.';
+    setProgress({
+      status: 'error',
+      currentStep: 'فشل الاتصال',
+      progressPercent: 100,
+      error: errorMsg,
+      message: errorMsg
+    });
+    throw new Error(errorMsg);
   }
 
   // Update banner_terms table to syncing
@@ -382,11 +527,36 @@ export async function syncTermFromBanner(
   });
 
   try {
+    setProgress({
+      status: 'connecting',
+      currentStep: 'حساب عدد الشعب',
+      progressPercent: 12,
+      message: 'تم الاتصال ببانر بنجاح. جاري الاستعلام عن إجمالي عدد الشُعب...'
+    });
+
     const totalCount = await client.getTotalSectionsCount(termCode);
     if (!totalCount || totalCount === 0) {
       await db.update(banner_terms).set({ status: 'idle', totalSections: 0, lastSyncAt: new Date() }).where(eq(banner_terms.termCode, termCode));
+      setProgress({
+        status: 'completed',
+        currentStep: 'اكتملت المزامنة',
+        progressPercent: 100,
+        totalSections: 0,
+        fetchedSections: 0,
+        totalCourses: 0,
+        message: 'لا توجد شعب مسجلة لهذا الفصل الدراسي.'
+      });
       return { success: true, sectionsCount: 0, coursesCount: 0, message: 'لا توجد شعب مسجلة لهذا الفصل الدراسي.' };
     }
+
+    setProgress({
+      status: 'fetching_sections',
+      currentStep: 'جلب الشُعب الدراسية',
+      progressPercent: 15,
+      totalSections: totalCount,
+      fetchedSections: 0,
+      message: `تم العثور على ${totalCount.toLocaleString()} شعبة. جاري بدء التنزيل...`
+    });
 
     const pageSize = 250;
     const totalPages = Math.ceil(totalCount / pageSize);
@@ -400,7 +570,26 @@ export async function syncTermFromBanner(
       }
       const roundRes = await client.fetchSectionsBatch(termCode, offsets, pageSize);
       allSections.push(...roundRes);
+
+      const pct = Math.min(80, Math.round(15 + (allSections.length / totalCount) * 65));
+      setProgress({
+        status: 'fetching_sections',
+        currentStep: 'جلب الشُعب الدراسية',
+        progressPercent: pct,
+        totalSections: totalCount,
+        fetchedSections: allSections.length,
+        message: `تم جلب ${allSections.length.toLocaleString()} من أصل ${totalCount.toLocaleString()} شعبة (${pct}%)...`
+      });
     }
+
+    setProgress({
+      status: 'fetching_prereqs',
+      currentStep: 'جلب المتطلبات والمقررات',
+      progressPercent: 82,
+      totalSections: allSections.length,
+      fetchedSections: allSections.length,
+      message: 'جاري استخراج المقررات وجلب المتطلبات السابقة...'
+    });
 
     // Extract unique courses (1 CRN per course) to fetch prerequisites
     const uniqueCourseCrnMap = new Map<string, { courseCode: string; crn: string }>();
@@ -434,6 +623,16 @@ export async function syncTermFromBanner(
       }
     }
 
+    setProgress({
+      status: 'saving',
+      currentStep: 'حفظ وتحديث قاعدة البيانات',
+      progressPercent: 90,
+      totalCourses: coursesMap.size,
+      totalSections: allSections.length,
+      fetchedSections: allSections.length,
+      message: `جاري حفظ ${allSections.length.toLocaleString()} شعبة و ${coursesMap.size} مقرر في قاعدة البيانات...`
+    });
+
     const termInfo: TermInfo = {
       academicYear: academicYear || '1448',
       semester: semester || 'الفصل الأول',
@@ -456,17 +655,36 @@ export async function syncTermFromBanner(
       lastError: null
     }).where(eq(banner_terms.termCode, termCode));
 
+    const successMsg = `تمت مزامنة ${allSections.length.toLocaleString()} شعبة و ${coursesMap.size.toLocaleString()} مقرر بنجاح.`;
+    setProgress({
+      status: 'completed',
+      currentStep: 'اكتملت المزامنة بنجاح',
+      progressPercent: 100,
+      totalCourses: coursesMap.size,
+      totalSections: allSections.length,
+      fetchedSections: allSections.length,
+      message: successMsg
+    });
+
     return {
       success: true,
       sectionsCount: allSections.length,
       coursesCount: coursesMap.size,
-      message: `تمت مزامنة ${allSections.length} شعبة و ${coursesMap.size} مقرر بنجاح.`
+      message: successMsg
     };
   } catch (err: any) {
     await db.update(banner_terms).set({
       status: 'error',
       lastError: err.message || String(err)
     }).where(eq(banner_terms.termCode, termCode));
+
+    setProgress({
+      status: 'error',
+      currentStep: 'فشلت المزامنة',
+      progressPercent: 100,
+      error: err.message || String(err),
+      message: `فشلت المزامنة: ${err.message || String(err)}`
+    });
     throw err;
   }
 }
@@ -495,14 +713,17 @@ export async function checkTermChangesAndSeats(termCode: string, db: any): Promi
     const liveResults = await client.updateLiveEnrollmentByCrns(termCode, chunk);
 
     for (const item of liveResults) {
-      if (item && item.maximum !== null && item.current !== null) {
-        await db.update(course_sections).set({
-          maxEnrollment: item.maximum,
-          currentEnrollment: item.current,
-          seatsAvailable: item.seatsAvailable,
-          isOpen: item.isOpen
-        }).where(and(eq(course_sections.crn, item.crn), eq(course_sections.term, termCode)));
-        updatedCount++;
+      if (item && item.crn) {
+        const seatUpdates: Record<string, any> = {};
+        if (item.maximum !== null && item.maximum !== undefined) seatUpdates.maxEnrollment = item.maximum;
+        if (item.current !== null && item.current !== undefined) seatUpdates.currentEnrollment = item.current;
+        if (item.seatsAvailable !== null && item.seatsAvailable !== undefined) seatUpdates.seatsAvailable = item.seatsAvailable;
+        if (item.isOpen !== null && item.isOpen !== undefined) seatUpdates.isOpen = item.isOpen;
+
+        if (Object.keys(seatUpdates).length > 0) {
+          await db.update(course_sections).set(seatUpdates).where(and(eq(course_sections.crn, item.crn), eq(course_sections.term, termCode)));
+          updatedCount++;
+        }
       }
     }
   }

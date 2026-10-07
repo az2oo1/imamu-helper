@@ -32,6 +32,7 @@ export const users = pgTable('users', {
 export const majors = pgTable('majors', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
+  batches: text('batches'),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
@@ -92,14 +93,18 @@ export const events = pgTable('events', {
   title: text('title').notNull(),
   date: text('date').notNull(), // Date string YYYY-MM-DD or ISO
   endDate: text('end_date'),    // Optional End date string YYYY-MM-DD
+  time: text('time'),           // Optional start time string
+  endTime: text('end_time'),     // Optional end time string
   description: text('description'),
   calendarType: text('calendar_type').default('academic'), // 'academic' | 'entity' | 'user'
   entityId: text('entity_id'),
   entityName: text('entity_name'),
   userId: text('user_id'),
   location: text('location'),
+  link: text('link'),
   isHoliday: boolean('is_holiday').default(false),
   isHolidayEnd: boolean('is_holiday_end').default(false),
+  isSemester: boolean('is_semester').default(false),
   isSemesterStart: boolean('is_semester_start').default(false),
   isSemesterEnd: boolean('is_semester_end').default(false),
   isEid: boolean('is_eid').default(false),
@@ -362,6 +367,9 @@ export const banner_terms = pgTable('banner_terms', {
   lastCheckAt: timestamp('last_check_at'),
   totalSections: integer('total_sections').default(0),
   status: text('status').default('idle'), // 'idle' | 'syncing' | 'error'
+  syncProgress: integer('sync_progress').default(0),
+  syncStage: text('sync_stage'),
+  syncMessage: text('sync_message'),
   lastError: text('last_error'),
   createdAt: timestamp('created_at').defaultNow(),
 });

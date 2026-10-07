@@ -1,6 +1,7 @@
 /**
  * Unified Task Types, Categories, Priorities, and Calendar Sync Utilities
  */
+import { normalizeExamDate, normalizeExamTime } from './schedule-utils';
 
 export type TaskPriority = 'low' | 'medium' | 'high';
 
@@ -15,7 +16,11 @@ export interface StudentTask {
   courseCode?: string;
   courseName?: string;
   dueDate?: string; // YYYY-MM-DD
+  endDate?: string; // YYYY-MM-DD
   dueTime?: string; // HH:mm (24h or 12h)
+  endTime?: string; // HH:mm (24h or 12h)
+  location?: string;
+  link?: string;
   color?: string; // Hex color
   createdAt?: string;
 }
@@ -96,10 +101,13 @@ const MONTH_NAMES_AR = [
  */
 export function formatTaskCountdown(dueDate?: string, dueTime?: string): { text: string; isOverdue: boolean; isToday: boolean } | null {
   if (!dueDate) return null;
+  const cleanDate = normalizeExamDate(dueDate);
+  if (!cleanDate) return null;
+
   const now = new Date();
   now.setHours(0, 0, 0, 0);
 
-  const parts = dueDate.split('-').map(Number);
+  const parts = cleanDate.split('-').map(Number);
   if (parts.length < 3 || isNaN(parts[0]) || isNaN(parts[1]) || isNaN(parts[2])) return null;
 
   const target = new Date(parts[0], parts[1] - 1, parts[2]);
@@ -124,32 +132,89 @@ export function formatTaskCountdown(dueDate?: string, dueTime?: string): { text:
 }
 
 /**
- * Formats due date & time pill label in Arabic (e.g. "24 سبتمبر، 12:30 م")
+ * Formats due date & time pill label in Arabic (e.g. "24 سبتمبر، 12:30 م" or "24 - 26 سبتمبر")
  */
-export function formatTaskDuePill(dueDate?: string, dueTime?: string): string | null {
+export function formatTaskDuePill(
+  dueDate?: string,
+  dueTime?: string,
+  endDate?: string,
+  endTime?: string
+): string | null {
   if (!dueDate) return null;
-  const parts = dueDate.split('-').map(Number);
-  if (parts.length < 3) return dueDate;
+  const str = String(dueDate).trim();
+  if (!str || str.toLowerCase().includes('nan')) return null;
+
+  const cleanDate = normalizeExamDate(dueDate);
+  if (!cleanDate || cleanDate.toLowerCase().includes('nan')) return null;
+
+  const parts = cleanDate.split('-').map(Number);
+  if (parts.length < 3 || isNaN(parts[0]) || isNaN(parts[1]) || isNaN(parts[2])) {
+    return null;
+  }
 
   const day = parts[2];
   const monthIdx = parts[1] - 1;
-  const monthStr = MONTH_NAMES_AR[monthIdx] || `${parts[1]}`;
+  if (monthIdx < 0 || monthIdx > 11 || isNaN(day) || day < 1 || day > 31) {
+    return null;
+  }
+  const monthStr = MONTH_NAMES_AR[monthIdx];
+  if (!monthStr) return null;
 
-  let timeFormatted = '';
-  if (dueTime) {
-    const timeParts = dueTime.split(':').map(Number);
-    if (timeParts.length >= 2 && !isNaN(timeParts[0]) && !isNaN(timeParts[1])) {
-      const h24 = timeParts[0];
-      const m = timeParts[1].toString().padStart(2, '0');
-      const isPM = h24 >= 12;
-      const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
-      timeFormatted = `، ${h12}:${m} ${isPM ? 'م' : 'ص'}`;
-    } else {
-      timeFormatted = `، ${dueTime}`;
+  let dateStr = `${day} ${monthStr}`;
+
+  // Check if there is an endDate different from dueDate
+  if (endDate && endDate !== dueDate) {
+    const cleanEndDate = normalizeExamDate(endDate);
+    if (cleanEndDate && !cleanEndDate.toLowerCase().includes('nan')) {
+      const endParts = cleanEndDate.split('-').map(Number);
+      if (endParts.length >= 3 && !isNaN(endParts[2])) {
+        const endDay = endParts[2];
+        const endMonthIdx = endParts[1] - 1;
+        if (endMonthIdx === monthIdx) {
+          dateStr = `${day} - ${endDay} ${monthStr}`;
+        } else if (endMonthIdx >= 0 && endMonthIdx <= 11) {
+          dateStr = `${day} ${monthStr} - ${endDay} ${MONTH_NAMES_AR[endMonthIdx]}`;
+        }
+      }
     }
   }
 
-  return `${day} ${monthStr}${timeFormatted}`;
+  // Format time (and optional endTime)
+  const formatTimeSlot = (tStr?: string) => {
+    if (!tStr || String(tStr).toLowerCase().includes('nan')) return null;
+    const raw = String(tStr).trim().toLowerCase();
+    const match = raw.match(/^(\d{1,2}):(\d{2})\s*(am|pm|ص|م)?$/i);
+    if (match) {
+      let h = parseInt(match[1], 10);
+      const m = match[2];
+      let isPM = false;
+      if (match[3]) {
+        const p = match[3].toLowerCase();
+        isPM = p === 'pm' || p === 'م';
+        if (h === 0) h = 12;
+        else if (h > 12) h -= 12;
+      } else {
+        isPM = h >= 12;
+        if (h > 12) h -= 12;
+        else if (h === 0) h = 12;
+        else if (h >= 1 && h <= 6) isPM = true;
+      }
+      return `${h}:${m} ${isPM ? 'م' : 'ص'}`;
+    }
+    return String(tStr);
+  };
+
+  const startTimeFormatted = formatTimeSlot(dueTime);
+  const endTimeFormatted = formatTimeSlot(endTime);
+
+  let timeFormatted = '';
+  if (startTimeFormatted && endTimeFormatted && endTimeFormatted !== startTimeFormatted) {
+    timeFormatted = `، ${startTimeFormatted} - ${endTimeFormatted}`;
+  } else if (startTimeFormatted) {
+    timeFormatted = `، ${startTimeFormatted}`;
+  }
+
+  return `${dateStr}${timeFormatted}`;
 }
 
 function notifyTaskChange() {

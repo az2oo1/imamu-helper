@@ -15,6 +15,7 @@ import {
   Palmtree,
   CheckCircle2,
   PartyPopper,
+  GraduationCap,
   X
 } from 'lucide-react';
 import Link from 'next/link';
@@ -23,10 +24,12 @@ import {
   AnimatedNumber, 
   InView, 
   SpotlightCard, 
-  TextEffect
+  TextEffect,
+  buttonVariants
 } from '../components/ui';
 import { 
   parseDate, 
+  formatDate,
   getCountdown, 
   calculateMokafaaDate, 
   calculateProgressPercent 
@@ -157,6 +160,7 @@ function CountdownsSection() {
   const [settings, setSettings] = useState<{semesterStartDate?: string, semesterEndDate?: string} | null>(null);
   const [nextMokafaaDate, setNextMokafaaDate] = useState<Date | null>(null);
   const [nextHoliday, setNextHoliday] = useState<{ title: string; date: Date; description?: string } | null>(null);
+  const [activeHoliday, setActiveHoliday] = useState<{ title: string; startDate: Date; endDate: Date; description?: string } | null>(null);
   const [isMokafaaToday, setIsMokafaaToday] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [semesterInfo, setSemesterInfo] = useState<{ start: Date | null; target: Date | null; label: string }>({ 
@@ -164,6 +168,7 @@ function CountdownsSection() {
     target: null, 
     label: "ينتهي الفصل الدراسي خلال" 
   });
+  const [isSemesterToday, setIsSemesterToday] = useState<{ isStart: boolean; isEnd: boolean }>({ isStart: false, isEnd: false });
   const [isNationalDayToday, setIsNationalDayToday] = useState(false);
   const [isEidToday, setIsEidToday] = useState(false);
   const [isHolidayToday, setIsHolidayToday] = useState(false);
@@ -224,65 +229,129 @@ function CountdownsSection() {
         setShowConfetti(true);
       }
 
-      // Next Holiday Calculation (strictly relying on database flags)
-      const holidayEvents: { title: string; date: Date; description?: string; isEid: boolean; isNationalDay: boolean; isHolidayEnd: boolean }[] = [];
+      // Holiday Calculation (Unified single holiday concept with active & upcoming support)
+      let foundActiveHoliday: { title: string; startDate: Date; endDate: Date; description?: string } | null = null;
+      const allHolidayEvents: { title: string; startDate: Date; endDate: Date; description?: string; isEid: boolean; isNationalDay: boolean }[] = [];
+
       for (const e of events) {
-        if (e.isHoliday || e.isHolidayEnd || e.isEid || e.isNationalDay) {
-          const d = parseDate(e.date);
-          if (d && d >= todayStart) {
-            holidayEvents.push({
+        const isHoli = e.isHoliday || e.isHolidayEnd || e.isEid || e.isNationalDay || (e.title && e.title.includes('إجازة'));
+        const isResumption = e.title && (e.title.includes('بعد إجازة') || e.title.includes('بعد الإجازة') || e.title.includes('استئناف'));
+        if (isHoli && !isResumption) {
+          const startDate = parseDate(e.date);
+          let endDate = parseDate(e.endDate);
+          if (!endDate && startDate) {
+            const legacyEnd = events.find((x: any) => 
+              (x.isHolidayEnd || (x.title && (x.title.includes('نهاية إجازة') || x.title.includes('استئناف')))) &&
+              parseDate(x.date) && parseDate(x.date)! >= startDate
+            );
+            endDate = legacyEnd ? parseDate(legacyEnd.date) : startDate;
+          }
+          if (startDate) {
+            allHolidayEvents.push({
               title: e.title,
-              date: d,
+              startDate,
+              endDate: endDate || startDate,
               description: e.description,
               isEid: !!e.isEid,
               isNationalDay: !!e.isNationalDay,
-              isHolidayEnd: !!e.isHolidayEnd,
             });
           }
         }
       }
-      holidayEvents.sort((a, b) => a.date.getTime() - b.date.getTime());
 
-      if (holidayEvents.length > 0) {
-        setNextHoliday(holidayEvents[0]);
-      } else {
-        setNextHoliday(null);
+      // 1. Check for Active Holiday today (today is between startDate and endDate)
+      for (const h of allHolidayEvents) {
+        if (h.startDate <= todayStart && h.endDate >= todayStart) {
+          foundActiveHoliday = h;
+          break;
+        }
       }
 
-      // Check for Active Celebration (National Day or Eid)
-      const hasNationalDay = events.some((e: any) => {
-        const d = parseDate(e.date);
-        return (e.isNationalDay || (d && d.getMonth() === 8 && d.getDate() === 23)) && 
-               d && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
-      }) || (now.getMonth() === 8 && now.getDate() === 23);
+      // 2. Check for Active National Day or Eid
+      const hasNationalDay = allHolidayEvents.some(h => 
+        (h.isNationalDay || (h.startDate.getMonth() === 8 && h.startDate.getDate() === 23)) &&
+        todayStart >= h.startDate && todayStart <= h.endDate
+      ) || (now.getMonth() === 8 && now.getDate() === 23);
 
-      const hasEid = events.some((e: any) => {
-        const d = parseDate(e.date);
-        return e.isEid && d && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
-      });
+      const hasEid = allHolidayEvents.some(h =>
+        h.isEid && todayStart >= h.startDate && todayStart <= h.endDate
+      );
 
       if (hasNationalDay) setIsNationalDayToday(true);
       if (hasEid) setIsEidToday(true);
-      if (hasNationalDay || hasEid) setShowConfetti(true);
 
-      const holidayToday = (holidayEvents.length > 0 && 
-        now.getFullYear() === holidayEvents[0].date.getFullYear() && 
-        now.getMonth() === holidayEvents[0].date.getMonth() && 
-        now.getDate() === holidayEvents[0].date.getDate()) || hasNationalDay || hasEid;
-      setIsHolidayToday(holidayToday);
+      if (foundActiveHoliday) {
+        setActiveHoliday(foundActiveHoliday);
+        setNextHoliday({
+          title: foundActiveHoliday.title,
+          date: foundActiveHoliday.endDate,
+          description: foundActiveHoliday.description,
+        });
+        setIsHolidayToday(true);
+        setShowConfetti(true);
+      } else if (hasNationalDay || hasEid) {
+        setIsHolidayToday(true);
+        setShowConfetti(true);
+        setNextHoliday({
+          title: hasNationalDay ? 'اليوم الوطني' : 'عيد مبارك',
+          date: todayStart,
+        });
+      } else {
+        setActiveHoliday(null);
+        setIsHolidayToday(false);
+        const upcomingHolidays = allHolidayEvents
+          .filter(h => h.startDate >= todayStart)
+          .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
 
-      // Semester Start & End Dates Calculation directly from Events table flags
+        if (upcomingHolidays.length > 0) {
+          setNextHoliday({
+            title: upcomingHolidays[0].title,
+            date: upcomingHolidays[0].startDate,
+            description: upcomingHolidays[0].description,
+          });
+        } else {
+          setNextHoliday(null);
+        }
+      }
+
+      // Semester Start & End Dates Calculation
       const startEvents = events
-        .filter((e: any) => e.isSemesterStart)
+        .filter((e: any) => 
+          (e.isSemester || e.isSemesterStart) &&
+          !e.isHoliday && !e.isEid && !e.isNationalDay &&
+          !e.title?.includes('اختبار') && !e.title?.includes('امتحان') &&
+          !e.title?.includes('اعتذار') && !e.title?.includes('الاعتذار') &&
+          !e.title?.includes('تسجيل') && !e.title?.includes('تحويل') &&
+          !e.title?.includes('بعد إجازة')
+        )
         .map((e: any) => parseDate(e.date))
         .filter((d: Date | null): d is Date => d !== null)
         .sort((a: Date, b: Date) => a.getTime() - b.getTime());
 
       const endEvents = events
-        .filter((e: any) => e.isSemesterEnd)
-        .map((e: any) => parseDate(e.date))
+        .filter((e: any) => 
+          !e.title?.includes('اختبار') && !e.title?.includes('امتحان') &&
+          !e.title?.includes('اعتذار') && !e.title?.includes('الاعتذار') &&
+          !e.title?.includes('تسجيل') && !e.title?.includes('تحويل')
+        )
+        .flatMap((e: any) => {
+          const res: (Date | null)[] = [];
+          if (e.isSemesterEnd) res.push(parseDate(e.date));
+          if ((e.isSemester || e.isSemesterStart) && e.endDate) res.push(parseDate(e.endDate));
+          return res;
+        })
         .filter((d: Date | null): d is Date => d !== null)
         .sort((a: Date, b: Date) => a.getTime() - b.getTime());
+
+      // Fallback to settings if no semester start/end events found
+      if (startEvents.length === 0 && settingsData?.semesterStartDate) {
+        const d = parseDate(settingsData.semesterStartDate);
+        if (d) startEvents.push(d);
+      }
+      if (endEvents.length === 0 && settingsData?.semesterEndDate) {
+        const d = parseDate(settingsData.semesterEndDate);
+        if (d) endEvents.push(d);
+      }
 
       // Determine active semester vs break period
       const lastStart = [...startEvents].reverse().find((d: Date) => d <= todayStart) || null;
@@ -292,8 +361,20 @@ function CountdownsSection() {
       let calcStart: Date | null = null;
       let calcTarget: Date | null = null;
       let calcLabel = "يبدأ الفصل الدراسي خلال";
+      let semIsStart = false;
+      let semIsEnd = false;
 
-      if (lastStart && upcomingEnd && lastStart <= upcomingEnd) {
+      if (lastStart && lastStart.getTime() === todayStart.getTime()) {
+        calcStart = lastStart;
+        calcTarget = lastStart;
+        calcLabel = "بداية الفصل الدراسي";
+        semIsStart = true;
+      } else if (upcomingEnd && upcomingEnd.getTime() === todayStart.getTime()) {
+        calcStart = lastStart;
+        calcTarget = upcomingEnd;
+        calcLabel = "نهاية الفصل الدراسي";
+        semIsEnd = true;
+      } else if (lastStart && upcomingEnd && lastStart <= upcomingEnd) {
         // Active Semester: Today is between a start and an end
         calcStart = lastStart;
         calcTarget = upcomingEnd;
@@ -308,8 +389,9 @@ function CountdownsSection() {
         calcLabel = "ينتهي الفصل الدراسي خلال";
       }
 
+      setIsSemesterToday({ isStart: semIsStart, isEnd: semIsEnd });
       setSemesterInfo({ start: calcStart, target: calcTarget, label: calcLabel });
-  }, [eventsData]);
+  }, [eventsData, settingsData]);
 
   const semesterTargetDate: Date | null = semesterInfo.target;
   const semesterLabel: string = semesterInfo.label;
@@ -337,9 +419,14 @@ function CountdownsSection() {
 
   // 3. Holiday Percent
   let holidayPercent = 0;
-  if (nextHoliday) {
+  if (isHolidayToday && activeHoliday && activeHoliday.endDate.getTime() > activeHoliday.startDate.getTime()) {
+    // Ongoing multi-day vacation progress
+    holidayPercent = calculateProgressPercent(activeHoliday.startDate, activeHoliday.endDate, nowTime);
+  } else if (isHolidayToday) {
+    holidayPercent = 100;
+  } else if (nextHoliday) {
     const holidayTargetTime = nextHoliday.date;
-    const holidayStartTime = new Date(holidayTargetTime.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days window
+    const holidayStartTime = semesterStartDateObj || new Date(holidayTargetTime.getTime() - 30 * 24 * 60 * 60 * 1000);
     holidayPercent = calculateProgressPercent(holidayStartTime, holidayTargetTime, nowTime);
   }
 
@@ -417,7 +504,27 @@ function CountdownsSection() {
                 {semesterTargetDate ? semesterLabel : "العد التنازلي للفصل الدراسي"}
               </h3>
             </div>
-            {semesterTargetDate ? (
+            {isSemesterToday.isStart ? (
+              <div className="bg-indigo-500/10 border border-indigo-500/20 px-4 py-4 rounded-2xl shadow-2xs relative overflow-hidden flex flex-col items-center justify-center w-full">
+                <span className="text-sm font-bold text-indigo-700 dark:text-indigo-400 z-10 flex items-center gap-1.5">
+                  <GraduationCap className="w-4.5 h-4.5 text-indigo-500" />
+                  اليوم بداية الفصل الدراسي الجديد! 🎓
+                </span>
+                <p className="text-[11px] text-indigo-600 dark:text-indigo-300 mt-1 font-medium z-10 text-center leading-relaxed">
+                  نتمنى لكم فصلاً دراسياً حافلاً بالتميز والنجاح والتفوق!
+                </p>
+              </div>
+            ) : isSemesterToday.isEnd ? (
+              <div className="bg-indigo-500/10 border border-indigo-500/20 px-4 py-4 rounded-2xl shadow-2xs relative overflow-hidden flex flex-col items-center justify-center w-full">
+                <span className="text-sm font-bold text-indigo-700 dark:text-indigo-400 z-10 flex items-center gap-1.5">
+                  <PartyPopper className="w-4.5 h-4.5 text-indigo-500" />
+                  اليوم نهاية الفصل الدراسي! 🎉
+                </span>
+                <p className="text-[11px] text-indigo-600 dark:text-indigo-300 mt-1 font-medium z-10 text-center leading-relaxed">
+                  مبارك ختام الفصل الدراسي، نتمنى لكم إجازة سعيدة ونتائج موفقة!
+                </p>
+              </div>
+            ) : semesterTargetDate ? (
               <LiveCountdownBoxes targetDate={semesterTargetDate} hoverBorderClass="hover:border-indigo-500/40" />
             ) : (
               <p className="text-xs text-slate-500 dark:text-zinc-400 font-medium py-3">
@@ -428,13 +535,13 @@ function CountdownsSection() {
 
           {/* Vertical Lines Progress Bar for Semester */}
           <VerticalLinesProgressBar 
-            percent={semesterPercent} 
+            percent={isSemesterToday.isEnd ? 100 : semesterPercent} 
             activeColorClass="bg-indigo-600 shadow-indigo-600/40"
             lineCount={30}
           />
         </SpotlightCard>
 
-        {/* Next Holiday Countdown Card */}
+        {/* Holiday Countdown Card */}
         <SpotlightCard 
           spotlightColor="rgba(16, 185, 129, 0.12)"
           hoverBorderColor="rgba(16, 185, 129, 0.45)"
@@ -445,18 +552,22 @@ function CountdownsSection() {
               <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-600 dark:text-emerald-400 shrink-0">
                 <Palmtree className="w-4.5 h-4.5" />
               </div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate" title={nextHoliday?.title || "موعد الإجازة القادمة"}>
-                {nextHoliday?.title || "موعد الإجازة القادمة"}
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate" title={isHolidayToday ? (activeHoliday?.title || "إجازة حالية") : (nextHoliday?.title || "موعد الإجازة القادمة")}>
+                {isHolidayToday ? (activeHoliday?.title || "إجازة حالية") : (nextHoliday?.title || "موعد الإجازة القادمة")}
               </h3>
             </div>
             {isHolidayToday ? (
               <div className="bg-emerald-500/10 border border-emerald-500/20 px-4 py-4 rounded-2xl shadow-2xs relative overflow-hidden flex flex-col items-center justify-center w-full">
                 <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400 z-10 flex items-center gap-1.5">
                   <PartyPopper className="w-4.5 h-4.5 text-emerald-500" />
-                  {isNationalDayToday ? 'اليوم إجازة اليوم الوطني! 🇸🇦' : (isEidToday ? 'عيدكم مبارك وكل عام وأنتم بخير! ✨' : `اليوم إجازة ${nextHoliday?.title || ''}! 🎉`)}
+                  {isNationalDayToday ? 'اليوم إجازة اليوم الوطني! 🇸🇦' : (isEidToday ? 'عيدكم مبارك وكل عام وأنتم بخير! ✨' : `اليوم إجازة ${activeHoliday?.title || nextHoliday?.title || ''}! 🎉`)}
                 </span>
                 <p className="text-[11px] text-emerald-600 dark:text-emerald-300 mt-1 font-medium z-10 text-center leading-relaxed">
-                  {isNationalDayToday ? 'دمت يا وطني شامخاً عزيزاً، وكل عام والمملكة وشعبها بألف خير.' : (nextHoliday?.description || 'نتمنى لكم إجازة سعيدة وممتعة!')}
+                  {isNationalDayToday 
+                    ? 'دمت يا وطني شامخاً عزيزاً، وكل عام والمملكة وشعبها بألف خير.' 
+                    : (activeHoliday && activeHoliday.endDate.getTime() > activeHoliday.startDate.getTime()
+                      ? `مستمرة حتى ${formatDate(activeHoliday.endDate, 'ar-display')} • نتمنى لكم إجازة سعيدة وممتعة!`
+                      : (activeHoliday?.description || nextHoliday?.description || 'نتمنى لكم إجازة سعيدة وممتعة!'))}
                 </p>
               </div>
             ) : nextHoliday?.date ? (
@@ -468,9 +579,9 @@ function CountdownsSection() {
             )}
           </div>
 
-          {/* Vertical Lines Progress Bar for Next Holiday */}
+          {/* Vertical Lines Progress Bar for Holiday */}
           <VerticalLinesProgressBar 
-            percent={isHolidayToday ? 100 : holidayPercent} 
+            percent={holidayPercent} 
             activeColorClass="bg-emerald-500 shadow-emerald-500/40"
             lineCount={30}
           />
@@ -705,7 +816,7 @@ export function Home() {
         <InView preset="scale-up" delay={0.35} className="flex flex-col sm:flex-row gap-4 justify-center items-center w-full max-w-md">
           <Link 
             href="/tools" 
-            className="px-6.5 py-3.5 rounded-2xl bg-[var(--color-imamu-brown)] text-[var(--btn-text-primary)] hover:opacity-90 font-bold text-sm sm:text-base shadow-md active:scale-95 transition-all duration-200 w-full sm:w-auto text-center flex items-center justify-center gap-2.5 whitespace-nowrap group"
+            className={buttonVariants({ variant: 'primary', size: 'lg', rounded: 'xl', className: 'w-full sm:w-auto text-center shadow-md group' })}
           >
             <Calculator className="w-4.5 h-4.5 shrink-0" />
             <span>الأدوات وحاسبة المعدل</span>
@@ -713,9 +824,9 @@ export function Home() {
           </Link>
           <Link 
             href="/resources" 
-            className="px-6.5 py-3.5 rounded-2xl bg-slate-100/90 dark:bg-zinc-900/90 hover:bg-slate-200/80 dark:hover:bg-zinc-800/90 border border-slate-200 dark:border-zinc-800 text-slate-800 dark:text-zinc-200 font-bold text-sm sm:text-base shadow-2xs backdrop-blur-md active:scale-95 transition-all duration-200 w-full sm:w-auto text-center flex items-center justify-center gap-2.5 whitespace-nowrap group"
+            className={buttonVariants({ variant: 'secondary', size: 'lg', rounded: 'xl', className: 'w-full sm:w-auto text-center group' })}
           >
-            <BookOpen className="w-4 h-4 text-slate-500 dark:text-zinc-400 shrink-0" />
+            <BookOpen className="w-4.5 h-4.5 text-slate-500 dark:text-zinc-400 shrink-0" />
             <span>المصادر والتجميعات</span>
           </Link>
         </InView>

@@ -23,6 +23,7 @@ import { createAdminRouter } from './src/server/routes/admin';
 import { createContributorsRouter } from './src/server/routes/contributors';
 import { createSeoRouter } from './src/server/routes/seo';
 import { createAuthenticatedAccountsRouter } from './src/server/routes/authenticatedAccounts';
+import { idempotencyMiddleware } from './src/server/middleware/idempotency';
 
 async function startServer() {
   // Wait for DB to be fully initialized (PGlite WASM or PostgreSQL)
@@ -125,6 +126,7 @@ async function startServer() {
   app.use('/uploads', express.static(legacyUploadsDir, staticUploadsConfig));
 
   app.use(express.json({ limit: '50mb' }));
+  app.use(idempotencyMiddleware);
 
   // Ensure all dedicated S3 buckets exist in Garage Object Storage in the background
   ensureAllBucketsExist().catch(err => console.warn('[Storage] Bucket init notice:', err.message || err));
@@ -184,6 +186,12 @@ async function startServer() {
 
   // Dynamic SEO Router (/sitemap.xml & /robots.txt)
   app.use("/", createSeoRouter(db));
+
+  // Calendar .ics direct subscription alias
+  app.get("/calendar.ics", (req, res) => {
+    const queryString = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+    res.redirect(307, `/api/calendar.ics${queryString}`);
+  });
 
   // Start periodic Telegram channel news fetcher worker with distributed locking
   const startPeriodicTelegramFetcher = () => {

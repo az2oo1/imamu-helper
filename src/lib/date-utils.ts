@@ -2,15 +2,11 @@
  * Unified Date Utilities for IMAMU Helper (R2)
  */
 
+import { normalizeExamDate } from './schedule-utils';
+
 export type DateInput = Date | string | number | null | undefined;
 
-export type DateFormatPreset = 
-  | 'iso-date'       // YYYY-MM-DD (e.g., "2026-09-23")
-  | 'ar-display'     // Arabic Gregorian Date (e.g., "23 سبتمبر 2026")
-  | 'ar-full'        // Arabic Full Date & Time (e.g., "الأربعاء، 23 سبتمبر 2026 • 3:45 م")
-  | 'ar-hijri'       // Hijri Umm al-Qura Date (e.g., "11 ربيع الأول 1448 هـ")
-  | 'time'           // Time string (e.g., "03:45 PM" / "3:45 م")
-  | 'ics';           // iCalendar ISO (e.g., "20260923T154500Z")
+export type DateFormatPreset = 'iso-date' | 'ar-display' | 'ar-full' | 'ar-hijri' | 'time' | 'ics';
 
 export interface CountdownResult {
   days: number;
@@ -25,16 +21,13 @@ export interface CountdownResult {
 export interface AcademicEventFlags {
   isHoliday?: boolean;
   isHolidayEnd?: boolean;
+  isSemester?: boolean;
   isSemesterStart?: boolean;
   isSemesterEnd?: boolean;
   isEid?: boolean;
   isNationalDay?: boolean;
 }
 
-/**
- * 1. Safe Date Parser
- * Parses strings (YYYY-MM-DD, DD/MM/YYYY, ISO), numbers, or Date objects into a valid Date object or null.
- */
 export function parseDate(input: DateInput): Date | null {
   if (!input) return null;
   const checkValid = (d: Date): Date | null => {
@@ -52,28 +45,21 @@ export function parseDate(input: DateInput): Date | null {
   const trimmed = String(input).trim();
   if (!trimmed) return null;
 
-  // Handle YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
     const [y, m, d] = trimmed.split('-').map(Number);
     return checkValid(new Date(y, m - 1, d));
   }
 
-  // Handle DD/MM/YYYY
-  const ddmmMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (ddmmMatch) {
-    const day = Number(ddmmMatch[1]);
-    const month = Number(ddmmMatch[2]) - 1;
-    const year = Number(ddmmMatch[3]);
-    return checkValid(new Date(year, month, day));
+  const norm = normalizeExamDate(trimmed);
+  if (norm) {
+    const [y, m, d] = norm.split('-').map(Number);
+    return checkValid(new Date(y, m - 1, d));
   }
 
   // Fallback to standard JS parsing
   return checkValid(new Date(trimmed));
 }
 
-/**
- * 2. Unified Date Formatter
- */
 export function formatDate(input: DateInput, preset: DateFormatPreset = 'ar-display'): string {
   const d = parseDate(input);
   if (!d) return '-';
@@ -123,12 +109,12 @@ export function formatDate(input: DateInput, preset: DateFormatPreset = 'ar-disp
     }
 
     case 'ics': {
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      const hours = String(d.getHours()).padStart(2, '0');
-      const minutes = String(d.getMinutes()).padStart(2, '0');
-      const seconds = String(d.getSeconds()).padStart(2, '0');
+      const year = d.getUTCFullYear();
+      const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(d.getUTCDate()).padStart(2, '0');
+      const hours = String(d.getUTCHours()).padStart(2, '0');
+      const minutes = String(d.getUTCMinutes()).padStart(2, '0');
+      const seconds = String(d.getUTCSeconds()).padStart(2, '0');
       return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;
     }
 
@@ -137,9 +123,6 @@ export function formatDate(input: DateInput, preset: DateFormatPreset = 'ar-disp
   }
 }
 
-/**
- * 3. Hijri Date Formatter
- */
 export function formatHijriDate(input: DateInput, options?: Intl.DateTimeFormatOptions): string {
   const d = parseDate(input);
   if (!d) return '-';
@@ -152,9 +135,6 @@ export function formatHijriDate(input: DateInput, options?: Intl.DateTimeFormatO
   return new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', defaultOpts).format(d) + ' هـ';
 }
 
-/**
- * Compact Hijri Month & Day Formatter (e.g. "١٢ ربيع الآخر")
- */
 export function formatHijriMonthDay(input: DateInput): string {
   const d = parseDate(input);
   if (!d) return '-';
@@ -164,9 +144,6 @@ export function formatHijriMonthDay(input: DateInput): string {
   }).format(d);
 }
 
-/**
- * 4. Unified Countdown Calculator
- */
 export function getCountdown(targetDateInput: DateInput, nowInput: DateInput = new Date()): CountdownResult {
   const target = parseDate(targetDateInput);
   const now = parseDate(nowInput) || new Date();
@@ -196,10 +173,6 @@ export function getCountdown(targetDateInput: DateInput, nowInput: DateInput = n
   };
 }
 
-/**
- * 5. Mokafaa Payout Calculation with Saudi Weekend Rules
- * (25th of month, Friday -> 24th, Saturday -> 26th)
- */
 export function calculateMokafaaDate(year: number, monthZeroBased: number): Date {
   const dateObj = new Date(year, monthZeroBased, 27);
   const dayOfWeek = dateObj.getDay();
@@ -208,9 +181,6 @@ export function calculateMokafaaDate(year: number, monthZeroBased: number): Date
   return dateObj;
 }
 
-/**
- * 6. Calculation of Progress Percentage
- */
 export function calculateProgressPercent(startInput: DateInput, endInput: DateInput, nowInput: DateInput = new Date()): number {
   const start = parseDate(startInput);
   const end = parseDate(endInput);
@@ -229,15 +199,123 @@ export function calculateProgressPercent(startInput: DateInput, endInput: DateIn
 /**
  * 7. Category Descriptor Badge Helper
  */
-export function getEventCategoryMeta(flags: AcademicEventFlags & { title?: string }): { label: string; icon: string; badgeClass: string } | null {
-  if (flags.title?.includes('مكافأة') || flags.title?.includes('المكافأة') || flags.title?.includes('إيداع')) {
-    return { label: '💰 إيداع المكافأة', icon: '💰', badgeClass: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30' };
+type CategoryMeta = { label: string; icon: string; badgeClass: string };
+type CategoryRule = { matches: (title: string, flags: AcademicEventFlags) => boolean; result: CategoryMeta };
+
+const categoryRules: CategoryRule[] = [
+  { matches: t => /مكافأة|المكافأة|إيداع/.test(t), result: { label: '💰 إيداع المكافأة', icon: '💰', badgeClass: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30' } },
+  { matches: (_t, f) => Boolean(f.isEid), result: { label: '🌙 احتفال العيد', icon: '🌙', badgeClass: 'bg-amber-500/15 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] border-amber-500/30' } },
+  { matches: t => /اختبار|امتحان/.test(t), result: { label: '📝 فترة الاختبارات', icon: '📝', badgeClass: 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30' } },
+  { matches: t => /تسجيل|التحويل|القبول|إعادة القيد|الاعتذار|التأجيل|حذف|إضافة/.test(t), result: { label: '📋 حركة أكاديمية', icon: '📋', badgeClass: 'bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30' } },
+  { matches: (t, f) => Boolean(f.isHoliday || f.isHolidayEnd || t.includes('إجازة')), result: { label: '🌴 إجازة', icon: '🌴', badgeClass: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' } },
+  { matches: (t, f) => Boolean(f.isSemesterStart || (!t.includes('بعد إجازة') && /بداية الدراسة|بدء الدراسة|بداية الفصل|بدء الفصل/.test(t))), result: { label: '🚀 بداية الفصل', icon: '🚀', badgeClass: 'bg-[var(--color-imamu-brown)/15] text-[var(--color-imamu-accent)] border-amber-700/30' } },
+  { matches: (t, f) => Boolean(f.isSemesterEnd || /نهاية الفصل|نهاية العام/.test(t)), result: { label: '🏁 نهاية الفصل', icon: '🏁', badgeClass: 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30' } },
+  { matches: (_t, f) => Boolean(f.isSemester), result: { label: '🎓 فصل دراسي', icon: '🎓', badgeClass: 'bg-[var(--color-imamu-brown)/15] text-[var(--color-imamu-accent)] border-amber-700/30' } }
+];
+
+export function getEventCategoryMeta(flags: AcademicEventFlags & { title?: string }): CategoryMeta | null {
+  const title = flags.title || '';
+  if (flags.isNationalDay || title.includes('الوطني') || title.includes('التأسيس')) {
+    return {
+      label: title.includes('التأسيس') ? '🇸🇦 يوم التأسيس' : '🇸🇦 اليوم الوطني',
+      icon: '🇸🇦',
+      badgeClass: 'bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 border-emerald-600/40'
+    };
   }
-  if (flags.isSemesterStart) return { label: '🚀 بداية الفصل', icon: '🚀', badgeClass: 'bg-[var(--color-imamu-brown)/15] text-[var(--color-imamu-accent)] border-amber-700/30' };
-  if (flags.isSemesterEnd) return { label: '🏁 نهاية الفصل', icon: '🏁', badgeClass: 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30' };
-  if (flags.isHoliday) return { label: '🌴 بداية إجازة', icon: '🌴', badgeClass: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' };
-  if (flags.isHolidayEnd) return { label: '🔄 نهاية إجازة', icon: '🔄', badgeClass: 'bg-teal-500/15 text-teal-600 dark:text-teal-400 border-teal-500/30' };
-  if (flags.isEid) return { label: '🌙 احتفال العيد', icon: '🌙', badgeClass: 'bg-amber-500/15 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] border-amber-500/30' };
-  if (flags.isNationalDay) return { label: '🇸🇦 اليوم الوطني', icon: '🇸🇦', badgeClass: 'bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 border-emerald-600/40' };
-  return null;
+  return categoryRules.find(rule => rule.matches(title, flags))?.result || null;
+}
+
+/**
+ * 8. Escape text for iCalendar (RFC 5545)
+ */
+export function escapeIcs(str?: string | null): string {
+  if (!str) return '';
+  return String(str)
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\r?\n/g, '\\n');
+}
+
+/**
+ * 9. Calculate exact start and end Date boundaries for calendar rendering & exports
+ */
+export function getEventDateTimeBounds(ev: {
+  date: DateInput;
+  endDate?: DateInput;
+  time?: string | null;
+  endTime?: string | null;
+}) {
+  const startBase = parseDate(ev.date);
+  if (!startBase || isNaN(startBase.getTime())) return null;
+
+  let hasTime = false;
+  let startD = startBase;
+  let endD: Date | null = null;
+
+  if (ev.time) {
+    const parsedStart = parseTimeIntoDate(startBase, ev.time);
+    if (parsedStart.hasTime) {
+      hasTime = true;
+      startD = parsedStart.date;
+
+      const endBase = ev.endDate ? (parseDate(ev.endDate) || startBase) : startBase;
+      if (ev.endTime) {
+        const parsedEnd = parseTimeIntoDate(endBase, ev.endTime);
+        endD = parsedEnd.date;
+      } else if (ev.endDate && ev.endDate !== ev.date) {
+        endD = parseTimeIntoDate(endBase, ev.time).date;
+      } else {
+        endD = new Date(startD.getTime() + 60 * 60 * 1000);
+      }
+    }
+  } else if (typeof ev.date === 'string' && (ev.date.includes('T') || ev.date.includes(':'))) {
+    hasTime = true;
+    startD = startBase;
+    endD = new Date(startD.getTime() + 60 * 60 * 1000);
+  }
+
+  return { startBase, startD, endD, hasTime };
+}
+
+/**
+ * 8. Time Parser Helper
+ * Parses various time formats (e.g. "10:15 am", "10:15 ص", "14:30", "10:15") into a Date instance.
+ */
+export function parseTimeIntoDate(baseDate: Date, timeStr?: string): { date: Date; hasTime: boolean } {
+  const d = new Date(baseDate.getTime());
+  if (!timeStr || typeof timeStr !== 'string') {
+    return { date: d, hasTime: false };
+  }
+  const clean = timeStr.trim().toLowerCase();
+  const match = clean.match(/^(\d{1,2}):(\d{2})(?:\s*(am|pm|ص|م))?$/i);
+  if (!match) {
+    return { date: d, hasTime: false };
+  }
+  let h = parseInt(match[1], 10);
+  const m = parseInt(match[2], 10);
+  const period = match[3];
+  if (period) {
+    const isPM = period === 'pm' || period === 'م';
+    const isAM = period === 'am' || period === 'ص';
+    if (isPM && h < 12) h += 12;
+    if (isAM && h === 12) h = 0;
+  } else if (h >= 1 && h <= 6) {
+    h += 12;
+  }
+  d.setHours(h, m, 0, 0);
+  return { date: d, hasTime: true };
+}
+
+/**
+ * 9. Format date as floating iCalendar string (YYYYMMDDTHHmmss) without Z
+ */
+export function formatIcsFloating(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const seconds = String(d.getSeconds()).padStart(2, '0');
+  return `${year}${month}${day}T${hours}${minutes}${seconds}`;
 }

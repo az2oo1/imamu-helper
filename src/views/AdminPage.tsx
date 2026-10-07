@@ -7,13 +7,14 @@ import {
   Trash2, Link as LinkIcon, Download, Upload, Plus, X,
   Users, Settings, HelpCircle, ExternalLink, Server, Command,
   CheckCircle2, AlertTriangle, Info, XCircle, RefreshCw, Zap, Loader2,
-  LayoutDashboard, Newspaper, GraduationCap, Link2, Folder, Edit3, Send, Mail, HeartHandshake, MessageSquare, Layers, UserCheck, Activity
+  LayoutDashboard, Newspaper, GraduationCap, Link2, Folder, Edit3, Send, Mail, HeartHandshake, MessageSquare, Layers, UserCheck, Activity,
+  MapPin, Search, Check, Sparkles, ChevronDown, ArrowRightLeft, MoveRight, MoreVertical, SlidersHorizontal, ArrowRight
 } from 'lucide-react';
 import { TutorialsTab } from '../components/TutorialsTab';
 import { AdminLogsPage } from './AdminLogsPage';
 import CreateCourseModal from '../components/CreateCourseModal';
 import CreateResourceModal from '../components/CreateResourceModal';
-import CreateEventModal from '../components/CreateEventModal';
+import CreateEventModal, { EventFormData } from '../components/CreateEventModal';
 import CreateAuthenticatedAccountModal from '../components/CreateAuthenticatedAccountModal';
 import { AuthenticatedAccountDashboardModal } from '../components/AuthenticatedAccountDashboardModal';
 import { AuthenticatedAccountProfileModal } from '../components/AuthenticatedAccountProfileModal';
@@ -23,9 +24,10 @@ import AdminContributorsTab from './admin/AdminContributorsTab';
 import AdminFeedbackTab from './admin/AdminFeedbackTab';
 import AdminSettingsTab from './admin/AdminSettingsTab';
 import AdminSectionsTab from './admin/AdminSectionsTab';
+import AdminMajorsTab from './admin/AdminMajorsTab';
 import CommandPalette from './admin/CommandPalette';
 import { matchArabicSearch } from '../lib/search-utils';
-import { parseDate, formatDate } from '../lib/date-utils';
+import { parseDate, formatDate, getEventCategoryMeta } from '../lib/date-utils';
 
 type Tab = 'dashboard' | 'users' | 'contributors' | 'news_sources' | 'majors' | 'events' | 'subjects' | 'sections' | 'teachers' | 'resources' | 'tutorials' | 'feedback' | 'settings' | 'logs';
 
@@ -144,11 +146,6 @@ export function AdminPage() {
   const [selectedAdminAccount, setSelectedAdminAccount] = useState<any | null>(null);
   const [isCreateAccountModalOpen, setIsCreateAccountModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<any | null>(null);
-  const [majorForm, setMajorForm] = useState<{
-    id?: number; name: string;
-    courses: { subjectId: number; optionalGroup: string; optionalGroupReqCount: string }[];
-    batches: { name: string; reqCount: string }[]
-  }>({ name: '', courses: [], batches: [] });
   const [draggedSubjectId, setDraggedSubjectId] = useState<number | null>(null);
   const [subjectForm, setSubjectForm] = useState<{ 
     id?: number; 
@@ -183,7 +180,23 @@ export function AdminPage() {
     tags: '' 
   });
 
-  const [eventForm, setEventForm] = useState<{ id?: number; title: string; date: string; description: string; isHoliday?: boolean; isHolidayEnd?: boolean; isSemesterStart?: boolean; isSemesterEnd?: boolean; isEid?: boolean; isNationalDay?: boolean }>({ title: '', date: '', description: '', isHoliday: false, isHolidayEnd: false, isSemesterStart: false, isSemesterEnd: false, isEid: false, isNationalDay: false });
+  const [eventForm, setEventForm] = useState<EventFormData>({
+    title: '',
+    date: '',
+    endDate: '',
+    time: '',
+    endTime: '',
+    location: '',
+    link: '',
+    description: '',
+    isHoliday: false,
+    isHolidayEnd: false,
+    isSemester: false,
+    isSemesterStart: false,
+    isSemesterEnd: false,
+    isEid: false,
+    isNationalDay: false
+  });
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
   const [isResourceModalOpen, setIsResourceModalOpen] = useState(false);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
@@ -197,7 +210,6 @@ export function AdminPage() {
   const [subjectSearch, setSubjectSearch] = useState('');
   const [subjectLimit, setSubjectLimit] = useState(20);
   const [majorSearch, setMajorSearch] = useState('');
-  const [majorLimit, setMajorLimit] = useState(10);
   const [eventSearch, setEventSearch] = useState('');
   const [eventLimit, setEventLimit] = useState(1000);
   const [unassignedSearch, setUnassignedSearch] = useState('');
@@ -566,8 +578,8 @@ export function AdminPage() {
     <div className="space-y-6" dir="rtl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h3 className="text-2xl font-serif font-bold" style={{ color: 'var(--text-main)' }}>حسابات الجهات (Entity Accounts)</h3>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>إنشاء وتعيين الحسابات الرسمية، ربط المستخدمين (User UID)، وإدارة السحب التلقائي من التليقرام</p>
+          <h3 className="text-2xl font-serif font-bold" style={{ color: 'var(--text-main)' }}>حسابات الجهات الموثقة</h3>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>إنشاء وتعيين الحسابات الرسمية، ربط المستخدمين، وإدارة المزامنة التلقائية مع قنوات تيليجرام</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <button
@@ -773,196 +785,16 @@ export function AdminPage() {
   // TAB: MAJORS
   // ============================================================================
   const renderMajors = () => (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-2xl font-serif font-bold" style={{ color: 'var(--text-main)' }}>Academic Majors</h3>
-        <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Configure degree planning programs, requirement groups, and courses</p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* Form + List */}
-        <div className="space-y-4">
-          <div className="rounded-2xl p-5 border space-y-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-            <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>{majorForm.id ? 'Edit Major' : 'Add New Major'}</h4>
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Major Name</label>
-                <input type="text" placeholder="e.g. Computer Science" value={majorForm.name} onChange={e => setMajorForm(s => ({ ...s, name: e.target.value }))} className="py-2.5 px-3 rounded-xl text-sm border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    const url = majorForm.id ? `/api/admin/majors/${majorForm.id}` : '/api/admin/majors';
-                    const method = majorForm.id ? 'PUT' : 'POST';
-                    handlePostWithMethod(url, method, majorForm, () => setMajorForm({ id: undefined, name: '', courses: [], batches: [] }));
-                  }}
-                  className="flex-1 bg-[var(--color-imamu-brown)] text-white py-2 rounded-xl font-medium text-sm hover:bg-[var(--color-imamu-brown-light)] transition"
-                >
-                  {majorForm.id ? 'Update Major' : 'Add Major'}
-                </button>
-                {majorForm.id && <button onClick={() => setMajorForm({ id: undefined, name: '', courses: [], batches: [] })} className="px-3 py-2 border rounded-xl text-sm font-medium transition hover:bg-[var(--bg-subtle)]" style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}>Cancel</button>}
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl p-5 border space-y-3" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-            <div className="flex items-center justify-between">
-              <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>Current Majors ({majors.length})</h4>
-            </div>
-            <input type="text" placeholder="Search majors..." value={majorSearch} onChange={e => setMajorSearch(e.target.value)} className="w-full py-1.5 px-3 rounded-xl text-xs border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-            <div className="divide-y divide-slate-100 dark:divide-zinc-800/60">
-              {majors.filter(m => m.name?.toLowerCase().includes(majorSearch.toLowerCase())).slice(0, majorLimit).map(m => (
-                <div key={m.id} className="py-3 flex items-center justify-between group">
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium text-sm truncate" style={{ color: 'var(--text-main)' }}>{m.name}</div>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      onClick={() => {
-                        const courses = m.courses?.map((c: any) => ({ ...c, optionalGroupReqCount: c.optionalGroupReqCount?.toString() || '1' })) || [];
-                        const bMap = new Map();
-                        courses.forEach((c: any) => { if (c.optionalGroup) bMap.set(c.optionalGroup, c.optionalGroupReqCount); });
-                        const batches = Array.from(bMap.entries()).map(([name, reqCount]) => ({ name, reqCount }));
-                        setMajorForm({ ...m, courses, batches });
-                      }}
-                      className="px-2.5 py-1.5 rounded-xl transition text-xs font-semibold hover:bg-slate-100/60 dark:hover:bg-zinc-800/60"
-                      style={{ color: 'var(--text-muted)' }}
-                    >Edit</button>
-                    <button onClick={() => handleDelete(`/api/admin/majors/${m.id}`, m.name)} className="p-1.5 rounded transition hover:bg-red-500/10"><Trash2 className="w-4 h-4 text-red-400" /></button>
-                  </div>
-                </div>
-              ))}
-              {majors.length === 0 && <div className="py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No majors added yet.</div>}
-            </div>
-          </div>
-        </div>
-
-        {/* Batches + Courses Planner */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="rounded-2xl p-5 border space-y-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-            <div className="flex justify-between items-center border-b pb-3" style={{ borderColor: 'var(--border-color)' }}>
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>Plan Levels & Batches (المستويات والحزم)</span>
-              <button type="button" onClick={() => setMajorForm(f => ({ ...f, batches: [...f.batches, { name: `Batch ${f.batches.length + 1}`, reqCount: '1' }] }))} className="text-xs text-[var(--color-imamu-brown)] font-medium hover:underline">+ Add Batch</button>
-            </div>
-            {majorForm.batches.length > 0 && (
-              <div className="rounded-xl p-3 space-y-2 border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}>
-                {majorForm.batches.map((b, i) => (
-                  <div key={i} className="flex gap-2 items-center">
-                    <input type="text" value={b.name} placeholder="Batch Name" onChange={e => { const newName = e.target.value; const oldName = b.name; setMajorForm(f => ({ ...f, batches: f.batches.map((batch, idx) => idx === i ? { ...batch, name: newName } : batch), courses: f.courses.map(c => c.optionalGroup === oldName ? { ...c, optionalGroup: newName } : c) })); }} className="flex-1 py-1.5 px-3 rounded-lg text-sm border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-                    <input type="number" min="1" value={b.reqCount} placeholder="Req" title="Required count" onChange={e => setMajorForm(f => ({ ...f, batches: f.batches.map((batch, idx) => idx === i ? { ...batch, reqCount: e.target.value } : batch), courses: f.courses.map(c => c.optionalGroup === b.name ? { ...c, optionalGroupReqCount: e.target.value } : c) }))} className="w-24 py-1.5 px-3 rounded-lg text-sm border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-                    <button type="button" onClick={() => setMajorForm(f => ({ ...f, batches: f.batches.filter((_, idx) => idx !== i), courses: f.courses.map(c => c.optionalGroup === b.name ? { ...c, optionalGroup: '', optionalGroupReqCount: '1' } : c) }))} className="text-red-400 hover:text-red-500 p-1"><Trash2 className="w-4 h-4" /></button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="flex flex-col gap-2">
-              <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Select Included Courses:</span>
-              <select
-                value=""
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val) {
-                    const subjectNum = parseInt(val);
-                    if (!majorForm.courses.some(c => c.subjectId === subjectNum)) {
-                      setMajorForm(f => ({ ...f, courses: [...f.courses, { subjectId: subjectNum, optionalGroup: '', optionalGroupReqCount: '1' }] }));
-                    }
-                  }
-                }}
-                className="w-full py-2 px-3 rounded-xl text-sm border"
-                style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
-              >
-                <option value="">Search courses to include...</option>
-                {subjects.map(subj => <option key={subj.id} value={subj.id}>{subj.code} - {subj.name}</option>)}
-              </select>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto rounded-xl p-2.5 border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}>
-                {subjects.map(subj => {
-                  const isSelected = majorForm.courses.some(c => c.subjectId === subj.id);
-                  return (
-                    <div key={subj.id} className="flex items-center text-xs">
-                      <label className="flex items-center gap-2 cursor-pointer select-none w-full truncate" style={{ color: 'var(--text-muted)' }}>
-                        <input type="checkbox" checked={isSelected} onChange={(e) => {
-                          if (e.target.checked) setMajorForm(f => ({ ...f, courses: [...f.courses, { subjectId: subj.id, optionalGroup: '', optionalGroupReqCount: '1' }] }));
-                          else setMajorForm(f => ({ ...f, courses: f.courses.filter(c => c.subjectId !== subj.id) }));
-                        }} />
-                        <span className="font-medium shrink-0" style={{ color: 'var(--text-main)' }}>{subj.code}</span>
-                        <span className="truncate">{subj.name}</span>
-                      </label>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {majorForm.courses.length > 0 && (
-                <div className="mt-4 border-t pt-4" style={{ borderColor: 'var(--border-color)' }}>
-                  <span className="block text-xs font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>Drag & Drop Courses into Batches/Levels:</span>
-                  <div className="flex gap-4 overflow-x-auto pb-4 items-start">
-                    {[{ name: '', title: 'Unassigned (Default)' }, ...majorForm.batches.map(b => ({ name: b.name, title: b.name }))].map(batch => (
-                      <div
-                        key={batch.name || 'unassigned'}
-                        className="flex-shrink-0 w-60 rounded-xl p-3 flex flex-col min-h-[120px] max-h-[40vh] h-[450px] border"
-                        style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          if (draggedSubjectId) {
-                            const newBatch = majorForm.batches.find(b => b.name === batch.name);
-                            setMajorForm(f => ({ ...f, courses: f.courses.map(c => c.subjectId === draggedSubjectId ? { ...c, optionalGroup: batch.name, optionalGroupReqCount: newBatch ? newBatch.reqCount : '1' } : c) }));
-                            setDraggedSubjectId(null);
-                          }
-                        }}
-                      >
-                        <h4 className="font-semibold text-xs border-b pb-2 mb-2 flex justify-between items-center shrink-0" style={{ borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>
-                          <span className="truncate max-w-[120px]">{batch.title}</span>
-                          {batch.name && <span className="bg-purple-500/15 text-purple-400 text-[10px] px-1.5 py-0.5 rounded-full shrink-0">{majorForm.batches.find(b => b.name === batch.name)?.reqCount} Req</span>}
-                        </h4>
-
-                        {!batch.name && (
-                          <input type="text" placeholder="Search..." value={unassignedSearch} onChange={(e) => setUnassignedSearch(e.target.value)} className="mb-2 w-full py-1 px-2 rounded text-xs border shrink-0" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-                        )}
-
-                        <div className="flex flex-col gap-1.5 overflow-y-auto flex-1 pr-1 pb-2">
-                          {majorForm.courses.filter(c => {
-                            if ((c.optionalGroup || '') !== batch.name) return false;
-                            if (!batch.name && unassignedSearch) {
-                              const subj = subjects.find(s => s.id === c.subjectId);
-                              if (!subj) return false;
-                              const term = unassignedSearch.toLowerCase();
-                              return subj.name.toLowerCase().includes(term) || subj.code.toLowerCase().includes(term);
-                            }
-                            return true;
-                          }).map(c => {
-                            const subj = subjects.find(s => s.id === c.subjectId);
-                            if (!subj) return null;
-                            return (
-                              <div
-                                key={c.subjectId}
-                                draggable
-                                onDragStart={(e) => { setDraggedSubjectId(c.subjectId); e.dataTransfer.setData('text/plain', c.subjectId.toString()); }}
-                                className="p-2 rounded shadow-sm text-xs cursor-grab active:cursor-grabbing border transition hover:border-[var(--color-imamu-brown)] shrink-0"
-                                style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
-                              >
-                                <div className="font-semibold" style={{ color: 'var(--text-main)' }}>{subj.code}</div>
-                                <div className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>{subj.name}</div>
-                              </div>
-                            );
-                          })}
-                          {majorForm.courses.filter(c => (c.optionalGroup || '') === batch.name).length === 0 && (
-                            <div className="italic flex-1 flex items-center justify-center border border-dashed rounded-lg min-h-[60px] text-[10px]" style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}>Drop here</div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <AdminMajorsTab
+      majors={majors}
+      subjects={subjects}
+      fetchData={fetchData}
+      toast={toast}
+      getToken={getToken}
+      initialSearch={majorSearch}
+    />
   );
+
   // TAB: EVENTS
   // ============================================================================
   const renderEvents = () => {
@@ -988,7 +820,22 @@ export function AdminPage() {
           <button
             onClick={() => {
               setEventForm({ 
-                id: undefined, title: '', date: '', description: '', isHoliday: false, isSemesterStart: false, isSemesterEnd: false 
+                id: undefined,
+                title: '',
+                date: '',
+                endDate: '',
+                time: '',
+                endTime: '',
+                location: '',
+                link: '',
+                description: '',
+                isHoliday: false,
+                isHolidayEnd: false,
+                isSemester: false,
+                isSemesterStart: false,
+                isSemesterEnd: false,
+                isEid: false,
+                isNationalDay: false
               });
               setIsEventModalOpen(true);
             }}
@@ -1070,7 +917,12 @@ export function AdminPage() {
           <div className="lg:col-span-2 space-y-3">
             <div className="rounded-2xl border divide-y divide-slate-100 dark:divide-zinc-800/60 overflow-hidden shadow-2xs" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
               {displayedEvents.map(e => {
-                const dateDisplay = e.date;
+                const dateRange = e.endDate && e.endDate !== e.date
+                  ? `${e.date} إلى ${e.endDate}`
+                  : e.date;
+                const dateDisplay = e.time
+                  ? `${dateRange} • ${e.time}${e.endTime && e.endTime !== e.time ? ` - ${e.endTime}` : ''}`
+                  : dateRange;
 
                 return (
                   <div 
@@ -1083,18 +935,41 @@ export function AdminPage() {
                           {e.title}
                         </span>
 
-                        {e.isSemesterStart && <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[var(--color-imamu-brown)/15] text-[var(--color-imamu-accent)] border border-amber-700/30">🚀 بداية الفصل</span>}
-                        {e.isSemesterEnd && <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30">🏁 نهاية الفصل</span>}
-                        {e.isHoliday && <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">🌴 بداية إجازة</span>}
-                        {e.isHolidayEnd && <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-500/30">🔄 نهاية إجازة</span>}
-                        {e.isEid && <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/15 text-[var(--color-imamu-accent)] dark:text-[var(--color-imamu-accent)] border border-amber-500/30">🌙 احتفال العيد</span>}
-                        {e.isNationalDay && <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 border border-emerald-600/40">🇸🇦 اليوم الوطني</span>}
+                        {(() => {
+                          const meta = getEventCategoryMeta(e);
+                          if (!meta) return null;
+                          return (
+                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${meta.badgeClass}`}>
+                              {meta.label}
+                            </span>
+                          );
+                        })()}
                       </div>
 
                       {e.description && (
                         <p className="text-xs leading-relaxed max-w-2xl" style={{ color: 'var(--text-muted)' }}>
                           {e.description}
                         </p>
+                      )}
+
+                      {(e.location || e.link) && (
+                        <div className="flex items-center gap-3 text-xs flex-wrap pt-0.5" style={{ color: 'var(--text-muted)' }}>
+                          {e.location && (
+                            <span className="flex items-center gap-1 font-medium">
+                              <MapPin className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" /> {e.location}
+                            </span>
+                          )}
+                          {e.link && (
+                            <a
+                              href={e.link.startsWith('http') ? e.link : `https://${e.link}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-[var(--color-imamu-accent)] hover:underline font-medium"
+                            >
+                              <Link2 className="w-3.5 h-3.5" /> {e.link}
+                            </a>
+                          )}
+                        </div>
                       )}
                     </div>
 
@@ -1111,9 +986,15 @@ export function AdminPage() {
                               id: e.id,
                               title: e.title || '',
                               date: e.date || '',
+                              endDate: e.endDate || '',
+                              time: e.time || '',
+                              endTime: e.endTime || '',
+                              location: e.location || '',
+                              link: e.link || '',
                               description: e.description || '',
                               isHoliday: !!e.isHoliday,
                               isHolidayEnd: !!e.isHolidayEnd,
+                              isSemester: !!e.isSemester,
                               isSemesterStart: !!e.isSemesterStart,
                               isSemesterEnd: !!e.isSemesterEnd,
                               isEid: !!e.isEid,
@@ -1154,10 +1035,11 @@ export function AdminPage() {
           onClose={() => setIsEventModalOpen(false)}
           eventForm={eventForm}
           setEventForm={setEventForm}
-          onSave={() => {
-            const url = eventForm.id ? `/api/admin/events/${eventForm.id}` : '/api/admin/events';
-            const method = eventForm.id ? 'PUT' : 'POST';
-            handlePostWithMethod(url, method, eventForm, () => {
+          onSave={(dataToSave) => {
+            const payload = dataToSave || eventForm;
+            const url = payload.id ? `/api/admin/events/${payload.id}` : '/api/admin/events';
+            const method = payload.id ? 'PUT' : 'POST';
+            handlePostWithMethod(url, method, payload, () => {
               fetchData();
             });
           }}
@@ -1241,7 +1123,7 @@ export function AdminPage() {
                       </span>
                     )}
                     {s.prereq && (
-                      <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1" title={s.prereq}>
+                      <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-[#8C6239]/10 text-[#7A542D] dark:text-[#D4A373] border border-[#8C6239]/20 flex items-center gap-1" title={s.prereq}>
                         <BookOpen className="w-3 h-3" />
                         <span className="truncate max-w-xs">متطلب: {s.prereq}</span>
                       </span>
@@ -1313,11 +1195,11 @@ export function AdminPage() {
   // TAB: ACADEMIC RESOURCES (المصادر والمراجع الأكاديمية)
   // ============================================================================
   const renderResources = () => (
-    <div className="space-y-6">
+    <div className="space-y-6" dir="rtl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h3 className="text-2xl font-serif font-bold" style={{ color: 'var(--text-main)' }}>Course Resources (المصادر والمراجع الأكاديمية)</h3>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Manage academic drives, summaries, past exams, and study links via resource wizard</p>
+          <h3 className="text-2xl font-serif font-bold" style={{ color: 'var(--text-main)' }}>المصادر والمراجع الأكاديمية</h3>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>إدارة الدرايفات والملخصات والاختبارات السابقة وروابط المواد التعليمية</p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
@@ -1326,10 +1208,10 @@ export function AdminPage() {
               setResourceForm({ title: '', type: 'course_hub', url: '', description: '', boxLink: '', whatsappLink: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', sectionsEnabled: true });
               setIsResourceModalOpen(true);
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-semibold text-xs sm:text-sm rounded-xl transition shadow-sm border border-emerald-500/30 shrink-0"
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl transition shadow-sm border border-emerald-500/30 shrink-0 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>Add New Resource</span>
+            <span>إضافة مصدر جديد</span>
           </button>
         </div>
       </div>
@@ -1337,31 +1219,31 @@ export function AdminPage() {
       <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
         <div className="px-5 py-4 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3" style={{ borderColor: 'var(--border-color)' }}>
           <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>
-            Academic Resources ({resourcesList.length})
+            المصادر المتاحة ({resourcesList.length})
           </h4>
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
             <input
               type="text"
-              placeholder="Search resources..."
+              placeholder="بحث في المصادر..."
               value={resourceSearch}
               onChange={e => setResourceSearch(e.target.value)}
-              className="py-1.5 px-3 rounded-xl text-xs border flex-1 sm:w-64"
+              className="py-1.5 px-3 rounded-xl text-xs border flex-1 sm:w-64 outline-none"
               style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
             />
             <select
               value={resourceFilterType}
               onChange={e => setResourceFilterType(e.target.value)}
-              className="py-1.5 px-2.5 rounded-xl text-xs border"
+              className="py-1.5 px-2.5 rounded-xl text-xs border outline-none"
               style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
             >
-              <option value="ALL">All Types</option>
-              <option value="course_hub">Course Package</option>
-              <option value="box">Box Storage</option>
-              <option value="summary">Summary</option>
-              <option value="syllabus">Syllabus</option>
-              <option value="exam">Exams</option>
-              <option value="whatsapp">WhatsApp</option>
-              <option value="telegram">Telegram</option>
+              <option value="ALL">جميع الأنواع</option>
+              <option value="course_hub">حزمة مقرر كاملة</option>
+              <option value="box">مجلد Box / درايف</option>
+              <option value="summary">ملخصات</option>
+              <option value="syllabus">خطة وتوصيف</option>
+              <option value="exam">نماذج اختبارات</option>
+              <option value="whatsapp">مجموعة واتساب</option>
+              <option value="telegram">قناة تيليجرام</option>
             </select>
           </div>
         </div>
