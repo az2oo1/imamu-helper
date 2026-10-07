@@ -11,7 +11,7 @@ import {
   CheckCircle, X, AlertCircle, ExternalLink, Compass, Info,
   Share2
 } from 'lucide-react';
-import { InView, SpotlightCard } from '../components/ui';
+import { InView, SpotlightCard, Button, buttonVariants } from '../components/ui';
 import { getSectionColorClasses } from '../lib/section-colors';
 import ReportDropdownMenu from '../components/ReportDropdownMenu';
 import { matchArabicSearch } from '../lib/search-utils';
@@ -305,7 +305,7 @@ export function HowToPage() {
           >
             {/* Action Bar: Back Button & Direct Link Share Button */}
             <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-              <button 
+              <Button 
                 onClick={() => {
                   setSelectedTutorial(null);
                   if (typeof window !== 'undefined') {
@@ -316,10 +316,12 @@ export function HowToPage() {
                   }
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                className="btn-rise inline-flex items-center gap-2 text-xs text-slate-700 dark:text-zinc-300 font-bold bg-white dark:bg-zinc-900 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-2xs hover:bg-slate-50 dark:hover:bg-zinc-800 transition cursor-pointer active:scale-95"
+                variant="secondary"
+                size="sm"
+                className="gap-2"
               >
                 <ArrowLeft className="w-4 h-4 rotate-180 text-[var(--color-imamu-accent)]" /> العودة إلى قائمة الشروحات
-              </button>
+              </Button>
 
               <div className="flex items-center gap-2">
                 <button
@@ -550,13 +552,14 @@ export function HowToPage() {
                       className="w-full p-3.5 bg-white dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 rounded-xl outline-none focus:ring-2 focus:ring-stone-100 dark:focus:ring-stone-900 focus:border-[var(--color-imamu-brown)] text-xs resize-none text-right text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500"
                     />
                     <div className="flex justify-end">
-                      <button
+                      <Button
                         onClick={submitTutorialComment}
                         disabled={!tutorialCommentInput.trim()}
-                        className="btn-rise bg-[var(--color-imamu-brown)] text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-md shadow-[var(--color-imamu-brown)/20] disabled:opacity-50 cursor-pointer"
+                        variant="primary"
+                        size="md"
                       >
                         إرسال التعليق
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ) : (
@@ -608,20 +611,18 @@ export function HowToPage() {
                       </p>
                     </div>
                   </div>
-                  <button 
+                  <Button 
                     onClick={(e) => {
                       e.stopPropagation();
                       router.push('/newbie');
                     }}
-                    className="btn-rise px-5 py-2.5 font-bold text-xs rounded-xl shrink-0 transition-all duration-200 cursor-pointer flex items-center gap-2 group/btn shadow-xs hover:shadow-md active:scale-95"
-                    style={{
-                      background: 'var(--color-imamu-brown)',
-                      color: 'var(--btn-text-primary, #ffffff)'
-                    }}
+                    variant="primary"
+                    size="md"
+                    className="shrink-0 group/btn"
                   >
                     <span>استكشف الدليل الأكاديمي</span>
                     <ArrowLeft className="w-3.5 h-3.5 transition-transform duration-200 group-hover/btn:-translate-x-1" />
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -793,12 +794,14 @@ export function HowToPage() {
               </div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white mb-2">{customAlert.title}</h3>
               <p className="text-xs text-slate-600 dark:text-zinc-400 mb-6 leading-relaxed">{customAlert.message}</p>
-              <button 
+              <Button 
                 onClick={() => setCustomAlert(null)}
-                className="w-full bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white font-bold py-2.5 rounded-xl text-xs transition shadow-md shadow-[var(--color-imamu-brown)/20]"
+                variant="primary"
+                size="md"
+                className="w-full"
               >
                 موافق
-              </button>
+              </Button>
             </motion.div>
           </div>
         )}
@@ -813,9 +816,14 @@ export function HowToPage() {
             >
               <div className="flex justify-between items-center border-b border-slate-100 dark:border-zinc-800 pb-3.5 mb-4">
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white">ملاحظاتك حول هذا الشرح 📝</h3>
-                <button onClick={() => setNegativeFeedbackModal(null)} className="text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-white">
+                <Button 
+                  onClick={() => setNegativeFeedbackModal(null)} 
+                  variant="ghost" 
+                  size="icon-sm"
+                  className="text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-white"
+                >
                   <X className="w-4.5 h-4.5" />
-                </button>
+                </Button>
               </div>
               <p className="text-xs text-slate-600 dark:text-zinc-400 mb-4 leading-relaxed">
                 يؤسفنا أن الشرح لم يكن كافياً. يرجى كتابة المشكلة التي واجهتك (مثال: الشرح قديم، الروابط معطلة، أو نقص في الخطوات) لمساعدتنا على تحسينه:
@@ -828,18 +836,22 @@ export function HowToPage() {
                 className="w-full p-3.5 bg-slate-50 dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 rounded-xl outline-none focus:ring-2 focus:ring-stone-100 dark:focus:ring-stone-900 focus:border-[var(--color-imamu-brown)] text-xs resize-none mb-6 text-right text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500"
               />
               <div className="flex gap-3">
-                <button 
+                <Button 
                   onClick={() => setNegativeFeedbackModal(null)}
-                  className="flex-1 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 font-bold py-2.5 rounded-xl text-xs transition"
+                  variant="secondary"
+                  size="md"
+                  className="flex-1"
                 >
                   إلغاء
-                </button>
-                <button 
+                </Button>
+                <Button 
                   onClick={submitNegativeFeedback}
-                  className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 rounded-xl text-xs transition shadow-md shadow-rose-600/20"
+                  variant="destructive"
+                  size="md"
+                  className="flex-1"
                 >
                   إرسال الملاحظة
-                </button>
+                </Button>
               </div>
             </motion.div>
           </div>

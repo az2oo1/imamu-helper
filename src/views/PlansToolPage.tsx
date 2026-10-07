@@ -6,6 +6,7 @@ import { FileText, ArrowLeft, GraduationCap, ExternalLink, Search, ArrowUpRight,
 import Link from 'next/link';
 import ReportDropdownMenu from '../components/ReportDropdownMenu';
 import { matchArabicSearch } from '../lib/search-utils';
+import { Button, buttonVariants } from '../components/ui';
 
 interface PdfFileItem {
   id: string;
@@ -284,12 +285,12 @@ export function PlansToolPage() {
               href="https://msari.vercel.app/index.html" 
               target="_blank" 
               rel="noreferrer" 
-              className="btn-rise inline-flex items-center justify-center gap-2 text-xs sm:text-sm font-bold text-white bg-[#0E352C] hover:bg-[#13493d] px-4.5 py-2.5 rounded-full border border-[#3DC9B0]/40 shadow-sm shadow-[#0E352C]/30 transition-all cursor-pointer shrink-0 self-start sm:self-auto"
+              className="btn-rise inline-flex items-center justify-center gap-2 text-xs font-bold text-white bg-[#0E352C] hover:bg-[#13493d] px-4 py-2 rounded-xl border border-[#3DC9B0]/40 shadow-xs transition-all cursor-pointer shrink-0 self-start sm:self-auto"
               title="الانتقال إلى منصة مساري لتنظيم الخطة الأكاديمية"
             >
               <GraduationCap className="w-4 h-4 text-[#3DC9B0] shrink-0" />
               <span>تعمّق مع مساري</span>
-              <ArrowUpRight className="w-4 h-4 text-slate-300 shrink-0" />
+              <ArrowUpRight className="w-3.5 h-3.5 text-slate-300 shrink-0" />
             </a>
           </div>
 
@@ -317,13 +318,15 @@ export function PlansToolPage() {
 
             {/* Add New PDF File Button (Admin Only) */}
             {isAdmin && (
-              <button
+              <Button
                 onClick={() => setIsAddPdfOpen(true)}
-                className="btn-rise flex items-center gap-1.5 px-4 py-2 rounded-full bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] text-white text-xs font-bold transition shadow-2xs cursor-pointer shrink-0"
+                variant="primary"
+                size="sm"
+                leftIcon={<Plus className="w-4 h-4" />}
+                className="shrink-0"
               >
-                <Plus className="w-4 h-4" />
-                <span>إضافة ملف PDF</span>
-              </button>
+                إضافة ملف PDF
+              </Button>
             )}
           </div>
         </div>
@@ -446,7 +449,7 @@ export function PlansToolPage() {
       <div className="flex items-center justify-between mb-6">
         <Link 
           href="/tools" 
-          className="btn-rise inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-700 dark:text-zinc-300 hover:text-[var(--color-imamu-accent)] dark:hover:text-[var(--color-imamu-accent)] hover:bg-slate-50 dark:hover:bg-zinc-800/80 hover:border-slate-300 dark:hover:border-zinc-700 transition-all duration-200 self-start bg-white dark:bg-zinc-900 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-2xs cursor-pointer active:scale-95" 
+          className={buttonVariants({ variant: 'secondary', size: 'sm', className: 'self-start' })} 
           dir="rtl"
         >
           <ArrowLeft className="w-4 h-4 rotate-180 text-[var(--color-imamu-accent)]" />

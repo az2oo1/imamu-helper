@@ -8,13 +8,13 @@ const isTest = process.env.NODE_ENV === 'test';
  */
 export const generalApiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: isTest ? 10000 : 600,
+  max: isTest ? 10000 : 3000,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: {
     error: 'Too many requests from this IP, please try again after 15 minutes.'
   },
-  skip: () => isTest,
+  skip: (req) => isTest || req.path.startsWith('/admin') || req.url.startsWith('/admin'),
 });
 
 /**

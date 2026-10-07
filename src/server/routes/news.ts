@@ -37,6 +37,25 @@ export function createNewsRouter(db: any) {
   router.get("/events", async (req, res) => {
     try {
       const currentUserId = extractUserId(req);
+      const validUserIds = new Set<string>();
+      if (currentUserId) {
+        validUserIds.add(String(currentUserId));
+        try {
+          const [currUser] = await db.select().from(users).where(
+            or(
+              eq(users.uid, currentUserId),
+              matchId(users.id, currentUserId),
+              eq(users.email, currentUserId)
+            )
+          );
+          if (currUser) {
+            if (currUser.uid) validUserIds.add(String(currUser.uid));
+            if (currUser.id) validUserIds.add(String(currUser.id));
+            if (currUser.email) validUserIds.add(String(currUser.email));
+          }
+        } catch (_e) {}
+      }
+
       const records = await db.select().from(events);
       // Filter: return academic, entity, and if user is logged in, their own events
       const filtered = records.filter((e: any) => {
@@ -44,7 +63,7 @@ export function createNewsRouter(db: any) {
           return true;
         }
         if (e.calendarType === 'user') {
-          return currentUserId && e.userId === currentUserId;
+          return e.userId && validUserIds.has(String(e.userId));
         }
         return true;
       });

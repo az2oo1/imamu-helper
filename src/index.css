@@ -331,3 +331,18 @@ button[type="submit"]:not(:disabled):active,
   background-color: color-mix(in srgb, var(--color-imamu-accent, #8C6239) 12%, transparent) !important;
 }
 
+/* ── Subject / Course Tag (Adaptive Dark & Light Mode) ── */
+.subject-tag {
+  background-color: color-mix(in srgb, var(--subject-color, #8c6239) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--subject-color, #8c6239) 30%, transparent);
+  color: color-mix(in srgb, var(--subject-color, #8c6239) 85%, #0f172a);
+}
+
+.dark .subject-tag,
+:where(.dark, .dark *) .subject-tag {
+  background-color: color-mix(in srgb, var(--subject-color, #8c6239) 22%, transparent);
+  border-color: color-mix(in srgb, var(--subject-color, #8c6239) 40%, transparent);
+  color: color-mix(in srgb, var(--subject-color, #8c6239) 55%, #ffffff);
+}
+
+

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Send, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
+import { Button } from './ui/Button';
 
 interface ReportProblemModalProps {
   isOpen: boolean;
@@ -187,22 +188,25 @@ export default function ReportProblemModal({
 
             {/* Buttons */}
             <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-zinc-800/80">
-              <button
+              <Button
                 type="button"
+                variant="secondary"
+                size="md"
                 onClick={onClose}
-                className="btn-rise px-4 py-2.5 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-bold transition cursor-pointer"
               >
                 إلغاء
-              </button>
+              </Button>
 
-              <button
+              <Button
                 type="submit"
+                variant="primary"
+                size="md"
                 disabled={submitting || !comment.trim()}
-                className="btn-rise bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md shadow-blue-600/20"
+                isLoading={submitting}
+                leftIcon={<Send className="w-3.5 h-3.5" />}
               >
-                <Send className="w-3.5 h-3.5" />
-                <span>{submitting ? 'جاري الإرسال...' : 'إرسال البلاغ'}</span>
-              </button>
+                {submitting ? 'جاري الإرسال...' : 'إرسال البلاغ'}
+              </Button>
             </div>
           </form>
         )}

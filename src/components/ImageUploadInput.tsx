@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Image as ImageIcon, Upload, Loader2, X } from 'lucide-react';
 import { compressBannerFile, compressAvatarFile, compressImageFile } from '../lib/imageCompressor';
+import { Button } from './ui/Button';
 
 interface Props {
   label: string;
@@ -102,16 +103,18 @@ export default function ImageUploadInput({ label, value, onChange, type, uploadU
         
         {/* Upload Button */}
         <div className="flex-1">
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
-            className="flex items-center justify-center gap-2 px-3 py-2 bg-[var(--bg-subtle)] hover:bg-[var(--border-color)] text-xs font-semibold rounded-xl border transition w-full disabled:opacity-50"
-            style={{ borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
+            isLoading={isUploading}
+            leftIcon={<Upload className="w-4 h-4 text-[var(--color-imamu-accent)]" />}
+            className="w-full"
           >
-            {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4 text-[var(--color-imamu-accent)]" />}
-            <span>{isUploading ? 'Uploading to Object Storage...' : (value ? 'Change Image' : 'Upload to Storage')}</span>
-          </button>
+            {isUploading ? 'جاري الرفع...' : (value ? 'تغيير الصورة' : 'رفع صورة')}
+          </Button>
           <input
             type="file"
             ref={fileInputRef}

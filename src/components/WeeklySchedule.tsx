@@ -513,7 +513,7 @@ export function WeeklySchedule({ sections, className = '', loading = false }: We
                         {sd.label}
                       </span>
                       {isToday && (
-                        <span className="px-1.5 py-0.2 rounded-md bg-[var(--color-imamu-accent)] text-stone-950 font-bold text-[9px] shadow-xs">
+                        <span className="px-1.5 py-0.2 rounded-md bg-[var(--color-imamu-accent)] text-white font-bold text-[9px] shadow-xs">
                           اليوم
                         </span>
                       )}
@@ -638,14 +638,14 @@ export function WeeklySchedule({ sections, className = '', loading = false }: We
                         >
                           {/* Start time → physical LEFT (justify-end in RTL flex) */}
                           <div className="flex justify-end shrink-0">
-                            <span className="text-[9px] font-bold tabular-nums leading-tight opacity-80" dir="ltr">
+                            <span className="text-[9px] font-bold tabular-nums leading-tight text-slate-600 dark:text-zinc-400" dir="ltr">
                               {formatMinutesToTime(slot.startMinutes, true)}
                             </span>
                           </div>
 
                           {/* Course Title — centered in the middle of the schedule box */}
                           <div className="flex-1 flex items-center justify-center text-center my-auto min-h-0 px-0.5">
-                            <p className="text-[10px] sm:text-[10.5px] font-bold leading-tight line-clamp-2">
+                            <p className="text-[10px] sm:text-[10.5px] font-bold leading-tight line-clamp-2 text-slate-900 dark:text-zinc-100">
                               {slot.courseTitle}
                             </p>
                           </div>
@@ -653,12 +653,12 @@ export function WeeklySchedule({ sections, className = '', loading = false }: We
                           {/* Bottom: Room → physical RIGHT (first in RTL flex), End time → physical LEFT (last) */}
                           <div className="flex items-center justify-between gap-1 mt-auto shrink-0">
                             {slot.room ? (
-                              <span className="flex items-center gap-0.5 text-[9px] font-bold opacity-80 truncate">
+                              <span className="flex items-center gap-0.5 text-[9px] font-bold text-slate-600 dark:text-zinc-400 truncate">
                                 <MapPin className="w-2 h-2 shrink-0" />
                                 <span>{slot.room}</span>
                               </span>
                             ) : <span />}
-                            <span className="text-[9px] font-semibold tabular-nums opacity-70 shrink-0" dir="ltr">
+                            <span className="text-[9px] font-semibold tabular-nums text-slate-500 dark:text-zinc-400 shrink-0" dir="ltr">
                               {formatMinutesToTime(slot.endMinutes, true)}
                             </span>
                           </div>
@@ -740,9 +740,9 @@ export function WeeklySchedule({ sections, className = '', loading = false }: We
                   <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 text-xs">
                     <span>{selectedSlot.day}</span>
                     <span className="text-slate-400 font-normal">·</span>
-                    <span className="inline-flex items-center gap-1" dir="ltr">
+                    <span className="inline-flex items-center gap-1" dir="rtl">
                       <span>{formatMinutesToTime(selectedSlot.startMinutes, true)}</span>
-                      <span className="text-slate-400 font-normal">→</span>
+                      <span className="text-slate-400 font-normal">←</span>
                       <span>{formatMinutesToTime(selectedSlot.endMinutes, true)}</span>
                     </span>
                   </div>

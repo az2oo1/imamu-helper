@@ -6,6 +6,7 @@ import {
   parseScheduleDays,
   formatTo12Hour
 } from '../../lib/schedule-utils';
+import { invalidatePrereqCatalogCache } from '../routes/subjects';
 
 export interface TermInfo {
   academicYear?: string | null;
@@ -409,6 +410,7 @@ export async function processAndUpsertCatalog(
 
   const elapsedMs = Date.now() - startTime;
   console.log(`[Sections Importer] Success in ${elapsedMs}ms: ${insertedCoursesCount} courses, ${insertedSectionsCount} sections.`);
+  invalidatePrereqCatalogCache();
 
   return {
     success: true,

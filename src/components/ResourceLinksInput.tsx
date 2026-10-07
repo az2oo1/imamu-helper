@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Trash2, Tag, Percent } from 'lucide-react';
+import { Button } from './ui/Button';
 
 export interface Link {
   name: string;
@@ -193,16 +194,16 @@ export default function ResourceLinksInput({ label, value, onChange, color, show
     <div className="space-y-2.5">
       <div className="flex justify-between items-center">
         <label className="block text-xs font-bold" style={{ color: 'var(--text-muted)' }}>{label}</label>
-        <button 
+        <Button 
           type="button" 
+          variant={isPaidColor ? "outline" : "secondary"}
+          size="xs"
           onClick={addLink}
-          className={`text-xs font-bold flex items-center gap-1 transition cursor-pointer hover:scale-[1.03] active:scale-95 ${
-            isPaidColor ? 'text-amber-600 hover:text-amber-500 dark:text-amber-400' : 'text-emerald-600 hover:text-emerald-500 dark:text-emerald-400'
-          }`}
+          leftIcon={<Plus className="w-3.5 h-3.5" />}
+          className={isPaidColor ? "text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/10" : "text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"}
         >
-          <Plus className="w-3.5 h-3.5" />
-          <span>+ إضافة رابط جديد</span>
-        </button>
+          إضافة رابط جديد
+        </Button>
       </div>
 
       {isPaidColor && (
@@ -301,14 +302,16 @@ export default function ResourceLinksInput({ label, value, onChange, color, show
                 )}
 
                 {/* Delete Button */}
-                <button
+                <Button
                   type="button"
+                  variant="destructive"
+                  size="icon-sm"
                   onClick={() => removeLink(i)}
-                  className="p-2 text-red-400 hover:bg-red-500/10 hover:text-red-600 rounded-xl shrink-0 transition self-start mt-0.5 cursor-pointer"
                   title="حذف هذا الرابط"
+                  className="shrink-0 self-start mt-0.5"
                 >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
               </motion.div>
             );
           })}
