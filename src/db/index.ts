@@ -58,6 +58,13 @@ const SCHEMA_VERIFICATION_STATEMENTS = [
     profile_pic_url text,
     created_at timestamp DEFAULT now()
   )`,
+  `CREATE TABLE IF NOT EXISTS verification_codes (
+    id serial PRIMARY KEY,
+    email text NOT NULL,
+    code text NOT NULL,
+    expires_at timestamp NOT NULL,
+    created_at timestamp DEFAULT now()
+  )`,
   `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS description text`,
   `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS syllabus text`,
   `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS tags text`,
