@@ -89,24 +89,24 @@ function DriveLinkButton({ boxLink }: { boxLink?: string }) {
         href={links[0].url}
         target="_blank"
         rel="noopener noreferrer"
-        className={buttonVariants({ variant: 'secondary', size: 'sm', className: 'group/btn' })}
+        className={buttonVariants({ variant: 'secondary', size: 'xs', className: 'group/btn flex-1 min-w-0 overflow-hidden' })}
       >
         <Folder className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-400 group-hover/btn:text-[var(--color-imamu-accent)] transition-colors" />
-        <span>الملفات</span>
+        <span className="truncate">الملفات</span>
       </a>
     );
   }
 
   // Multiple links (2 or more) -> fixed button label 'الملفات (N)', list in dropdown shows custom names
   return (
-    <div className={`relative inline-block text-right shrink-0 ${isOpen ? 'z-[100]' : 'z-20'}`} ref={dropdownRef}>
+    <div className={`relative inline-block text-right flex-1 min-w-0 ${isOpen ? 'z-[100]' : 'z-20'}`} ref={dropdownRef}>
       <button
         type="button"
         onClick={() => setIsOpen(prev => !prev)}
-        className={buttonVariants({ variant: 'secondary', size: 'sm', className: 'group/btn' })}
+        className={buttonVariants({ variant: 'secondary', size: 'xs', className: 'group/btn w-full min-w-0 overflow-hidden' })}
       >
         <Folder className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-400 group-hover/btn:text-[var(--color-imamu-accent)] transition-colors" />
-        <span>الملفات ({links.length})</span>
+        <span className="truncate">الملفات ({links.length})</span>
         <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? 'rotate-180 text-[var(--color-imamu-accent)]' : ''}`} />
       </button>
 
@@ -591,14 +591,15 @@ export function Resources() {
                     </div>
 
                     {/* Resource Links */}
-                    <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 dark:border-zinc-800/80 pt-3.5 mt-auto w-full relative z-20">
+                    <div className="flex flex-nowrap items-center gap-1.5 border-t border-slate-100 dark:border-zinc-800/80 pt-3.5 mt-auto w-full relative z-20">
                   <Button
                     variant="secondary"
-                    size="sm"
+                    size="xs"
+                    className="flex-1 min-w-0 overflow-hidden"
                     onClick={() => setSelectedCourse(item)}
                     leftIcon={<Info className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-400 group-hover:text-[var(--color-imamu-accent)] transition-colors" />}
                   >
-                    التفاصيل
+                    <span className="truncate">التفاصيل</span>
                   </Button>
 
                   <DriveLinkButton boxLink={item.boxLink} />
@@ -608,10 +609,10 @@ export function Resources() {
                       href={resolvedWaUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={buttonVariants({ variant: 'whatsapp', size: 'sm' })}
+                      className={buttonVariants({ variant: 'whatsapp', size: 'xs', className: 'flex-1 min-w-0 overflow-hidden' })}
                     >
                       <WhatsappIcon className="w-3.5 h-3.5 fill-current" />
-                      <span>واتساب</span>
+                      <span className="truncate">واتساب</span>
                     </a>
                   )}
                 </div>
