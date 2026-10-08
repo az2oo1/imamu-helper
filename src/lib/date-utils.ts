@@ -196,6 +196,39 @@ export function calculateProgressPercent(startInput: DateInput, endInput: DateIn
   return Math.min(100, Math.max(0, percent));
 }
 
+export interface ProgressMetrics {
+  totalDays: number;
+  passedDays: number;
+  remainingDays: number;
+  percent: number;
+}
+
+export function calculateProgressMetrics(
+  startInput: DateInput | null | undefined,
+  endInput: DateInput | null | undefined,
+  nowInput: DateInput = new Date()
+): ProgressMetrics {
+  const start = parseDate(startInput);
+  const end = parseDate(endInput);
+  const now = parseDate(nowInput) || new Date();
+
+  if (!start || !end || end.getTime() <= start.getTime()) {
+    return { totalDays: 0, passedDays: 0, remainingDays: 0, percent: 0 };
+  }
+
+  const dayMs = 86400000;
+  const totalDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / dayMs));
+  const passedDays = Math.max(0, Math.min(totalDays, Math.round((now.getTime() - start.getTime()) / dayMs)));
+  const remainingDays = Math.max(0, Math.round((end.getTime() - now.getTime()) / dayMs));
+
+  return {
+    totalDays,
+    passedDays,
+    remainingDays,
+    percent: Math.min(100, Math.max(0, Math.round((passedDays / totalDays) * 100)))
+  };
+}
+
 /**
  * 7. Category Descriptor Badge Helper
  */

@@ -353,14 +353,24 @@ export function WeeklySchedule({ sections, className = '', loading = false }: We
         }
       });
 
-      // Gaps between consecutive merged intervals
+      // Gaps between consecutive merged intervals. Account for the visual
+      // minimum height of short class cards when placing the label.
       for (let i = 0; i < merged.length - 1; i++) {
         const gapStart = merged[i].end;
         const gapEnd = merged[i + 1].start;
         const gapMinutes = gapEnd - gapStart;
         if (gapMinutes > 10) {
-          const top = getY(gapStart);
-          const bottom = getY(gapEnd);
+          const previousSlots = slots.filter(slot =>
+            slot.startMinutes < gapStart && slot.endMinutes === gapStart
+          );
+          const visualPreviousBottom = previousSlots.reduce((bottom, slot) => {
+            const slotTop = getY(slot.startMinutes) + 2;
+            const slotHeight = Math.max(58, getY(slot.endMinutes) - getY(slot.startMinutes) - 4);
+            return Math.max(bottom, slotTop + slotHeight);
+          }, getY(gapStart));
+          const top = visualPreviousBottom + 2;
+          const bottom = getY(gapEnd) - 2;
+          if (bottom <= top) continue;
           const height = bottom - top;
           const hrs = Math.floor(gapMinutes / 60);
           const mins = gapMinutes % 60;
@@ -583,7 +593,7 @@ export function WeeklySchedule({ sections, className = '', loading = false }: We
                     {(dayGaps[sd.key] || []).map((gap, gIdx) => (
                       <div
                         key={`gap_${gIdx}`}
-                        className="absolute inset-x-0 flex items-center justify-center pointer-events-none z-10"
+                        className="absolute inset-x-0 flex items-center justify-center pointer-events-none z-0"
                         style={{ top: `${gap.top}px`, height: `${gap.height}px` }}
                       >
                         <span className="text-[11px] font-bold text-slate-400/90 dark:text-zinc-500 tabular-nums select-none tracking-wide">

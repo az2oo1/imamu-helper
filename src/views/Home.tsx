@@ -32,7 +32,7 @@ import {
   formatDate,
   getCountdown, 
   calculateMokafaaDate, 
-  calculateProgressPercent 
+  calculateProgressMetrics
 } from '../lib/date-utils';
 import { useSWR } from '../lib/swr';
 
@@ -404,30 +404,25 @@ function CountdownsSection() {
   let mokafaaPercent = 0;
   if (nextMokafaaDate) {
     const prevMokafaaDate = calculateMokafaaDate(nextMokafaaDate.getFullYear(), nextMokafaaDate.getMonth() - 1);
-    mokafaaPercent = calculateProgressPercent(prevMokafaaDate, nextMokafaaDate, nowTime);
+    mokafaaPercent = calculateProgressMetrics(prevMokafaaDate, nextMokafaaDate, nowTime).percent;
   }
 
   // 2. Semester Percent
   let semesterPercent = 0;
   if (semesterStartDateObj && semesterTargetDate) {
-    semesterPercent = calculateProgressPercent(semesterStartDateObj, semesterTargetDate, nowTime);
-  } else if (semesterTargetDate) {
-    // Fallback: estimate progress relative to a 100-day term
-    const defaultStart = new Date(semesterTargetDate.getTime() - 100 * 24 * 60 * 60 * 1000);
-    semesterPercent = calculateProgressPercent(defaultStart, semesterTargetDate, nowTime);
+    semesterPercent = calculateProgressMetrics(semesterStartDateObj, semesterTargetDate, nowTime).percent;
   }
 
   // 3. Holiday Percent
   let holidayPercent = 0;
   if (isHolidayToday && activeHoliday && activeHoliday.endDate.getTime() > activeHoliday.startDate.getTime()) {
     // Ongoing multi-day vacation progress
-    holidayPercent = calculateProgressPercent(activeHoliday.startDate, activeHoliday.endDate, nowTime);
+    holidayPercent = calculateProgressMetrics(activeHoliday.startDate, activeHoliday.endDate, nowTime).percent;
   } else if (isHolidayToday) {
     holidayPercent = 100;
   } else if (nextHoliday) {
     const holidayTargetTime = nextHoliday.date;
-    const holidayStartTime = semesterStartDateObj || new Date(holidayTargetTime.getTime() - 30 * 24 * 60 * 60 * 1000);
-    holidayPercent = calculateProgressPercent(holidayStartTime, holidayTargetTime, nowTime);
+    holidayPercent = calculateProgressMetrics(semesterStartDateObj, holidayTargetTime, nowTime).percent;
   }
 
   return (

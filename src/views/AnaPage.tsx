@@ -14,7 +14,7 @@ import {
 import { SpotlightCard, AnimatedNumber, Button } from '../components/ui';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  parseDate, formatDate, getCountdown, calculateMokafaaDate
+  parseDate, formatDate, getCountdown, calculateMokafaaDate, calculateProgressMetrics
 } from '../lib/date-utils';
 import { useSWR } from '../lib/swr';
 import clsx from 'clsx';
@@ -387,7 +387,7 @@ const COURSE_COLORS = [
 // ─────────────────────────────────────────────
 function SegmentedBar({
   percent,
-  total = 34,
+  total = 21,
   filledColor = 'bg-[var(--color-imamu-accent)]',
 }: {
   percent: number;
@@ -396,13 +396,13 @@ function SegmentedBar({
 }) {
   const filled = Math.round((percent / 100) * total);
   return (
-    <div className="flex gap-[2px] items-center w-full">
+    <div className="flex gap-[5px] items-center w-full">
       {Array.from({ length: total }).map((_, i) => (
         <div
           key={i}
-          className={`flex-1 h-2 rounded-[1px] transition-colors ${
+          className={`flex-1 h-3 sm:h-4 rounded-[1.3px] transition-colors duration-300 ${
             i < filled
-              ? filledColor
+              ? `${filledColor} shadow-xs`
               : 'bg-slate-200 dark:bg-zinc-800'
           }`}
         />
@@ -465,7 +465,7 @@ function ProgressMetricCard({
       {/* Segmented bar + percent */}
       <div className="flex items-center gap-2.5">
         <div className="flex-1 min-w-0">
-          <SegmentedBar percent={percent} total={34} filledColor={barColor} />
+          <SegmentedBar percent={percent} filledColor={barColor} />
         </div>
         <span className="text-xs font-extrabold text-slate-900 dark:text-white w-9 text-left tabular-nums shrink-0">
           {percent}%
@@ -1248,24 +1248,8 @@ function SidebarInsights({
   const isUpcomingSemester = !!(startDay && todayDateOnly.getTime() < startDay.getTime());
   const isEndedSemester = !!(endDay && todayDateOnly.getTime() > endDay.getTime());
 
-  const totalDays = startDay && endDay
-    ? Math.max(1, Math.round((endDay.getTime() - startDay.getTime()) / 86400000))
-    : 115;
-  const passedDays = isUpcomingSemester
-    ? 0
-    : startDay
-      ? (isEndedSemester ? totalDays : Math.max(0, Math.round((todayDateOnly.getTime() - startDay.getTime()) / 86400000)))
-      : 0;
-  const remainingDays = isEndedSemester
-    ? 0
-    : endDay
-      ? Math.max(0, Math.round((endDay.getTime() - todayDateOnly.getTime()) / 86400000))
-      : 0;
-  const progressPercent = isUpcomingSemester
-    ? 0
-    : isEndedSemester
-      ? 100
-      : Math.min(100, Math.max(0, Math.round((passedDays / totalDays) * 100)));
+  const semesterProgress = calculateProgressMetrics(startDay, endDay, todayDateOnly);
+  const { totalDays, passedDays, remainingDays, percent: progressPercent } = semesterProgress;
 
   // 2. Mokafaa progress calculations
   const prevMokafaa = nextMokafaa
@@ -1281,37 +1265,25 @@ function SidebarInsights({
   const moStart = prevMokafaa ? new Date(prevMokafaa.getFullYear(), prevMokafaa.getMonth(), prevMokafaa.getDate()) : null;
   const moTarget = nextMokafaa ? new Date(nextMokafaa.getFullYear(), nextMokafaa.getMonth(), nextMokafaa.getDate()) : null;
 
-  const mokafaaTotalDays = moStart && moTarget
-    ? Math.max(1, Math.round((moTarget.getTime() - moStart.getTime()) / 86400000))
-    : 30;
-
-  const mokafaaPassedDays = moStart
-    ? Math.max(0, Math.min(mokafaaTotalDays, Math.round((todayDateOnly.getTime() - moStart.getTime()) / 86400000)))
-    : 25;
-
-  const mokafaaRemainingDays = moTarget
-    ? Math.max(0, Math.round((moTarget.getTime() - todayDateOnly.getTime()) / 86400000))
-    : 0;
-
-  const mokafaaPercent = Math.min(100, Math.max(0, Math.round((mokafaaPassedDays / mokafaaTotalDays) * 100)));
+  const mokafaaProgress = calculateProgressMetrics(moStart, moTarget, todayDateOnly);
+  const {
+    totalDays: mokafaaTotalDays,
+    passedDays: mokafaaPassedDays,
+    remainingDays: mokafaaRemainingDays,
+    percent: mokafaaPercent
+  } = mokafaaProgress;
 
   // 3. Next Vacation progress calculations
   const holTarget = nextHoliday ? new Date(nextHoliday.date.getFullYear(), nextHoliday.date.getMonth(), nextHoliday.date.getDate()) : null;
-  const holStart = startDay || (holTarget ? new Date(holTarget.getTime() - 30 * 86400000) : null);
+  const holStart = startDay;
   
-  const holidayTotalDays = holStart && holTarget
-    ? Math.max(1, Math.round((holTarget.getTime() - holStart.getTime()) / 86400000))
-    : 30;
-
-  const holidayPassedDays = holStart
-    ? Math.max(0, Math.min(holidayTotalDays, Math.round((todayDateOnly.getTime() - holStart.getTime()) / 86400000)))
-    : 25;
-
-  const holidayRemainingDays = holTarget
-    ? Math.max(0, Math.round((holTarget.getTime() - todayDateOnly.getTime()) / 86400000))
-    : 0;
-
-  const holidayPercent = Math.min(100, Math.max(0, Math.round((holidayPassedDays / holidayTotalDays) * 100)));
+  const holidayProgress = calculateProgressMetrics(holStart, holTarget, todayDateOnly);
+  const {
+    totalDays: holidayTotalDays,
+    passedDays: holidayPassedDays,
+    remainingDays: holidayRemainingDays,
+    percent: holidayPercent
+  } = holidayProgress;
 
   // 4. Upcoming exams from courses
   const upcomingExams = (activeSemester?.courses || [])
@@ -1948,17 +1920,19 @@ function SidebarInsights({
 
               <div className="flex flex-col divide-y divide-slate-100 dark:divide-zinc-800/60 max-h-[500px] overflow-y-auto pr-0.5 custom-scrollbar">
               {/* Semester End Progress Card */}
-              <ProgressMetricCard
-                icon="📚"
-                title="نهاية الفصل الدراسي"
-                passedDays={passedDays}
-                totalDays={totalDays}
-                remainingDays={remainingDays}
-                percent={progressPercent}
-                startDate={semesterStart || new Date(Date.now() - 25 * 86400000)}
-                endDate={semesterEnd || new Date(Date.now() + 112 * 86400000)}
-                remainingColor="text-[var(--color-imamu-accent)]"
-              />
+              {semesterStart && semesterEnd && (
+                <ProgressMetricCard
+                  icon="📚"
+                  title="نهاية الفصل الدراسي"
+                  passedDays={passedDays}
+                  totalDays={totalDays}
+                  remainingDays={remainingDays}
+                  percent={progressPercent}
+                  startDate={semesterStart}
+                  endDate={semesterEnd}
+                  remainingColor="text-[var(--color-imamu-accent)]"
+                />
+              )}
 
               {/* Vacation Card */}
               {activeHoliday && vacationEnd ? (() => {
@@ -1982,7 +1956,7 @@ function SidebarInsights({
                     barColor="bg-emerald-500"
                   />
                 );
-              })() : nextHoliday ? (
+              })() : nextHoliday && holStart ? (
                 <ProgressMetricCard
                   icon="🌴"
                   title={nextHoliday.title || 'أقرب إجازة'}
@@ -1990,24 +1964,26 @@ function SidebarInsights({
                   totalDays={holidayTotalDays}
                   remainingDays={holidayRemainingDays}
                   percent={holidayPercent}
-                  startDate={holStart || new Date(Date.now() - 25 * 86400000)}
+                  startDate={holStart}
                   endDate={nextHoliday.date}
                   remainingColor="text-[var(--color-imamu-accent)]"
                 />
               ) : null}
 
               {/* Next Mokafaa Progress Card */}
-              <ProgressMetricCard
-                icon="💰"
-                title="المكافأة الجامعية"
-                passedDays={mokafaaPassedDays}
-                totalDays={mokafaaTotalDays}
-                remainingDays={mokafaaRemainingDays}
-                percent={mokafaaPercent}
-                startDate={prevMokafaa || new Date(Date.now() - 25 * 86400000)}
-                endDate={nextMokafaa || new Date(Date.now() + 5 * 86400000)}
-                remainingColor="text-[var(--color-imamu-accent)]"
-              />
+              {prevMokafaa && nextMokafaa && (
+                <ProgressMetricCard
+                  icon="💰"
+                  title="المكافأة الجامعية"
+                  passedDays={mokafaaPassedDays}
+                  totalDays={mokafaaTotalDays}
+                  remainingDays={mokafaaRemainingDays}
+                  percent={mokafaaPercent}
+                  startDate={prevMokafaa}
+                  endDate={nextMokafaa}
+                  remainingColor="text-[var(--color-imamu-accent)]"
+                />
+              )}
             </div>
           </div>
         </div>
