@@ -836,7 +836,7 @@ export function Home() {
       <CountdownsSection />
 
       {/* Features Grid */}
-      <InView preset="fade-up" delay={0.2} className="w-full max-w-5xl px-4 mt-28 sm:mt-40">
+      <InView preset="fade-up" delay={0.2} className="w-full max-w-5xl px-4 mt-28 sm:mt-40 pb-16 sm:pb-24">
         <div className="flex flex-col items-center text-center mb-12 sm:mb-16">
           <h2 className="text-2xl sm:text-3xl font-serif font-extrabold text-slate-900 dark:text-white mb-3">
             جميع الخدمات في مكان واحد
@@ -846,7 +846,7 @@ export function Home() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8" dir="rtl">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-10" dir="rtl">
           {features.map((feat) => (
             <Link key={feat.id} href={feat.path} className="block group">
               <SpotlightCard 

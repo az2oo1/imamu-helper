@@ -797,15 +797,16 @@ export function CalendarPage() {
 
           <div className="flex items-center gap-2">
             {/* New Task Button */}
-            <button 
-              type="button"
+            <Button
               onClick={() => setIsTaskModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 transition-colors shadow-2xs border border-slate-200 dark:border-zinc-700 cursor-pointer shrink-0"
+              variant="secondary"
+              size="sm"
+              className="shrink-0"
+              leftIcon={<Plus className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />}
               title="إضافة مهمة جديدة"
             >
-              <Plus className="w-3.5 h-3.5 text-[var(--color-imamu-accent)]" />
-              <span>مهمة جديدة</span>
-            </button>
+              مهمة جديدة
+            </Button>
 
             {/* View Switcher: شهر | أسبوع */}
             <div className="flex bg-slate-100 dark:bg-zinc-950 p-1 rounded-2xl border border-slate-200 dark:border-zinc-800 shrink-0">
