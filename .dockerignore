@@ -6,4 +6,8 @@ npm-debug.log
 dist
 .git
 .github
+.data
+tests
+docs
+*.md
 .DS_Store

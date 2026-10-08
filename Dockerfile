@@ -40,13 +40,11 @@ COPY package*.json ./
 # Install only production dependencies
 RUN npm ci --omit=dev
 
-# Copy built artifacts from builder
+# Copy only runtime artifacts from builder
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/drizzle ./drizzle
-COPY --from=builder /app/src ./src
-COPY --from=builder /app/server.ts ./server.ts
 
 # Ensure runtime directories exist with appropriate ownership
 RUN mkdir -p /app/uploads /app/.data && chown -R node:node /app
