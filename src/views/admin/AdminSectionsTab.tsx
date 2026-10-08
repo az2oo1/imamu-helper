@@ -23,6 +23,7 @@ import {
   saveSharedFolders
 } from './admin-sections-model';
 import { SectionDetailsModal } from './SectionDetailsModal';
+import { Button } from '../../components/ui/Button';
 
 export default function AdminSectionsTab({
   getToken,
@@ -808,7 +809,7 @@ export default function AdminSectionsTab({
   return (
     <div className="space-y-6 animate-fadeIn" dir="rtl">
       {/* Top View Toggle: Sections vs Teachers */}
-      <div className="flex items-center justify-between flex-wrap gap-3 pb-2 border-b border-slate-200 dark:border-zinc-800">
+      <div className="rounded-2xl border px-5 py-4 flex items-center justify-between flex-wrap gap-3" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
         <div className="flex items-center gap-2.5">
           {activeSubTab === 'teachers' ? (
             <>
@@ -843,10 +844,13 @@ export default function AdminSectionsTab({
 
         <div className="flex items-center gap-2 flex-wrap">
           {activeSubTab === 'sections' && grandTotalSections > 0 && selectedFolder === null && (
-            <button
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              rounded="xl"
               onClick={handleDeleteAllSections}
               disabled={isDeletingAll}
-              className="flex items-center gap-1.5 px-3 py-2 bg-rose-600/10 hover:bg-rose-600 text-rose-600 hover:text-white border border-rose-500/30 font-bold text-xs rounded-xl transition cursor-pointer disabled:opacity-50"
               title="حذف ومسح جميع الشعب الدراسية"
             >
               {isDeletingAll ? (
@@ -855,27 +859,32 @@ export default function AdminSectionsTab({
                 <Trash2 className="w-3.5 h-3.5" />
               )}
               <span>حذف جميع الشعب</span>
-            </button>
+            </Button>
           )}
-          <button
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            rounded="xl"
             onClick={openAddTermModal}
-            className="flex items-center gap-2 px-4 py-2 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl transition shadow-md border border-amber-700/30 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>إضافة فصل دراسي</span>
-          </button>
-          <button
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            rounded="xl"
             onClick={() => {
               if (activeSubTab === 'teachers') fetchTeachers();
               else { fetchSections(); fetchTerms(); fetchBannerTerms(); }
             }}
             disabled={loading || teachersLoading || bannerTermsLoading}
-            className="p-2 rounded-xl border transition hover:bg-slate-100 dark:hover:bg-zinc-800 cursor-pointer shadow-xs"
-            style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
             title="تحديث البيانات"
           >
             <RefreshCw className={`w-4 h-4 ${(loading || teachersLoading || bannerTermsLoading) ? 'animate-spin' : ''}`} />
-          </button>
+          </Button>
         </div>
       </div>
 

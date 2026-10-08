@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { matchArabicSearch } from '../../lib/search-utils';
 
-export type Tab = 'dashboard' | 'users' | 'contributors' | 'news_sources' | 'majors' | 'events' | 'subjects' | 'sections' | 'teachers' | 'resources' | 'tutorials' | 'feedback' | 'settings' | 'logs';
+export type Tab = 'dashboard' | 'users' | 'contributors' | 'news_sources' | 'majors' | 'events' | 'subjects' | 'sections' | 'teachers' | 'resources' | 'academic' | 'tutorials' | 'feedback' | 'settings' | 'logs';
 
 export interface SearchResultItem {
   id: string;

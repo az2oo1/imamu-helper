@@ -328,7 +328,7 @@ export function NewsPage() {
   const showAccounts = searchFilter === 'accounts';
 
   return (
-    <div className="flex flex-col flex-1 w-full pb-24 px-4 sm:px-6 lg:px-8 pt-8 relative max-w-7xl mx-auto text-right min-h-screen" dir="rtl">
+    <div className="flex flex-col flex-1 min-w-0 w-full max-w-full overflow-x-hidden pb-24 px-4 sm:px-6 lg:px-8 pt-8 relative max-w-7xl mx-auto text-right min-h-screen" dir="rtl">
       
       {/* Page Header */}
       <div className="mb-6 relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -336,8 +336,8 @@ export function NewsPage() {
           <span className="text-xs sm:text-sm font-semibold tracking-widest text-[var(--color-imamu-accent)] uppercase mb-1 block">
             التحديثات والحسابات الرسمية
           </span>
-          <h1 className="text-3xl sm:text-4xl font-serif font-bold tracking-tight text-slate-900 dark:text-white mb-2">أخبار وحسابات جامعة الإمام</h1>
-          <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-xl">
+          <h1 className="text-2xl min-[380px]:text-3xl sm:text-4xl font-serif font-bold tracking-tight text-slate-900 dark:text-white mb-2 break-words">أخبار وحسابات جامعة الإمام</h1>
+          <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-xl break-words">
             متابعة التحديثات والأخبار الأكاديمية والبحث الشامل في المقالات والحسابات الرسمية الموثقة.
           </p>
         </div>
@@ -502,10 +502,10 @@ export function NewsPage() {
 
       {/* Main Content Layout: Main Grid vs Sidebar Widgets */}
       {showArticles && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <div className="grid min-w-0 w-full grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
           {/* Main Articles Area */}
-          <div className="lg:col-span-8 space-y-8 w-full">
+          <div className="lg:col-span-8 space-y-8 w-full min-w-0">
             
             {/* Featured Hero Card (Only when not searching or on main view) */}
             {!isSearching && featuredItem && (
@@ -648,7 +648,7 @@ export function NewsPage() {
             </div>
 
             {/* News Grid Section */}
-            <InView preset="fade-up" delay={0.2} className="w-full">
+            <InView preset="fade-up" delay={0.2} className="w-full min-w-0">
               <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
                 <span>{isSearching ? `نتائج الأخبار (${filteredNews.length})` : 'أحدث التحديثات'}</span>
                 <div className="h-px bg-slate-200 dark:bg-zinc-800 flex-1 mr-3" />
@@ -659,8 +659,8 @@ export function NewsPage() {
                   لا توجد أخبار تطابق المعايير المحددة حالياً.
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                  <div className="flex flex-col gap-6 w-full">
+                <div className="grid min-w-0 grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                  <div className="flex flex-col gap-6 w-full min-w-0">
                     {filteredNews.filter((_, idx) => idx % 2 === 0).map((item) => (
                       <SpotlightCard
                         key={item.id}
@@ -764,7 +764,7 @@ export function NewsPage() {
                     ))}
                   </div>
 
-                  <div className="flex flex-col gap-6 w-full">
+                  <div className="flex flex-col gap-6 w-full min-w-0">
                     {filteredNews.filter((_, idx) => idx % 2 === 1).map((item) => (
                       <SpotlightCard
                         key={item.id}
@@ -874,7 +874,7 @@ export function NewsPage() {
           </div>
 
           {/* Right Sidebar Column (Widget: Top 10 Accounts) - Direct on Background */}
-          <div className="lg:col-span-4 space-y-8 w-full sticky top-24">
+          <div className="lg:col-span-4 space-y-8 w-full min-w-0 sticky top-24">
             {/* Widget: Top 10 Authenticated Accounts - Direct on Background */}
             <InView preset="fade-up" delay={0.15}>
               <div className="py-2 pt-2">

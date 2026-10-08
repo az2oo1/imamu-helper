@@ -48,7 +48,7 @@ export function SpotlightCard({
       onClick={onClick}
       whileHover={{ borderColor: effectiveHoverBorder }}
       transition={{ duration: 0.2 }}
-      className={`relative rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-2xs ${className}`}
+      className={`relative min-w-0 max-w-full rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-2xs ${className}`}
     >
       {/* Radial Spotlight overlay */}
       <motion.div

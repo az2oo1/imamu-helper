@@ -25,11 +25,13 @@ import AdminFeedbackTab from './admin/AdminFeedbackTab';
 import AdminSettingsTab from './admin/AdminSettingsTab';
 import AdminSectionsTab from './admin/AdminSectionsTab';
 import AdminMajorsTab from './admin/AdminMajorsTab';
+import AdminAcademicHubTab from './admin/AdminAcademicHubTab';
+import { Button } from '../components/ui/Button';
 import CommandPalette from './admin/CommandPalette';
 import { matchArabicSearch } from '../lib/search-utils';
 import { parseDate, formatDate, getEventCategoryMeta } from '../lib/date-utils';
 
-type Tab = 'dashboard' | 'users' | 'contributors' | 'news_sources' | 'majors' | 'events' | 'subjects' | 'sections' | 'teachers' | 'resources' | 'tutorials' | 'feedback' | 'settings' | 'logs';
+type Tab = 'dashboard' | 'users' | 'contributors' | 'news_sources' | 'majors' | 'events' | 'subjects' | 'sections' | 'teachers' | 'resources' | 'academic' | 'tutorials' | 'feedback' | 'settings' | 'logs';
 
 interface Toast {
   id: string;
@@ -121,6 +123,10 @@ export function AdminPage() {
   const [resourcesList, setResourcesList] = useState<any[]>([]);
   const [resourceSearch, setResourceSearch] = useState('');
   const [resourceFilterType, setResourceFilterType] = useState('ALL');
+  const [resourceFilterWhatsapp, setResourceFilterWhatsapp] = useState('ALL');
+  const [resourceFilterFiles, setResourceFilterFiles] = useState('ALL');
+  const [resourceFilterCourses, setResourceFilterCourses] = useState('ALL');
+  const [resourceFilterLinkCount, setResourceFilterLinkCount] = useState('ALL');
   const [globalSettings, setGlobalSettings] = useState<any>({ fetchRangeDays: 30, autoDeleteDays: 30 });
   const [telegramChannelInput, setTelegramChannelInput] = useState('');
   const [isExtractingTelegram, setIsExtractingTelegram] = useState(false);
@@ -236,7 +242,7 @@ export function AdminPage() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get('tab') as Tab;
-      if (tabParam && ['dashboard', 'users', 'contributors', 'news_sources', 'majors', 'events', 'subjects', 'sections', 'teachers', 'resources', 'tutorials', 'feedback', 'settings', 'logs'].includes(tabParam)) {
+      if (tabParam && ['dashboard', 'users', 'contributors', 'news_sources', 'majors', 'events', 'academic', 'tutorials', 'feedback', 'settings', 'logs'].includes(tabParam)) {
         setActiveTab(tabParam);
       }
     }
@@ -259,10 +265,7 @@ export function AdminPage() {
     { id: 'news_sources', label: 'حسابات الجهات', icon: <Shield className="w-5 h-5" /> },
     { id: 'majors', label: 'التخصصات الأكاديمية', icon: <GraduationCap className="w-5 h-5" /> },
     { id: 'events', label: 'المواعيد والتقويم', icon: <Calendar className="w-5 h-5" /> },
-    { id: 'subjects', label: 'المقررات الأكاديمية', icon: <BookOpen className="w-5 h-5" /> },
-    { id: 'sections', label: 'الشعب والمواعيد', icon: <Layers className="w-5 h-5" /> },
-    { id: 'teachers', label: 'هيئة التدريس', icon: <UserCheck className="w-5 h-5" /> },
-    { id: 'resources', label: 'المصادر والمراجع', icon: <Folder className="w-5 h-5" /> },
+    { id: 'academic', label: 'الأكاديميا الموحدة', icon: <GraduationCap className="w-5 h-5" /> },
     { id: 'tutorials', label: 'إدارة شروحات الدليلة', icon: <HelpCircle className="w-5 h-5" /> },
     { id: 'feedback', label: 'البلاغات والتقييمات', icon: <MessageSquare className="w-5 h-5" /> },
     { id: 'settings', label: 'الإعدادات العامة', icon: <Settings className="w-5 h-5" /> },
@@ -286,8 +289,7 @@ export function AdminPage() {
     if (!userPerms || userPerms.length === 0 || userPerms.includes('*') || userPerms.includes('all')) return true;
     if (tabId === 'dashboard') return true;
     if (tabId === 'users' || tabId === 'contributors') return userPerms.includes('users') || userPerms.includes('contributors');
-    if (tabId === 'majors' || tabId === 'subjects' || tabId === 'sections' || tabId === 'teachers') return userPerms.includes('courses') || userPerms.includes('teachers');
-    if (tabId === 'resources') return userPerms.includes('resources');
+    if (tabId === 'academic') return userPerms.includes('resources') || userPerms.includes('courses') || userPerms.includes('teachers');
     if (tabId === 'events') return userPerms.includes('dates');
     if (tabId === 'news_sources') return userPerms.includes('news');
     if (tabId === 'tutorials' || tabId === 'feedback') return userPerms.includes('tutorials') || userPerms.includes('feedback');
@@ -582,7 +584,11 @@ export function AdminPage() {
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>إنشاء وتعيين الحسابات الرسمية، ربط المستخدمين، وإدارة المزامنة التلقائية مع قنوات تيليجرام</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <button
+          <Button
+            type="button"
+            variant="whatsapp"
+            size="sm"
+            rounded="xl"
             onClick={() => {
               setEditingAccount(null);
               setIsCreateAccountModalOpen(true);
@@ -591,7 +597,7 @@ export function AdminPage() {
           >
             <Plus className="w-4 h-4" />
             <span>إنشاء حساب موثق جديد</span>
-          </button>
+          </Button>
           
           <button
             disabled={isFetchingAll}
@@ -624,7 +630,11 @@ export function AdminPage() {
               من خلال النافذة المنبثقة، يمكنك تعيين عدة مدراء بـ User UID وإضافة عدة قنوات تليقرام للسحب التلقائي.
             </p>
 
-            <button
+            <Button
+              type="button"
+              variant="whatsapp"
+              size="sm"
+              rounded="xl"
               onClick={() => {
                 setEditingAccount(null);
                 setIsCreateAccountModalOpen(true);
@@ -633,7 +643,7 @@ export function AdminPage() {
             >
               <Plus className="w-4 h-4" />
               <span>فتح نافذة إنشاء حساب موثق</span>
-            </button>
+            </Button>
           </div>
 
           {/* Telegram Extractor Quick Tools */}
@@ -727,7 +737,11 @@ export function AdminPage() {
                         <span>لوحة التحكم</span>
                       </button>
 
-                      <button
+                      <Button
+                        type="button"
+                        variant="whatsapp"
+                        size="sm"
+                        rounded="xl"
                         onClick={() => {
                           setEditingAccount(s);
                           setIsCreateAccountModalOpen(true);
@@ -737,7 +751,7 @@ export function AdminPage() {
                       >
                         <Edit3 className="w-3.5 h-3.5" />
                         <span>تعديل</span>
-                      </button>
+                      </Button>
 
                       <button onClick={() => handleDelete(`/api/admin/news_sources/${s.id}`, `@${s.handle}`)} className="p-1.5 rounded-xl hover:bg-red-500/10 transition" title="حذف الحساب">
                         <Trash2 className="w-4 h-4 text-red-400" />
@@ -980,7 +994,7 @@ export function AdminPage() {
                       </div>
 
                       <div className="flex items-center gap-1">
-                        <button 
+                        <Button
                           onClick={() => {
                             setEventForm({
                               id: e.id,
@@ -1006,15 +1020,15 @@ export function AdminPage() {
                           style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
                         >
                           تعديل
-                        </button>
+                        </Button>
 
-                        <button 
+                        <Button
                           onClick={() => handleDelete(`/api/admin/events/${e.id}`, e.title)} 
                           className="p-2 rounded-xl transition hover:bg-red-500/10 cursor-pointer text-red-400"
                           title="حذف الموعد"
                         >
                           <Trash2 className="w-4 h-4" />
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -1054,42 +1068,37 @@ export function AdminPage() {
   // ============================================================================
   const renderSubjects = () => (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="rounded-2xl border px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
         <div>
-          <h3 className="text-2xl font-serif font-bold" style={{ color: 'var(--text-main)' }}>Academic Courses (المقررات والمواد)</h3>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Manage course metadata, credits, level, syllabus, and basic info</p>
+          <h3 className="text-2xl font-serif font-bold" style={{ color: 'var(--text-main)' }}>المقررات والمواد الأكاديمية</h3>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>إدارة بيانات المقررات والساعات والمستويات والخطط الدراسية</p>
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setActiveTab('sections')}
-            className="flex items-center gap-2 px-3.5 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 font-semibold text-xs sm:text-sm rounded-xl transition border border-indigo-500/20 shrink-0"
-          >
-            <Layers className="w-4 h-4" />
-            <span>إدارة الشعب والمواعيد</span>
-          </button>
-
-          <button
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            rounded="xl"
             onClick={() => {
               setSubjectForm({ 
                 id: undefined, code: '', name: '', creditHours: '3', level: '', college: '', department: '', prereq: '', whatsappLink: '', description: '', syllabus: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', tags: '' 
               });
               setIsCourseModalOpen(true);
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-[var(--color-imamu-brown)] hover:bg-[var(--color-imamu-brown-dark)] active:scale-95 text-white font-semibold text-xs sm:text-sm rounded-xl transition shadow-sm border border-amber-700/30 shrink-0"
           >
             <Plus className="w-4 h-4" />
-            <span>Create New Course</span>
-          </button>
+            <span>إضافة مقرر جديد</span>
+          </Button>
         </div>
 
       </div>
 
       <div className="rounded-2xl border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-        <div className="px-5 py-4 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3" style={{ borderColor: 'var(--border-color)' }}>
-          <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>Current Courses ({subjects.length})</h4>
+        <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+          <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>المقررات الحالية ({subjects.length})</h4>
           <div className="flex items-center gap-2">
-            <input type="text" placeholder="Search courses..." value={subjectSearch} onChange={e => setSubjectSearch(e.target.value)} className="flex-1 sm:w-64 py-1.5 px-3 rounded-xl text-xs border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+            <input type="text" placeholder="البحث في المقررات..." value={subjectSearch} onChange={e => setSubjectSearch(e.target.value)} className="flex-1 sm:w-64 py-1.5 px-3 rounded-xl text-xs border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
             <select value={subjectLimit} onChange={e => setSubjectLimit(Number(e.target.value))} className="py-1.5 px-2.5 rounded-xl text-xs border" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>
               <option value={10}>10</option><option value={20}>20</option><option value={50}>50</option><option value={1000}>All</option>
             </select>
@@ -1110,8 +1119,8 @@ export function AdminPage() {
                 <div className="flex-1 min-w-0 space-y-1">
                   <div className="font-bold text-sm truncate" style={{ color: 'var(--text-main)' }}>{s.name}</div>
                   <div className="flex items-center gap-2 flex-wrap text-xs" style={{ color: 'var(--text-muted)' }}>
-                    <span>{s.creditHours || 3} Hours</span>
-                    {s.level && <span>• Level {s.level}</span>}
+                    <span>{s.creditHours || 3} ساعات</span>
+                    {s.level && <span>• المستوى {s.level}</span>}
                     {s.college && (
                       <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
                         {s.college}
@@ -1128,13 +1137,17 @@ export function AdminPage() {
                         <span className="truncate max-w-xs">متطلب: {s.prereq}</span>
                       </span>
                     )}
-                    {s.tags && <span className="text-slate-400">• Tags: {s.tags}</span>}
+                    {s.tags && <span className="text-slate-400">• الوسوم: {s.tags}</span>}
                   </div>
                 </div>
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                <button 
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  rounded="xl"
                   onClick={() => {
                     setSubjectForm({ 
                       id: s.id, 
@@ -1154,22 +1167,21 @@ export function AdminPage() {
                       tags: s.tags || ''
                     });
                     setIsCourseModalOpen(true);
-                  }} 
-                  className="px-3 py-1.5 rounded-xl border text-xs font-bold transition hover:bg-[var(--color-imamu-brown-light)]/10 text-[var(--color-imamu-accent)] border-amber-700/30"
+                  }}
                 >
-                  Edit Course
-                </button>
+                  تعديل المقرر
+                </Button>
 
-                <button 
+                <Button
                   onClick={() => handleDelete(`/api/admin/subjects/${s.id}`, s.name)} 
                   className="p-2 rounded-xl transition hover:bg-red-500/10 text-red-400"
                 >
                   <Trash2 className="w-4 h-4" />
-                </button>
+                </Button>
               </div>
             </div>
           ))}
-          {subjects.length === 0 && <div className="py-12 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No courses added yet.</div>}
+          {subjects.length === 0 && <div className="py-12 text-center text-sm" style={{ color: 'var(--text-muted)' }}>لم تتم إضافة مقررات بعد.</div>}
         </div>
       </div>
 
@@ -1196,32 +1208,35 @@ export function AdminPage() {
   // ============================================================================
   const renderResources = () => (
     <div className="space-y-6" dir="rtl">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="rounded-2xl border px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
         <div>
           <h3 className="text-2xl font-serif font-bold" style={{ color: 'var(--text-main)' }}>المصادر والمراجع الأكاديمية</h3>
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>إدارة الدرايفات والملخصات والاختبارات السابقة وروابط المواد التعليمية</p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
-          <button
+          <Button
+            type="button"
+            variant="whatsapp"
+            size="sm"
+            rounded="xl"
             onClick={() => {
               setResourceForm({ title: '', type: 'course_hub', url: '', description: '', boxLink: '', whatsappLink: '', freeResourcesUrl: '', paidResourcesUrl: '', avatarUrl: '', sectionsEnabled: true });
               setIsResourceModalOpen(true);
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl transition shadow-sm border border-emerald-500/30 shrink-0 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>إضافة مصدر جديد</span>
-          </button>
+          </Button>
         </div>
       </div>
 
       <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-        <div className="px-5 py-4 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3" style={{ borderColor: 'var(--border-color)' }}>
+        <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
           <h4 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>
             المصادر المتاحة ({resourcesList.length})
           </h4>
-          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-2 flex-wrap">
             <input
               type="text"
               placeholder="بحث في المصادر..."
@@ -1245,18 +1260,75 @@ export function AdminPage() {
               <option value="whatsapp">مجموعة واتساب</option>
               <option value="telegram">قناة تيليجرام</option>
             </select>
+            {[
+              { label: 'واتساب', value: resourceFilterWhatsapp, setValue: setResourceFilterWhatsapp },
+              { label: 'روابط الملفات', value: resourceFilterFiles, setValue: setResourceFilterFiles },
+              { label: 'روابط الدورات', value: resourceFilterCourses, setValue: setResourceFilterCourses }
+            ].map(filter => {
+              const nextValue = filter.value === 'ALL' ? 'HAS' : filter.value === 'HAS' ? 'NONE' : 'ALL';
+              const stateLabel = filter.value === 'HAS' ? 'نعم' : filter.value === 'NONE' ? 'لا' : 'الكل';
+              return (
+                <button
+                  key={filter.label}
+                  type="button"
+                  onClick={() => filter.setValue(nextValue)}
+                  className={`inline-flex items-center gap-1.5 py-1.5 px-2.5 rounded-xl text-xs border transition ${
+                    filter.value === 'HAS'
+                      ? 'text-emerald-600 border-emerald-500/40 bg-emerald-500/10'
+                      : filter.value === 'NONE'
+                        ? 'text-red-500 border-red-500/30 bg-red-500/10'
+                        : 'text-slate-500'
+                  }`}
+                  style={filter.value === 'ALL' ? { background: 'var(--bg-subtle)', borderColor: 'var(--border-color)' } : undefined}
+                  title="اضغط للتبديل بين نعم، لا، والكل"
+                >
+                  <span className="inline-flex h-3.5 w-3.5 items-center justify-center rounded border text-[10px] font-black">
+                    {filter.value === 'HAS' ? '✓' : filter.value === 'NONE' ? '×' : ''}
+                  </span>
+                  {filter.label}: {stateLabel}
+                </button>
+              );
+            })}
+            <select
+              value={resourceFilterLinkCount}
+              onChange={e => setResourceFilterLinkCount(e.target.value)}
+              className="py-1.5 px-2.5 rounded-xl text-xs border outline-none"
+              style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
+            >
+              <option value="ALL">عدد الروابط: الكل</option>
+              <option value="0">0 روابط</option>
+              <option value="1">رابط واحد</option>
+              <option value="2">رابطان</option>
+              <option value="3+">3 روابط فأكثر</option>
+            </select>
           </div>
         </div>
 
         <div className="divide-y divide-slate-100 dark:divide-zinc-800/60">
           {resourcesList
             .filter(r => {
+              const countLinks = (value: unknown) => {
+                if (!value || typeof value !== 'string') return 0;
+                const matches = value.match(/(?:https?:\/\/|www\.)[^\s)]+/gi);
+                return matches ? matches.length : 0;
+              };
+              const whatsappCount = countLinks(r.whatsappLink || r.whatsappUrl);
+              const fileCount = countLinks(r.fileUrl || r.driveUrl || r.url) + countLinks(r.boxLink);
+              const courseCount = countLinks(r.freeResourcesUrl) + countLinks(r.paidResourcesUrl);
+              const totalLinkCount = whatsappCount + fileCount + courseCount;
               const matchSearch = !resourceSearch || 
                 r.title?.toLowerCase().includes(resourceSearch.toLowerCase()) || 
                 r.courseCode?.toLowerCase().includes(resourceSearch.toLowerCase()) || 
                 r.courseName?.toLowerCase().includes(resourceSearch.toLowerCase());
               const matchType = resourceFilterType === 'ALL' || r.type === resourceFilterType;
-              return matchSearch && matchType;
+              const matchesPresence = (filter: string, count: number) => filter === 'ALL' || (filter === 'HAS' ? count > 0 : count === 0);
+              const matchesLinkCount = resourceFilterLinkCount === 'ALL' ||
+                (resourceFilterLinkCount === '3+' ? totalLinkCount >= 3 : totalLinkCount === Number(resourceFilterLinkCount));
+              return matchSearch && matchType &&
+                matchesPresence(resourceFilterWhatsapp, whatsappCount) &&
+                matchesPresence(resourceFilterFiles, fileCount) &&
+                matchesPresence(resourceFilterCourses, courseCount) &&
+                matchesLinkCount;
             })
             .map(r => (
               <div key={r.id} className="p-4 flex items-center justify-between gap-4 transition hover:bg-slate-100/60 dark:hover:bg-zinc-800/60">
@@ -1275,39 +1347,25 @@ export function AdminPage() {
 
                   {r.description && <p className="text-xs mt-1 text-slate-400 line-clamp-2">{r.description}</p>}
                   
-                  {/* Badges for attached links */}
-                  <div className="flex items-center gap-2 mt-2 flex-wrap text-[11px]">
-                    {(r.fileUrl || r.driveUrl || r.url) && (
-                      <a
-                        href={r.fileUrl || r.driveUrl || r.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[var(--color-imamu-accent)] hover:underline flex items-center gap-1 font-mono"
-                      >
-                        <ExternalLink className="w-3 h-3" /> Link
-                      </a>
-                    )}
-                    {r.boxLink && (
-                      <a
-                        href={r.boxLink}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-sky-400 hover:underline flex items-center gap-1 font-mono"
-                      >
-                        <ExternalLink className="w-3 h-3" /> Box
-                      </a>
-                    )}
-                    {r.whatsappLink && (
-                      <a
-                        href={r.whatsappLink}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-emerald-400 hover:underline flex items-center gap-1 font-mono"
-                      >
-                        <ExternalLink className="w-3 h-3" /> WhatsApp
-                      </a>
-                    )}
-                  </div>
+                  {(() => {
+                    const countLinks = (value: unknown) => {
+                      if (!value || typeof value !== 'string') return 0;
+                      const matches = value.match(/(?:https?:\/\/|www\.)[^\s)]+/gi);
+                      return matches ? matches.length : 0;
+                    };
+                    const whatsappCount = countLinks(r.whatsappLink || r.whatsappUrl);
+                    const fileCount = countLinks(r.fileUrl || r.driveUrl || r.url) + countLinks(r.boxLink);
+                    const courseCount = countLinks(r.freeResourcesUrl) + countLinks(r.paidResourcesUrl);
+                    const totalLinkCount = whatsappCount + fileCount + courseCount;
+                    return (
+                      <div className="flex items-center gap-1.5 mt-2 flex-wrap text-[11px]">
+                        {whatsappCount > 0 && <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">واتساب ({whatsappCount})</span>}
+                        {fileCount > 0 && <span className="px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-500 border border-sky-500/20">ملفات ({fileCount})</span>}
+                        {courseCount > 0 && <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">دورات ({courseCount})</span>}
+                        <span className="px-2 py-0.5 rounded-full bg-slate-500/10 text-slate-500 border border-slate-500/20">الروابط ({totalLinkCount})</span>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
@@ -1406,10 +1464,13 @@ export function AdminPage() {
       case 'news_sources': return renderNewsSources();
       case 'majors': return renderMajors();
       case 'events': return renderEvents();
-      case 'subjects': return renderSubjects();
-      case 'sections': return <AdminSectionsTab getToken={getToken} toast={toast} defaultSubTab="sections" />;
-      case 'teachers': return <AdminSectionsTab getToken={getToken} toast={toast} defaultSubTab="teachers" />;
-      case 'resources': return renderResources();
+      case 'academic': return (
+        <AdminAcademicHubTab
+          teachersContent={<AdminSectionsTab getToken={getToken} toast={toast} defaultSubTab="teachers" />}
+          subjectsContent={renderSubjects()}
+          resourcesContent={renderResources()}
+        />
+      );
       case 'tutorials': return <TutorialsTab user={user} sections={tutorialSections} tutorials={tutorials} onRefresh={fetchData} />;
       case 'feedback': return <AdminFeedbackTab getToken={getToken} />;
       case 'settings': return (

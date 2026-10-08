@@ -38,6 +38,13 @@ interface CourseDetailsModalProps {
   initialData?: any;
 }
 
+function formatCreditHours(value: number | string): string {
+  const hours = Number(value);
+  if (hours === 1) return 'ساعة';
+  if (hours === 2) return 'ساعتان';
+  return `${hours} ساعات`;
+}
+
 function CourseAvatar({ avatarUrl, bannerUrl, name }: { avatarUrl?: string; whatsappUrl?: string; bannerUrl?: string; name?: string }) {
   const [hasError, setHasError] = useState(false);
 
@@ -186,13 +193,14 @@ function CourseContentDetails({
     }
   };
 
-  const isNonCourseRes = course.isAcademicSubject === false || course.code === 'مجموعة طلابية' || course.code === 'مصدر أكاديمي' || (!course.subjectId && (!course.code || course.code === 'مجموعة طلابية' || course.code === 'مصدر أكاديمي'));
+  const isGroupResource = course.type === 'group' || course.type === 'whatsapp' || course.code === 'مجموعة طلابية';
+  const isNonCourseRes = course.isAcademicSubject === false || isGroupResource || course.code === 'مصدر أكاديمي' || (!course.subjectId && (!course.code || course.code === 'مجموعة طلابية' || course.code === 'مصدر أكاديمي'));
 
   const rawCode = course.code ? course.code.replace(/^مصادر مادة\s*/i, '').replace(/^مادة\s*/i, '').trim() : '';
   const decodedCourseTitle = decodeHtmlEntities(course.name || course.title);
   const rawName = decodedCourseTitle ? decodedCourseTitle.replace(/^مصادر مادة\s+مادة\s*/gi, '').replace(/^مصادر مادة\s*/gi, '').trim() : '';
   
-  const displayCode = isNonCourseRes ? rawCode : (normalizeCourseCode(rawCode) || rawCode.replace(/\s*\([^)]*\)/g, '').trim());
+  const displayCode = isGroupResource ? 'مجموعة طلابية' : (isNonCourseRes ? rawCode : (normalizeCourseCode(rawCode) || rawCode.replace(/\s*\([^)]*\)/g, '').trim()));
   const displayName = isNonCourseRes ? (rawName || decodedCourseTitle) : (rawName.replace(/\s*\([^)]*\)/g, '').trim() || decodedCourseTitle);
 
   const isAcademicSubject = !isNonCourseRes && course.isAcademicSubject !== false && Boolean(
@@ -308,12 +316,12 @@ function CourseContentDetails({
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
         <div>
           <div className="flex flex-wrap items-center gap-1.5 mb-2.5 min-h-[30px]">
-            {course.creditHours ? (
+            {course.creditHours && !isGroupResource ? (
               <span className="flex items-center gap-1 px-2.5 py-0.5 bg-slate-100 dark:bg-zinc-800/80 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700/80 text-xs font-bold rounded-md shadow-2xs shrink-0 whitespace-nowrap">
                 <Clock className="w-3 h-3 text-[var(--color-imamu-accent)] shrink-0" />
-                <span>{course.creditHours} ساعات</span>
+                <span>{formatCreditHours(course.creditHours)}</span>
               </span>
-            ) : detailsLoading && course.isAcademicSubject !== false ? (
+            ) : detailsLoading && course.isAcademicSubject !== false && !isGroupResource ? (
               <span 
                 className="flex items-center gap-1 px-2.5 py-0.5 bg-slate-100 dark:bg-zinc-800/80 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700/80 text-xs font-bold rounded-md shadow-2xs shrink-0 whitespace-nowrap animate-pulse select-none"
                 title="جاري التحميل..."
@@ -323,7 +331,7 @@ function CourseContentDetails({
               </span>
             ) : null}
 
-            {displayCode && displayCode !== 'مادة' && displayCode !== 'مصدر أكاديمي' && displayCode !== 'مجموعة طلابية' && displayCode !== displayName && (
+            {displayCode && displayCode !== 'مادة' && displayCode !== 'مصدر أكاديمي' && displayCode !== displayName && (
               <span className="px-2.5 py-0.5 bg-slate-100 dark:bg-zinc-800/80 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700/80 text-xs font-mono font-bold rounded-md shadow-2xs shrink-0 whitespace-nowrap" dir="ltr">
                 {displayCode}
               </span>
@@ -355,7 +363,7 @@ function CourseContentDetails({
             href={parsedWa.url}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer shrink-0 self-start sm:self-center"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all duration-200 hover:scale-[1.04] active:scale-95 cursor-pointer shrink-0 self-end -mt-2 sm:mt-0 sm:self-center"
           >
             <WhatsappIcon className="w-4 h-4 fill-current" />
             <span>واتساب</span>
@@ -365,18 +373,19 @@ function CourseContentDetails({
 
       {/* Tabs Header */}
       <LayoutGroup id="courseDetailsModalTabs">
-        <div className="relative flex flex-wrap items-center gap-1 border-b border-slate-200 dark:border-zinc-800/80 mb-6 pb-0" dir="rtl">
+        <div className="relative flex flex-nowrap items-center gap-0.5 sm:gap-1 border-b border-slate-200 dark:border-zinc-800/80 mb-6 pb-0 overflow-hidden" dir="rtl">
           <button
             type="button"
             onClick={() => setActiveTab('overview')}
-            className={`relative pb-3 px-4 font-bold transition-colors duration-200 text-xs sm:text-sm flex items-center gap-2 select-none cursor-pointer ${
+            aria-label="نظرة عامة"
+            className={`relative flex-1 min-w-0 justify-center pb-3 px-0.5 sm:px-4 font-bold transition-colors duration-200 text-[9px] min-[380px]:text-[10px] sm:text-sm flex items-center gap-0.5 sm:gap-2 select-none cursor-pointer ${
               activeTab === 'overview'
                 ? 'text-[var(--color-imamu-accent)]'
                 : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
             }`}
           >
             <BookOpen className={`w-4 h-4 transition-colors ${activeTab === 'overview' ? 'text-[var(--color-imamu-accent)]' : 'text-slate-400 dark:text-zinc-500'}`} />
-            <span>نظرة عامة</span>
+            <span className="truncate">نظرة عامة</span>
             {activeTab === 'overview' && (
               <motion.div
                 layoutId="modalActiveTabUnderline"
@@ -391,14 +400,15 @@ function CourseContentDetails({
           <button
             type="button"
             onClick={() => setActiveTab('explanations')}
-            className={`relative pb-3 px-4 font-bold transition-colors duration-200 text-xs sm:text-sm flex items-center gap-2 select-none cursor-pointer ${
+            aria-label={`الشروحات (${explanationsCount})`}
+            className={`relative flex-1 min-w-0 justify-center pb-3 px-0.5 sm:px-4 font-bold transition-colors duration-200 text-[9px] min-[380px]:text-[10px] sm:text-sm flex items-center gap-0.5 sm:gap-2 select-none cursor-pointer ${
               activeTab === 'explanations'
                 ? 'text-[var(--color-imamu-accent)]'
                 : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
             }`}
           >
             <Video className={`w-4 h-4 transition-colors ${activeTab === 'explanations' ? 'text-[var(--color-imamu-accent)]' : 'text-slate-400 dark:text-zinc-500'}`} />
-            <span>الشروحات ({explanationsCount})</span>
+            <span className="truncate">الشروحات ({explanationsCount})</span>
             {activeTab === 'explanations' && (
               <motion.div
                 layoutId="modalActiveTabUnderline"
@@ -411,14 +421,15 @@ function CourseContentDetails({
           <button
             type="button"
             onClick={() => setActiveTab('files')}
-            className={`relative pb-3 px-4 font-bold transition-colors duration-200 text-xs sm:text-sm flex items-center gap-2 select-none cursor-pointer ${
+            aria-label={`الملفات (${filesCount})`}
+            className={`relative flex-1 min-w-0 justify-center pb-3 px-0.5 sm:px-4 font-bold transition-colors duration-200 text-[9px] min-[380px]:text-[10px] sm:text-sm flex items-center gap-0.5 sm:gap-2 select-none cursor-pointer ${
               activeTab === 'files'
                 ? 'text-[var(--color-imamu-accent)]'
                 : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
             }`}
           >
             <Folder className={`w-4 h-4 transition-colors ${activeTab === 'files' ? 'text-[var(--color-imamu-accent)]' : 'text-slate-400 dark:text-zinc-500'}`} />
-            <span>الملفات ({filesCount})</span>
+            <span className="truncate">الملفات ({filesCount})</span>
             {activeTab === 'files' && (
               <motion.div
                 layoutId="modalActiveTabUnderline"
@@ -432,14 +443,15 @@ function CourseContentDetails({
             <button
               type="button"
               onClick={() => setActiveTab('syllabus')}
-              className={`relative pb-3 px-4 font-bold transition-colors duration-200 text-xs sm:text-sm flex items-center gap-2 select-none cursor-pointer ${
+              aria-label="توصيف المقرر"
+              className={`relative flex-1 min-w-0 justify-center pb-3 px-0.5 sm:px-4 font-bold transition-colors duration-200 text-[9px] min-[380px]:text-[10px] sm:text-sm flex items-center gap-0.5 sm:gap-2 select-none cursor-pointer ${
                 activeTab === 'syllabus'
                   ? 'text-[var(--color-imamu-accent)]'
                   : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
               }`}
             >
               <FileText className={`w-4 h-4 transition-colors ${activeTab === 'syllabus' ? 'text-[var(--color-imamu-accent)]' : 'text-slate-400 dark:text-zinc-500'}`} />
-              <span>توصيف المقرر</span>
+              <span className="truncate">توصيف المقرر</span>
               {activeTab === 'syllabus' && (
                 <motion.div
                   layoutId="modalActiveTabUnderline"
@@ -744,7 +756,7 @@ function CourseContentDetails({
 
 function buildInitialCourse(initialData: any, courseIdOrCode: any) {
   if (!initialData) return null;
-  const isNonCourseInitial = !initialData.subjectId || initialData.isAcademicSubject === false || initialData.courseCode === 'مجموعة طلابية' || initialData.courseCode === 'مصدر أكاديمي';
+  const isNonCourseInitial = !initialData.subjectId || initialData.isAcademicSubject === false || initialData.type === 'group' || initialData.type === 'whatsapp' || initialData.courseCode === 'مجموعة طلابية' || initialData.courseCode === 'مصدر أكاديمي';
   return {
     id: initialData.subjectId || initialData.id,
     subjectId: initialData.subjectId || null,
@@ -752,6 +764,7 @@ function buildInitialCourse(initialData: any, courseIdOrCode: any) {
     name: initialData.title || initialData.name || initialData.courseName,
     title: initialData.title || initialData.name,
     isAcademicSubject: !isNonCourseInitial,
+    type: initialData.type || null,
     avatarUrl: initialData.avatarUrl || null,
     bannerUrl: initialData.bannerUrl || null,
     whatsappLink: initialData.whatsappLink || initialData.whatsappUrl || null,
@@ -811,7 +824,9 @@ export function CourseDetailsModal({ isOpen, onClose, courseIdOrCode, initialDat
     const updateHeight = () => {
       if (element) {
         const fullHeight = element.scrollHeight;
-        const maxHeight = window.innerHeight * 0.85 - 144;
+        const maxHeight = window.innerWidth < 640
+          ? window.innerHeight - 144
+          : window.innerHeight * 0.85 - 144;
         setContentHeight(Math.min(fullHeight, maxHeight));
       }
     };
@@ -941,7 +956,7 @@ export function CourseDetailsModal({ isOpen, onClose, courseIdOrCode, initialDat
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 24 }}
           transition={{ type: 'spring', stiffness: 380, damping: 32 }}
-          className="relative bg-white dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800 rounded-t-3xl sm:rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] z-10"
+          className="relative bg-white dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800 rounded-none sm:rounded-3xl w-full h-[100dvh] sm:h-auto max-w-xl overflow-hidden shadow-2xl flex flex-col max-h-none sm:max-h-[92vh] z-10"
         >
           {/* Back Button if navigated */}
           {navHistory.length > 0 && (
@@ -997,7 +1012,7 @@ export function CourseDetailsModal({ isOpen, onClose, courseIdOrCode, initialDat
             transition={{ duration: 0.28, ease: [0.4, 0.2, 0.2, 1] }}
             className="overflow-hidden"
           >
-            <div ref={contentRef} className="pt-10 px-6 pb-6 overflow-y-auto max-h-[calc(85vh-9rem)] custom-scrollbar">
+            <div ref={contentRef} className="pt-10 px-4 sm:px-6 pb-6 overflow-y-auto max-h-[calc(100dvh-9rem)] sm:max-h-[calc(85vh-9rem)] custom-scrollbar">
               {loading ? (
                 <div className="space-y-6 animate-pulse" dir="rtl">
                   <div className="flex items-center justify-between gap-4">

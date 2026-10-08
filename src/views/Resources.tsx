@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../lib/AuthContext';
-import { BookOpen, Search, ExternalLink, Folder, Plus, Trash2, Pencil, Info, MessageCircle, ChevronDown } from 'lucide-react';
+import { BookOpen, Search, ExternalLink, Folder, Plus, Info, MessageCircle, ChevronDown } from 'lucide-react';
 import { WhatsappIcon } from '../components/WhatsappIcon';
 import { InView, SpotlightCard, CustomSelect, Button, buttonVariants } from '../components/ui';
 import { CourseDetailsModal } from '../components/CourseDetailsModal';
@@ -563,35 +563,13 @@ export function Resources() {
                         </span>
                         <div className="flex items-center gap-2">
                           <span className="text-[11px] text-slate-500 dark:text-zinc-400 font-medium">{item.major}</span>
-                          {isAdmin && (
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openEditModal(item);
-                                }}
-                                className="p-1 text-slate-400 hover:text-[var(--color-imamu-accent)] hover:bg-[var(--color-imamu-brown)]/10 rounded-lg transition cursor-pointer"
-                                title="تعديل هذا المصدر"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteResource(item.id);
-                                }}
-                                className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition cursor-pointer"
-                                title="حذف هذا المصدر"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          )}
                           <ReportDropdownMenu
                             targetType="resource"
                             targetId={item.id}
                             targetTitle={item.title}
                             user={user}
+                            onEdit={isAdmin ? () => openEditModal(item) : undefined}
+                            onDelete={isAdmin ? () => handleDeleteResource(item.id) : undefined}
                             buttonClassName="p-1 text-slate-400 hover:text-[var(--color-imamu-accent)] hover:bg-[var(--color-imamu-brown)]/10 rounded-lg transition cursor-pointer"
                           />
                         </div>
@@ -671,5 +649,3 @@ export function Resources() {
     </div>
   );
 }
-
-
