@@ -34,18 +34,28 @@ export default function AdminAcademicHubTab({
         </p>
       </div>
 
-      <div className="flex items-center gap-1 sm:gap-2 flex-nowrap border-b overflow-hidden" style={{ borderColor: 'var(--border-color)' }}>
+      <div
+        className="grid grid-cols-3 gap-1.5 sm:gap-2 rounded-2xl border p-1.5 sm:p-2"
+        style={{
+          borderColor: 'var(--border-color)',
+          backgroundColor: 'color-mix(in srgb, var(--bg-card) 88%, var(--bg-subtle))'
+        }}
+        role="tablist"
+        aria-label="أقسام الأكاديميا"
+      >
         {tabs.map(tab => (
           <Button
             key={tab.id}
             type="button"
             variant={activeTab === tab.id ? 'accent' : 'ghost'}
-            size="sm"
+            size="md"
             rounded="xl"
-            className="min-w-0 flex-1 px-1 text-[9px] min-[380px]:text-[10px] sm:px-3 sm:text-xs"
+            className="min-w-0 w-full min-h-11 px-1.5 text-[10px] leading-tight min-[380px]:text-[11px] sm:px-3 sm:text-xs"
             onClick={() => setActiveTab(tab.id)}
+            role="tab"
+            aria-selected={activeTab === tab.id}
           >
-            <span className="truncate">{tab.label}</span>
+            <span className="whitespace-normal">{tab.label}</span>
           </Button>
         ))}
       </div>

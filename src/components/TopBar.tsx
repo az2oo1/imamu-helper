@@ -202,7 +202,7 @@ export function TopBar() {
                           dir="rtl"
                         >
                           <UserCircle2 className="w-4 h-4 text-slate-400 dark:text-zinc-400" />
-                          إعدادات الملف الشخصي
+                          الملف الشخصي
                         </Link>
                         <Link 
                           href={managedAccounts.length > 0 ? `/@/${encodeURIComponent(managedAccounts[0].handle.replace(/^@/, ''))}/dashboard` : '/profile'} 
@@ -363,31 +363,6 @@ export function TopBar() {
                         <span className="text-xs text-slate-500 dark:text-zinc-400 truncate">{dbUser?.major || 'طالب'}</span>
                       </div>
                     </div>
-                    <Link
-                      href={managedAccounts.length > 0 ? `/@/${encodeURIComponent(managedAccounts[0].handle.replace(/^@/, ''))}/dashboard` : '/profile'}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40 font-bold text-xs hover:bg-emerald-100 dark:hover:bg-emerald-950/50 transition cursor-pointer"
-                    >
-                      <Building2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                      <span>لوحة تحكم الجهة</span>
-                    </Link>
-                    {isAdmin && (
-                      <Link
-                        href="/admin"
-                        onClick={() => setMobileMenuOpen(false)}
-                        className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/40 font-bold text-xs hover:bg-indigo-100 dark:hover:bg-indigo-950/50 transition cursor-pointer"
-                      >
-                        <ShieldCheck className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                        <span>لوحة التحكم والإدارة</span>
-                      </Link>
-                    )}
-                    <button
-                      onClick={() => { signOut(); setMobileMenuOpen(false); }}
-                      className="flex w-full justify-center items-center gap-2 rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40 px-4 py-2.5 text-xs font-bold text-red-600 dark:text-red-400 transition hover:bg-red-100 cursor-pointer"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      تسجيل الخروج
-                    </button>
                   </>
                 ) : (
                   <Link

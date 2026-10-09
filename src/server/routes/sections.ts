@@ -100,20 +100,34 @@ export function aggregateTeachersFromSections(sections: any[]) {
   }>();
 
   for (const rawSec of sections) {
-    const sec = formatSectionRow(rawSec);
-    const instructorsList = [...(sec.instructors || [])];
-    if (instructorsList.length === 0 && sec.primaryInstructor && sec.primaryInstructor !== 'غير محدد') {
+    let instructorsList: any[] = [];
+    try {
+      if (typeof rawSec.instructors === 'string' && rawSec.instructors.startsWith('[')) {
+        instructorsList = JSON.parse(rawSec.instructors);
+      } else if (Array.isArray(rawSec.instructors)) {
+        instructorsList = rawSec.instructors;
+      }
+    } catch {
+      instructorsList = [];
+    }
+    if (instructorsList.length === 0 && rawSec.primaryInstructor && rawSec.primaryInstructor !== 'غير محدد') {
       instructorsList.push({
-        name: sec.primaryInstructor,
-        email: sec.primaryInstructorEmail || null
+        name: rawSec.primaryInstructor,
+        email: rawSec.primaryInstructorEmail || null
       });
     }
 
-    const courseCode = String(sec.courseCode || 'بدون رمز').trim();
-    const courseTitle = String(sec.courseTitle || courseCode).trim();
-    const crn = String(sec.crn || '').trim();
-    const sectionNumber = String(sec.sectionNumber || '').trim();
-    const campus = sec.campus ? String(sec.campus).trim() : null;
+    const courseCode = String(rawSec.courseCode || 'بدون رمز').trim();
+    const courseTitle = String(rawSec.courseTitle || courseCode).trim();
+    const crn = String(rawSec.crn || '').trim();
+    const sectionNumber = String(rawSec.sectionNumber || '').trim();
+    const campus = rawSec.campus ? String(rawSec.campus).trim() : null;
+    let schedules: any[] = [];
+    try {
+      schedules = normalizeFormattedSchedules(rawSec.schedules);
+    } catch {
+      schedules = [];
+    }
 
     const sectionObj = {
       crn,
@@ -121,13 +135,13 @@ export function aggregateTeachersFromSections(sections: any[]) {
       courseCode,
       courseTitle,
       campus,
-      instructionalMethod: sec.instructionalMethod || sec.scheduleType || null,
-      creditHours: Number(sec.creditHours) || 3,
-      schedules: sec.schedules || [],
-      scheduleSummary: sec.scheduleSummary || null,
-      academicYear: sec.academicYear || null,
-      semester: sec.semester || null,
-      term: sec.term || null
+      instructionalMethod: rawSec.instructionalMethod || rawSec.scheduleType || null,
+      creditHours: Number(rawSec.creditHours) || 3,
+      schedules,
+      scheduleSummary: rawSec.scheduleSummary || null,
+      academicYear: rawSec.academicYear || null,
+      semester: rawSec.semester || null,
+      term: rawSec.term || null
     };
 
     for (const inst of instructorsList) {
@@ -577,6 +591,9 @@ export function createSectionsRouter(db: any) {
   // ============================================================================
   // 6.5. ADMIN: GET /admin/teachers - Faculty & instructors aggregated from sections
   // ============================================================================
+  const adminTeachersCache = new Map<string, { expiresAt: number; payload: any }>();
+  const ADMIN_TEACHERS_CACHE_TTL = 60 * 1000;
+
   router.get('/admin/teachers', requireAuth, async (req: AuthRequest, res: express.Response): Promise<any> => {
     if (!(await checkAdmin(req, db))) return res.status(403).json({ error: 'Admin only' });
     try {
@@ -584,6 +601,11 @@ export function createSectionsRouter(db: any) {
       const academicYear = String(req.query.academicYear || '').trim();
       const semester = String(req.query.semester || '').trim();
       const campus = String(req.query.campus || '').trim();
+      const cacheKey = JSON.stringify({ term, academicYear, semester, campus });
+      const cached = adminTeachersCache.get(cacheKey);
+      if (cached && cached.expiresAt > Date.now()) {
+        return res.json(cached.payload);
+      }
 
       let conditions: any[] = [];
       if (term && term !== 'all') conditions.push(eq(course_sections.term, term));
@@ -594,18 +616,36 @@ export function createSectionsRouter(db: any) {
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
       const items = await db
-        .select()
+        .select({
+          crn: course_sections.crn,
+          sectionNumber: course_sections.sectionNumber,
+          courseCode: course_sections.courseCode,
+          courseTitle: course_sections.courseTitle,
+          academicYear: course_sections.academicYear,
+          semester: course_sections.semester,
+          term: course_sections.term,
+          campus: course_sections.campus,
+          scheduleType: course_sections.scheduleType,
+          instructionalMethod: course_sections.instructionalMethod,
+          creditHours: course_sections.creditHours,
+          instructors: course_sections.instructors,
+          primaryInstructor: course_sections.primaryInstructor,
+          schedules: course_sections.schedules,
+          scheduleSummary: course_sections.scheduleSummary
+        })
         .from(course_sections)
         .where(whereClause);
 
       const teachers = aggregateTeachersFromSections(items);
 
-      res.json({
+      const payload = {
         success: true,
         teachers,
         totalTeachers: teachers.length,
         totalSections: items.length
-      });
+      };
+      adminTeachersCache.set(cacheKey, { expiresAt: Date.now() + ADMIN_TEACHERS_CACHE_TTL, payload });
+      res.json(payload);
     } catch (err: any) {
       console.error('[Admin Teachers Error]', err);
       res.status(500).json({ error: 'Failed to fetch teachers' });

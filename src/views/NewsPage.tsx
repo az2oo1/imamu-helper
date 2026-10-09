@@ -328,7 +328,7 @@ export function NewsPage() {
   const showAccounts = searchFilter === 'accounts';
 
   return (
-    <div className="flex flex-col flex-1 min-w-0 w-full max-w-full overflow-x-hidden pb-24 px-4 sm:px-6 lg:px-8 pt-8 relative max-w-7xl mx-auto text-right min-h-screen" dir="rtl">
+    <div className="flex flex-col flex-1 min-w-0 w-full overflow-x-hidden pb-24 pt-8 relative mx-auto text-right min-h-screen" dir="rtl">
       
       {/* Page Header */}
       <div className="mb-6 relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-4">

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../lib/AuthContext';
 import { useTheme, COLOR_PRESETS } from '../lib/ThemeContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronDown, ChevronUp, UserCircle2, Mail, Phone, BookOpen, Calculator, Clock, CheckCircle2, AlertCircle, Loader2, Camera, GraduationCap, Settings, Sparkles, ArrowUpRight, Palette, Check, Sun, Moon, ExternalLink } from 'lucide-react';
+import { ChevronDown, ChevronUp, UserCircle2, Mail, Phone, BookOpen, Calculator, Clock, CheckCircle2, AlertCircle, Loader2, Camera, GraduationCap, Sparkles, ArrowUpRight, Palette, Check, Sun, Moon, ExternalLink } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AnimatedNumber } from '../components/ui';
 
@@ -36,7 +36,6 @@ export function ProfilePage() {
     userName: dbUser?.userName || '',
   });
 
-  const [activeTab, setActiveTab] = useState<'profile'>('profile');
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
   const [phoneEditable, setPhoneEditable] = useState(false);
 
@@ -221,32 +220,6 @@ export function ProfilePage() {
 
         {/* Right Side: Form & Progress */}
         <div className="w-full flex-1 min-w-0">
-          {/* Animated Tab Bar with Icons & Direct Link to Ana */}
-          <div className="relative flex items-center gap-1 border-b border-slate-200 dark:border-zinc-800/80 mb-8 pb-0" dir="rtl">
-            <button 
-              type="button"
-              className="relative pb-3.5 px-4 font-bold text-sm flex items-center gap-2 select-none cursor-pointer text-[var(--color-imamu-accent)]"
-            >
-              <Settings className="w-4.5 h-4.5 text-[var(--color-imamu-accent)]" />
-              <span>إعدادات الحساب</span>
-              <motion.div
-                layoutId="profileActiveTabUnderline"
-                className="absolute bottom-0 right-0 left-0 h-0.5 bg-[var(--color-imamu-brown)] dark:bg-[var(--color-imamu-brown)] rounded-full shadow-xs shadow-[var(--color-imamu-brown)/20]"
-                transition={{ type: "spring", stiffness: 400, damping: 32 }}
-              />
-            </button>
-
-            <button 
-              type="button"
-              onClick={() => router.push('/ana?tab=progress')} 
-              className="relative pb-3.5 px-4 font-bold transition-colors duration-200 text-sm flex items-center gap-2 select-none cursor-pointer text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200 group"
-            >
-              <GraduationCap className="w-4.5 h-4.5 text-slate-400 dark:text-zinc-500 group-hover:text-slate-800 dark:group-hover:text-zinc-200 transition-colors" />
-              <span>التقدم والمقررات</span>
-              <ArrowUpRight className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 group-hover:text-slate-800 dark:group-hover:text-zinc-200 transition-colors -mr-1" />
-            </button>
-          </div>
-
           <AnimatePresence>
             {feedback && (
               <motion.div
